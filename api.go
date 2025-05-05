@@ -10,11 +10,12 @@ import (
 type Envelope struct {
 	ID         ID
 	Value      []byte    `json:",omitzero"`
-	Source     string    `json:",omitzero"`
+	Provider   string    `json:",omitzero"`
 	Version    string    `json:",omitzero"`
 	Error      string    `json:",omitzero"`
 	CreatedAt  time.Time `json:",omitzero"`
 	ResolvedAt time.Time `json:",omitzero"`
+	ExpiresAt  time.Time `json",omitzero"`
 }
 
 func Handler(provider SecretProvider) (string, http.Handler) {
