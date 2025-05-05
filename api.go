@@ -15,7 +15,7 @@ type Envelope struct {
 	Error      string    `json:",omitzero"`
 	CreatedAt  time.Time `json:",omitzero"`
 	ResolvedAt time.Time `json:",omitzero"`
-	ExpiresAt  time.Time `json",omitzero"`
+	ExpiresAt  time.Time `json:",omitzero"`
 }
 
 func Handler(provider SecretProvider) (string, http.Handler) {
