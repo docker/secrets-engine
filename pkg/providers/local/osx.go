@@ -1,7 +1,7 @@
 //go:build darwin && cgo
 // +build darwin,cgo
 
-package main
+package local
 
 import (
 	"fmt"

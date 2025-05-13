@@ -27,8 +27,11 @@ func (id ID) Valid() error {
 	if !validIdentifier(string(id)) {
 		return fmt.Errorf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", id)
 	}
+
 	return nil
 }
+
+func (id ID) String() string { return string(id) }
 
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
 // Rules:
