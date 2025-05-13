@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-var ErrNotFound = errors.New("secret not found")
+var (
+	ErrNotFound     = errors.New("secret not found")
+	ErrAccessDenied = errors.New("access denied") // nuh, uh, uh!
+)
 
 type Request struct {
 	ID ID `json:",omitzero"`
