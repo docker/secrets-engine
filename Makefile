@@ -3,6 +3,7 @@ GIT_TAG?=dev
 CLI_EXPERIMENTS_EXTENSION_IMAGE?=docker/secrets-engine-extension
 GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.mod")
 
+export NRI_PLUGIN_BINARY := nri-secrets-engine
 
 ifeq ($(OS),Windows_NT)
 	WINDOWS = $(OS)
@@ -23,6 +24,7 @@ BUILDER=buildx-multiarch
 
 DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
+          			--build-arg NRI_PLUGIN_BINARY \
           			--build-arg GIT_TAG
 
 GO_TEST := go test
@@ -45,10 +47,16 @@ lint: multiarch-builder ## Lint code
 
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
-	@sh -c "rm $(DOCKER_X_CLI_PLUGIN_DST) $(DOCKER_MCP_CLI_PLUGIN_DST)"
 
 unit-tests:
 	CGO_ENABLED=0 go test -v -tags="gen" ./...
+
+nri-plugin:
+	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w ${GO_LDFLAGS}" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
+
+nri-plugin-cross: multiarch-builder
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-nri-plugin --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
