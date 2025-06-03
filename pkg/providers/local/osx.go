@@ -1,5 +1,4 @@
 //go:build darwin && cgo
-// +build darwin,cgo
 
 package local
 
@@ -7,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/secrets-engine/pkg/secrets"
 	"github.com/keybase/go-keychain"
+
+	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 const (
