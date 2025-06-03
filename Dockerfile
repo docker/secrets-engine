@@ -35,3 +35,29 @@ RUN gofmt -s -w .
 
 FROM scratch AS format
 COPY --from=do-format /app .
+
+FROM base AS build-nri-plugin
+ARG TARGETOS
+ARG TARGETARCH
+ARG GO_LDFLAGS
+ARG NRI_PLUGIN_BINARY
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-s -w ${GO_LDFLAGS}" -o /out/${NRI_PLUGIN_BINARY} ./cmd/nri-plugin
+
+FROM scratch AS binary-nri-plugin-unix
+ARG NRI_PLUGIN_BINARY
+COPY --link --from=build-nri-plugin /out/${NRI_PLUGIN_BINARY} /
+FROM binary-nri-plugin-unix AS binary-nri-plugin-darwin
+FROM binary-nri-plugin-unix AS binary-nri-plugin-linux
+FROM scratch AS binary-nri-plugin-windows
+ARG NRI_PLUGIN_BINARY
+COPY --link --from=build-nri-plugin /out/${NRI_PLUGIN_BINARY} /${NRI_PLUGIN_BINARY}.exe
+FROM binary-nri-plugin-$TARGETOS AS binary-nri-plugin
+FROM --platform=$BUILDPLATFORM alpine AS packager-nri-plugin
+WORKDIR /nri-plugin
+ARG NRI_PLUGIN_BINARY
+RUN --mount=from=binary-nri-plugin mkdir -p /out && cp ${NRI_PLUGIN_BINARY}* /out/
+FROM scratch AS package-nri-plugin
+COPY --from=packager-nri-plugin /out .
