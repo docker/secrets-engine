@@ -1,0 +1,40 @@
+linters:
+  enable-all: false
+  disable-all: true
+  enable:
+    - errcheck
+    - gocyclo
+    - gofmt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - nolintlint
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+linters-settings:
+  gocritic:
+    disabled-checks:
+      - dupArg
+      - assignOp
+      - captLocal
+      - ifElseChain
+      - singleCaseSwitch
+      - dupSubExpr
+      - appendAssign
+      - exitAfterDefer
+      - unslice
+  gocyclo:
+    min-complexity: 16
+  goimports:
+    local-prefixes: github.com/docker/secrets-engine
+  lll:
+    line-length: 200
+
