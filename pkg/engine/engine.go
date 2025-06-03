@@ -63,13 +63,13 @@ func envelopeErr(req secrets.Request, err error) secrets.Envelope {
 }
 
 type pluginRegistration struct {
-	name     string
-	version  string
+	name string
+	//version  string
 	pattern  string
 	provider secrets.Resolver
 }
 
-func (e *Engine) Register(name, version, pattern string, provider secrets.Resolver) error {
+func (e *Engine) Register(name, _, pattern string, provider secrets.Resolver) error {
 	if slices.ContainsFunc(e.plugins, func(pr pluginRegistration) bool {
 		return pr.name == name
 	}) {
@@ -86,7 +86,7 @@ func (e *Engine) Register(name, version, pattern string, provider secrets.Resolv
 }
 
 func (e *Engine) RegisterHandler() (string, http.Handler) {
-	return "/secrets/register", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return "/secrets/register", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("not implemented")
 	})
 }
@@ -96,7 +96,7 @@ func (e *Engine) Handler() (string, http.Handler) {
 
 	mux.Handle(handlers.Resolver(e))
 	mux.Handle(e.RegisterHandler())
-	mux.Handle("/secrets", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/secrets", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	}))
 

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+
 	"github.com/docker/secrets-engine/pkg/handlers"
 	"github.com/docker/secrets-engine/pkg/providers/local"
 	"github.com/docker/secrets-engine/pkg/secrets"
