@@ -8,6 +8,7 @@ on:
         default: "main"
       tag:
         description: "Release Tag"
+        required: true
 permissions:
   id-token: write
   contents: write
@@ -40,11 +41,10 @@ jobs:
         run: make BUILDER=${{ steps.buildx.outputs.name }} nri-plugin-package
 
       - name: Ship it
-        if: ${{ github.event.inputs.tag != '' }} # don't release if no tag is specified
         uses: ncipollo/release-action@v1
         with:
           artifacts: "./dist/*.tar.gz"
-          prerelease: true
           draft: false
           tag: ${{ github.event.inputs.tag }}
           commit: ${{ github.event.inputs.branch }}
+          generateReleaseNotes: true
