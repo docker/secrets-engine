@@ -9,6 +9,7 @@ on:
       tag:
         description: "Release Tag"
 permissions:
+  id-token: write
   contents: write
 
 jobs:
@@ -18,13 +19,6 @@ jobs:
     env:
       GITHUB_WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - name: Generate app token
-        uses: tibdex/github-app-token@v1
-        id: generate_token
-        with:
-          app_id: ${{ vars.DESKTOP_GITHUB_CONTENT_APP_ID }}
-          private_key: ${{ secrets.DESKTOP_GITHUB_CONTENT_APP_SECRET }}
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -52,6 +46,5 @@ jobs:
           artifacts: "./dist/*.tar.gz"
           prerelease: true
           draft: false
-          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event.inputs.tag }}
           commit: ${{ github.event.inputs.branch }}
