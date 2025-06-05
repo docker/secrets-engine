@@ -4,12 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
-	"log/slog"
 	"os"
 
 	"github.com/containerd/nri/pkg/api"
 	"github.com/containerd/nri/pkg/stub"
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 )
 
@@ -24,6 +23,7 @@ type plugin struct {
 
 var (
 	cfg config
+	log *logrus.Logger
 )
 
 var (
@@ -44,7 +44,7 @@ var (
 )
 
 func (p *plugin) Configure(_ context.Context, config, runtime, version string) (stub.EventMask, error) {
-	slog.Info(fmt.Sprintf("Connected to %s/%s...", runtime, version))
+	log.Infof("Connected to %s/%s...", runtime, version)
 
 	if config == "" {
 		return 0, nil
@@ -55,38 +55,38 @@ func (p *plugin) Configure(_ context.Context, config, runtime, version string) (
 		return 0, fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
-	slog.Info(fmt.Sprintf("Got configuration data %+v...", cfg))
+	log.Info(fmt.Sprintf("Got configuration data %+v...", cfg))
 
 	return 0, nil
 }
 
 func (p *plugin) Synchronize(_ context.Context, pods []*api.PodSandbox, containers []*api.Container) ([]*api.ContainerUpdate, error) {
-	slog.Info(fmt.Sprintf("Synchronized state with the runtime (%d pods, %d containers)...",
-		len(pods), len(containers)))
+	log.Infof("Synchronized state with the runtime (%d pods, %d containers)...",
+		len(pods), len(containers))
 	return nil, nil
 }
 
 func (p *plugin) Shutdown(_ context.Context) {
-	slog.Info("Runtime shutting down...")
+	log.Info("Runtime shutting down...")
 }
 
 func (p *plugin) RunPodSandbox(_ context.Context, pod *api.PodSandbox) error {
-	slog.Info(fmt.Sprintf("Started pod %s/%s...", pod.GetNamespace(), pod.GetName()))
+	log.Infof("Started pod %s/%s...", pod.GetNamespace(), pod.GetName())
 	return nil
 }
 
 func (p *plugin) StopPodSandbox(_ context.Context, pod *api.PodSandbox) error {
-	slog.Info(fmt.Sprintf("Stopped pod %s/%s...", pod.GetNamespace(), pod.GetName()))
+	log.Infof("Stopped pod %s/%s...", pod.GetNamespace(), pod.GetName())
 	return nil
 }
 
 func (p *plugin) RemovePodSandbox(_ context.Context, pod *api.PodSandbox) error {
-	slog.Info(fmt.Sprintf("Removed pod %s/%s...", pod.GetNamespace(), pod.GetName()))
+	log.Infof("Removed pod %s/%s...", pod.GetNamespace(), pod.GetName())
 	return nil
 }
 
 func (p *plugin) CreateContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
-	slog.Info(fmt.Sprintf("Creating container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Creating container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 
 	//
 	// This is the container creation request handler. Because the container
@@ -107,22 +107,22 @@ func (p *plugin) CreateContainer(_ context.Context, pod *api.PodSandbox, ctr *ap
 }
 
 func (p *plugin) PostCreateContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) error {
-	slog.Info(fmt.Sprintf("Created container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Created container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 	return nil
 }
 
 func (p *plugin) StartContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) error {
-	slog.Info(fmt.Sprintf("Starting container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Starting container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 	return nil
 }
 
 func (p *plugin) PostStartContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) error {
-	slog.Info(fmt.Sprintf("Started container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Started container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 	return nil
 }
 
 func (p *plugin) UpdateContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container, _ *api.LinuxResources) ([]*api.ContainerUpdate, error) {
-	slog.Info(fmt.Sprintf("Updating container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Updating container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 
 	//
 	// This is the container update request handler. You can make changes to
@@ -139,12 +139,12 @@ func (p *plugin) UpdateContainer(_ context.Context, pod *api.PodSandbox, ctr *ap
 }
 
 func (p *plugin) PostUpdateContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) error {
-	slog.Info(fmt.Sprintf("Updated container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Updated container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 	return nil
 }
 
 func (p *plugin) StopContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) ([]*api.ContainerUpdate, error) {
-	slog.Info(fmt.Sprintf("Stopped container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Stopped container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 
 	//
 	// This is the container (post-)stop request handler. You can update any
@@ -156,12 +156,12 @@ func (p *plugin) StopContainer(_ context.Context, pod *api.PodSandbox, ctr *api.
 }
 
 func (p *plugin) RemoveContainer(_ context.Context, pod *api.PodSandbox, ctr *api.Container) error {
-	slog.Info(fmt.Sprintf("Removed container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName()))
+	log.Infof("Removed container %s/%s/%s...", pod.GetNamespace(), pod.GetName(), ctr.GetName())
 	return nil
 }
 
 func (p *plugin) onClose() {
-	slog.Info("Connection to the runtime lost, exiting...")
+	log.Info("Connection to the runtime lost, exiting...")
 	os.Exit(0)
 }
 
@@ -192,7 +192,7 @@ func main() {
 	}
 
 	if err = p.stub.Run(context.Background()); err != nil {
-		slog.Error(fmt.Sprintf("plugin exited (%v)", err))
+		log.Error(fmt.Sprintf("plugin exited (%v)", err))
 		os.Exit(1)
 	}
 }
