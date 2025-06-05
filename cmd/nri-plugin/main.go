@@ -13,7 +13,7 @@ import (
 )
 
 type config struct {
-	CfgParam1 string `json:"cfgParam1"`
+	LogFile string `yaml:"logFile"`
 }
 
 type plugin struct {
@@ -50,12 +50,21 @@ func (p *plugin) Configure(_ context.Context, config, runtime, version string) (
 		return 0, nil
 	}
 
+	oldCfg := cfg
 	err := yaml.Unmarshal([]byte(config), &cfg)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse configuration: %w", err)
+		return 0, fmt.Errorf("failed to parse provided configuration: %w", err)
 	}
 
-	log.Info(fmt.Sprintf("Got configuration data %+v...", cfg))
+	if cfg.LogFile != oldCfg.LogFile {
+		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Errorf("failed to open log file %q: %v", cfg.LogFile, err)
+			return 0, fmt.Errorf("failed to open log file %q: %w", cfg.LogFile, err)
+		}
+		log.SetOutput(f)
+	}
+	log.Info("NRI plugin configured successfully")
 
 	return 0, nil
 }
@@ -174,7 +183,16 @@ func main() {
 
 	flag.StringVar(&pluginName, "name", "", "plugin name to register to NRI")
 	flag.StringVar(&pluginIdx, "idx", "", "plugin index to register to NRI")
+	flag.StringVar(&cfg.LogFile, "log-file", "", "logfile name, if logging to a file")
 	flag.Parse()
+
+	if cfg.LogFile != "" {
+		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("failed to open log file %q: %v", cfg.LogFile, err)
+		}
+		log.SetOutput(f)
+	}
 
 	p := &plugin{}
 	opts := []stub.Option{
