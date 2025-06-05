@@ -181,6 +181,11 @@ func main() {
 		err        error
 	)
 
+	log = logrus.StandardLogger()
+	log.SetFormatter(&logrus.TextFormatter{
+		PadLevelText: true,
+	})
+
 	flag.StringVar(&pluginName, "name", "", "plugin name to register to NRI")
 	flag.StringVar(&pluginIdx, "idx", "", "plugin index to register to NRI")
 	flag.StringVar(&cfg.LogFile, "log-file", "", "logfile name, if logging to a file")
