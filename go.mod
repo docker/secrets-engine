@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v1.11.0
 	github.com/containerd/nri v0.9.0
 	github.com/keybase/go-keychain v0.0.1
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -19,7 +20,6 @@ require (
 	github.com/knqyf263/go-plugin v0.8.1-0.20240827022226-114c6257e441 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tetratelabs/wazero v1.8.2-0.20241030035603-dc08732e57d5 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
