@@ -1,4 +1,4 @@
-name: Proto Check
+name: Proto Generate Check
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    name: Lint
+  check:
+    name: Check
     runs-on: ubuntu-latest
     permissions:
       id-token: write
