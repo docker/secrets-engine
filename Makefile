@@ -3,6 +3,8 @@ GIT_TAG?=dev
 CLI_EXPERIMENTS_EXTENSION_IMAGE?=docker/secrets-engine-extension
 GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.mod")
 
+export BUF_VERSION := v1.54.0
+
 export NRI_PLUGIN_BINARY := nri-secrets-engine
 
 ifeq ($(OS),Windows_NT)
@@ -25,6 +27,7 @@ BUILDER=buildx-multiarch
 DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg NRI_PLUGIN_BINARY \
+          			--build-arg BUF_VERSION \
           			--build-arg GIT_TAG
 
 GO_TEST := go test
@@ -64,6 +67,9 @@ nri-plugin-package: nri-plugin-cross ## Cross compile and package the host clien
 	tar -C dist/darwin_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-darwin-arm64.tar.gz $(NRI_PLUGIN_BINARY)
 	tar -C dist/windows_amd64 -czf dist/$(NRI_PLUGIN_BINARY)-windows-amd64.tar.gz $(NRI_PLUGIN_BINARY).exe
 	tar -C dist/windows_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-windows-arm64.tar.gz $(NRI_PLUGIN_BINARY).exe
+
+proto-gen:
+	buf generate
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
