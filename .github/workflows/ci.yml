@@ -39,6 +39,16 @@ jobs:
       - name: Protobuf Lint
         run: make BUILDER=${{ steps.buildx.outputs.name }} proto-lint
 
+      - name: Check if protobuf generate is clean
+        run: |
+          make BUILDER=${{ steps.buildx.outputs.name }} proto-generate
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "::error::Protobuf files need to be regenerated. Please run 'make proto-generate' and commit the changes."
+            git status
+            git diff
+            exit 1
+          fi
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
