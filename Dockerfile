@@ -12,6 +12,8 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build
 
+
+
 FROM base AS lint
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG TARGETOS
@@ -35,6 +37,24 @@ RUN gofmt -s -w .
 
 FROM scratch AS format
 COPY --from=do-format /app .
+
+FROM base AS proto-base
+ARG BUF_VERSION
+RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}
+
+FROM proto-base AS proto-lint
+RUN --mount=target=. \
+    buf lint
+
+FROM proto-base AS do-proto-generate
+COPY . .
+RUN buf generate
+
+FROM scratch AS proto-generate
+COPY --from=do-proto-generate /app .
 
 FROM base AS build-nri-plugin
 ARG TARGETOS
