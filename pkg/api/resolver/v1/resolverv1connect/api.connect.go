@@ -21,10 +21,10 @@ import (
 const _ = connect.IsAtLeastVersion1_13_0
 
 const (
-	// EngineName is the fully-qualified name of the Engine service.
-	EngineName = "secrets_engine.api.v1.Engine"
-	// PluginName is the fully-qualified name of the Plugin service.
-	PluginName = "secrets_engine.api.v1.Plugin"
+	// EngineServiceName is the fully-qualified name of the EngineService service.
+	EngineServiceName = "resolver.v1.EngineService"
+	// PluginServiceName is the fully-qualified name of the PluginService service.
+	PluginServiceName = "resolver.v1.PluginService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -35,182 +35,183 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// EngineRegisterPluginProcedure is the fully-qualified name of the Engine's RegisterPlugin RPC.
-	EngineRegisterPluginProcedure = "/secrets_engine.api.v1.Engine/RegisterPlugin"
-	// PluginConfigureProcedure is the fully-qualified name of the Plugin's Configure RPC.
-	PluginConfigureProcedure = "/secrets_engine.api.v1.Plugin/Configure"
-	// PluginShutdownProcedure is the fully-qualified name of the Plugin's Shutdown RPC.
-	PluginShutdownProcedure = "/secrets_engine.api.v1.Plugin/Shutdown"
+	// EngineServiceRegisterPluginProcedure is the fully-qualified name of the EngineService's
+	// RegisterPlugin RPC.
+	EngineServiceRegisterPluginProcedure = "/resolver.v1.EngineService/RegisterPlugin"
+	// PluginServiceConfigureProcedure is the fully-qualified name of the PluginService's Configure RPC.
+	PluginServiceConfigureProcedure = "/resolver.v1.PluginService/Configure"
+	// PluginServiceShutdownProcedure is the fully-qualified name of the PluginService's Shutdown RPC.
+	PluginServiceShutdownProcedure = "/resolver.v1.PluginService/Shutdown"
 )
 
-// EngineClient is a client for the secrets_engine.api.v1.Engine service.
-type EngineClient interface {
+// EngineServiceClient is a client for the resolver.v1.EngineService service.
+type EngineServiceClient interface {
 	// RegisterPlugin registers the plugin with the engine.
-	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.Empty], error)
+	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error)
 }
 
-// NewEngineClient constructs a client for the secrets_engine.api.v1.Engine service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
-// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
-// connect.WithGRPCWeb() options.
+// NewEngineServiceClient constructs a client for the resolver.v1.EngineService service. By default,
+// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
+// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
+// or connect.WithGRPCWeb() options.
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewEngineClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EngineClient {
+func NewEngineServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EngineServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	engineMethods := v1.File_resolver_v1_api_proto.Services().ByName("Engine").Methods()
-	return &engineClient{
-		registerPlugin: connect.NewClient[v1.RegisterPluginRequest, v1.Empty](
+	engineServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("EngineService").Methods()
+	return &engineServiceClient{
+		registerPlugin: connect.NewClient[v1.RegisterPluginRequest, v1.RegisterPluginResponse](
 			httpClient,
-			baseURL+EngineRegisterPluginProcedure,
-			connect.WithSchema(engineMethods.ByName("RegisterPlugin")),
+			baseURL+EngineServiceRegisterPluginProcedure,
+			connect.WithSchema(engineServiceMethods.ByName("RegisterPlugin")),
 			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
-// engineClient implements EngineClient.
-type engineClient struct {
-	registerPlugin *connect.Client[v1.RegisterPluginRequest, v1.Empty]
+// engineServiceClient implements EngineServiceClient.
+type engineServiceClient struct {
+	registerPlugin *connect.Client[v1.RegisterPluginRequest, v1.RegisterPluginResponse]
 }
 
-// RegisterPlugin calls secrets_engine.api.v1.Engine.RegisterPlugin.
-func (c *engineClient) RegisterPlugin(ctx context.Context, req *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.Empty], error) {
+// RegisterPlugin calls resolver.v1.EngineService.RegisterPlugin.
+func (c *engineServiceClient) RegisterPlugin(ctx context.Context, req *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
 	return c.registerPlugin.CallUnary(ctx, req)
 }
 
-// EngineHandler is an implementation of the secrets_engine.api.v1.Engine service.
-type EngineHandler interface {
+// EngineServiceHandler is an implementation of the resolver.v1.EngineService service.
+type EngineServiceHandler interface {
 	// RegisterPlugin registers the plugin with the engine.
-	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.Empty], error)
+	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error)
 }
 
-// NewEngineHandler builds an HTTP handler from the service implementation. It returns the path on
-// which to mount the handler and the handler itself.
+// NewEngineServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewEngineHandler(svc EngineHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	engineMethods := v1.File_resolver_v1_api_proto.Services().ByName("Engine").Methods()
-	engineRegisterPluginHandler := connect.NewUnaryHandler(
-		EngineRegisterPluginProcedure,
+func NewEngineServiceHandler(svc EngineServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	engineServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("EngineService").Methods()
+	engineServiceRegisterPluginHandler := connect.NewUnaryHandler(
+		EngineServiceRegisterPluginProcedure,
 		svc.RegisterPlugin,
-		connect.WithSchema(engineMethods.ByName("RegisterPlugin")),
+		connect.WithSchema(engineServiceMethods.ByName("RegisterPlugin")),
 		connect.WithHandlerOptions(opts...),
 	)
-	return "/secrets_engine.api.v1.Engine/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return "/resolver.v1.EngineService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case EngineRegisterPluginProcedure:
-			engineRegisterPluginHandler.ServeHTTP(w, r)
+		case EngineServiceRegisterPluginProcedure:
+			engineServiceRegisterPluginHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	})
 }
 
-// UnimplementedEngineHandler returns CodeUnimplemented from all methods.
-type UnimplementedEngineHandler struct{}
+// UnimplementedEngineServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedEngineServiceHandler struct{}
 
-func (UnimplementedEngineHandler) RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.Empty], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("secrets_engine.api.v1.Engine.RegisterPlugin is not implemented"))
+func (UnimplementedEngineServiceHandler) RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.EngineService.RegisterPlugin is not implemented"))
 }
 
-// PluginClient is a client for the secrets_engine.api.v1.Plugin service.
-type PluginClient interface {
+// PluginServiceClient is a client for the resolver.v1.PluginService service.
+type PluginServiceClient interface {
 	// Configure the plugin and get its event subscription.
-	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.Empty], error)
+	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error)
 	// Shutdown a plugin (let it know the runtime is going down).
-	Shutdown(context.Context, *connect.Request[v1.Empty]) (*connect.Response[v1.Empty], error)
+	Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error)
 }
 
-// NewPluginClient constructs a client for the secrets_engine.api.v1.Plugin service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
-// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
-// connect.WithGRPCWeb() options.
+// NewPluginServiceClient constructs a client for the resolver.v1.PluginService service. By default,
+// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
+// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
+// or connect.WithGRPCWeb() options.
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewPluginClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) PluginClient {
+func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) PluginServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	pluginMethods := v1.File_resolver_v1_api_proto.Services().ByName("Plugin").Methods()
-	return &pluginClient{
-		configure: connect.NewClient[v1.ConfigureRequest, v1.Empty](
+	pluginServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("PluginService").Methods()
+	return &pluginServiceClient{
+		configure: connect.NewClient[v1.ConfigureRequest, v1.ConfigureResponse](
 			httpClient,
-			baseURL+PluginConfigureProcedure,
-			connect.WithSchema(pluginMethods.ByName("Configure")),
+			baseURL+PluginServiceConfigureProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Configure")),
 			connect.WithClientOptions(opts...),
 		),
-		shutdown: connect.NewClient[v1.Empty, v1.Empty](
+		shutdown: connect.NewClient[v1.ShutdownRequest, v1.ShutdownResponse](
 			httpClient,
-			baseURL+PluginShutdownProcedure,
-			connect.WithSchema(pluginMethods.ByName("Shutdown")),
+			baseURL+PluginServiceShutdownProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("Shutdown")),
 			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
-// pluginClient implements PluginClient.
-type pluginClient struct {
-	configure *connect.Client[v1.ConfigureRequest, v1.Empty]
-	shutdown  *connect.Client[v1.Empty, v1.Empty]
+// pluginServiceClient implements PluginServiceClient.
+type pluginServiceClient struct {
+	configure *connect.Client[v1.ConfigureRequest, v1.ConfigureResponse]
+	shutdown  *connect.Client[v1.ShutdownRequest, v1.ShutdownResponse]
 }
 
-// Configure calls secrets_engine.api.v1.Plugin.Configure.
-func (c *pluginClient) Configure(ctx context.Context, req *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.Empty], error) {
+// Configure calls resolver.v1.PluginService.Configure.
+func (c *pluginServiceClient) Configure(ctx context.Context, req *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error) {
 	return c.configure.CallUnary(ctx, req)
 }
 
-// Shutdown calls secrets_engine.api.v1.Plugin.Shutdown.
-func (c *pluginClient) Shutdown(ctx context.Context, req *connect.Request[v1.Empty]) (*connect.Response[v1.Empty], error) {
+// Shutdown calls resolver.v1.PluginService.Shutdown.
+func (c *pluginServiceClient) Shutdown(ctx context.Context, req *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error) {
 	return c.shutdown.CallUnary(ctx, req)
 }
 
-// PluginHandler is an implementation of the secrets_engine.api.v1.Plugin service.
-type PluginHandler interface {
+// PluginServiceHandler is an implementation of the resolver.v1.PluginService service.
+type PluginServiceHandler interface {
 	// Configure the plugin and get its event subscription.
-	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.Empty], error)
+	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error)
 	// Shutdown a plugin (let it know the runtime is going down).
-	Shutdown(context.Context, *connect.Request[v1.Empty]) (*connect.Response[v1.Empty], error)
+	Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error)
 }
 
-// NewPluginHandler builds an HTTP handler from the service implementation. It returns the path on
-// which to mount the handler and the handler itself.
+// NewPluginServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewPluginHandler(svc PluginHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	pluginMethods := v1.File_resolver_v1_api_proto.Services().ByName("Plugin").Methods()
-	pluginConfigureHandler := connect.NewUnaryHandler(
-		PluginConfigureProcedure,
+func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	pluginServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("PluginService").Methods()
+	pluginServiceConfigureHandler := connect.NewUnaryHandler(
+		PluginServiceConfigureProcedure,
 		svc.Configure,
-		connect.WithSchema(pluginMethods.ByName("Configure")),
+		connect.WithSchema(pluginServiceMethods.ByName("Configure")),
 		connect.WithHandlerOptions(opts...),
 	)
-	pluginShutdownHandler := connect.NewUnaryHandler(
-		PluginShutdownProcedure,
+	pluginServiceShutdownHandler := connect.NewUnaryHandler(
+		PluginServiceShutdownProcedure,
 		svc.Shutdown,
-		connect.WithSchema(pluginMethods.ByName("Shutdown")),
+		connect.WithSchema(pluginServiceMethods.ByName("Shutdown")),
 		connect.WithHandlerOptions(opts...),
 	)
-	return "/secrets_engine.api.v1.Plugin/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return "/resolver.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case PluginConfigureProcedure:
-			pluginConfigureHandler.ServeHTTP(w, r)
-		case PluginShutdownProcedure:
-			pluginShutdownHandler.ServeHTTP(w, r)
+		case PluginServiceConfigureProcedure:
+			pluginServiceConfigureHandler.ServeHTTP(w, r)
+		case PluginServiceShutdownProcedure:
+			pluginServiceShutdownHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	})
 }
 
-// UnimplementedPluginHandler returns CodeUnimplemented from all methods.
-type UnimplementedPluginHandler struct{}
+// UnimplementedPluginServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedPluginServiceHandler struct{}
 
-func (UnimplementedPluginHandler) Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.Empty], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("secrets_engine.api.v1.Plugin.Configure is not implemented"))
+func (UnimplementedPluginServiceHandler) Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.PluginService.Configure is not implemented"))
 }
 
-func (UnimplementedPluginHandler) Shutdown(context.Context, *connect.Request[v1.Empty]) (*connect.Response[v1.Empty], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("secrets_engine.api.v1.Plugin.Shutdown is not implemented"))
+func (UnimplementedPluginServiceHandler) Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.PluginService.Shutdown is not implemented"))
 }
