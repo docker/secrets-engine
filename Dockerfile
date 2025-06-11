@@ -12,6 +12,10 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build
 
+FROM base AS buf
+ARG BUF_VERSION=v1.54.0
+RUN GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}
+
 FROM base AS lint
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG TARGETOS
