@@ -69,7 +69,7 @@ nri-plugin-package: nri-plugin-cross ## Cross compile and package the host clien
 	tar -C dist/windows_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-windows-arm64.tar.gz $(NRI_PLUGIN_BINARY).exe
 
 proto-gen:
-	buf generate
+	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=buf .
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:

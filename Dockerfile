@@ -43,9 +43,12 @@ ARG BUF_VERSION
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@${BUF_VERSION} \
+    GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}
 COPY . .
 RUN buf generate
+
+FROM scratch AS buf
+COPY --from=do-buf /app .
 
 FROM base AS build-nri-plugin
 ARG TARGETOS
