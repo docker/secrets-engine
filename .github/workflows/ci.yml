@@ -33,8 +33,11 @@ jobs:
           endpoint: "docker/secrets-engine"
           install: true
 
-      - name: Lint
+      - name: Go Lint
         run: make BUILDER=${{ steps.buildx.outputs.name }} lint
+
+      - name: Protobuf Lint
+        run: make BUILDER=${{ steps.buildx.outputs.name }} proto-lint
 
   unit-tests:
     name: Unit Tests

@@ -1,12 +1,12 @@
 edition = "2023";
 
-package secrets_engine.api.v1;
+package resolver.v1;
 
 option go_package = "github.com/docker/secrets-engine/pkg/api/resolver/v1;resolverv1";
 
-service Engine {
+service EngineService {
   // RegisterPlugin registers the plugin with the engine.
-  rpc RegisterPlugin(RegisterPluginRequest) returns (Empty);
+  rpc RegisterPlugin(RegisterPluginRequest) returns (RegisterPluginResponse);
 }
 
 message RegisterPluginRequest {
@@ -16,14 +16,14 @@ message RegisterPluginRequest {
   string plugin_idx = 2;
 }
 
-message Empty {}
+message RegisterPluginResponse {}
 
-service Plugin {
+service PluginService {
   // Configure the plugin and get its event subscription.
-  rpc Configure(ConfigureRequest) returns (Empty);
+  rpc Configure(ConfigureRequest) returns (ConfigureResponse);
 
   // Shutdown a plugin (let it know the runtime is going down).
-  rpc Shutdown(Empty) returns (Empty);
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
 
 }
 
@@ -39,3 +39,9 @@ message ConfigureRequest {
   // Configured request processing timeout in milliseconds.
   int64 request_timeout = 5;
 }
+
+message ConfigureResponse {}
+
+message ShutdownRequest {}
+
+message ShutdownResponse {}
