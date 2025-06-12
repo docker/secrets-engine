@@ -2,10 +2,16 @@ package stub
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
@@ -33,15 +39,30 @@ type Config struct {
 
 // Stub is the interface the stub provides for the plugin implementation.
 type Stub interface {
+	// Run starts the plugin then waits for the plugin service to exit, either due to a
+	// critical error or by cancelling the context. Once Run() returns, the plugin can be
+	// restarted by calling Run() again.
+	Run(context.Context) error
+
 	// RegistrationTimeout returns the registration timeout for the stub.
 	// This is the default timeout if the plugin has not been started or
 	// the timeout received in the Configure request otherwise.
 	RegistrationTimeout() time.Duration
+
+	// RequestTimeout returns the request timeout for the stub.
+	// This is the default timeout if the plugin has not been started or
+	// the timeout received in the Configure request otherwise.
+	RequestTimeout() time.Duration
 }
 
 // stub implements Stub.
 type stub struct {
-	cfg
+	name    string
+	m       sync.Mutex
+	factory func(context.Context) (ipc, error)
+
+	registrationTimeout time.Duration
+	requestTimeout      time.Duration
 }
 
 // New creates a stub with the given plugin and options.
@@ -53,13 +74,63 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 		return nil, err
 	}
 	stub := &stub{
-		cfg: *cfg,
+		name: cfg.name,
+		factory: func(ctx context.Context) (ipc, error) {
+			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout)
+		},
 	}
-	logrus.Infof("Created plugin %s", stub.name)
+	logrus.Infof("Created plugin %s", cfg.name)
 
 	return stub, nil
 }
 
+func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc, error) {
+	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{p.Shutdown}))
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p}))
+	ipc, err := newIPC(conn, httpMux)
+	if err != nil {
+		return nil, err
+	}
+	runtimeCfg, err := doRegister(ctx, ipc.conn(), name, p, timeout)
+	if err != nil {
+		ipc.close()
+		return nil, err
+	}
+	if err := p.Configure(ctx, *runtimeCfg); err != nil {
+		ipc.close()
+		return nil, fmt.Errorf("failed to configure plugin %q: %w", name, err)
+	}
+	logrus.Infof("Started plugin %s...", name)
+	return ipc, nil
+}
+
+// Run the plugin. Start event processing then wait for an error or getting stopped.
+func (stub *stub) Run(ctx context.Context) error {
+	if !stub.m.TryLock() {
+		return fmt.Errorf("already running")
+	}
+	defer stub.m.Unlock()
+	ipc, err := stub.factory(ctx)
+	if err != nil {
+		return err
+	}
+	err = ipc.wait(ctx)
+	select {
+	case <-ctx.Done():
+	default:
+	}
+	return errors.Join(ipc.close(), err)
+}
+
 func (stub *stub) RegistrationTimeout() time.Duration {
 	return stub.registrationTimeout
+}
+
+func (stub *stub) RequestTimeout() time.Duration {
+	return stub.requestTimeout
 }
