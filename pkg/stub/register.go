@@ -62,7 +62,7 @@ func (c *registerClient) register(ctx context.Context) (*RuntimeConfig, error) {
 	}, nil
 }
 
-func DoRegister(ctx context.Context, conn net.Conn, pluginName string, plugin Plugin, timeout time.Duration) (*RuntimeConfig, error) {
+func doRegister(ctx context.Context, conn net.Conn, pluginName string, plugin Plugin, timeout time.Duration) (*RuntimeConfig, error) {
 	client := newRegisterClient(conn, pluginName, plugin, timeout)
 	resp, err := client.register(ctx)
 	if err != nil {
