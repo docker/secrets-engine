@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,7 +20,7 @@ func NewEngine() *Engine {
 	return &Engine{}
 }
 
-func (e *Engine) GetSecret(req secrets.Request) (secrets.Envelope, error) {
+func (e *Engine) GetSecret(ctx context.Context, req secrets.Request) (secrets.Envelope, error) {
 	var errs []error
 
 	if err := req.ID.Valid(); err != nil {
@@ -34,7 +35,7 @@ func (e *Engine) GetSecret(req secrets.Request) (secrets.Envelope, error) {
 			continue
 		}
 
-		envelope, err := plugin.provider.GetSecret(req)
+		envelope, err := plugin.provider.GetSecret(ctx, req)
 		if err != nil {
 			errs = append(errs, err)
 			continue
