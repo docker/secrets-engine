@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -30,7 +31,7 @@ func Resolver(provider secrets.Resolver) (string, http.Handler) {
 				candidates = append(candidates, secrets.Envelope{ID: secrets.ID(idUnsafe), Error: fmt.Sprintf("invalid identifier: %q", idUnsafe)})
 				continue
 			}
-			envelope, err := provider.GetSecret(secrets.Request{ID: id})
+			envelope, err := provider.GetSecret(context.TODO(), secrets.Request{ID: id})
 			if err != nil {
 				candidates = append(candidates, secrets.Envelope{ID: secrets.ID(idUnsafe), Error: fmt.Sprintf("secret %s not available: %v", id, err)})
 				continue

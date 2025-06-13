@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -32,5 +33,5 @@ type Envelope struct {
 }
 
 type Resolver interface {
-	GetSecret(request Request) (Envelope, error)
+	GetSecret(ctx context.Context, request Request) (Envelope, error)
 }

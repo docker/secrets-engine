@@ -1,6 +1,10 @@
 package local
 
-import "github.com/docker/secrets-engine/pkg/secrets"
+import (
+	"context"
+
+	"github.com/docker/secrets-engine/pkg/secrets"
+)
 
 type Store struct{}
 
@@ -8,7 +12,7 @@ func New() *Store {
 	return &Store{}
 }
 
-func (store *Store) GetSecret(req secrets.Request) (secrets.Envelope, error) {
+func (store *Store) GetSecret(_ context.Context, req secrets.Request) (secrets.Envelope, error) {
 	return getSecret(req.ID)
 }
 
