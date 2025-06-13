@@ -1,6 +1,9 @@
 package secrets
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // Restricted controls access to a set of secrets.
 //
@@ -28,7 +31,7 @@ func (r *Restricted) Allow(allowed ...ID) {
 	}
 }
 
-func (r *Restricted) GetSecret(request Request) (Envelope, error) {
+func (r *Restricted) GetSecret(ctx context.Context, request Request) (Envelope, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -36,7 +39,7 @@ func (r *Restricted) GetSecret(request Request) (Envelope, error) {
 		return Envelope{ID: request.ID, Error: ErrAccessDenied.Error()}, ErrAccessDenied
 	}
 
-	return r.next.GetSecret(request)
+	return r.next.GetSecret(ctx, request)
 }
 
 func allowList[K comparable](allowed ...K) map[K]struct{} {
