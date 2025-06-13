@@ -386,9 +386,13 @@ func (b0 ConfigureRequest_builder) Build() *ConfigureRequest {
 }
 
 type ConfigureResponse struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Version     *string                `protobuf:"bytes,1,opt,name=version"`
+	xxx_hidden_Pattern     *string                `protobuf:"bytes,2,opt,name=pattern"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ConfigureResponse) Reset() {
@@ -416,15 +420,81 @@ func (x *ConfigureResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *ConfigureResponse) GetVersion() string {
+	if x != nil {
+		if x.xxx_hidden_Version != nil {
+			return *x.xxx_hidden_Version
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *ConfigureResponse) GetPattern() string {
+	if x != nil {
+		if x.xxx_hidden_Pattern != nil {
+			return *x.xxx_hidden_Pattern
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *ConfigureResponse) SetVersion(v string) {
+	x.xxx_hidden_Version = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+}
+
+func (x *ConfigureResponse) SetPattern(v string) {
+	x.xxx_hidden_Pattern = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+}
+
+func (x *ConfigureResponse) HasVersion() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *ConfigureResponse) HasPattern() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *ConfigureResponse) ClearVersion() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Version = nil
+}
+
+func (x *ConfigureResponse) ClearPattern() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_Pattern = nil
+}
+
 type ConfigureResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
+	// Version of the plugin.
+	Version *string
+	// Pattern
+	Pattern *string
 }
 
 func (b0 ConfigureResponse_builder) Build() *ConfigureResponse {
 	m0 := &ConfigureResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
+	if b.Version != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_Version = b.Version
+	}
+	if b.Pattern != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		x.xxx_hidden_Pattern = b.Pattern
+	}
 	return m0
 }
 
@@ -514,6 +584,198 @@ func (b0 ShutdownResponse_builder) Build() *ShutdownResponse {
 	return m0
 }
 
+type GetSecretRequest struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SecretId    *string                `protobuf:"bytes,1,opt,name=secret_id,json=secretId"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GetSecretRequest) Reset() {
+	*x = GetSecretRequest{}
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSecretRequest) ProtoMessage() {}
+
+func (x *GetSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *GetSecretRequest) GetSecretId() string {
+	if x != nil {
+		if x.xxx_hidden_SecretId != nil {
+			return *x.xxx_hidden_SecretId
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *GetSecretRequest) SetSecretId(v string) {
+	x.xxx_hidden_SecretId = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *GetSecretRequest) HasSecretId() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *GetSecretRequest) ClearSecretId() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_SecretId = nil
+}
+
+type GetSecretRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// ID of the secret to resolve.
+	SecretId *string
+}
+
+func (b0 GetSecretRequest_builder) Build() *GetSecretRequest {
+	m0 := &GetSecretRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.SecretId != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_SecretId = b.SecretId
+	}
+	return m0
+}
+
+type GetSecretResponse struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SecretId    *string                `protobuf:"bytes,1,opt,name=secret_id,json=secretId"`
+	xxx_hidden_SecretValue *string                `protobuf:"bytes,2,opt,name=secret_value,json=secretValue"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GetSecretResponse) Reset() {
+	*x = GetSecretResponse{}
+	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSecretResponse) ProtoMessage() {}
+
+func (x *GetSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *GetSecretResponse) GetSecretId() string {
+	if x != nil {
+		if x.xxx_hidden_SecretId != nil {
+			return *x.xxx_hidden_SecretId
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *GetSecretResponse) GetSecretValue() string {
+	if x != nil {
+		if x.xxx_hidden_SecretValue != nil {
+			return *x.xxx_hidden_SecretValue
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *GetSecretResponse) SetSecretId(v string) {
+	x.xxx_hidden_SecretId = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+}
+
+func (x *GetSecretResponse) SetSecretValue(v string) {
+	x.xxx_hidden_SecretValue = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+}
+
+func (x *GetSecretResponse) HasSecretId() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *GetSecretResponse) HasSecretValue() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *GetSecretResponse) ClearSecretId() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_SecretId = nil
+}
+
+func (x *GetSecretResponse) ClearSecretValue() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_SecretValue = nil
+}
+
+type GetSecretResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// ID of the secret to resolve.
+	SecretId *string
+	// The resolved secret value.
+	SecretValue *string
+}
+
+func (b0 GetSecretResponse_builder) Build() *GetSecretResponse {
+	m0 := &GetSecretResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.SecretId != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_SecretId = b.SecretId
+	}
+	if b.SecretValue != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		x.xxx_hidden_SecretValue = b.SecretValue
+	}
+	return m0
+}
+
 var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
@@ -531,18 +793,27 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"engineName\x12%\n" +
 	"\x0eengine_version\x18\x03 \x01(\tR\rengineVersion\x121\n" +
 	"\x14registration_timeout\x18\x04 \x01(\x03R\x13registrationTimeout\x12'\n" +
-	"\x0frequest_timeout\x18\x05 \x01(\x03R\x0erequestTimeout\"\x13\n" +
-	"\x11ConfigureResponse\"\x11\n" +
+	"\x0frequest_timeout\x18\x05 \x01(\x03R\x0erequestTimeout\"G\n" +
+	"\x11ConfigureResponse\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
+	"\apattern\x18\x02 \x01(\tR\apattern\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
-	"\x10ShutdownResponse2j\n" +
+	"\x10ShutdownResponse\"/\n" +
+	"\x10GetSecretRequest\x12\x1b\n" +
+	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\"S\n" +
+	"\x11GetSecretResponse\x12\x1b\n" +
+	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12!\n" +
+	"\fsecret_value\x18\x02 \x01(\tR\vsecretValue2j\n" +
 	"\rEngineService\x12Y\n" +
 	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2\xa4\x01\n" +
 	"\rPluginService\x12J\n" +
 	"\tConfigure\x12\x1d.resolver.v1.ConfigureRequest\x1a\x1e.resolver.v1.ConfigureResponse\x12G\n" +
-	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponseB\xa9\x01\n" +
+	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponse2]\n" +
+	"\x0fResolverService\x12J\n" +
+	"\tGetSecret\x12\x1d.resolver.v1.GetSecretRequest\x1a\x1e.resolver.v1.GetSecretResponseB\xa9\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z?github.com/docker/secrets-engine/pkg/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
-var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_resolver_v1_api_proto_goTypes = []any{
 	(*RegisterPluginRequest)(nil),  // 0: resolver.v1.RegisterPluginRequest
 	(*RegisterPluginResponse)(nil), // 1: resolver.v1.RegisterPluginResponse
@@ -550,16 +821,20 @@ var file_resolver_v1_api_proto_goTypes = []any{
 	(*ConfigureResponse)(nil),      // 3: resolver.v1.ConfigureResponse
 	(*ShutdownRequest)(nil),        // 4: resolver.v1.ShutdownRequest
 	(*ShutdownResponse)(nil),       // 5: resolver.v1.ShutdownResponse
+	(*GetSecretRequest)(nil),       // 6: resolver.v1.GetSecretRequest
+	(*GetSecretResponse)(nil),      // 7: resolver.v1.GetSecretResponse
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
 	0, // 0: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
 	2, // 1: resolver.v1.PluginService.Configure:input_type -> resolver.v1.ConfigureRequest
 	4, // 2: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	1, // 3: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 4: resolver.v1.PluginService.Configure:output_type -> resolver.v1.ConfigureResponse
-	5, // 5: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
+	6, // 3: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
+	1, // 4: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 5: resolver.v1.PluginService.Configure:output_type -> resolver.v1.ConfigureResponse
+	5, // 6: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	7, // 7: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -576,9 +851,9 @@ func file_resolver_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   3,
 		},
 		GoTypes:           file_resolver_v1_api_proto_goTypes,
 		DependencyIndexes: file_resolver_v1_api_proto_depIdxs,
