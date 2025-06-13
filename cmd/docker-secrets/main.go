@@ -63,7 +63,7 @@ func (cmd *getCmd) Run() error {
 	if err != nil {
 		return fmt.Errorf("parsing sercet id %q: %w", cmd.ID, err)
 	}
-	envelope, err := store.GetSecret(secrets.Request{ID: id})
+	envelope, err := store.GetSecret(context.Background(), secrets.Request{ID: id})
 	if err != nil {
 		return fmt.Errorf("resolving secret: %w", err)
 	}
@@ -221,7 +221,7 @@ func (cmd *runCmd) Run() error {
 			return fmt.Errorf("invalid secret identifier: %w", err)
 		}
 
-		envelope, err := provider.GetSecret(secrets.Request{ID: id})
+		envelope, err := provider.GetSecret(ctx, secrets.Request{ID: id})
 		if err != nil {
 			return fmt.Errorf("resolving secret: %w", err)
 		}
@@ -251,7 +251,7 @@ func (cmd *runCmd) Run() error {
 			return fmt.Errorf("invalid secret identifier: %w", err)
 		}
 
-		envelope, err := provider.GetSecret(secrets.Request{ID: id})
+		envelope, err := provider.GetSecret(ctx, secrets.Request{ID: id})
 		if err != nil {
 			return fmt.Errorf("resolving secret: %w", err)
 		}
@@ -269,7 +269,7 @@ func (cmd *runCmd) Run() error {
 		}
 
 		// make sure the secret is available
-		if _, err = provider.GetSecret(secrets.Request{ID: id}); err != nil {
+		if _, err = provider.GetSecret(ctx, secrets.Request{ID: id}); err != nil {
 			return fmt.Errorf("resolving secret: %w", err)
 		}
 
