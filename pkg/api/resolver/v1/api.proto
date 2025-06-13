@@ -24,7 +24,6 @@ service PluginService {
 
   // Shutdown a plugin (let it know the runtime is going down).
   rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
-
 }
 
 message ConfigureRequest {
@@ -40,8 +39,30 @@ message ConfigureRequest {
   int64 request_timeout = 5;
 }
 
-message ConfigureResponse {}
+message ConfigureResponse {
+  // Version of the plugin.
+  string version = 1;
+  // Pattern
+  string pattern = 2;
+}
 
 message ShutdownRequest {}
 
 message ShutdownResponse {}
+
+service ResolverService {
+  // Resolve a secret by its ID.
+  rpc GetSecret(GetSecretRequest) returns (GetSecretResponse);
+}
+
+message GetSecretRequest {
+  // ID of the secret to resolve.
+  string secret_id = 1;
+}
+
+message GetSecretResponse {
+  // ID of the secret to resolve.
+  string secret_id = 1;
+  // The resolved secret value.
+  string secret_value = 2;
+}
