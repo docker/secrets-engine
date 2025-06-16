@@ -40,7 +40,7 @@ type cfgService struct {
 	configure            ConfigureInterface
 	shutdown             func(context.Context)
 	done                 chan struct{}
-	config               cfgFromEngine
+	config               *cfgFromEngine
 	pluginCfgCallbackErr error
 }
 
@@ -68,7 +68,7 @@ func (s *cfgService) Configure(ctx context.Context, c *connect.Request[resolverv
 	engineVersion := c.Msg.GetEngineVersion()
 	logrus.Infof("Configuring plugin %s for engine %s/%s...", s.pluginName, engineName, engineVersion)
 
-	s.config = cfgFromEngine{
+	s.config = &cfgFromEngine{
 		engineName:     engineName,
 		engineVersion:  engineVersion,
 		requestTimeout: time.Duration(c.Msg.GetRequestTimeout() * int64(time.Millisecond)),
@@ -96,7 +96,10 @@ func (s *cfgService) Shutdown(ctx context.Context, _ *connect.Request[resolverv1
 func (s *cfgService) WaitUntilConfigured(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
+		return nil
 	case <-s.done:
 	}
 	return s.pluginCfgCallbackErr
@@ -105,5 +108,5 @@ func (s *cfgService) WaitUntilConfigured(ctx context.Context) error {
 func (s *cfgService) GetConfig() (*cfgFromEngine, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	return &s.config, s.pluginCfgCallbackErr
+	return s.config, s.pluginCfgCallbackErr
 }
