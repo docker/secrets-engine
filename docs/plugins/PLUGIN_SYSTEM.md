@@ -9,7 +9,7 @@ Each plugin also is a server that handles resolver requests from the secrets eng
 By default, any plugin can be discovered by scanning the plugin directory for
 executables and then launched by the secrets engine. In the case where a plugin
 is already known to the secrets engine (e.g. docker CLI), it can discover
-the plugin via the System Path.
+the plugin via the PATH.
 
 Alternatively, a plugin can make itself known to an already running secrets
 engine by reusing the default socket.
