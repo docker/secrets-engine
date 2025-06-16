@@ -61,9 +61,8 @@ func TestConfigure_AllSuccess(t *testing.T) {
 	mockCfg := &Config{Version: "v1.2.3", Pattern: "test-*"}
 	mock := newMockConfigure(t, mockCfg, nil, expCfg)
 	service := newConfigureService("pluginX", mock, nil)
-	cfg, err := service.GetConfig()
-	assert.NoError(t, err)
-	assert.Nil(t, cfg)
+	_, err := service.GetConfig()
+	assert.Equal(t, errPluginNotConfiguredYet, err)
 
 	chErrWaitUntilConfigured := make(chan error)
 	ctx, cancel := context.WithCancel(t.Context())

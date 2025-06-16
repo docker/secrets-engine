@@ -14,6 +14,10 @@ import (
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
 )
 
+var (
+	errPluginNotConfiguredYet = errors.New("plugin not configured yet")
+)
+
 var _ = (resolverv1connect.PluginServiceHandler)((*cfgService)(nil))
 
 // ConfigureInterface handles Configure API request.
@@ -108,5 +112,10 @@ func (s *cfgService) WaitUntilConfigured(ctx context.Context) error {
 func (s *cfgService) GetConfig() (*cfgFromEngine, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
+	select {
+	case <-s.done:
+	default:
+		return nil, errPluginNotConfiguredYet
+	}
 	return s.config, s.pluginCfgCallbackErr
 }
