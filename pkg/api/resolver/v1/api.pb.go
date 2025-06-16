@@ -177,16 +177,15 @@ func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
 }
 
 type ConfigureRequest struct {
-	state                          protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Config              *string                `protobuf:"bytes,1,opt,name=config"`
-	xxx_hidden_EngineName          *string                `protobuf:"bytes,2,opt,name=engine_name,json=engineName"`
-	xxx_hidden_EngineVersion       *string                `protobuf:"bytes,3,opt,name=engine_version,json=engineVersion"`
-	xxx_hidden_RegistrationTimeout int64                  `protobuf:"varint,4,opt,name=registration_timeout,json=registrationTimeout"`
-	xxx_hidden_RequestTimeout      int64                  `protobuf:"varint,5,opt,name=request_timeout,json=requestTimeout"`
-	XXX_raceDetectHookData         protoimpl.RaceDetectHookData
-	XXX_presence                   [1]uint32
-	unknownFields                  protoimpl.UnknownFields
-	sizeCache                      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Config         *string                `protobuf:"bytes,1,opt,name=config"`
+	xxx_hidden_EngineName     *string                `protobuf:"bytes,2,opt,name=engine_name,json=engineName"`
+	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,3,opt,name=engine_version,json=engineVersion"`
+	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,4,opt,name=request_timeout,json=requestTimeout"`
+	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
+	XXX_presence              [1]uint32
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *ConfigureRequest) Reset() {
@@ -244,13 +243,6 @@ func (x *ConfigureRequest) GetEngineVersion() string {
 	return ""
 }
 
-func (x *ConfigureRequest) GetRegistrationTimeout() int64 {
-	if x != nil {
-		return x.xxx_hidden_RegistrationTimeout
-	}
-	return 0
-}
-
 func (x *ConfigureRequest) GetRequestTimeout() int64 {
 	if x != nil {
 		return x.xxx_hidden_RequestTimeout
@@ -260,27 +252,22 @@ func (x *ConfigureRequest) GetRequestTimeout() int64 {
 
 func (x *ConfigureRequest) SetConfig(v string) {
 	x.xxx_hidden_Config = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 5)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
 }
 
 func (x *ConfigureRequest) SetEngineName(v string) {
 	x.xxx_hidden_EngineName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 5)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
 }
 
 func (x *ConfigureRequest) SetEngineVersion(v string) {
 	x.xxx_hidden_EngineVersion = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 5)
-}
-
-func (x *ConfigureRequest) SetRegistrationTimeout(v int64) {
-	x.xxx_hidden_RegistrationTimeout = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 5)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
 }
 
 func (x *ConfigureRequest) SetRequestTimeout(v int64) {
 	x.xxx_hidden_RequestTimeout = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 5)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
 }
 
 func (x *ConfigureRequest) HasConfig() bool {
@@ -304,18 +291,11 @@ func (x *ConfigureRequest) HasEngineVersion() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
-func (x *ConfigureRequest) HasRegistrationTimeout() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
-}
-
 func (x *ConfigureRequest) HasRequestTimeout() bool {
 	if x == nil {
 		return false
 	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
 func (x *ConfigureRequest) ClearConfig() {
@@ -333,13 +313,8 @@ func (x *ConfigureRequest) ClearEngineVersion() {
 	x.xxx_hidden_EngineVersion = nil
 }
 
-func (x *ConfigureRequest) ClearRegistrationTimeout() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
-	x.xxx_hidden_RegistrationTimeout = 0
-}
-
 func (x *ConfigureRequest) ClearRequestTimeout() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
 	x.xxx_hidden_RequestTimeout = 0
 }
 
@@ -352,8 +327,6 @@ type ConfigureRequest_builder struct {
 	EngineName *string
 	// Version of the runtime engine is running in.
 	EngineVersion *string
-	// Configured registration timeout in milliseconds.
-	RegistrationTimeout *int64
 	// Configured request processing timeout in milliseconds.
 	RequestTimeout *int64
 }
@@ -363,23 +336,19 @@ func (b0 ConfigureRequest_builder) Build() *ConfigureRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Config != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 5)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
 		x.xxx_hidden_Config = b.Config
 	}
 	if b.EngineName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 5)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
 		x.xxx_hidden_EngineName = b.EngineName
 	}
 	if b.EngineVersion != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 5)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 4)
 		x.xxx_hidden_EngineVersion = b.EngineVersion
 	}
-	if b.RegistrationTimeout != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 5)
-		x.xxx_hidden_RegistrationTimeout = *b.RegistrationTimeout
-	}
 	if b.RequestTimeout != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 5)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
 		x.xxx_hidden_RequestTimeout = *b.RequestTimeout
 	}
 	return m0
@@ -786,14 +755,13 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"pluginName\x12\x1d\n" +
 	"\n" +
 	"plugin_idx\x18\x02 \x01(\tR\tpluginIdx\"\x18\n" +
-	"\x16RegisterPluginResponse\"\xce\x01\n" +
+	"\x16RegisterPluginResponse\"\x9b\x01\n" +
 	"\x10ConfigureRequest\x12\x16\n" +
 	"\x06config\x18\x01 \x01(\tR\x06config\x12\x1f\n" +
 	"\vengine_name\x18\x02 \x01(\tR\n" +
 	"engineName\x12%\n" +
-	"\x0eengine_version\x18\x03 \x01(\tR\rengineVersion\x121\n" +
-	"\x14registration_timeout\x18\x04 \x01(\x03R\x13registrationTimeout\x12'\n" +
-	"\x0frequest_timeout\x18\x05 \x01(\x03R\x0erequestTimeout\"G\n" +
+	"\x0eengine_version\x18\x03 \x01(\tR\rengineVersion\x12'\n" +
+	"\x0frequest_timeout\x18\x04 \x01(\x03R\x0erequestTimeout\"G\n" +
 	"\x11ConfigureResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
 	"\apattern\x18\x02 \x01(\tR\apattern\"\x11\n" +
