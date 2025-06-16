@@ -11,7 +11,7 @@ executables and then launched by the secrets engine. In the case where a plugin
 is already known to the secrets engine (e.g. docker CLI), it can discover
 the plugin via the System Path.
 
-Alternatively, a plugin can make themselves known to an already running secrets
+Alternatively, a plugin can make itself known to an already running secrets
 engine by reusing the default socket.
 
 ```mermaid
