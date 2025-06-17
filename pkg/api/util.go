@@ -9,7 +9,7 @@ import (
 func ParsePluginName(name string) (string, string, error) {
 	split := strings.SplitN(name, "-", 2)
 	if len(split) < 2 {
-		return "", "", fmt.Errorf("invalid plugin name %q, idx-pluginname expected", name)
+		return "", "", fmt.Errorf("invalid plugin name %q, <[0-9][0-9]>-<pluginname> expected", name)
 	}
 
 	if err := CheckPluginIndex(split[0]); err != nil {
