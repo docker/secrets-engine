@@ -33,6 +33,6 @@ sequenceDiagram
     E->>E: setup plugin management server (per plugin!)
     Note over P,E: Start plugin
     E->>E: start management server
-    P->>E: register plugin to resolver call
-    E->>P: configure plugin call
+    P->>E: register plugin to resolver call (plugin name, version, pattern, etc.)
+    E->>P: register response (success/error, config, engine name/version)
 ```
