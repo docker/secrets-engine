@@ -76,19 +76,18 @@ type cfg struct {
 }
 
 func newCfg(p Plugin, opts ...Option) (*cfg, error) {
-	var identity identity
+	identity := &identity{}
 	timeout := adaptation.DefaultPluginRegistrationTimeout
 	if isPluginEnvSet() {
-		i, t, err := getCfgFromEnv()
+		var err error
+		identity, timeout, err = getCfgFromEnv()
 		if err != nil {
 			return nil, err
 		}
-		identity = *i
-		timeout = t
 	}
 	cfg := &cfg{
 		plugin:              p,
-		identity:            identity,
+		identity:            *identity,
 		registrationTimeout: timeout,
 		socketPath:          adaptation.DefaultSocketPath,
 	}
@@ -114,19 +113,21 @@ var (
 // Note: Partially set ENV based config as an error, as we expect the
 // secret engine to always set all ENV based configuration.
 func getCfgFromEnv() (*identity, time.Duration, error) {
-	name := os.Getenv(adaptation.PluginNameEnvVar)
-	idx := os.Getenv(adaptation.PluginIdxEnvVar)
-	timeoutStr := os.Getenv(adaptation.PluginRegistrationTimeoutEnvVar)
-	if name == "" {
+	var (
+		name       string
+		idx        string
+		timeoutStr string
+	)
+	if name = os.Getenv(adaptation.PluginNameEnvVar); name == "" {
 		return nil, 0, errPluginNameNotSet
 	}
-	if idx == "" {
+	if idx = os.Getenv(adaptation.PluginIdxEnvVar); idx == "" {
 		return nil, 0, errPluginIdxNotSet
 	}
 	if err := api.CheckPluginIndex(idx); err != nil {
 		return nil, 0, fmt.Errorf("invalid plugin index %q: %w", idx, err)
 	}
-	if timeoutStr == "" {
+	if timeoutStr = os.Getenv(adaptation.PluginRegistrationTimeoutEnvVar); timeoutStr == "" {
 		return nil, 0, errPluginRegistrationTimeoutNotSet
 	}
 	timeout, err := time.ParseDuration(timeoutStr)
