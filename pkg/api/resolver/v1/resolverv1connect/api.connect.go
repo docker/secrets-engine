@@ -40,8 +40,6 @@ const (
 	// EngineServiceRegisterPluginProcedure is the fully-qualified name of the EngineService's
 	// RegisterPlugin RPC.
 	EngineServiceRegisterPluginProcedure = "/resolver.v1.EngineService/RegisterPlugin"
-	// PluginServiceConfigureProcedure is the fully-qualified name of the PluginService's Configure RPC.
-	PluginServiceConfigureProcedure = "/resolver.v1.PluginService/Configure"
 	// PluginServiceShutdownProcedure is the fully-qualified name of the PluginService's Shutdown RPC.
 	PluginServiceShutdownProcedure = "/resolver.v1.PluginService/Shutdown"
 	// ResolverServiceGetSecretProcedure is the fully-qualified name of the ResolverService's GetSecret
@@ -123,8 +121,6 @@ func (UnimplementedEngineServiceHandler) RegisterPlugin(context.Context, *connec
 
 // PluginServiceClient is a client for the resolver.v1.PluginService service.
 type PluginServiceClient interface {
-	// Configure the plugin and get its event subscription.
-	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error)
 	// Shutdown a plugin (let it know the runtime is going down).
 	Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error)
 }
@@ -140,12 +136,6 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 	baseURL = strings.TrimRight(baseURL, "/")
 	pluginServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("PluginService").Methods()
 	return &pluginServiceClient{
-		configure: connect.NewClient[v1.ConfigureRequest, v1.ConfigureResponse](
-			httpClient,
-			baseURL+PluginServiceConfigureProcedure,
-			connect.WithSchema(pluginServiceMethods.ByName("Configure")),
-			connect.WithClientOptions(opts...),
-		),
 		shutdown: connect.NewClient[v1.ShutdownRequest, v1.ShutdownResponse](
 			httpClient,
 			baseURL+PluginServiceShutdownProcedure,
@@ -157,13 +147,7 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // pluginServiceClient implements PluginServiceClient.
 type pluginServiceClient struct {
-	configure *connect.Client[v1.ConfigureRequest, v1.ConfigureResponse]
-	shutdown  *connect.Client[v1.ShutdownRequest, v1.ShutdownResponse]
-}
-
-// Configure calls resolver.v1.PluginService.Configure.
-func (c *pluginServiceClient) Configure(ctx context.Context, req *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error) {
-	return c.configure.CallUnary(ctx, req)
+	shutdown *connect.Client[v1.ShutdownRequest, v1.ShutdownResponse]
 }
 
 // Shutdown calls resolver.v1.PluginService.Shutdown.
@@ -173,8 +157,6 @@ func (c *pluginServiceClient) Shutdown(ctx context.Context, req *connect.Request
 
 // PluginServiceHandler is an implementation of the resolver.v1.PluginService service.
 type PluginServiceHandler interface {
-	// Configure the plugin and get its event subscription.
-	Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error)
 	// Shutdown a plugin (let it know the runtime is going down).
 	Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error)
 }
@@ -186,12 +168,6 @@ type PluginServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	pluginServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("PluginService").Methods()
-	pluginServiceConfigureHandler := connect.NewUnaryHandler(
-		PluginServiceConfigureProcedure,
-		svc.Configure,
-		connect.WithSchema(pluginServiceMethods.ByName("Configure")),
-		connect.WithHandlerOptions(opts...),
-	)
 	pluginServiceShutdownHandler := connect.NewUnaryHandler(
 		PluginServiceShutdownProcedure,
 		svc.Shutdown,
@@ -200,8 +176,6 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 	)
 	return "/resolver.v1.PluginService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case PluginServiceConfigureProcedure:
-			pluginServiceConfigureHandler.ServeHTTP(w, r)
 		case PluginServiceShutdownProcedure:
 			pluginServiceShutdownHandler.ServeHTTP(w, r)
 		default:
@@ -212,10 +186,6 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 
 // UnimplementedPluginServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedPluginServiceHandler struct{}
-
-func (UnimplementedPluginServiceHandler) Configure(context.Context, *connect.Request[v1.ConfigureRequest]) (*connect.Response[v1.ConfigureResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.PluginService.Configure is not implemented"))
-}
 
 func (UnimplementedPluginServiceHandler) Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.PluginService.Shutdown is not implemented"))
