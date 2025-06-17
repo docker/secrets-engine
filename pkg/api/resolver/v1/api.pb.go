@@ -24,6 +24,8 @@ type RegisterPluginRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_PluginName  *string                `protobuf:"bytes,1,opt,name=plugin_name,json=pluginName"`
 	xxx_hidden_PluginIdx   *string                `protobuf:"bytes,2,opt,name=plugin_idx,json=pluginIdx"`
+	xxx_hidden_Version     *string                `protobuf:"bytes,3,opt,name=version"`
+	xxx_hidden_Pattern     *string                `protobuf:"bytes,4,opt,name=pattern"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -75,14 +77,44 @@ func (x *RegisterPluginRequest) GetPluginIdx() string {
 	return ""
 }
 
+func (x *RegisterPluginRequest) GetVersion() string {
+	if x != nil {
+		if x.xxx_hidden_Version != nil {
+			return *x.xxx_hidden_Version
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *RegisterPluginRequest) GetPattern() string {
+	if x != nil {
+		if x.xxx_hidden_Pattern != nil {
+			return *x.xxx_hidden_Pattern
+		}
+		return ""
+	}
+	return ""
+}
+
 func (x *RegisterPluginRequest) SetPluginName(v string) {
 	x.xxx_hidden_PluginName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
 }
 
 func (x *RegisterPluginRequest) SetPluginIdx(v string) {
 	x.xxx_hidden_PluginIdx = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+}
+
+func (x *RegisterPluginRequest) SetVersion(v string) {
+	x.xxx_hidden_Version = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
+}
+
+func (x *RegisterPluginRequest) SetPattern(v string) {
+	x.xxx_hidden_Pattern = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
 }
 
 func (x *RegisterPluginRequest) HasPluginName() bool {
@@ -99,6 +131,20 @@ func (x *RegisterPluginRequest) HasPluginIdx() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
+func (x *RegisterPluginRequest) HasVersion() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
+}
+
+func (x *RegisterPluginRequest) HasPattern() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
+}
+
 func (x *RegisterPluginRequest) ClearPluginName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_PluginName = nil
@@ -109,6 +155,16 @@ func (x *RegisterPluginRequest) ClearPluginIdx() {
 	x.xxx_hidden_PluginIdx = nil
 }
 
+func (x *RegisterPluginRequest) ClearVersion() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	x.xxx_hidden_Version = nil
+}
+
+func (x *RegisterPluginRequest) ClearPattern() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	x.xxx_hidden_Pattern = nil
+}
+
 type RegisterPluginRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
@@ -116,6 +172,10 @@ type RegisterPluginRequest_builder struct {
 	PluginName *string
 	// Plugin invocation index. Plugins are called in ascending index order.
 	PluginIdx *string
+	// Version of the plugin.
+	Version *string
+	// Pattern
+	Pattern *string
 }
 
 func (b0 RegisterPluginRequest_builder) Build() *RegisterPluginRequest {
@@ -123,20 +183,34 @@ func (b0 RegisterPluginRequest_builder) Build() *RegisterPluginRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.PluginName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
 		x.xxx_hidden_PluginName = b.PluginName
 	}
 	if b.PluginIdx != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
 		x.xxx_hidden_PluginIdx = b.PluginIdx
+	}
+	if b.Version != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 4)
+		x.xxx_hidden_Version = b.Version
+	}
+	if b.Pattern != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
+		x.xxx_hidden_Pattern = b.Pattern
 	}
 	return m0
 }
 
 type RegisterPluginResponse struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Config         *string                `protobuf:"bytes,1,opt,name=config"`
+	xxx_hidden_EngineName     *string                `protobuf:"bytes,2,opt,name=engine_name,json=engineName"`
+	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,3,opt,name=engine_version,json=engineVersion"`
+	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,4,opt,name=request_timeout,json=requestTimeout"`
+	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
+	XXX_presence              [1]uint32
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *RegisterPluginResponse) Reset() {
@@ -164,56 +238,7 @@ func (x *RegisterPluginResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-type RegisterPluginResponse_builder struct {
-	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
-
-}
-
-func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
-	m0 := &RegisterPluginResponse{}
-	b, x := &b0, m0
-	_, _ = b, x
-	return m0
-}
-
-type ConfigureRequest struct {
-	state                     protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Config         *string                `protobuf:"bytes,1,opt,name=config"`
-	xxx_hidden_EngineName     *string                `protobuf:"bytes,2,opt,name=engine_name,json=engineName"`
-	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,3,opt,name=engine_version,json=engineVersion"`
-	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,4,opt,name=request_timeout,json=requestTimeout"`
-	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
-	XXX_presence              [1]uint32
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
-}
-
-func (x *ConfigureRequest) Reset() {
-	*x = ConfigureRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConfigureRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConfigureRequest) ProtoMessage() {}
-
-func (x *ConfigureRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-func (x *ConfigureRequest) GetConfig() string {
+func (x *RegisterPluginResponse) GetConfig() string {
 	if x != nil {
 		if x.xxx_hidden_Config != nil {
 			return *x.xxx_hidden_Config
@@ -223,7 +248,7 @@ func (x *ConfigureRequest) GetConfig() string {
 	return ""
 }
 
-func (x *ConfigureRequest) GetEngineName() string {
+func (x *RegisterPluginResponse) GetEngineName() string {
 	if x != nil {
 		if x.xxx_hidden_EngineName != nil {
 			return *x.xxx_hidden_EngineName
@@ -233,7 +258,7 @@ func (x *ConfigureRequest) GetEngineName() string {
 	return ""
 }
 
-func (x *ConfigureRequest) GetEngineVersion() string {
+func (x *RegisterPluginResponse) GetEngineVersion() string {
 	if x != nil {
 		if x.xxx_hidden_EngineVersion != nil {
 			return *x.xxx_hidden_EngineVersion
@@ -243,82 +268,82 @@ func (x *ConfigureRequest) GetEngineVersion() string {
 	return ""
 }
 
-func (x *ConfigureRequest) GetRequestTimeout() int64 {
+func (x *RegisterPluginResponse) GetRequestTimeout() int64 {
 	if x != nil {
 		return x.xxx_hidden_RequestTimeout
 	}
 	return 0
 }
 
-func (x *ConfigureRequest) SetConfig(v string) {
+func (x *RegisterPluginResponse) SetConfig(v string) {
 	x.xxx_hidden_Config = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
 }
 
-func (x *ConfigureRequest) SetEngineName(v string) {
+func (x *RegisterPluginResponse) SetEngineName(v string) {
 	x.xxx_hidden_EngineName = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
 }
 
-func (x *ConfigureRequest) SetEngineVersion(v string) {
+func (x *RegisterPluginResponse) SetEngineVersion(v string) {
 	x.xxx_hidden_EngineVersion = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
 }
 
-func (x *ConfigureRequest) SetRequestTimeout(v int64) {
+func (x *RegisterPluginResponse) SetRequestTimeout(v int64) {
 	x.xxx_hidden_RequestTimeout = v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
 }
 
-func (x *ConfigureRequest) HasConfig() bool {
+func (x *RegisterPluginResponse) HasConfig() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *ConfigureRequest) HasEngineName() bool {
+func (x *RegisterPluginResponse) HasEngineName() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
-func (x *ConfigureRequest) HasEngineVersion() bool {
+func (x *RegisterPluginResponse) HasEngineVersion() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
-func (x *ConfigureRequest) HasRequestTimeout() bool {
+func (x *RegisterPluginResponse) HasRequestTimeout() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
-func (x *ConfigureRequest) ClearConfig() {
+func (x *RegisterPluginResponse) ClearConfig() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_Config = nil
 }
 
-func (x *ConfigureRequest) ClearEngineName() {
+func (x *RegisterPluginResponse) ClearEngineName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
 	x.xxx_hidden_EngineName = nil
 }
 
-func (x *ConfigureRequest) ClearEngineVersion() {
+func (x *RegisterPluginResponse) ClearEngineVersion() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
 	x.xxx_hidden_EngineVersion = nil
 }
 
-func (x *ConfigureRequest) ClearRequestTimeout() {
+func (x *RegisterPluginResponse) ClearRequestTimeout() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
 	x.xxx_hidden_RequestTimeout = 0
 }
 
-type ConfigureRequest_builder struct {
+type RegisterPluginResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// Any plugin-specific data, if present among the engine configuration.
@@ -331,8 +356,8 @@ type ConfigureRequest_builder struct {
 	RequestTimeout *int64
 }
 
-func (b0 ConfigureRequest_builder) Build() *ConfigureRequest {
-	m0 := &ConfigureRequest{}
+func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
+	m0 := &RegisterPluginResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Config != nil {
@@ -354,119 +379,6 @@ func (b0 ConfigureRequest_builder) Build() *ConfigureRequest {
 	return m0
 }
 
-type ConfigureResponse struct {
-	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Version     *string                `protobuf:"bytes,1,opt,name=version"`
-	xxx_hidden_Pattern     *string                `protobuf:"bytes,2,opt,name=pattern"`
-	XXX_raceDetectHookData protoimpl.RaceDetectHookData
-	XXX_presence           [1]uint32
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
-}
-
-func (x *ConfigureResponse) Reset() {
-	*x = ConfigureResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConfigureResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConfigureResponse) ProtoMessage() {}
-
-func (x *ConfigureResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-func (x *ConfigureResponse) GetVersion() string {
-	if x != nil {
-		if x.xxx_hidden_Version != nil {
-			return *x.xxx_hidden_Version
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *ConfigureResponse) GetPattern() string {
-	if x != nil {
-		if x.xxx_hidden_Pattern != nil {
-			return *x.xxx_hidden_Pattern
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *ConfigureResponse) SetVersion(v string) {
-	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
-}
-
-func (x *ConfigureResponse) SetPattern(v string) {
-	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
-}
-
-func (x *ConfigureResponse) HasVersion() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
-}
-
-func (x *ConfigureResponse) HasPattern() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
-}
-
-func (x *ConfigureResponse) ClearVersion() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_Version = nil
-}
-
-func (x *ConfigureResponse) ClearPattern() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_Pattern = nil
-}
-
-type ConfigureResponse_builder struct {
-	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
-
-	// Version of the plugin.
-	Version *string
-	// Pattern
-	Pattern *string
-}
-
-func (b0 ConfigureResponse_builder) Build() *ConfigureResponse {
-	m0 := &ConfigureResponse{}
-	b, x := &b0, m0
-	_, _ = b, x
-	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
-		x.xxx_hidden_Version = b.Version
-	}
-	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
-		x.xxx_hidden_Pattern = b.Pattern
-	}
-	return m0
-}
-
 type ShutdownRequest struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -475,7 +387,7 @@ type ShutdownRequest struct {
 
 func (x *ShutdownRequest) Reset() {
 	*x = ShutdownRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[4]
+	mi := &file_resolver_v1_api_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -487,7 +399,7 @@ func (x *ShutdownRequest) String() string {
 func (*ShutdownRequest) ProtoMessage() {}
 
 func (x *ShutdownRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[4]
+	mi := &file_resolver_v1_api_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +430,7 @@ type ShutdownResponse struct {
 
 func (x *ShutdownResponse) Reset() {
 	*x = ShutdownResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[5]
+	mi := &file_resolver_v1_api_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +442,7 @@ func (x *ShutdownResponse) String() string {
 func (*ShutdownResponse) ProtoMessage() {}
 
 func (x *ShutdownResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[5]
+	mi := &file_resolver_v1_api_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +476,7 @@ type GetSecretRequest struct {
 
 func (x *GetSecretRequest) Reset() {
 	*x = GetSecretRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -576,7 +488,7 @@ func (x *GetSecretRequest) String() string {
 func (*GetSecretRequest) ProtoMessage() {}
 
 func (x *GetSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +556,7 @@ type GetSecretResponse struct {
 
 func (x *GetSecretResponse) Reset() {
 	*x = GetSecretResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	mi := &file_resolver_v1_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +568,7 @@ func (x *GetSecretResponse) String() string {
 func (*GetSecretResponse) ProtoMessage() {}
 
 func (x *GetSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	mi := &file_resolver_v1_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,22 +661,20 @@ var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x15resolver/v1/api.proto\x12\vresolver.v1\"W\n" +
+	"\x15resolver/v1/api.proto\x12\vresolver.v1\"\x8b\x01\n" +
 	"\x15RegisterPluginRequest\x12\x1f\n" +
 	"\vplugin_name\x18\x01 \x01(\tR\n" +
 	"pluginName\x12\x1d\n" +
 	"\n" +
-	"plugin_idx\x18\x02 \x01(\tR\tpluginIdx\"\x18\n" +
-	"\x16RegisterPluginResponse\"\x9b\x01\n" +
-	"\x10ConfigureRequest\x12\x16\n" +
+	"plugin_idx\x18\x02 \x01(\tR\tpluginIdx\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\x12\x18\n" +
+	"\apattern\x18\x04 \x01(\tR\apattern\"\xa1\x01\n" +
+	"\x16RegisterPluginResponse\x12\x16\n" +
 	"\x06config\x18\x01 \x01(\tR\x06config\x12\x1f\n" +
 	"\vengine_name\x18\x02 \x01(\tR\n" +
 	"engineName\x12%\n" +
 	"\x0eengine_version\x18\x03 \x01(\tR\rengineVersion\x12'\n" +
-	"\x0frequest_timeout\x18\x04 \x01(\x03R\x0erequestTimeout\"G\n" +
-	"\x11ConfigureResponse\x12\x18\n" +
-	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
-	"\apattern\x18\x02 \x01(\tR\apattern\"\x11\n" +
+	"\x0frequest_timeout\x18\x04 \x01(\x03R\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
 	"\x10ShutdownResponse\"/\n" +
 	"\x10GetSecretRequest\x12\x1b\n" +
@@ -773,36 +683,31 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12!\n" +
 	"\fsecret_value\x18\x02 \x01(\tR\vsecretValue2j\n" +
 	"\rEngineService\x12Y\n" +
-	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2\xa4\x01\n" +
-	"\rPluginService\x12J\n" +
-	"\tConfigure\x12\x1d.resolver.v1.ConfigureRequest\x1a\x1e.resolver.v1.ConfigureResponse\x12G\n" +
+	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2X\n" +
+	"\rPluginService\x12G\n" +
 	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponse2]\n" +
 	"\x0fResolverService\x12J\n" +
 	"\tGetSecret\x12\x1d.resolver.v1.GetSecretRequest\x1a\x1e.resolver.v1.GetSecretResponseB\xa9\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z?github.com/docker/secrets-engine/pkg/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
-var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_resolver_v1_api_proto_goTypes = []any{
 	(*RegisterPluginRequest)(nil),  // 0: resolver.v1.RegisterPluginRequest
 	(*RegisterPluginResponse)(nil), // 1: resolver.v1.RegisterPluginResponse
-	(*ConfigureRequest)(nil),       // 2: resolver.v1.ConfigureRequest
-	(*ConfigureResponse)(nil),      // 3: resolver.v1.ConfigureResponse
-	(*ShutdownRequest)(nil),        // 4: resolver.v1.ShutdownRequest
-	(*ShutdownResponse)(nil),       // 5: resolver.v1.ShutdownResponse
-	(*GetSecretRequest)(nil),       // 6: resolver.v1.GetSecretRequest
-	(*GetSecretResponse)(nil),      // 7: resolver.v1.GetSecretResponse
+	(*ShutdownRequest)(nil),        // 2: resolver.v1.ShutdownRequest
+	(*ShutdownResponse)(nil),       // 3: resolver.v1.ShutdownResponse
+	(*GetSecretRequest)(nil),       // 4: resolver.v1.GetSecretRequest
+	(*GetSecretResponse)(nil),      // 5: resolver.v1.GetSecretResponse
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
 	0, // 0: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	2, // 1: resolver.v1.PluginService.Configure:input_type -> resolver.v1.ConfigureRequest
-	4, // 2: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	6, // 3: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
-	1, // 4: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 5: resolver.v1.PluginService.Configure:output_type -> resolver.v1.ConfigureResponse
-	5, // 6: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	7, // 7: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	2, // 1: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4, // 2: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
+	1, // 3: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 4: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5, // 5: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -819,7 +724,7 @@ func file_resolver_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   3,
 		},
