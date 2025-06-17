@@ -25,7 +25,7 @@ type ErrInvalidPluginIndex struct {
 }
 
 func (e ErrInvalidPluginIndex) Error() string {
-	return fmt.Sprintf("invalid plugin index %s: %s", e.Actual, e.Msg)
+	return fmt.Sprintf("invalid plugin index %q: %s", e.Actual, e.Msg)
 }
 
 func (e ErrInvalidPluginIndex) Is(target error) bool {
