@@ -29,7 +29,7 @@ type stub struct {
 }
 
 // New creates a stub with the given plugin and options.
-func New(p Plugin, opts ...Option) (Stub, error) {
+func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	cfg, err := newCfg(p, opts...)
 	if err != nil {
 		return nil, err
