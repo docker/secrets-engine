@@ -22,10 +22,9 @@ const (
 
 type RegisterPluginRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_PluginName  *string                `protobuf:"bytes,1,opt,name=plugin_name,json=pluginName"`
-	xxx_hidden_PluginIdx   *string                `protobuf:"bytes,2,opt,name=plugin_idx,json=pluginIdx"`
-	xxx_hidden_Version     *string                `protobuf:"bytes,3,opt,name=version"`
-	xxx_hidden_Pattern     *string                `protobuf:"bytes,4,opt,name=pattern"`
+	xxx_hidden_Name        *string                `protobuf:"bytes,1,opt,name=name"`
+	xxx_hidden_Version     *string                `protobuf:"bytes,2,opt,name=version"`
+	xxx_hidden_Pattern     *string                `protobuf:"bytes,3,opt,name=pattern"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -57,20 +56,10 @@ func (x *RegisterPluginRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RegisterPluginRequest) GetPluginName() string {
+func (x *RegisterPluginRequest) GetName() string {
 	if x != nil {
-		if x.xxx_hidden_PluginName != nil {
-			return *x.xxx_hidden_PluginName
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *RegisterPluginRequest) GetPluginIdx() string {
-	if x != nil {
-		if x.xxx_hidden_PluginIdx != nil {
-			return *x.xxx_hidden_PluginIdx
+		if x.xxx_hidden_Name != nil {
+			return *x.xxx_hidden_Name
 		}
 		return ""
 	}
@@ -97,71 +86,54 @@ func (x *RegisterPluginRequest) GetPattern() string {
 	return ""
 }
 
-func (x *RegisterPluginRequest) SetPluginName(v string) {
-	x.xxx_hidden_PluginName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
-}
-
-func (x *RegisterPluginRequest) SetPluginIdx(v string) {
-	x.xxx_hidden_PluginIdx = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+func (x *RegisterPluginRequest) SetName(v string) {
+	x.xxx_hidden_Name = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 3)
 }
 
 func (x *RegisterPluginRequest) SetVersion(v string) {
 	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
 }
 
 func (x *RegisterPluginRequest) SetPattern(v string) {
 	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 3)
 }
 
-func (x *RegisterPluginRequest) HasPluginName() bool {
+func (x *RegisterPluginRequest) HasName() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *RegisterPluginRequest) HasPluginIdx() bool {
+func (x *RegisterPluginRequest) HasVersion() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
-func (x *RegisterPluginRequest) HasVersion() bool {
+func (x *RegisterPluginRequest) HasPattern() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
-func (x *RegisterPluginRequest) HasPattern() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
-}
-
-func (x *RegisterPluginRequest) ClearPluginName() {
+func (x *RegisterPluginRequest) ClearName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_PluginName = nil
-}
-
-func (x *RegisterPluginRequest) ClearPluginIdx() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_PluginIdx = nil
+	x.xxx_hidden_Name = nil
 }
 
 func (x *RegisterPluginRequest) ClearVersion() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
 	x.xxx_hidden_Version = nil
 }
 
 func (x *RegisterPluginRequest) ClearPattern() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
 	x.xxx_hidden_Pattern = nil
 }
 
@@ -169,9 +141,7 @@ type RegisterPluginRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// Name of the plugin to register.
-	PluginName *string
-	// Plugin invocation index. Plugins are called in ascending index order.
-	PluginIdx *string
+	Name *string
 	// Version of the plugin.
 	Version *string
 	// Pattern
@@ -182,20 +152,16 @@ func (b0 RegisterPluginRequest_builder) Build() *RegisterPluginRequest {
 	m0 := &RegisterPluginRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	if b.PluginName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
-		x.xxx_hidden_PluginName = b.PluginName
-	}
-	if b.PluginIdx != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
-		x.xxx_hidden_PluginIdx = b.PluginIdx
+	if b.Name != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 3)
+		x.xxx_hidden_Name = b.Name
 	}
 	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 3)
 		x.xxx_hidden_Version = b.Version
 	}
 	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 3)
 		x.xxx_hidden_Pattern = b.Pattern
 	}
 	return m0
@@ -661,14 +627,11 @@ var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x15resolver/v1/api.proto\x12\vresolver.v1\"\x8b\x01\n" +
-	"\x15RegisterPluginRequest\x12\x1f\n" +
-	"\vplugin_name\x18\x01 \x01(\tR\n" +
-	"pluginName\x12\x1d\n" +
-	"\n" +
-	"plugin_idx\x18\x02 \x01(\tR\tpluginIdx\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion\x12\x18\n" +
-	"\apattern\x18\x04 \x01(\tR\apattern\"\xa1\x01\n" +
+	"\x15resolver/v1/api.proto\x12\vresolver.v1\"_\n" +
+	"\x15RegisterPluginRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
+	"\apattern\x18\x03 \x01(\tR\apattern\"\xa1\x01\n" +
 	"\x16RegisterPluginResponse\x12\x16\n" +
 	"\x06config\x18\x01 \x01(\tR\x06config\x12\x1f\n" +
 	"\vengine_name\x18\x02 \x01(\tR\n" +
