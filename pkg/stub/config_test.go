@@ -5,16 +5,13 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 
 	nriNet "github.com/containerd/nri/pkg/net"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/pkg/adaptation"
-	"github.com/docker/secrets-engine/pkg/api"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
@@ -28,32 +25,8 @@ func (m mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelop
 func (m mockPlugin) Shutdown(context.Context) {
 }
 
-func Test_newCfg(t *testing.T) {
-	tests := []struct {
-		name string
-		test func(t *testing.T)
-	}{
-		{
-			name: "no options allowed when launched from secrets engine",
-			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_, err := newCfg(mockPlugin{}, WithPluginName("test-plugin"))
-				assert.ErrorContains(t, err, "cannot use manual launch options")
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.test(t)
-		})
-	}
-}
-
 func cleanupEnv() {
-	_ = os.Setenv(adaptation.PluginNameEnvVar, "")
-	_ = os.Setenv(adaptation.PluginIdxEnvVar, "")
-	_ = os.Setenv(adaptation.PluginRegistrationTimeoutEnvVar, "")
+	_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, "")
 }
 
 func Test_newCfgForManualLaunch(t *testing.T) {
@@ -69,7 +42,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				defer func() {
 					os.Args = args
 				}()
-				os.Args = []string{"10-test-plugin"}
+				os.Args = []string{"test-plugin"}
 				os.Setenv("XDG_RUNTIME_DIR", os.TempDir())
 				socketPath := adaptation.DefaultSocketPath()
 				os.Remove(socketPath)
@@ -80,58 +53,14 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				}
 				defer listener.Close()
 				defer os.Remove(socketPath)
+
 				m := mockPlugin{}
-
-				cfg, err := newCfgForManualLaunch(m)
+				c, err := newCfgForManualLaunch(m)
 				assert.NoError(t, err)
-				assert.Equal(t, "10", cfg.identity.idx)
-				assert.Equal(t, "test-plugin", cfg.identity.name)
-				assert.Equal(t, adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
-				assert.NotNil(t, cfg.conn)
-				assert.Equal(t, m, cfg.plugin)
-			},
-		},
-		{
-			name: "no options just defaults but filename does not contain index",
-			test: func(t *testing.T) {
-				var args []string
-				copy(args, os.Args)
-				defer func() {
-					os.Args = args
-				}()
-				os.Args = []string{"test-plugin"}
-				os.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-				socketPath := adaptation.DefaultSocketPath()
-				os.Remove(socketPath)
-				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0755))
-				listener, err := net.Listen("unix", socketPath)
-				if err != nil {
-					t.Fatalf("listen failed: %v", err)
-				}
-				defer listener.Close()
-				defer os.Remove(socketPath)
-
-				_, err = newCfgForManualLaunch(mockPlugin{})
-				assert.ErrorIs(t, err, &api.ErrInvalidPluginIndex{Actual: "test", Msg: "must be two digits"})
-			},
-		},
-		{
-			name: "without name",
-			test: func(t *testing.T) {
-				var args []string
-				copy(args, os.Args)
-				defer func() {
-					os.Args = args
-				}()
-				os.Args = []string{"test-plugin"}
-				client, server := net.Pipe()
-				defer client.Close()
-				defer server.Close()
-				cfg, err := newCfgForManualLaunch(mockPlugin{}, WithPluginIdx("10"), WithConnection(client))
-				assert.NoError(t, err)
-				assert.Equal(t, "10", cfg.identity.idx)
-				assert.Equal(t, "test-plugin", cfg.identity.name)
-				assert.Equal(t, client, cfg.conn)
+				assert.Equal(t, "test-plugin", c.name)
+				assert.Equal(t, adaptation.DefaultPluginRegistrationTimeout, c.registrationTimeout)
+				assert.Equal(t, m, c.plugin)
+				assert.NotNil(t, c.conn)
 			},
 		},
 		{
@@ -142,14 +71,13 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				defer server.Close()
 				cfg, err := newCfgForManualLaunch(mockPlugin{},
 					WithPluginName("test-plugin"),
-					WithPluginIdx("10"),
 					WithRegistrationTimeout(10*adaptation.DefaultPluginRegistrationTimeout),
 					WithConnection(client),
 				)
 				assert.NoError(t, err)
-				assert.Equal(t, "10", cfg.identity.idx)
-				assert.Equal(t, "test-plugin", cfg.identity.name)
+				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
+				assert.Equal(t, client, cfg.conn)
 			},
 		},
 	}
@@ -166,72 +94,24 @@ func Test_restoreConfig(t *testing.T) {
 		test func(t *testing.T)
 	}{
 		{
-			name: "name missing",
+			name: "no config from the engine",
 			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_, err := restoreConfig()
-				assert.ErrorIs(t, err, errPluginNameNotSet)
+				_, err := restoreConfig(mockPlugin{})
+				assert.ErrorIs(t, err, errPluginNotLaunchedByEngine)
 			},
 		},
 		{
-			name: "index missing",
+			name: "invalid config from the engine",
 			test: func(t *testing.T) {
 				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_, err := restoreConfig()
-				assert.ErrorIs(t, err, errPluginIdxNotSet)
-			},
-		},
-		{
-			name: "invalid index",
-			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_ = os.Setenv(adaptation.PluginIdxEnvVar, "invalid-index")
-				_, err := restoreConfig()
-				assert.ErrorIs(t, err, &api.ErrInvalidPluginIndex{Actual: "invalid-index", Msg: "must be two digits"})
-			},
-		},
-		{
-			name: "registration timeout missing",
-			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_ = os.Setenv(adaptation.PluginIdxEnvVar, "10")
-				_, err := restoreConfig()
-				assert.ErrorIs(t, err, errPluginRegistrationTimeoutNotSet)
-			},
-		},
-		{
-			name: "invalid registration timeout",
-			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_ = os.Setenv(adaptation.PluginIdxEnvVar, "10")
-				_ = os.Setenv(adaptation.PluginRegistrationTimeoutEnvVar, "10")
-				_, err := restoreConfig()
-				assert.ErrorContains(t, err, "invalid registration timeout")
-			},
-		},
-		{
-			name: "socket fd missing",
-			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_ = os.Setenv(adaptation.PluginIdxEnvVar, "10")
-				_ = os.Setenv(adaptation.PluginRegistrationTimeoutEnvVar, "10s")
-				_, err := restoreConfig()
-				assert.ErrorIs(t, err, errPluginSocketNotSet)
+				_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, "test-plugin")
+				_, err := restoreConfig(mockPlugin{})
+				assert.Error(t, err)
 			},
 		},
 		{
 			name: "valid config",
 			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginNameEnvVar, "test-plugin")
-				_ = os.Setenv(adaptation.PluginIdxEnvVar, "10")
-				_ = os.Setenv(adaptation.PluginRegistrationTimeoutEnvVar, "10s")
-
 				sockets, err := nriNet.NewSocketPair()
 				require.NoError(t, err)
 				defer sockets.Close()
@@ -240,13 +120,20 @@ func Test_restoreConfig(t *testing.T) {
 				defer conn.Close()
 				peerFile := sockets.PeerFile()
 				defer peerFile.Close()
-				_ = os.Setenv(adaptation.PluginSocketEnvVar, strconv.Itoa(int(peerFile.Fd())))
+				defer cleanupEnv()
+				engineCfg := adaptation.PluginConfigFromEngine{
+					Name:                "test-plugin",
+					RegistrationTimeout: 10 * adaptation.DefaultPluginRegistrationTimeout,
+					Fd:                  int(peerFile.Fd()),
+				}
+				cfgString, err := engineCfg.ToString()
+				require.NoError(t, err)
+				_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, cfgString)
 
-				cfg, err := restoreConfig()
+				cfg, err := restoreConfig(mockPlugin{})
 				assert.NoError(t, err)
-				assert.Equal(t, "test-plugin", cfg.identity.name)
-				assert.Equal(t, "10", cfg.identity.idx)
-				assert.Equal(t, 10*time.Second, cfg.timeout)
+				assert.Equal(t, "test-plugin", cfg.name)
+				assert.Equal(t, 10*adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
 				defer cfg.conn.Close()
 				msg := []byte("hello test")
 				go func() {
