@@ -18,6 +18,14 @@ import (
 type mockPlugin struct {
 }
 
+func (m mockPlugin) Config() Config {
+	return Config{}
+}
+
+func (m mockPlugin) Configure(context.Context, RuntimeConfig) error {
+	return nil
+}
+
 func (m mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{}, nil
 }
