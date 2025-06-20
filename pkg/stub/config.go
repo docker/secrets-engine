@@ -55,13 +55,10 @@ type cfg struct {
 
 func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	engineCfg, err := restoreConfig(p)
-	if err != nil && !errors.Is(err, errPluginNotLaunchedByEngine) {
-		return nil, err
+	if errors.Is(err, errPluginNotLaunchedByEngine) {
+		return newCfgForManualLaunch(p, opts...)
 	}
-	if err == nil && engineCfg != nil {
-		return engineCfg, nil
-	}
-	return newCfgForManualLaunch(p, opts...)
+	return engineCfg, err
 }
 
 func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
@@ -101,7 +98,7 @@ func restoreConfig(p Plugin) (*cfg, error) {
 	if cfgString == "" {
 		return nil, errPluginNotLaunchedByEngine
 	}
-	c, err := adaptation.NewPluginConfigFromEngineFromString(cfgString)
+	c, err := adaptation.NewPluginConfigFromEngineEnv(cfgString)
 	if err != nil {
 		return nil, err
 	}

@@ -9,22 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mockPluginNameWithLength(n int) string {
-	var sb strings.Builder
-	sb.Grow(n)
-	for i := 0; i < n; i++ {
-		if i%2 == 0 {
-			sb.WriteByte('a')
-		} else {
-			sb.WriteByte('b')
-		}
-	}
-	return sb.String()
-}
-
 func TestPluginConfigFromEngine_ToString(t *testing.T) {
 	in := PluginConfigFromEngine{
-		Name:                mockPluginNameWithLength(500),
+		Name:                strings.Repeat("ab", 250), // 500 characters
 		RegistrationTimeout: 27 * time.Nanosecond,
 		Fd:                  10,
 	}
@@ -33,7 +20,7 @@ func TestPluginConfigFromEngine_ToString(t *testing.T) {
 	// This is coming from here: https://superuser.com/questions/1070272/why-does-windows-have-a-limit-on-environment-variables-at-all
 	// -> we verify that a plugin name of 500 characters is still within the limit
 	assert.LessOrEqual(t, len(out), 2048)
-	restored, err := NewPluginConfigFromEngineFromString(out)
+	restored, err := NewPluginConfigFromEngineEnv(out)
 	assert.NoError(t, err)
 	assert.Equal(t, in, *restored)
 }
@@ -77,7 +64,7 @@ func TestNewPluginConfigFromEngineFromString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			out, err := tt.in.ToString()
 			require.NoError(t, err)
-			_, err = NewPluginConfigFromEngineFromString(out)
+			_, err = NewPluginConfigFromEngineEnv(out)
 			if tt.err != "" {
 				assert.ErrorContains(t, err, tt.err)
 			} else {

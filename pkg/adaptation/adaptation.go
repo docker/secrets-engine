@@ -11,7 +11,7 @@ import (
 
 const (
 	// PluginLaunchedByEngineVar is used to inform engine-launched plugins about their name.
-	PluginLaunchedByEngineVar = "DOCKER_SECRETS_ENGINE_LAUNCH_CFG"
+	PluginLaunchedByEngineVar = "DOCKER_SECRETS_ENGINE_PLUGIN_LAUNCH_CFG"
 	// DefaultPluginRegistrationTimeout is the default timeout for plugin registration.
 	DefaultPluginRegistrationTimeout = 5 * time.Second
 )
@@ -40,7 +40,7 @@ func (c *PluginConfigFromEngine) ToString() (string, error) {
 	return string(result), nil
 }
 
-func NewPluginConfigFromEngineFromString(in string) (*PluginConfigFromEngine, error) {
+func NewPluginConfigFromEngineEnv(in string) (*PluginConfigFromEngine, error) {
 	var result PluginConfigFromEngine
 	if err := json.Unmarshal([]byte(in), &result); err != nil {
 		return nil, fmt.Errorf("failed to decode plugin config from engine %q: %w", PluginLaunchedByEngineVar, err)
