@@ -12,7 +12,23 @@ import (
 type Plugin interface {
 	secrets.Resolver
 
+	Config() Config
+
+	Configure(context.Context, RuntimeConfig) error
+
 	Shutdown(context.Context)
+}
+
+type RuntimeConfig struct {
+	Config  string
+	Engine  string
+	Version string
+}
+
+type Config struct {
+	Version string
+
+	Pattern string
 }
 
 // Stub is the interface the stub provides for the plugin implementation.
