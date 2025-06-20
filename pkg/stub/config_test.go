@@ -25,10 +25,6 @@ func (m mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelop
 func (m mockPlugin) Shutdown(context.Context) {
 }
 
-func cleanupEnv() {
-	_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, "")
-}
-
 func Test_newCfgForManualLaunch(t *testing.T) {
 	tests := []struct {
 		name string
@@ -39,11 +35,11 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 			test: func(t *testing.T) {
 				var args []string
 				copy(args, os.Args)
-				defer func() {
+				t.Cleanup(func() {
 					os.Args = args
-				}()
+				})
 				os.Args = []string{"test-plugin"}
-				os.Setenv("XDG_RUNTIME_DIR", os.TempDir())
+				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
 				socketPath := adaptation.DefaultSocketPath()
 				os.Remove(socketPath)
 				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0755))
@@ -51,8 +47,10 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
-				defer listener.Close()
-				defer os.Remove(socketPath)
+				t.Cleanup(func() {
+					listener.Close()
+					os.Remove(socketPath)
+				})
 
 				m := mockPlugin{}
 				c, err := newCfgForManualLaunch(m)
@@ -67,8 +65,10 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 			name: "with all custom options",
 			test: func(t *testing.T) {
 				client, server := net.Pipe()
-				defer client.Close()
-				defer server.Close()
+				t.Cleanup(func() {
+					client.Close()
+					server.Close()
+				})
 				cfg, err := newCfgForManualLaunch(mockPlugin{},
 					WithPluginName("test-plugin"),
 					WithRegistrationTimeout(10*adaptation.DefaultPluginRegistrationTimeout),
@@ -103,8 +103,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "invalid config from the engine",
 			test: func(t *testing.T) {
-				defer cleanupEnv()
-				_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, "test-plugin")
+				t.Setenv(adaptation.PluginLaunchedByEngineVar, "test-plugin")
 				_, err := restoreConfig(mockPlugin{})
 				assert.Error(t, err)
 			},
@@ -114,13 +113,12 @@ func Test_restoreConfig(t *testing.T) {
 			test: func(t *testing.T) {
 				sockets, err := nriNet.NewSocketPair()
 				require.NoError(t, err)
-				defer sockets.Close()
+				t.Cleanup(func() { sockets.Close() })
 				conn, err := sockets.LocalConn()
 				require.NoError(t, err)
-				defer conn.Close()
+				t.Cleanup(func() { conn.Close() })
 				peerFile := sockets.PeerFile()
-				defer peerFile.Close()
-				defer cleanupEnv()
+				t.Cleanup(func() { peerFile.Close() })
 				engineCfg := adaptation.PluginConfigFromEngine{
 					Name:                "test-plugin",
 					RegistrationTimeout: 10 * adaptation.DefaultPluginRegistrationTimeout,
@@ -128,13 +126,13 @@ func Test_restoreConfig(t *testing.T) {
 				}
 				cfgString, err := engineCfg.ToString()
 				require.NoError(t, err)
-				_ = os.Setenv(adaptation.PluginLaunchedByEngineVar, cfgString)
+				t.Setenv(adaptation.PluginLaunchedByEngineVar, cfgString)
 
 				cfg, err := restoreConfig(mockPlugin{})
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
-				defer cfg.conn.Close()
+				t.Cleanup(func() { cfg.conn.Close() })
 				msg := []byte("hello test")
 				go func() {
 					_, err := conn.Write(msg)
