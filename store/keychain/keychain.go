@@ -10,7 +10,7 @@ var ErrCollectionPathInvalid = errors.New("keychain collection path is invalid")
 
 const (
 	// the docker label is the default prefix on all keys stored by the keychain
-	// e.g. io.docker.Secrets:encoded(realm/app/username)
+	// e.g. io.docker.Secrets:id(realm/app/username)
 	dockerSecretsLabel = "io.docker.Secrets"
 )
 
@@ -37,7 +37,6 @@ func WithKeyPrefix[T store.Secret](prefix string) Options[T] {
 
 // New creates a new keychain store
 //
-// collectionID is a singular noun indicating the collection name, e.g. "docker"
 // factory is a function used to instantiate new secrets of type T.
 func New[T store.Secret](factory Factory[T], opts ...Options[T]) (store.Store, error) {
 	k := &keychainStore[T]{
