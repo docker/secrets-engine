@@ -16,11 +16,12 @@ const (
 	keychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
 )
 
-// toSecretsService prefixes a secrets engine key
-// The freedesktop.secrets API uses `/` to indicate <collection>/<id>
-func toSecretsService(prefix string, id store.ID) string {
-	// r := strings.NewReplacer("/", "__")
-	return prefix + ":" + id.String()
+func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
+	return map[string]string{
+		"id":            id.String(),
+		"service:group": k.serviceGroup,
+		"service:name":  k.serviceName,
+	}
 }
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
@@ -35,10 +36,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 	defer service.CloseSession(session)
 
-	attributes := map[string]string{
-		"id":    id.String(),
-		"owner": k.keyPrefix,
-	}
+	attributes := k.itemAttributes(id)
 	items, err := service.SearchCollection(keychainObjectPath, attributes)
 	if err != nil {
 		return err
@@ -67,10 +65,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, err
 	}
 
-	attributes := map[string]string{
-		"id":    id.String(),
-		"owner": k.keyPrefix,
-	}
+	attributes := k.itemAttributes(id)
 	items, err := service.SearchCollection(keychainObjectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
@@ -109,9 +104,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 		return nil, err
 	}
 
-	attributes := map[string]string{
-		"owner": k.keyPrefix,
-	}
+	attributes := k.itemAttributes("")
 	itemPaths, err := service.SearchCollection(keychainObjectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
@@ -170,10 +163,9 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
-	properties := kc.NewSecretProperties(toSecretsService(k.keyPrefix, id), map[string]string{
-		"id":    id.String(),
-		"owner": k.keyPrefix,
-	})
+	attributes := k.itemAttributes(id)
+	label := k.itemLabel(id)
+	properties := kc.NewSecretProperties(label, attributes)
 
 	_, err = service.CreateItem(keychainObjectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
 	if err != nil {
