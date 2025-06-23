@@ -6,47 +6,54 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
-var ErrCollectionPathInvalid = errors.New("keychain collection path is invalid")
-
-const (
-	// the docker label is the default prefix on all keys stored by the keychain
-	// e.g. io.docker.Secrets:id(realm/app/username)
-	dockerSecretsLabel = "io.docker.Secrets"
-)
-
 type keychainStore[T store.Secret] struct {
-	keyPrefix string
-	factory   func() T
+	serviceGroup string
+	serviceName  string
+	factory      func() T
 }
 
 var _ store.Store = &keychainStore[store.Secret]{}
 
 type Factory[T store.Secret] func() T
 
-type Options[T store.Secret] func(*keychainStore[T]) error
-
-func WithKeyPrefix[T store.Secret](prefix string) Options[T] {
-	return func(ks *keychainStore[T]) error {
-		if prefix == "" {
-			return errors.New("the prefix cannot be empty")
-		}
-		ks.keyPrefix = prefix
-		return nil
-	}
-}
-
-// New creates a new keychain store
+// New creates a new keychain store.
 //
-// factory is a function used to instantiate new secrets of type T.
-func New[T store.Secret](factory Factory[T], opts ...Options[T]) (store.Store, error) {
-	k := &keychainStore[T]{
-		factory:   factory,
-		keyPrefix: dockerSecretsLabel,
+// It takes ServiceGroup and ServiceName and a [Factory] as input.
+//
+// A ServiceGroup is added to an item stored by the keychain under the item's
+// attributes and label. Many applications can share the same serviceGroup.
+//
+// On macOS it is important that the service group matches the Keychain Access
+// Groups. This prevents access from other applications not inside the Keychain
+// Access group.
+// https://developer.apple.com/documentation/security/sharing-access-to-keychain-items-among-a-collection-of-apps#Set-your-apps-access-groups
+//
+// On Linux the service group is added to the attributes of a secret to tag
+// the item. The secrets service API does not have the concept of a scoped item
+// per application inside the collection.
+// Thus, adding a service group does not prevent other applications from
+// accessing the secret.
+//
+// A ServiceName is a unique name of the application storing credentials, it is
+// important to keep the service name unchanged once the service has stored credentials.
+// Changing the service name can be done, but would require migrating existing credentials.
+//
+// [Factory] is a function used to instantiate new secrets of type T.
+func New[T store.Secret](serviceGroup, serviceName string, factory Factory[T]) (store.Store, error) {
+	if serviceGroup == "" || serviceName == "" {
+		return nil, errors.New("serviceGroup and serviceName are required")
 	}
-	for _, o := range opts {
-		if err := o(k); err != nil {
-			return nil, err
-		}
+
+	k := &keychainStore[T]{
+		factory:      factory,
+		serviceGroup: serviceGroup,
+		serviceName:  serviceName,
 	}
 	return k, nil
+}
+
+// itemLabel prefixes a secret ID with the service group and service name
+// e.g. group:name:id
+func (k *keychainStore[T]) itemLabel(id store.ID) string {
+	return k.serviceGroup + ":" + k.serviceName + ":" + id.String()
 }
