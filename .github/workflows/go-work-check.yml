@@ -1,0 +1,37 @@
+name: Go Work Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          check-latest: true
+
+      - name: Check if go work sync/vendor is clean
+        run: |
+          go work sync
+          go work vendor
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "::error::Go work sync/vendor files need to be updated. Please run 'go work sync' and 'go mod vendor' and commit the changes."
+            git status
+            git diff
+            exit 1
+          fi
