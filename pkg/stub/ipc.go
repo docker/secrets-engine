@@ -17,7 +17,7 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-type Ipc interface {
+type ipc interface {
 	conn() net.Conn
 	wait(ctx context.Context) error
 	close() error
@@ -29,7 +29,7 @@ type ipcServer struct {
 	err    error
 }
 
-func newIpcServer(l net.Listener, handler http.Handler) *ipcServer {
+func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServer {
 	result := &ipcServer{
 		done: make(chan struct{}),
 		server: &http.Server{
@@ -39,6 +39,7 @@ func newIpcServer(l net.Listener, handler http.Handler) *ipcServer {
 	go func() {
 		err := result.server.Serve(l)
 		if !errors.Is(err, http.ErrServerClosed) {
+			onError()
 			result.err = err
 		}
 		close(result.done)
@@ -46,7 +47,7 @@ func newIpcServer(l net.Listener, handler http.Handler) *ipcServer {
 	return result
 }
 
-func NewIPC(sockConn net.Conn, handler http.Handler) (Ipc, error) {
+func newIPC(sockConn net.Conn, handler http.Handler) (ipc, error) {
 	mux := multiplex.Multiplex(sockConn)
 	listener, err := mux.Listen(multiplex.PluginServiceConn)
 	if err != nil {
@@ -58,7 +59,7 @@ func NewIPC(sockConn net.Conn, handler http.Handler) (Ipc, error) {
 		mux.Close()
 		return nil, fmt.Errorf("failed to multiplex grcp client connection: %w", err)
 	}
-	server := newIpcServer(listener, handler)
+	server := newIpcServer(listener, handler, func() { mux.Close() })
 	return &ipcImpl{
 		mConn:  conn,
 		server: server,
