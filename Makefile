@@ -52,7 +52,10 @@ clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
 
 unit-tests:
-	CGO_ENABLED=0 go test -v -tags="gen" ./...
+	CGO_ENABLED=0 go test -v -tags="gen" $$(go list ./... | grep -v /store/)
+
+keychain-unit-tests:
+	$(MAKE) -C store/ unit-tests
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w ${GO_LDFLAGS}" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
