@@ -40,8 +40,8 @@ type Config struct {
 // Stub is the interface the stub provides for the plugin implementation.
 type Stub interface {
 	// Run starts the plugin then waits for the plugin service to exit, either due to a
-	// critical error or by cancelling the context. Once Run() returns, the plugin can be
-	// restarted by calling Run() again.
+	// critical error or by cancelling the context. Calling Run() while the plugin is running,
+	// will result in an error. After the plugin service exits, Run() can safely be called again.
 	Run(context.Context) error
 
 	// RegistrationTimeout returns the registration timeout for the stub.
