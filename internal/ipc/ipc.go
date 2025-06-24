@@ -1,4 +1,4 @@
-package stub
+package ipc
 
 import (
 	"context"
@@ -17,10 +17,10 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-type ipc interface {
-	conn() net.Conn
-	wait(ctx context.Context) error
-	close() error
+type MuxedIpc interface {
+	Conn() net.Conn
+	Wait(ctx context.Context) error
+	Close() error
 }
 
 type ipcServer struct {
@@ -47,7 +47,7 @@ func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServ
 	return result
 }
 
-func newIPC(sockConn net.Conn, handler http.Handler) (ipc, error) {
+func NewIPC(sockConn net.Conn, handler http.Handler) (MuxedIpc, error) {
 	mux := multiplex.Multiplex(sockConn)
 	listener, err := mux.Listen(multiplex.PluginServiceConn)
 	if err != nil {
@@ -71,11 +71,11 @@ func newIPC(sockConn net.Conn, handler http.Handler) (ipc, error) {
 	}, nil
 }
 
-func (i *ipcImpl) conn() net.Conn {
+func (i *ipcImpl) Conn() net.Conn {
 	return i.mConn
 }
 
-func (i *ipcImpl) wait(ctx context.Context) error {
+func (i *ipcImpl) Wait(ctx context.Context) error {
 	select {
 	case <-i.server.done:
 		return i.server.err
@@ -84,6 +84,6 @@ func (i *ipcImpl) wait(ctx context.Context) error {
 	}
 }
 
-func (i *ipcImpl) close() error {
+func (i *ipcImpl) Close() error {
 	return i.teardown()
 }
