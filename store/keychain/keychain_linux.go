@@ -17,11 +17,14 @@ const (
 )
 
 func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
-	return map[string]string{
-		"id":            id.String(),
+	attributes := map[string]string{
 		"service:group": k.serviceGroup,
 		"service:name":  k.serviceName,
 	}
+	if id.String() != "" {
+		attributes["id"] = id.String()
+	}
+	return attributes
 }
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
@@ -104,7 +107,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 		return nil, err
 	}
 
-	attributes := k.itemAttributes("")
+	attributes := k.itemAttributes(store.ID(""))
 	itemPaths, err := service.SearchCollection(keychainObjectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
