@@ -1,4 +1,4 @@
-module github.com/docker/secrets-engine/stub
+module github.com/docker/secrets-engine/plugin
 
 go 1.24.3
 

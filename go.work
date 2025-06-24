@@ -2,5 +2,5 @@ go 1.24.3
 
 use (
 	.
-	./stub
+	./plugin
 )
