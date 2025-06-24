@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
@@ -59,7 +60,7 @@ type Stub interface {
 type stub struct {
 	name    string
 	m       sync.Mutex
-	factory func(context.Context) (ipc, error)
+	factory func(context.Context) (ipc.MuxedIpc, error)
 
 	registrationTimeout time.Duration
 	requestTimeout      time.Duration
@@ -75,7 +76,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	}
 	stub := &stub{
 		name: cfg.name,
-		factory: func(ctx context.Context) (ipc, error) {
+		factory: func(ctx context.Context) (ipc.MuxedIpc, error) {
 			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout)
 		},
 	}
@@ -84,7 +85,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	return stub, nil
 }
 
-func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc, error) {
+func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc.MuxedIpc, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -92,17 +93,17 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 	})
 	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{p.Shutdown}))
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p}))
-	ipc, err := newIPC(conn, httpMux)
+	ipc, err := ipc.NewIPC(conn, httpMux)
 	if err != nil {
 		return nil, err
 	}
-	runtimeCfg, err := doRegister(ctx, ipc.conn(), name, p, timeout)
+	runtimeCfg, err := doRegister(ctx, ipc.Conn(), name, p, timeout)
 	if err != nil {
-		ipc.close()
+		ipc.Close()
 		return nil, err
 	}
 	if err := p.Configure(ctx, *runtimeCfg); err != nil {
-		ipc.close()
+		ipc.Close()
 		return nil, fmt.Errorf("failed to configure plugin %q: %w", name, err)
 	}
 	logrus.Infof("Started plugin %s...", name)
@@ -119,12 +120,12 @@ func (stub *stub) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ipc.wait(ctx)
+	err = ipc.Wait(ctx)
 	select {
 	case <-ctx.Done():
 	default:
 	}
-	return errors.Join(ipc.close(), err)
+	return errors.Join(ipc.Close(), err)
 }
 
 func (stub *stub) RegistrationTimeout() time.Duration {
