@@ -11,16 +11,36 @@ import (
 	"github.com/containerd/nri/pkg/net/multiplex"
 )
 
-type ipcImpl struct {
-	mConn    net.Conn
-	server   *ipcServer
-	teardown func() error
+type PluginIPC interface {
+	// Conn returns a connection that can be used to reach the runtime server on the other end of
+	// the multiplexed connection (this is not the original net.Conn, but a multiplexed connection!).
+	Conn() net.Conn
+	// Wait blocks forever until the server is closed or an error occurs.
+	// Cancelling the context will not close the server, but will return nil.
+	Wait(ctx context.Context) error
+	// Close shuts down the server and closes the multiplexer, and its connection/listener.
+	Close() error
 }
 
-type MuxedIpc interface {
+func NewPluginIPC(sockConn net.Conn, handler http.Handler) (PluginIPC, error) {
+	return newMuxedIPC(sockConn, handler, multiplex.PluginServiceConn, multiplex.RuntimeServiceConn)
+}
+
+type RuntimeIPC interface {
+	// Conn returns a connection that can be used to reach the server running in the plugin on the other end of
+	// the multiplexed connection (this is not the original net.Conn, but a multiplexed connection!).
 	Conn() net.Conn
+	// Wait blocks forever until the server is closed or an error occurs.
+	// Cancelling the context will not close the server, but will return nil.
 	Wait(ctx context.Context) error
+	// Close shuts down the server and closes the multiplexer, and its connection/listener.
 	Close() error
+	// Unblock unblocks the multiplexed connection, allowing it to read from the socket.
+	Unblock()
+}
+
+func NewRuntimeIPC(sockConn net.Conn, handler http.Handler) (RuntimeIPC, error) {
+	return newMuxedIPC(sockConn, handler, multiplex.RuntimeServiceConn, multiplex.PluginServiceConn, multiplex.WithBlockedRead())
 }
 
 type ipcServer struct {
@@ -47,14 +67,21 @@ func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServ
 	return result
 }
 
-func NewIPC(sockConn net.Conn, handler http.Handler) (MuxedIpc, error) {
-	mux := multiplex.Multiplex(sockConn)
-	listener, err := mux.Listen(multiplex.PluginServiceConn)
+type ipcImpl struct {
+	mConn    net.Conn
+	server   *ipcServer
+	teardown func() error
+	unblock  func()
+}
+
+func newMuxedIPC(sockConn net.Conn, handler http.Handler, listenerID, connID multiplex.ConnID, options ...multiplex.Option) (*ipcImpl, error) {
+	mux := multiplex.Multiplex(sockConn, options...)
+	listener, err := mux.Listen(listenerID)
 	if err != nil {
 		mux.Close()
 		return nil, err
 	}
-	conn, err := mux.Open(multiplex.RuntimeServiceConn)
+	conn, err := mux.Open(connID)
 	if err != nil {
 		mux.Close()
 		return nil, fmt.Errorf("failed to multiplex grcp client connection: %w", err)
@@ -68,6 +95,7 @@ func NewIPC(sockConn net.Conn, handler http.Handler) (MuxedIpc, error) {
 			<-server.done
 			return err
 		}),
+		unblock: mux.Unblock,
 	}, nil
 }
 
@@ -86,4 +114,8 @@ func (i *ipcImpl) Wait(ctx context.Context) error {
 
 func (i *ipcImpl) Close() error {
 	return i.teardown()
+}
+
+func (i *ipcImpl) Unblock() {
+	i.unblock()
 }
