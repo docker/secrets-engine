@@ -2,6 +2,7 @@ package adaptation
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 var _ resolverv1connect.EngineServiceHandler = &RegisterService{}
@@ -26,39 +28,74 @@ type pluginCfgOut struct {
 type pluginCfgIn struct {
 	name    string
 	version string
-	pattern string
+	pattern secrets.Pattern
 }
 
-type onRegisteredFunc func(ctx context.Context, cfg pluginCfgIn) error
+type pluginRegistrator interface {
+	register(ctx context.Context, cfg pluginCfgIn) (*pluginCfgOut, error)
+}
 
 type RegisterService struct {
-	m            sync.Mutex
-	onRegistered onRegisteredFunc
-	sent         pluginCfgOut
-}
-
-func NewRegisterService(cfg pluginCfgOut, registeredFunc onRegisteredFunc) *RegisterService {
-	return &RegisterService{
-		sent:         cfg,
-		onRegistered: registeredFunc,
-	}
+	r pluginRegistrator
 }
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
-	r.m.Lock()
-	defer r.m.Unlock()
+	pattern, err := secrets.ParsePattern(c.Msg.GetPattern())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 	in := pluginCfgIn{
 		name:    c.Msg.GetName(),
 		version: c.Msg.GetVersion(),
-		pattern: c.Msg.GetPattern(),
+		pattern: pattern,
 	}
-	if err := r.onRegistered(ctx, in); err != nil {
+	out, err := r.r.register(ctx, in)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
-		EngineName:     proto.String(r.sent.engineName),
-		EngineVersion:  proto.String(r.sent.engineVersion),
-		Config:         proto.String(r.sent.config),
-		RequestTimeout: proto.Int64(int64(r.sent.requestTimeout.Seconds())),
+		EngineName:     proto.String(out.engineName),
+		EngineVersion:  proto.String(out.engineVersion),
+		Config:         proto.String(out.config),
+		RequestTimeout: proto.Int64(int64(out.requestTimeout.Seconds())),
 	}.Build()), nil
+}
+
+type pluginCfgInValidator interface {
+	Validate(pluginCfgIn) (*pluginCfgOut, error)
+}
+
+type registrationResult struct {
+	cfg pluginCfgIn
+	err error
+}
+
+type registrationLogic struct {
+	m         sync.Mutex
+	done      bool
+	validator pluginCfgInValidator
+	result    chan registrationResult
+}
+
+func newRegistrationLogic(validator pluginCfgInValidator, result chan registrationResult) *registrationLogic {
+	return &registrationLogic{
+		validator: validator,
+		result:    result,
+	}
+}
+
+func (l *registrationLogic) register(_ context.Context, cfg pluginCfgIn) (*pluginCfgOut, error) {
+	l.m.Lock()
+	defer l.m.Unlock()
+	if l.done {
+		return nil, errors.New("already registered")
+	}
+	l.done = true
+	out, err := l.validator.Validate(cfg)
+	select {
+	case l.result <- registrationResult{cfg: cfg, err: err}:
+	default:
+		return nil, errors.New("registration rejected")
+	}
+	return out, nil
 }
