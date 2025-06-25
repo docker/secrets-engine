@@ -76,9 +76,9 @@ func isValidRune(c rune) bool {
 // - "*" matches a single component
 // - "**" matches zero or more components
 // - "/" is the separator
-func (id ID) Match(pattern string) bool {
+func (id ID) Match(pattern Pattern) bool {
 	pathParts := split(string(id))
-	patternParts := split(pattern)
+	patternParts := split(string(pattern))
 
 	return match(patternParts, pathParts)
 }
