@@ -66,7 +66,7 @@ func envelopeErr(req secrets.Request, err error) secrets.Envelope {
 type pluginRegistration struct {
 	name string
 	//version  string
-	pattern  string
+	pattern  secrets.Pattern
 	provider secrets.Resolver
 }
 
@@ -76,10 +76,14 @@ func (e *Engine) Register(name, _, pattern string, provider secrets.Resolver) er
 	}) {
 		return fmt.Errorf("provider name %q already registered", name)
 	}
+	p, err := secrets.ParsePattern(pattern)
+	if err != nil {
+		return err
+	}
 
 	e.plugins = append(e.plugins, pluginRegistration{
 		name:     name,
-		pattern:  pattern,
+		pattern:  p,
 		provider: provider,
 	})
 
