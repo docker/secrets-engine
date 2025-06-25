@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 type SetupResult struct {
@@ -18,7 +19,7 @@ type SetupResult struct {
 	close func() error
 }
 
-func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, validatePattern func(string) error) (*SetupResult, error) {
+func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, acceptPattern func(secrets.Pattern) error) (*SetupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
 	defer close(chRegistrationResult)
 	httpMux := http.NewServeMux()
@@ -29,7 +30,7 @@ func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, validatePat
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(newRegisterService(newRegistrationLogic(&setupValidator{
 		out:                cfg,
 		isLaunchedByEngine: isLaunchedByEngine,
-		verifyPattern:      validatePattern,
+		acceptPattern:      acceptPattern,
 	}, chRegistrationResult))))
 	i, err := ipc.NewRuntimeIPC(conn, httpMux)
 	if err != nil {
@@ -46,10 +47,12 @@ func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, validatePat
 	select {
 	case r := <-chRegistrationResult:
 		if r.err != nil {
+			i.Close()
 			return nil, fmt.Errorf("failed to register plugin: %w", err)
 		}
 		out = r.cfg
 	case err := <-chIpcErr:
+		i.Close()
 		return nil, fmt.Errorf("failed to register plugin, ipc error: %w", err)
 	case <-time.After(getPluginRegistrationTimeout()):
 		i.Close()
@@ -67,7 +70,7 @@ var _ pluginCfgInValidator = &setupValidator{}
 type setupValidator struct {
 	out                pluginCfgOut
 	isLaunchedByEngine bool
-	verifyPattern      func(pattern string) error
+	acceptPattern      func(secrets.Pattern) error
 }
 
 func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
@@ -77,7 +80,7 @@ func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
 	if !p.isLaunchedByEngine && in.name == "" {
 		return nil, errors.New("plugin name is empty")
 	}
-	if err := p.verifyPattern(in.pattern); err == nil {
+	if err := p.acceptPattern(in.pattern); err == nil {
 		return nil, err
 	}
 	return &p.out, nil
