@@ -21,12 +21,14 @@ func TestParsePattern(t *testing.T) {
 		{"valid pattern starting with double asterisk", "**/bar", false},
 		{"valid pattern ending with double asterisk", "foo/**/baz", false},
 		{"valid pattern with mix of components and wildcards", "foo/*/baz/**/*", false},
+		{"invalid pattern with mix of asterisks and allowed characters v1", "*a*", true},
+		{"invalid pattern with mix of asterisks and allowed characters v2", "*a", true},
 		{"invalid pattern with leading slash", "/foo/bar", true},
 		{"invalid pattern with trailing slash", "foo/bar/", true},
 		{"invalid pattern with empty component", "foo//bar", true},
 		{"invalid empty pattern", "", true},
 		{"invalid pattern only with slash", "/", true},
-		{"invalid pattern with mix of asterisks and allowed characters", "foo/*a*/baz", true},
+		{"invalid pattern with components and a mix of asterisks and allowed characters", "foo/*a*/baz", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
