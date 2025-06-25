@@ -9,6 +9,9 @@ var (
 	ErrInvalidPattern = errors.New("invalid pattern")
 )
 
+// Pattern can be used to match secret identifiers.
+// Valid patterns must follow the same validation rules as secret identifiers, with the exception
+// that '*' can be used to match a single component, and '**' can be used to match zero or more components.
 type Pattern string
 
 func ParsePattern(pattern string) (Pattern, error) {
@@ -19,6 +22,7 @@ func ParsePattern(pattern string) (Pattern, error) {
 	return p, nil
 }
 
+// Valid returns nil if the pattern is considered valid.
 func (p Pattern) Valid() error {
 	if !validPattern(string(p)) {
 		return ErrInvalidPattern
