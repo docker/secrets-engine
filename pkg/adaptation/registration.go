@@ -36,19 +36,10 @@ type pluginRegistrator interface {
 }
 
 type RegisterService struct {
-	m sync.Mutex
 	r pluginRegistrator
 }
 
-func newRegisterService(registeredFunc pluginRegistrator) *RegisterService {
-	return &RegisterService{
-		r: registeredFunc,
-	}
-}
-
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
-	r.m.Lock()
-	defer r.m.Unlock()
 	pattern, err := secrets.ParsePattern(c.Msg.GetPattern())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)

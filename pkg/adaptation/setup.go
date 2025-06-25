@@ -19,19 +19,23 @@ type SetupResult struct {
 	close func() error
 }
 
-func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, acceptPattern func(secrets.Pattern) error) (*SetupResult, error) {
+var _ pluginCfgInValidator = &setupValidator{}
+
+type setupValidator struct {
+	out           pluginCfgOut
+	name          string
+	acceptPattern func(secrets.Pattern) error
+}
+
+func Setup(conn net.Conn, v setupValidator) (*SetupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
-	defer close(chRegistrationResult)
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(newRegisterService(newRegistrationLogic(&setupValidator{
-		out:                cfg,
-		isLaunchedByEngine: isLaunchedByEngine,
-		acceptPattern:      acceptPattern,
-	}, chRegistrationResult))))
+	registrator := newRegistrationLogic(v, chRegistrationResult)
+	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{registrator}))
 	i, err := ipc.NewRuntimeIPC(conn, httpMux)
 	if err != nil {
 		return nil, err
@@ -65,20 +69,12 @@ func Setup(conn net.Conn, isLaunchedByEngine bool, cfg pluginCfgOut, acceptPatte
 	}, nil
 }
 
-var _ pluginCfgInValidator = &setupValidator{}
-
-type setupValidator struct {
-	out                pluginCfgOut
-	isLaunchedByEngine bool
-	acceptPattern      func(secrets.Pattern) error
-}
-
 func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
-	if p.isLaunchedByEngine && in.name != "" {
-		return nil, errors.New("plugin already registered with a different name")
+	if p.name != "" && in.name != p.name {
+		return nil, errors.New("plugin name cannot be changed when launched by engine")
 	}
-	if !p.isLaunchedByEngine && in.name == "" {
-		return nil, errors.New("plugin name is empty")
+	if p.name == "" && in.name == "" {
+		return nil, errors.New("plugin name is required when not launched by engine")
 	}
 	if err := p.acceptPattern(in.pattern); err == nil {
 		return nil, err
