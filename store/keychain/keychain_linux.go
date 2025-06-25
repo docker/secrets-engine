@@ -94,7 +94,10 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 
 	err = k.isCollectionLocked(service)
-	if err != nil {
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return err
+	}
+	if errors.Is(err, errCollectionLocked) {
 		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
 			return err
 		}
@@ -131,7 +134,10 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 
 	err = k.isCollectionLocked(service)
-	if err != nil {
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return nil, err
+	}
+	if errors.Is(err, errCollectionLocked) {
 		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
 			return nil, err
 		}
@@ -178,7 +184,10 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	}
 
 	err = k.isCollectionLocked(service)
-	if err != nil {
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return nil, err
+	}
+	if errors.Is(err, errCollectionLocked) {
 		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
 			return nil, err
 		}
@@ -243,7 +252,10 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	}
 
 	err = k.isCollectionLocked(service)
-	if err != nil {
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return err
+	}
+	if errors.Is(err, errCollectionLocked) {
 		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
 			return err
 		}
