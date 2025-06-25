@@ -8,9 +8,9 @@ import (
 
 func TestParseID(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		outErr bool
+		name      string
+		input     string
+		mustError bool
 	}{
 		{"valid name with dash", "my-secretA9", false},
 		{"valid name with dot", "my.secretA9", false},
@@ -26,7 +26,7 @@ func TestParseID(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParseID(tc.input)
-			if tc.outErr {
+			if tc.mustError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)

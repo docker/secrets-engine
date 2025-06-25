@@ -8,9 +8,9 @@ import (
 
 func TestParsePattern(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		outErr bool
+		name      string
+		input     string
+		mustError bool
 	}{
 		{"valid pattern with single component", "foo", false},
 		{"valid pattern with multiple components", "foo/bar/baz", false},
@@ -33,7 +33,7 @@ func TestParsePattern(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParsePattern(tc.input)
-			if tc.outErr {
+			if tc.mustError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
