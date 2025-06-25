@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/docker/secrets-engine/store"
 	"github.com/keybase/dbus"
@@ -11,9 +12,8 @@ import (
 )
 
 const (
-	// the default collection would be 'login'
-	// gnome-keyring does not support creating collections
-	keychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
+	// the default collection in most X11 sessions would be 'login'
+	loginKeychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
 )
 
 func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
@@ -25,6 +25,55 @@ func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
 		attributes["id"] = id.String()
 	}
 	return attributes
+}
+
+// getDefaultCollection gets the secret service collection dbus object path.
+//
+// It prefers the loginKeychainObjectPath, since most users on X11 would have
+// this available.
+//
+// As a fallback it queries the secret service for the default collection and
+// returns that instead.
+func (k *keychainStore[T]) getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
+	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Service.Collections")
+	if err != nil {
+		return "", err
+	}
+	collections, ok := variant.Value().([]dbus.ObjectPath)
+	if !ok {
+		return "", errors.New("could not list keychain collections")
+	}
+	// choose the 'login' collection if it exists
+	if slices.Contains(collections, loginKeychainObjectPath) {
+		return loginKeychainObjectPath, nil
+	}
+	// we need to fallback to the default collection
+	var defaultKeychainObjectPath dbus.ObjectPath
+	err = service.ServiceObj().
+		Call("org.freedesktop.Secret.Service.ReadAlias", 0, "default").
+		Store(&defaultKeychainObjectPath)
+	if err != nil {
+		return "", err
+	}
+
+	return defaultKeychainObjectPath, nil
+}
+
+var errCollectionLocked = errors.New("collection is locked")
+
+// isCollectionLocked verifies if the collection is locked.
+//
+// It returns the errCollectionLocked error by default if the collection is locked.
+// On any other error, it returns the underlying error instead.
+func (k *keychainStore[T]) isCollectionLocked(service *kc.SecretService) error {
+	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Collection.Locked")
+	if err != nil {
+		return err
+	}
+	if locked, ok := variant.Value().(bool); ok && !locked {
+		return nil
+	}
+	return errCollectionLocked
 }
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
@@ -39,8 +88,20 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 	defer service.CloseSession(session)
 
+	objectPath, err := k.getDefaultCollection(service)
+	if err != nil {
+		return err
+	}
+
+	err = k.isCollectionLocked(service)
+	if err != nil {
+		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
+			return err
+		}
+	}
+
 	attributes := k.itemAttributes(id)
-	items, err := service.SearchCollection(keychainObjectPath, attributes)
+	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return err
 	}
@@ -64,12 +125,20 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 	defer service.CloseSession(session)
 
-	if err := service.Unlock([]dbus.ObjectPath{keychainObjectPath}); err != nil {
+	objectPath, err := k.getDefaultCollection(service)
+	if err != nil {
 		return nil, err
 	}
 
+	err = k.isCollectionLocked(service)
+	if err != nil {
+		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
+			return nil, err
+		}
+	}
+
 	attributes := k.itemAttributes(id)
-	items, err := service.SearchCollection(keychainObjectPath, attributes)
+	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
 	}
@@ -103,12 +172,20 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	}
 	defer service.CloseSession(session)
 
-	if err := service.Unlock([]dbus.ObjectPath{keychainObjectPath}); err != nil {
+	objectPath, err := k.getDefaultCollection(service)
+	if err != nil {
 		return nil, err
 	}
 
+	err = k.isCollectionLocked(service)
+	if err != nil {
+		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
+			return nil, err
+		}
+	}
+
 	attributes := k.itemAttributes(store.ID(""))
-	itemPaths, err := service.SearchCollection(keychainObjectPath, attributes)
+	itemPaths, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
 	}
@@ -156,6 +233,18 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	}
 	defer service.CloseSession(session)
 
+	objectPath, err := k.getDefaultCollection(service)
+	if err != nil {
+		return err
+	}
+
+	err = k.isCollectionLocked(service)
+	if err != nil {
+		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
+			return err
+		}
+	}
+
 	value, err := secret.Marshal()
 	if err != nil {
 		return err
@@ -170,7 +259,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	label := k.itemLabel(id)
 	properties := kc.NewSecretProperties(label, attributes)
 
-	_, err = service.CreateItem(keychainObjectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
+	_, err = service.CreateItem(objectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
 	if err != nil {
 		return err
 	}
