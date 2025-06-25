@@ -13,6 +13,9 @@ import (
 
 const (
 	// the default collection in most X11 sessions would be 'login'
+	// it is created by default through PAM, see https://wiki.gnome.org/Projects/GnomeKeyring/Pam.
+	//
+	// NOTE: do not use this directly, always call [getDefaultCollection]
 	loginKeychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
 )
 
@@ -30,10 +33,11 @@ func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
 // getDefaultCollection gets the secret service collection dbus object path.
 //
 // It prefers the loginKeychainObjectPath, since most users on X11 would have
-// this available.
+// this available via PAM, see https://wiki.gnome.org/Projects/GnomeKeyring/Pam.
 //
-// As a fallback it queries the secret service for the default collection and
-// returns that instead.
+// As a fallback it queries the secret service for the default collection.
+// It is possible that the host does not have a collection set up, in that case
+// the only option is to error.
 func (k *keychainStore[T]) getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
 	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Service.Collections")
 	if err != nil {
@@ -54,6 +58,10 @@ func (k *keychainStore[T]) getDefaultCollection(service *kc.SecretService) (dbus
 		Store(&defaultKeychainObjectPath)
 	if err != nil {
 		return "", err
+	}
+
+	if !defaultKeychainObjectPath.IsValid() {
+		return "", errors.New("the default collection object path is invalid")
 	}
 
 	return defaultKeychainObjectPath, nil
