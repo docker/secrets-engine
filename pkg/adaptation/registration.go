@@ -2,6 +2,7 @@ package adaptation
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -29,18 +30,18 @@ type pluginCfgIn struct {
 	pattern string
 }
 
-type onRegisteredFunc func(ctx context.Context, cfg pluginCfgIn) error
-
-type RegisterService struct {
-	m            sync.Mutex
-	onRegistered onRegisteredFunc
-	sent         pluginCfgOut
+type pluginRegistrator interface {
+	register(ctx context.Context, cfg pluginCfgIn) (*pluginCfgOut, error)
 }
 
-func NewRegisterService(cfg pluginCfgOut, registeredFunc onRegisteredFunc) *RegisterService {
+type RegisterService struct {
+	m sync.Mutex
+	r pluginRegistrator
+}
+
+func newRegisterService(registeredFunc pluginRegistrator) *RegisterService {
 	return &RegisterService{
-		sent:         cfg,
-		onRegistered: registeredFunc,
+		r: registeredFunc,
 	}
 }
 
@@ -52,13 +53,53 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 		version: c.Msg.GetVersion(),
 		pattern: c.Msg.GetPattern(),
 	}
-	if err := r.onRegistered(ctx, in); err != nil {
+	out, err := r.r.register(ctx, in)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
-		EngineName:     proto.String(r.sent.engineName),
-		EngineVersion:  proto.String(r.sent.engineVersion),
-		Config:         proto.String(r.sent.config),
-		RequestTimeout: proto.Int64(int64(r.sent.requestTimeout.Seconds())),
+		EngineName:     proto.String(out.engineName),
+		EngineVersion:  proto.String(out.engineVersion),
+		Config:         proto.String(out.config),
+		RequestTimeout: proto.Int64(int64(out.requestTimeout.Seconds())),
 	}.Build()), nil
+}
+
+type pluginCfgInValidator interface {
+	Validate(pluginCfgIn) (*pluginCfgOut, error)
+}
+
+type registrationResult struct {
+	cfg pluginCfgIn
+	err error
+}
+
+type registrationLogic struct {
+	m         sync.Mutex
+	done      bool
+	validator pluginCfgInValidator
+	result    chan registrationResult
+}
+
+func newRegistrationLogic(validator pluginCfgInValidator, result chan registrationResult) *registrationLogic {
+	return &registrationLogic{
+		validator: validator,
+		result:    result,
+	}
+}
+
+func (l *registrationLogic) register(_ context.Context, cfg pluginCfgIn) (*pluginCfgOut, error) {
+	l.m.Lock()
+	defer l.m.Unlock()
+	if l.done {
+		return nil, errors.New("already registered")
+	}
+	l.done = true
+	out, err := l.validator.Validate(cfg)
+	select {
+	case l.result <- registrationResult{cfg: cfg, err: err}:
+	default:
+		return nil, errors.New("registration rejected")
+	}
+	return out, nil
 }
