@@ -19,7 +19,11 @@ const (
 	loginKeychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
 )
 
-func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
+// newItemAttributes configures the default attributes for each item in the keychain
+//
+// It sets the `service:group` and `service:name` attributes as well as the
+// secret id.
+func newItemAttributes[T store.Secret](id store.ID, k *keychainStore[T]) map[string]string {
 	attributes := map[string]string{
 		"service:group": k.serviceGroup,
 		"service:name":  k.serviceName,
@@ -38,7 +42,7 @@ func (k *keychainStore[T]) itemAttributes(id store.ID) map[string]string {
 // As a fallback it queries the secret service for the default collection.
 // It is possible that the host does not have a collection set up, in that case
 // the only option is to error.
-func (k *keychainStore[T]) getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
+func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
 	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Service.Collections")
 	if err != nil {
 		return "", err
@@ -73,7 +77,7 @@ var errCollectionLocked = errors.New("collection is locked")
 //
 // It returns the errCollectionLocked error by default if the collection is locked.
 // On any other error, it returns the underlying error instead.
-func (k *keychainStore[T]) isCollectionLocked(service *kc.SecretService) error {
+func isCollectionLocked(service *kc.SecretService) error {
 	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Collection.Locked")
 	if err != nil {
 		return err
@@ -96,12 +100,12 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 	defer service.CloseSession(session)
 
-	objectPath, err := k.getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(service)
 	if err != nil {
 		return err
 	}
 
-	err = k.isCollectionLocked(service)
+	err = isCollectionLocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return err
 	}
@@ -111,7 +115,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 		}
 	}
 
-	attributes := k.itemAttributes(id)
+	attributes := newItemAttributes(id, k)
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return err
@@ -136,12 +140,12 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 	defer service.CloseSession(session)
 
-	objectPath, err := k.getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(service)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.isCollectionLocked(service)
+	err = isCollectionLocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return nil, err
 	}
@@ -151,7 +155,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		}
 	}
 
-	attributes := k.itemAttributes(id)
+	attributes := newItemAttributes(id, k)
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
@@ -186,12 +190,12 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	}
 	defer service.CloseSession(session)
 
-	objectPath, err := k.getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(service)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.isCollectionLocked(service)
+	err = isCollectionLocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return nil, err
 	}
@@ -201,7 +205,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 		}
 	}
 
-	attributes := k.itemAttributes(store.ID(""))
+	attributes := newItemAttributes("", k)
 	itemPaths, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
@@ -254,12 +258,12 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	}
 	defer service.CloseSession(session)
 
-	objectPath, err := k.getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(service)
 	if err != nil {
 		return err
 	}
 
-	err = k.isCollectionLocked(service)
+	err = isCollectionLocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return err
 	}
@@ -279,7 +283,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
-	attributes := k.itemAttributes(id)
+	attributes := newItemAttributes(id, k)
 	label := k.itemLabel(id)
 	properties := kc.NewSecretProperties(label, attributes)
 
