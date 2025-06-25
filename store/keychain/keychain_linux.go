@@ -91,11 +91,11 @@ func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
 
 var errCollectionLocked = errors.New("collection is locked")
 
-// isCollectionLocked verifies if the collection is locked.
+// isCollectionUnlocked verifies if the collection is unlocked.
 //
 // It returns the errCollectionLocked error by default if the collection is locked.
 // On any other error, it returns the underlying error instead.
-func isCollectionLocked(service *kc.SecretService) error {
+func isCollectionUnlocked(service *kc.SecretService) error {
 	variant, err := service.ServiceObj().GetProperty(secretServiceIsCollectionLockedProperty)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 		return err
 	}
 
-	err = isCollectionLocked(service)
+	err = isCollectionUnlocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return err
 	}
@@ -163,7 +163,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, err
 	}
 
-	err = isCollectionLocked(service)
+	err = isCollectionUnlocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 		return nil, err
 	}
 
-	err = isCollectionLocked(service)
+	err = isCollectionUnlocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
-	err = isCollectionLocked(service)
+	err = isCollectionUnlocked(service)
 	if err != nil && !errors.Is(err, errCollectionLocked) {
 		return err
 	}
