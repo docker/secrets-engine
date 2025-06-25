@@ -17,7 +17,7 @@ type Pattern string
 func ParsePattern(pattern string) (Pattern, error) {
 	p := Pattern(pattern)
 	if err := p.Valid(); err != nil {
-		return "", fmt.Errorf("parse pattern: %w", err)
+		return "", fmt.Errorf("parsing pattern: %w", err)
 	}
 	return p, nil
 }
@@ -43,7 +43,9 @@ func (p Pattern) Match(id ID) bool {
 // - Each component is non-empty
 // - Only characters A-Z, a-z, 0-9, '.', '-', '_' or '*'
 // - No leading, trailing, or double slashes
-// - '*' can be used in two ways: '*' matches a single component, '**' matches zero or more components
+// - Asterisks rules:
+//   - '*' cannot be mixed with other characters in the same component
+//   - there can be no more than two '*' per component
 func validPattern(s string) bool {
 	if len(s) == 0 {
 		return false
@@ -51,19 +53,11 @@ func validPattern(s string) bool {
 
 	componentLen := 0
 	wildcardLen := 0
+
 	for _, r := range s {
 		switch {
 		case r == '/':
-			if componentLen == 0 {
-				// Empty component (leading, trailing, or double slash)
-				return false
-			}
-			if wildcardLen > 2 {
-				// No more than two wildcards per component
-				return false
-			}
-			if wildcardLen > 0 && wildcardLen != componentLen {
-				// Wildcard can't be mixed with other characters in the same component
+			if !isValidComponentMatcher(componentLen, wildcardLen) {
 				return false
 			}
 			componentLen = 0
@@ -77,8 +71,20 @@ func validPattern(s string) bool {
 			return false
 		}
 	}
+	// Final component
+	return isValidComponentMatcher(componentLen, wildcardLen)
+}
 
-	// Final component must not be empty
+func isValidComponentMatcher(componentLen, wildcardLen int) bool {
+	if wildcardLen > 2 {
+		// No more than two wildcards per component
+		return false
+	}
+	if wildcardLen > 0 && wildcardLen != componentLen {
+		// Wildcard can't be mixed with other characters in the same component
+		return false
+	}
+	// Component must not be empty
 	return componentLen > 0
 }
 
