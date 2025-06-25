@@ -22,7 +22,7 @@ func ParseID(s string) (ID, error) {
 	return id, nil
 }
 
-// Valid returns nil if the identifier if considered valid.
+// Valid returns nil if the identifier is considered valid.
 func (id ID) Valid() error {
 	if !validIdentifier(string(id)) {
 		return fmt.Errorf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", id)
@@ -37,7 +37,7 @@ func (id ID) String() string { return string(id) }
 // Rules:
 // - Components separated by '/'
 // - Each component is non-empty
-// - Only characters A-Z, a-z, 0-9, '.', or '-'
+// - Only characters A-Z, a-z, 0-9, '.', '_' or '-'
 // - No leading, trailing, or double slashes
 func validIdentifier(s string) bool {
 	if len(s) == 0 {
