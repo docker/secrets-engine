@@ -1,3 +1,6 @@
+// The keychain package for Linux uses the org.freedesktop.secret service API
+// over dbus.
+// For more information on the Secret Service API, see https://specifications.freedesktop.org/secret-service-spec/latest/index.html.
 package keychain
 
 import (
@@ -17,6 +20,21 @@ const (
 	//
 	// NOTE: do not use this directly, always call [getDefaultCollection]
 	loginKeychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
+
+	// used to list all available collections on the secret service API
+	//
+	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html
+	secretServiceCollectionProperty = "org.freedesktop.Secret.Service.Collections"
+
+	// used to get the dbus object path of an aliased collection
+	// An common alias would be 'default'
+	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html
+	secretServiceGetAliasObjectPath = "org.freedesktop.Secret.Service.ReadAlias"
+
+	// used to check if the collection is locked
+	//
+	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Collection.html
+	secretServiceIsCollectionLockedProperty = "org.freedesktop.Secret.Collection.Locked"
 )
 
 // newItemAttributes configures the default attributes for each item in the keychain
@@ -43,7 +61,7 @@ func newItemAttributes[T store.Secret](id store.ID, k *keychainStore[T]) map[str
 // It is possible that the host does not have a collection set up, in that case
 // the only option is to error.
 func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
-	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Service.Collections")
+	variant, err := service.ServiceObj().GetProperty(secretServiceCollectionProperty)
 	if err != nil {
 		return "", err
 	}
@@ -58,7 +76,7 @@ func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
 	// we need to fallback to the default collection
 	var defaultKeychainObjectPath dbus.ObjectPath
 	err = service.ServiceObj().
-		Call("org.freedesktop.Secret.Service.ReadAlias", 0, "default").
+		Call(secretServiceGetAliasObjectPath, 0, "default").
 		Store(&defaultKeychainObjectPath)
 	if err != nil {
 		return "", err
@@ -78,7 +96,7 @@ var errCollectionLocked = errors.New("collection is locked")
 // It returns the errCollectionLocked error by default if the collection is locked.
 // On any other error, it returns the underlying error instead.
 func isCollectionLocked(service *kc.SecretService) error {
-	variant, err := service.ServiceObj().GetProperty("org.freedesktop.Secret.Collection.Locked")
+	variant, err := service.ServiceObj().GetProperty(secretServiceIsCollectionLockedProperty)
 	if err != nil {
 		return err
 	}
