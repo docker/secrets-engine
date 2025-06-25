@@ -140,7 +140,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	attributes := k.itemAttributes(id)
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
+		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
 
 	if len(items) == 0 {
@@ -187,7 +187,11 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	attributes := k.itemAttributes(store.ID(""))
 	itemPaths, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", store.ErrCredentialNotFound, err)
+		return nil, fmt.Errorf("failed to search collection: %w", err)
+	}
+
+	if len(itemPaths) == 0 {
+		return nil, store.ErrCredentialNotFound
 	}
 
 	credentials := make(map[store.ID]store.Secret, len(itemPaths))
