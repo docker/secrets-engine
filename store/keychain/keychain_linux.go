@@ -41,13 +41,16 @@ const (
 //
 // It sets the `service:group` and `service:name` attributes as well as the
 // secret id.
-func newItemAttributes[T store.Secret](id store.ID, k *keychainStore[T]) map[string]string {
+//
+// id can also be empty and is used in cases were we only want to filter on the
+// service:group and service:name attributes.
+func newItemAttributes[T store.Secret](id string, k *keychainStore[T]) map[string]string {
 	attributes := map[string]string{
 		"service:group": k.serviceGroup,
 		"service:name":  k.serviceName,
 	}
-	if id.String() != "" {
-		attributes["id"] = id.String()
+	if id != "" {
+		attributes["id"] = id
 	}
 	return attributes
 }
@@ -107,6 +110,10 @@ func isCollectionUnlocked(service *kc.SecretService) error {
 }
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+	if err := id.Valid(); err != nil {
+		return err
+	}
+
 	service, err := kc.NewService()
 	if err != nil {
 		return err
@@ -133,7 +140,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 		}
 	}
 
-	attributes := newItemAttributes(id, k)
+	attributes := newItemAttributes(id.String(), k)
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return err
@@ -147,6 +154,10 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+	if err := id.Valid(); err != nil {
+		return nil, err
+	}
+
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -173,7 +184,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		}
 	}
 
-	attributes := newItemAttributes(id, k)
+	attributes := newItemAttributes(id.String(), k)
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
@@ -265,6 +276,10 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 }
 
 func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+	if err := id.Valid(); err != nil {
+		return err
+	}
+
 	service, err := kc.NewService()
 	if err != nil {
 		return err
@@ -301,7 +316,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
-	attributes := newItemAttributes(id, k)
+	attributes := newItemAttributes(id.String(), k)
 	label := k.itemLabel(id)
 	properties := kc.NewSecretProperties(label, attributes)
 
