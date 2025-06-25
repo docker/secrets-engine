@@ -11,6 +11,7 @@ import (
 
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 var _ resolverv1connect.EngineServiceHandler = &RegisterService{}
@@ -27,7 +28,7 @@ type pluginCfgOut struct {
 type pluginCfgIn struct {
 	name    string
 	version string
-	pattern string
+	pattern secrets.Pattern
 }
 
 type pluginRegistrator interface {
@@ -48,10 +49,14 @@ func newRegisterService(registeredFunc pluginRegistrator) *RegisterService {
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
 	r.m.Lock()
 	defer r.m.Unlock()
+	pattern, err := secrets.ParsePattern(c.Msg.GetPattern())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 	in := pluginCfgIn{
 		name:    c.Msg.GetName(),
 		version: c.Msg.GetVersion(),
-		pattern: c.Msg.GetPattern(),
+		pattern: pattern,
 	}
 	out, err := r.r.register(ctx, in)
 	if err != nil {
