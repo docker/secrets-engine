@@ -37,7 +37,7 @@ func TestParseID(t *testing.T) {
 
 func TestMatch(t *testing.T) {
 	tests := []struct {
-		pattern   string
+		pattern   Pattern
 		matches   []string
 		noMatches []string
 	}{
@@ -67,7 +67,7 @@ func TestMatch(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		t.Run(tc.pattern, func(t *testing.T) {
+		t.Run(string(tc.pattern), func(t *testing.T) {
 			for _, m := range tc.matches {
 				id, err := ParseID(m)
 				assert.NoError(t, err)
