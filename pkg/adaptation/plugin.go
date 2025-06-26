@@ -3,10 +3,12 @@ package adaptation
 import (
 	"sync"
 	"time"
+
+	"github.com/docker/secrets-engine/pkg/api"
 )
 
 var (
-	pluginRegistrationTimeout = DefaultPluginRegistrationTimeout
+	pluginRegistrationTimeout = api.DefaultPluginRegistrationTimeout
 	timeoutCfgLock            sync.RWMutex
 )
 
