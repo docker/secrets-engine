@@ -1,7 +1,6 @@
 package keychain
 
 import (
-	"context"
 	"maps"
 	"testing"
 
@@ -11,9 +10,6 @@ import (
 )
 
 func TestKeychain(t *testing.T) {
-	mainCtx, mainCtxCancel := context.WithCancel(context.Background())
-	t.Cleanup(mainCtxCancel)
-
 	ks, err := New("com.test.test", "test",
 		func() *mocks.MockCredential {
 			return &mocks.MockCredential{}
@@ -22,25 +18,19 @@ func TestKeychain(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("save credentials", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(mainCtx)
-		t.Cleanup(cancel)
-
 		id := store.ID("com.test.test/test/bob")
 		require.NoError(t, id.Valid())
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
 		}
-		require.NoError(t, ks.Save(ctx, id, creds))
+		require.NoError(t, ks.Save(t.Context(), id, creds))
 	})
 
 	t.Run("get credential", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(mainCtx)
-		t.Cleanup(cancel)
-
 		id := store.ID("com.test.test/test/bob")
 		require.NoError(t, id.Valid())
-		secret, err := ks.Get(ctx, id)
+		secret, err := ks.Get(t.Context(), id)
 		require.NoError(t, err)
 
 		actual, ok := secret.(*mocks.MockCredential)
@@ -54,9 +44,6 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("list all credentials", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(mainCtx)
-		t.Cleanup(cancel)
-
 		moreCreds := map[store.ID]*mocks.MockCredential{
 			"com.test.test/test/jeff": {
 				Username: "jeff",
@@ -69,9 +56,9 @@ func TestKeychain(t *testing.T) {
 		}
 
 		for id, anotherCred := range moreCreds {
-			require.NoError(t, ks.Save(ctx, id, anotherCred))
+			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
 		}
-		secrets, err := ks.GetAll(ctx)
+		secrets, err := ks.GetAll(t.Context())
 		require.NoError(t, err)
 
 		actual := make(map[store.ID]*mocks.MockCredential)
@@ -92,13 +79,10 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(mainCtx)
-		t.Cleanup(cancel)
-
 		id := store.ID("com.test.test/test/bob")
 		require.NoError(t, id.Valid())
-		require.NoError(t, ks.Delete(ctx, id))
-		_, err := ks.Get(ctx, id)
+		require.NoError(t, ks.Delete(t.Context(), id))
+		_, err := ks.Get(t.Context(), id)
 		require.ErrorIs(t, err, store.ErrCredentialNotFound)
 	})
 }
