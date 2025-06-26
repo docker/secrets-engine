@@ -13,7 +13,15 @@ var (
 	ErrAuthFailed            = errors.New("user incorrectly enterered their credentials")
 )
 
-func newKeychainItem[T store.Secret](id store.ID, k *keychainStore[T]) kc.Item {
+// newKeychainItem creates a new keychain item with valid default parameters.
+//
+// It uses a generic password class, which is suitable for most use cases.
+//
+// By default, the item will only return one secret when queried.
+//
+// The id parameter can be empty, in which case the item will search based on
+// the service name and group, but not the item label or account.
+func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 	item := kc.NewItem()
 	// generic password is used here as we don't know what we are storing
 	// the main difference between a generic and internet password is the
@@ -23,27 +31,27 @@ func newKeychainItem[T store.Secret](id store.ID, k *keychainStore[T]) kc.Item {
 	// set this to MatchLimitAll if you want to retrieve all items
 	item.SetMatchLimit(kc.MatchLimitOne)
 	item.SetAccessible(kc.AccessibleAfterFirstUnlock)
-	item.SetReturnData(true)
 	item.SetReturnAttributes(true)
 
 	item.SetService(k.serviceName)
 	item.SetAccessGroup(k.serviceGroup)
 
-	if id.String() != "" {
-		item.SetLabel(k.itemLabel(id))
-		item.SetAccount(id.String())
+	if id != "" {
+		item.SetAccount(id)
 	}
 
 	return item
 }
 
-func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+// getItemWithData retrieves a keychain item with its data.
+//
+// It uses the SetReturnData attribute to query for an item with its data.
+// It cannot be used with MatchLimitAll, as it will return an error.
+// https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)#Discussion
+func getItemWithData[T store.Secret](id string, k *keychainStore[T]) (*kc.QueryResult, error) {
 	item := newKeychainItem(id, k)
-	return mapKeychainError(kc.DeleteItem(item))
-}
+	item.SetReturnData(true)
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	item := newKeychainItem(id, k)
 	results, err := kc.QueryItem(item)
 	if err != nil {
 		return nil, mapKeychainError(err)
@@ -52,40 +60,84 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, store.ErrCredentialNotFound
 	}
 
+	return &results[0], nil
+}
+
+func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+	if err := id.Valid(); err != nil {
+		return err
+	}
+
+	item := newKeychainItem(id.String(), k)
+	return mapKeychainError(kc.DeleteItem(item))
+}
+
+func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+	if err := id.Valid(); err != nil {
+		return nil, err
+	}
+
+	result, err := getItemWithData(id.String(), k)
+	if err != nil {
+		return nil, err
+	}
+
 	secret := k.factory()
-	if err := secret.Unmarshal(results[0].Data); err != nil {
+	if err := secret.Unmarshal(result.Data); err != nil {
 		return nil, err
 	}
 	return secret, nil
 }
 
 func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secret, error) {
-	item := newKeychainItem(store.ID(""), k)
+	item := newKeychainItem("", k)
+
+	// We use the MatchLimitAll attribute to query for multiple items from the
+	// store. It cannot be used with item.SetReturnData.
+	// https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)#Discussion
 	item.SetMatchLimit(kc.MatchLimitAll)
 
 	results, err := kc.QueryItem(item)
 	if err != nil {
 		return nil, mapKeychainError(err)
 	}
+
 	creds := make(map[store.ID]store.Secret, len(results))
 	for _, result := range results {
-		secret := k.factory()
-		if err := secret.Unmarshal(result.Data); err != nil {
+		id, err := store.ParseID(result.Account)
+		if err != nil {
 			return nil, err
 		}
-		id := store.ID(result.Label)
+
+		i, err := getItemWithData(id.String(), k)
+		if err != nil {
+			return nil, err
+		}
+
+		secret := k.factory()
+		if err := secret.Unmarshal(i.Data); err != nil {
+			return nil, err
+		}
 		creds[id] = secret
 	}
 	return creds, nil
 }
 
 func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+	if err := id.Valid(); err != nil {
+		return err
+	}
+
 	data, err := secret.Marshal()
 	if err != nil {
 		return err
 	}
-	item := newKeychainItem(id, k)
+	item := newKeychainItem(id.String(), k)
 	item.SetData(data)
+	// only creation of a secret needs the label attribute.
+	// it is a user-friendly name for the item, which is displayed in the keychain UI.
+	// https://developer.apple.com/documentation/security/ksecattrlabel
+	item.SetLabel(k.itemLabel(id))
 	return mapKeychainError(kc.AddItem(item))
 }
 
