@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/secrets-engine/pkg/adaptation"
+	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/pkg/api"
 )
 
 // ManualLaunchOption to apply to a plugin during its creation
@@ -64,7 +65,7 @@ func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	cfg := &cfg{
 		plugin:              p,
-		registrationTimeout: adaptation.DefaultPluginRegistrationTimeout,
+		registrationTimeout: api.DefaultPluginRegistrationTimeout,
 	}
 	for _, o := range opts {
 		if err := o(cfg); err != nil {
@@ -72,7 +73,7 @@ func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 		}
 	}
 	if cfg.conn == nil {
-		defaultSocketPath := adaptation.DefaultSocketPath()
+		defaultSocketPath := api.DefaultSocketPath()
 		conn, err := net.Dial("unix", defaultSocketPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to default socket %q: %w", defaultSocketPath, err)
@@ -94,11 +95,11 @@ var (
 )
 
 func restoreConfig(p Plugin) (*cfg, error) {
-	cfgString := os.Getenv(adaptation.PluginLaunchedByEngineVar)
+	cfgString := os.Getenv(api.PluginLaunchedByEngineVar)
 	if cfgString == "" {
 		return nil, errPluginNotLaunchedByEngine
 	}
-	c, err := adaptation.NewPluginConfigFromEngineEnv(cfgString)
+	c, err := ipc.NewPluginConfigFromEngineEnv(cfgString)
 	if err != nil {
 		return nil, err
 	}
