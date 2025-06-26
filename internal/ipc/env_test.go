@@ -1,4 +1,4 @@
-package adaptation
+package ipc
 
 import (
 	"strings"

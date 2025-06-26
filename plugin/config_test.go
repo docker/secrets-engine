@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/pkg/adaptation"
+	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/pkg/api"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
@@ -48,7 +49,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				})
 				os.Args = []string{"test-plugin"}
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-				socketPath := adaptation.DefaultSocketPath()
+				socketPath := api.DefaultSocketPath()
 				os.Remove(socketPath)
 				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0755))
 				listener, err := net.Listen("unix", socketPath)
@@ -64,7 +65,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				c, err := newCfgForManualLaunch(m)
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", c.name)
-				assert.Equal(t, adaptation.DefaultPluginRegistrationTimeout, c.registrationTimeout)
+				assert.Equal(t, api.DefaultPluginRegistrationTimeout, c.registrationTimeout)
 				assert.Equal(t, m, c.plugin)
 				assert.NotNil(t, c.conn)
 			},
@@ -79,12 +80,12 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				})
 				cfg, err := newCfgForManualLaunch(mockPlugin{},
 					WithPluginName("test-plugin"),
-					WithRegistrationTimeout(10*adaptation.DefaultPluginRegistrationTimeout),
+					WithRegistrationTimeout(10*api.DefaultPluginRegistrationTimeout),
 					WithConnection(client),
 				)
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
-				assert.Equal(t, 10*adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
+				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
 				assert.Equal(t, client, cfg.conn)
 			},
 		},
@@ -111,7 +112,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "invalid config from the engine",
 			test: func(t *testing.T) {
-				t.Setenv(adaptation.PluginLaunchedByEngineVar, "test-plugin")
+				t.Setenv(api.PluginLaunchedByEngineVar, "test-plugin")
 				_, err := restoreConfig(mockPlugin{})
 				assert.Error(t, err)
 			},
@@ -127,19 +128,19 @@ func Test_restoreConfig(t *testing.T) {
 				t.Cleanup(func() { conn.Close() })
 				peerFile := sockets.PeerFile()
 				t.Cleanup(func() { peerFile.Close() })
-				engineCfg := adaptation.PluginConfigFromEngine{
+				engineCfg := ipc.PluginConfigFromEngine{
 					Name:                "test-plugin",
-					RegistrationTimeout: 10 * adaptation.DefaultPluginRegistrationTimeout,
+					RegistrationTimeout: 10 * api.DefaultPluginRegistrationTimeout,
 					Fd:                  int(peerFile.Fd()),
 				}
 				cfgString, err := engineCfg.ToString()
 				require.NoError(t, err)
-				t.Setenv(adaptation.PluginLaunchedByEngineVar, cfgString)
+				t.Setenv(api.PluginLaunchedByEngineVar, cfgString)
 
 				cfg, err := restoreConfig(mockPlugin{})
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
-				assert.Equal(t, 10*adaptation.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
+				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
 				t.Cleanup(func() { cfg.conn.Close() })
 				msg := []byte("hello test")
 				go func() {
