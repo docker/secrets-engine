@@ -1,0 +1,82 @@
+#!/bin/sh
+
+set -eux pipefail
+
+if test -z $(command -v gnome-keyring-daemon); then
+    echo "gnome-keyring-daemon is not installed"
+    exit 1
+fi
+
+if test -z $(command -v busctl); then
+    echo "busctl is not installed"
+    exit 1
+fi
+
+if test -z $(command -v dbus-daemon); then
+    echo "dbus-daemon is not installed"
+    exit 1
+fi
+
+mkdir -p ~/.local/share/keyrings
+touch ~/.local/share/keyrings/login.keyring
+
+# create fake passwordless 'login' keyring
+echo '[keyring]
+display-name=login
+ctime=1750965549
+mtime=0
+lock-on-idle=false
+lock-after=false' > ~/.local/share/keyrings/login.keyring
+
+# Start D-Bus session (dbus must be installed)
+export DBUS_SESSION_BUS_ADDRESS=$(dbus-daemon --session --print-address --fork)
+
+gnome-keyring-daemon --start --components=secrets
+
+# Wait up to 5 seconds for org.freedesktop.secrets to appear on D-Bus
+timeout=5000
+interval=100
+elapsed=0
+
+while ! gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetNameOwner \
+  org.freedesktop.secrets >/dev/null 2>&1; do 
+
+    sleep 0.1
+    elapsed=$((elapsed + interval))
+    if (( elapsed >= timeout )); then
+        echo "❌ Timeout waiting for gnome-keyring-daemon to register org.freedesktop.secrets"
+        exit 1
+    fi
+done
+
+owner=$(gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetNameOwner \
+  org.freedesktop.secrets | awk -F"'" '{print $2}')
+
+if test -v $owner; then
+    echo "there is no owner of the org.freedesktop.secrets API"
+    exit 1
+fi
+
+pid=$(gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetConnectionUnixProcessID \
+  "$owner" | awk '{print $2}' | tr -d ',)')
+
+if test -v $pid; then
+    echo "there is no registered org.freedesktop.secrets daemon"
+    exit 1
+fi
+
+exe=$(readlink -f /proc/$pid/exe)
+
+if [[ "$exe" != *gnome-keyring-daemon* ]]; then
+    echo "dbus org.freedesktop.secrets is not using gnome-keyring-daemon"
+    exit 1
+fi
