@@ -88,7 +88,7 @@ func (l *registrationLogic) register(_ context.Context, cfg pluginCfgIn) (*plugi
 	l.m.Lock()
 	defer l.m.Unlock()
 	if l.done {
-		return nil, errors.New("already registered")
+		return nil, errors.New("cannot rerun registration")
 	}
 	l.done = true
 	out, err := l.validator.Validate(cfg)
@@ -97,5 +97,5 @@ func (l *registrationLogic) register(_ context.Context, cfg pluginCfgIn) (*plugi
 	default:
 		return nil, errors.New("registration rejected")
 	}
-	return out, nil
+	return out, err
 }
