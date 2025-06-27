@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -11,29 +12,23 @@ import (
 	"github.com/hashicorp/yamux"
 )
 
-func NewPluginIPC(sockConn net.Conn, handler http.Handler) (IPC, *http.Client, error) {
+func NewPluginIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error)) (io.Closer, *http.Client, error) {
+	// TODO: configure yamux logger
 	session, err := yamux.Client(sockConn, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux client: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler)
+	i, c := newMuxedIPC(session, handler, onServerClosed)
 	return i, c, nil
 }
 
-type IPC interface {
-	// Wait blocks forever until the server is closed or an error occurs.
-	// Cancelling the context will not close the server, but will return nil.
-	Wait(ctx context.Context) error
-	// Close shuts down the server and closes the multiplexer, and its connection/listener.
-	Close() error
-}
-
-func NewRuntimeIPC(sockConn net.Conn, handler http.Handler) (IPC, *http.Client, error) {
+func NewRuntimeIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error)) (io.Closer, *http.Client, error) {
+	// TODO: configure yamux logger
 	session, err := yamux.Server(sockConn, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux server: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler)
+	i, c := newMuxedIPC(session, handler, onServerClosed)
 	return i, c, nil
 }
 
@@ -43,7 +38,7 @@ type ipcServer struct {
 	err    error
 }
 
-func newIpcServer(l net.Listener, handler http.Handler, onError func() error) *ipcServer {
+func newIpcServer(l net.Listener, handler http.Handler, onClose func(error) error) *ipcServer {
 	result := &ipcServer{
 		done: make(chan struct{}),
 		server: &http.Server{
@@ -52,9 +47,10 @@ func newIpcServer(l net.Listener, handler http.Handler, onError func() error) *i
 	}
 	go func() {
 		err := result.server.Serve(l)
-		if !errors.Is(err, http.ErrServerClosed) {
-			result.err = errors.Join(err, onError())
+		if errors.Is(err, http.ErrServerClosed) { // not an error, client closed the connection
+			err = nil
 		}
+		result.err = errors.Join(err, onClose(err))
 		close(result.done)
 	}()
 	return result
@@ -65,8 +61,13 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-func newMuxedIPC(session *yamux.Session, handler http.Handler) (*ipcImpl, *http.Client) {
-	server := newIpcServer(session, handler, session.Close)
+func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(error)) (*ipcImpl, *http.Client) {
+	server := newIpcServer(session, handler, func(err error) error {
+		if onClose != nil {
+			onClose(err)
+		}
+		return session.Close()
+	})
 	return &ipcImpl{
 		server: server,
 		teardown: sync.OnceValue(func() error {
@@ -75,15 +76,6 @@ func newMuxedIPC(session *yamux.Session, handler http.Handler) (*ipcImpl, *http.
 			return err
 		}),
 	}, createYamuxedClient(session)
-}
-
-func (i *ipcImpl) Wait(ctx context.Context) error {
-	select {
-	case <-i.server.done:
-		return i.server.err
-	case <-ctx.Done():
-		return nil
-	}
 }
 
 func (i *ipcImpl) Close() error {

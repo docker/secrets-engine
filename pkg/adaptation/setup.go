@@ -1,12 +1,14 @@
 package adaptation
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
@@ -36,16 +38,16 @@ func Setup(conn net.Conn, v setupValidator) (*SetupResult, error) {
 	})
 	registrator := newRegistrationLogic(v, chRegistrationResult)
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{registrator}))
-	i, c, err := ipc.NewRuntimeIPC(conn, httpMux)
+	chIpcErr := make(chan error, 1)
+	i, c, err := ipc.NewRuntimeIPC(conn, httpMux, func(err error) {
+		if errors.Is(err, io.EOF) {
+			logrus.Infof("Connection to plugin %v closed", v.name)
+		}
+		chIpcErr <- err
+	})
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	chIpcErr := make(chan error, 1)
-	go func() {
-		chIpcErr <- i.Wait(ctx)
-	}()
 	var out pluginCfgIn
 	select {
 	case r := <-chRegistrationResult:
