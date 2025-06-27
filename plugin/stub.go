@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -60,7 +61,7 @@ type Stub interface {
 type stub struct {
 	name    string
 	m       sync.Mutex
-	factory func(context.Context) (ipc.IPC, error)
+	factory func(ctx context.Context, onClose func()) (io.Closer, error)
 
 	registrationTimeout time.Duration
 	requestTimeout      time.Duration
@@ -76,8 +77,8 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	}
 	stub := &stub{
 		name: cfg.name,
-		factory: func(ctx context.Context) (ipc.IPC, error) {
-			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout)
+		factory: func(ctx context.Context, onClose func()) (io.Closer, error) {
+			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout, onClose)
 		},
 	}
 	logrus.Infof("Created plugin %s", cfg.name)
@@ -85,7 +86,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	return stub, nil
 }
 
-func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc.IPC, error) {
+func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration, onClose func()) (io.Closer, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -93,7 +94,12 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 	})
 	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{p.Shutdown}))
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p}))
-	ipc, c, err := ipc.NewPluginIPC(conn, httpMux)
+	ipc, c, err := ipc.NewPluginIPC(conn, httpMux, func(err error) {
+		if errors.Is(err, io.EOF) {
+			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", name)
+		}
+		onClose()
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +122,16 @@ func (stub *stub) Run(ctx context.Context) error {
 		return fmt.Errorf("already running")
 	}
 	defer stub.m.Unlock()
-	ipc, err := stub.factory(ctx)
+	done := make(chan struct{})
+	ipc, err := stub.factory(ctx, func() {
+		close(done)
+	})
 	if err != nil {
 		return err
 	}
-	err = ipc.Wait(ctx)
 	select {
 	case <-ctx.Done():
-	default:
+	case <-done:
 	}
 	return errors.Join(ipc.Close(), err)
 }
