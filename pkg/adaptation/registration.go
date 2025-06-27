@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
@@ -40,6 +41,7 @@ type RegisterService struct {
 }
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
+	logrus.Infof("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
 	pattern, err := secrets.ParsePattern(c.Msg.GetPattern())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
