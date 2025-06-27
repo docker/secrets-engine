@@ -52,7 +52,13 @@ clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
 
 unit-tests:
-	CGO_ENABLED=0 go test -v -tags="gen" ./...
+	CGO_ENABLED=0 go test -v -tags="gen" $$(go list ./... | grep -v /store/)
+
+keychain-linux-unit-tests:
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=$(DOCKER_TARGET) --file store/Dockerfile .
+
+keychain-unit-tests:
+	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w ${GO_LDFLAGS}" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
@@ -78,4 +84,4 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint unit-tests cross x-package clean help generate docker-mcp
+.PHONY: run bin format lint unit-tests cross x-package clean help generate docker-mcp keychain-linux-unit-tests keychain-unit-tests

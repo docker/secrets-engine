@@ -1,0 +1,84 @@
+#!/bin/sh
+
+set -eux pipefail
+
+kwalletd=$(command -v kwalletd5 || command -v kwalletd6)
+
+if test -z "$kwalletd"; then
+    echo "kwalletd5 or kwalletd6 is not installed"
+    exit 1
+fi
+
+if test -z $(command -v dbus-daemon); then
+    echo "dbus-daemon is not installed"
+    exit 1
+fi
+
+mkdir -p ~/.local/share/dbus-1/services
+touch ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
+
+echo "[D-BUS Service]
+Name=org.freedesktop.secrets
+Exec=${kwalletd}" > ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
+
+
+mkdir -p ~/.local/share/kwalletd
+mkdir ~/.config
+
+echo -e "[Wallet]\nFirst Use=false\nDefault Wallet=kwallet" > ~/.config/kwalletrc
+echo -e "[Wallet]\nVersion=1" > ~/.local/share/kwalletd/kwallet.kwl
+
+export QT_QPA_PLATFORM=minimal
+
+# Start D-Bus session (dbus must be installed)
+export DBUS_SESSION_BUS_ADDRESS=$(dbus-daemon --session --print-address --fork)
+
+"$kwalletd" &
+
+# Wait up to 5 seconds for org.freedesktop.secrets to appear on D-Bus
+timeout=5000
+interval=100
+elapsed=0
+
+while ! gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetNameOwner \
+  org.freedesktop.secrets >/dev/null 2>&1; do 
+
+    sleep 0.1
+    elapsed=$((elapsed + interval))
+    if (( elapsed >= timeout )); then
+        echo "❌ Timeout waiting for kwalletd to register org.freedesktop.secrets"
+        exit 1
+    fi
+done
+
+owner=$(gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetNameOwner \
+  org.freedesktop.secrets | awk -F"'" '{print $2}')
+
+if test -v $owner; then
+    echo "there is no owner of the org.freedesktop.secrets API"
+    exit 1
+fi
+
+pid=$(gdbus call --session \
+  --dest org.freedesktop.DBus \
+  --object-path /org/freedesktop/DBus \
+  --method org.freedesktop.DBus.GetConnectionUnixProcessID \
+  "$owner" | awk '{print $2}' | tr -d ',)')
+
+if test -v $pid; then
+    echo "there is no registered org.freedesktop.secrets daemon"
+    exit 1
+fi
+
+exe=$(readlink -f /proc/$pid/exe)
+
+if [[ "$exe" != "/usr/bin/ksecretd" ]]; then
+    echo "dbus org.freedesktop.secrets is not using ${kwalletd}"
+    exit 1
+fi
