@@ -58,7 +58,7 @@ in `store/scripts`.
 
 On a high-level, each script does:
 
-1. Check relavant binaries avaliable
+1. Check relevant binaries available
 2. Creates the necessary files for the keyring daemon
 3. Starts the dbus daemon
 4. Sets the `DBUS_SESSION_BUS_ADDRESS` environment variable
