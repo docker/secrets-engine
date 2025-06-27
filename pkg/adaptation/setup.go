@@ -14,9 +14,9 @@ import (
 )
 
 type SetupResult struct {
-	conn  net.Conn
-	cfg   pluginCfgIn
-	close func() error
+	client *http.Client
+	cfg    pluginCfgIn
+	close  func() error
 }
 
 var _ pluginCfgInValidator = &setupValidator{}
@@ -36,11 +36,10 @@ func Setup(conn net.Conn, v setupValidator) (*SetupResult, error) {
 	})
 	registrator := newRegistrationLogic(v, chRegistrationResult)
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{registrator}))
-	i, err := ipc.NewRuntimeIPC(conn, httpMux)
+	i, c, err := ipc.NewRuntimeIPC(conn, httpMux)
 	if err != nil {
 		return nil, err
 	}
-	i.Unblock()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	chIpcErr := make(chan error, 1)
@@ -63,9 +62,9 @@ func Setup(conn net.Conn, v setupValidator) (*SetupResult, error) {
 		return nil, errors.New("plugin registration timed out")
 	}
 	return &SetupResult{
-		conn:  conn,
-		cfg:   out,
-		close: i.Close,
+		client: c,
+		cfg:    out,
+		close:  i.Close,
 	}, nil
 }
 

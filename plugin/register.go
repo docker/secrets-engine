@@ -3,7 +3,6 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -22,22 +21,12 @@ type registerClient struct {
 	timeout      time.Duration
 }
 
-func newRegisterClient(conn net.Conn, pluginName string, plugin Plugin, timeout time.Duration) *registerClient {
+func newRegisterClient(c *http.Client, pluginName string, plugin Plugin, timeout time.Duration) *registerClient {
 	return &registerClient{
-		engineClient: resolverv1connect.NewEngineServiceClient(createHTTPClient(conn), "http://unix"),
+		engineClient: resolverv1connect.NewEngineServiceClient(c, "http://unix"),
 		pluginName:   pluginName,
 		plugin:       plugin,
 		timeout:      timeout,
-	}
-}
-
-func createHTTPClient(conn net.Conn) *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(context.Context, string, string) (net.Conn, error) {
-				return conn, nil
-			},
-		},
 	}
 }
 
@@ -62,8 +51,8 @@ func (c *registerClient) register(ctx context.Context) (*RuntimeConfig, error) {
 	}, nil
 }
 
-func doRegister(ctx context.Context, conn net.Conn, pluginName string, plugin Plugin, timeout time.Duration) (*RuntimeConfig, error) {
-	client := newRegisterClient(conn, pluginName, plugin, timeout)
+func doRegister(ctx context.Context, c *http.Client, pluginName string, plugin Plugin, timeout time.Duration) (*RuntimeConfig, error) {
+	client := newRegisterClient(c, pluginName, plugin, timeout)
 	resp, err := client.register(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register plugin %s: %w", pluginName, err)
