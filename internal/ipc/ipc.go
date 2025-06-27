@@ -8,13 +8,19 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/containerd/nri/pkg/net/multiplex"
+	"github.com/hashicorp/yamux"
 )
 
-type PluginIPC interface {
-	// Conn returns a connection that can be used to reach the runtime server on the other end of
-	// the multiplexed connection (this is not the original net.Conn, but a multiplexed connection!).
-	Conn() net.Conn
+func NewPluginIPC(sockConn net.Conn, handler http.Handler) (IPC, *http.Client, error) {
+	session, err := yamux.Client(sockConn, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating yamux client: %w", err)
+	}
+	i, c := newMuxedIPC(session, handler)
+	return i, c, nil
+}
+
+type IPC interface {
 	// Wait blocks forever until the server is closed or an error occurs.
 	// Cancelling the context will not close the server, but will return nil.
 	Wait(ctx context.Context) error
@@ -22,25 +28,13 @@ type PluginIPC interface {
 	Close() error
 }
 
-func NewPluginIPC(sockConn net.Conn, handler http.Handler) (PluginIPC, error) {
-	return newMuxedIPC(sockConn, handler, multiplex.PluginServiceConn, multiplex.RuntimeServiceConn)
-}
-
-type RuntimeIPC interface {
-	// Conn returns a connection that can be used to reach the server running in the plugin on the other end of
-	// the multiplexed connection (this is not the original net.Conn, but a multiplexed connection!).
-	Conn() net.Conn
-	// Wait blocks forever until the server is closed or an error occurs.
-	// Cancelling the context will not close the server, but will return nil.
-	Wait(ctx context.Context) error
-	// Close shuts down the server and closes the multiplexer, and its connection/listener.
-	Close() error
-	// Unblock unblocks the multiplexed connection, allowing it to read from the socket.
-	Unblock()
-}
-
-func NewRuntimeIPC(sockConn net.Conn, handler http.Handler) (RuntimeIPC, error) {
-	return newMuxedIPC(sockConn, handler, multiplex.RuntimeServiceConn, multiplex.PluginServiceConn, multiplex.WithBlockedRead())
+func NewRuntimeIPC(sockConn net.Conn, handler http.Handler) (IPC, *http.Client, error) {
+	session, err := yamux.Server(sockConn, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating yamux server: %w", err)
+	}
+	i, c := newMuxedIPC(session, handler)
+	return i, c, nil
 }
 
 type ipcServer struct {
@@ -49,7 +43,7 @@ type ipcServer struct {
 	err    error
 }
 
-func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServer {
+func newIpcServer(l net.Listener, handler http.Handler, onError func() error) *ipcServer {
 	result := &ipcServer{
 		done: make(chan struct{}),
 		server: &http.Server{
@@ -59,8 +53,7 @@ func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServ
 	go func() {
 		err := result.server.Serve(l)
 		if !errors.Is(err, http.ErrServerClosed) {
-			onError()
-			result.err = err
+			result.err = errors.Join(err, onError())
 		}
 		close(result.done)
 	}()
@@ -68,39 +61,20 @@ func newIpcServer(l net.Listener, handler http.Handler, onError func()) *ipcServ
 }
 
 type ipcImpl struct {
-	mConn    net.Conn
 	server   *ipcServer
 	teardown func() error
-	unblock  func()
 }
 
-func newMuxedIPC(sockConn net.Conn, handler http.Handler, listenerID, connID multiplex.ConnID, options ...multiplex.Option) (*ipcImpl, error) {
-	mux := multiplex.Multiplex(sockConn, options...)
-	listener, err := mux.Listen(listenerID)
-	if err != nil {
-		mux.Close()
-		return nil, err
-	}
-	conn, err := mux.Open(connID)
-	if err != nil {
-		mux.Close()
-		return nil, fmt.Errorf("failed to multiplex grcp client connection: %w", err)
-	}
-	server := newIpcServer(listener, handler, func() { mux.Close() })
+func newMuxedIPC(session *yamux.Session, handler http.Handler) (*ipcImpl, *http.Client) {
+	server := newIpcServer(session, handler, session.Close)
 	return &ipcImpl{
-		mConn:  conn,
 		server: server,
 		teardown: sync.OnceValue(func() error {
-			err := errors.Join(server.server.Close(), mux.Close())
+			err := errors.Join(server.server.Close(), session.Close())
 			<-server.done
 			return err
 		}),
-		unblock: mux.Unblock,
-	}, nil
-}
-
-func (i *ipcImpl) Conn() net.Conn {
-	return i.mConn
+	}, createYamuxedClient(session)
 }
 
 func (i *ipcImpl) Wait(ctx context.Context) error {
@@ -116,6 +90,11 @@ func (i *ipcImpl) Close() error {
 	return i.teardown()
 }
 
-func (i *ipcImpl) Unblock() {
-	i.unblock()
+func createYamuxedClient(session *yamux.Session) *http.Client {
+	transport := &http.Transport{
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			return session.Open()
+		},
+	}
+	return &http.Client{Transport: transport}
 }
