@@ -28,8 +28,7 @@ DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg NRI_PLUGIN_BINARY \
           			--build-arg BUF_VERSION \
-          			--build-arg GIT_TAG \
-					--build-arg MAIN_MODULE_PATH
+          			--build-arg GIT_TAG
 
 GO_TEST := go test
 ifneq ($(shell sh -c "which gotestsum 2> /dev/null"),)
