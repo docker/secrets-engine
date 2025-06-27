@@ -60,7 +60,7 @@ type Stub interface {
 type stub struct {
 	name    string
 	m       sync.Mutex
-	factory func(context.Context) (ipc.PluginIPC, error)
+	factory func(context.Context) (ipc.IPC, error)
 
 	registrationTimeout time.Duration
 	requestTimeout      time.Duration
@@ -76,7 +76,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	}
 	stub := &stub{
 		name: cfg.name,
-		factory: func(ctx context.Context) (ipc.PluginIPC, error) {
+		factory: func(ctx context.Context) (ipc.IPC, error) {
 			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout)
 		},
 	}
@@ -85,7 +85,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	return stub, nil
 }
 
-func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc.PluginIPC, error) {
+func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration) (ipc.IPC, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -93,11 +93,11 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 	})
 	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{p.Shutdown}))
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p}))
-	ipc, err := ipc.NewPluginIPC(conn, httpMux)
+	ipc, c, err := ipc.NewPluginIPC(conn, httpMux)
 	if err != nil {
 		return nil, err
 	}
-	runtimeCfg, err := doRegister(ctx, ipc.Conn(), name, p, timeout)
+	runtimeCfg, err := doRegister(ctx, c, name, p, timeout)
 	if err != nil {
 		ipc.Close()
 		return nil, err

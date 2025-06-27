@@ -6,6 +6,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	github.com/alecthomas/kong v1.11.0
 	github.com/containerd/nri v0.9.0
+	github.com/hashicorp/yamux v0.1.2
 	github.com/keybase/go-keychain v0.0.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
