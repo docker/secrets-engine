@@ -35,10 +35,10 @@ func getPluginRegistrationTimeout() time.Duration {
 }
 
 var (
-	_ = (secrets.Resolver)((*Plugin)(nil))
+	_ = (secrets.Resolver)((*plugin)(nil))
 )
 
-type Plugin struct {
+type plugin struct {
 	sync.Mutex
 	base           string
 	pattern        secrets.Pattern
@@ -48,13 +48,13 @@ type Plugin struct {
 	close          func() error
 }
 
-// NewExternalPlugin Create a plugin (stub) for an accepted external plugin connection.
-func NewExternalPlugin(conn net.Conn, v setupValidator) (*Plugin, error) {
+// newExternalPlugin Create a plugin (stub) for an accepted external plugin connection.
+func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
 	r, err := setup(conn, v)
 	if err != nil {
 		return nil, err
 	}
-	return &Plugin{
+	return &plugin{
 		base:           r.cfg.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
@@ -68,7 +68,7 @@ var (
 	errIDMismatch = errors.New("id mismatch")
 )
 
-func (p *Plugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
 		SecretId: proto.String(request.ID.String()),
 	}.Build())
