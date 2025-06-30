@@ -22,6 +22,33 @@ var (
 	sysErrNoSuchLogonSession      = windows.Errno(windows.ERROR_NO_SUCH_LOGON_SESSION)
 )
 
+// encodeSecret marshals the secret into a slice of bytes in UTF16 format
+func encodeSecret(secret store.Secret) ([]byte, error) {
+	data, err := secret.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
+	blob, _, err := transform.Bytes(encoder, data)
+	if err != nil {
+		return nil, err
+	}
+	return blob, nil
+}
+
+// decodeSecret unmarshals the secret from UTF16 format to UTF8
+// secret will contain the unmarshaled value.
+func decodeSecret(blob []byte, secret store.Secret) error {
+	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+	val, _, err := transform.Bytes(decoder, blob)
+	if err != nil {
+		return err
+	}
+
+	return secret.Unmarshal(val)
+}
+
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	if err := id.Valid(); err != nil {
 		return err
@@ -52,17 +79,10 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, mapWindowsCredentialError(err)
 	}
 
-	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-	blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
-	if err != nil {
-		return nil, err
-	}
-
 	secret := k.factory()
-	if err := secret.Unmarshal(blob); err != nil {
+	if err := decodeSecret(gc.CredentialBlob, secret); err != nil {
 		return nil, err
 	}
-
 	return secret, nil
 }
 
@@ -142,13 +162,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
-	data, err := secret.Marshal()
-	if err != nil {
-		return err
-	}
-
-	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
-	blob, _, err := transform.Bytes(encoder, data)
+	blob, err := encodeSecret(secret)
 	if err != nil {
 		return err
 	}
