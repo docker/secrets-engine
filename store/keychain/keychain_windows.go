@@ -54,15 +54,8 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 		return err
 	}
 
-	g, err := wincred.GetGenericCredential(k.itemLabel(id))
-	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
-		return mapWindowsCredentialError(err)
-	}
-	if g == nil {
-		return nil
-	}
-
-	err = g.Delete()
+	g := wincred.NewGenericCredential(k.itemLabel(id))
+	err := g.Delete()
 	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
 		return mapWindowsCredentialError(err)
 	}
