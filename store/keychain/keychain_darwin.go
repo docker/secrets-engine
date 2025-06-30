@@ -69,7 +69,11 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 
 	item := newKeychainItem(id.String(), k)
-	return mapKeychainError(kc.DeleteItem(item))
+	err := kc.DeleteItem(item)
+	if err != nil && !errors.Is(err, kc.ErrorItemNotFound) {
+		return mapKeychainError(err)
+	}
+	return nil
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
