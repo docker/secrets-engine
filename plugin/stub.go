@@ -93,7 +93,8 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 		_, _ = w.Write([]byte("ok"))
 	})
 	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{p.Shutdown}))
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p}))
+	setupCompleted := make(chan struct{})
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p, setupCompleted, timeout}))
 	ipc, c, err := ipc.NewPluginIPC(conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", name)
@@ -114,6 +115,7 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 		return nil, fmt.Errorf("failed to configure plugin %q: %w", name, err)
 	}
 	logrus.Infof("Started plugin %s...", name)
+	close(setupCompleted)
 	return ipc, nil
 }
 
