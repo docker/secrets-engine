@@ -8,6 +8,7 @@ import (
 
 	"github.com/danieljoos/wincred"
 	"github.com/docker/secrets-engine/store"
+	"golang.org/x/sys/windows"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
@@ -17,6 +18,8 @@ var (
 	ErrInvalidCredentialFlags     = errors.New("an invalid flag was specified for the flags parameter")
 	ErrInvalidCredentialParameter = errors.New("protected field does not match provided value for an existing credential")
 	ErrNoLogonSession             = errors.New("logon session does not exist or there is no credential set associated with this logon session")
+	sysErrInvalidCredentialFlags  = windows.Errno(windows.ERROR_INVALID_FLAGS)
+	sysErrNoSuchLogonSession      = windows.Errno(windows.ERROR_NO_SUCH_LOGON_SESSION)
 )
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
@@ -179,6 +182,10 @@ func mapWindowsCredentialError(err error) error {
 		return ErrCredentialBadUsername
 	case wincred.ErrInvalidParameter:
 		return ErrInvalidCredentialParameter
+	case sysErrInvalidCredentialFlags:
+		return ErrInvalidCredentialFlags
+	case sysErrNoSuchLogonSession:
+		return ErrNoLogonSession
 	}
-	return nil
+	return err
 }
