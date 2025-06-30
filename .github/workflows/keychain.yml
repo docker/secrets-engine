@@ -40,27 +40,27 @@ jobs:
           install: true
       - name: Test
         run: DOCKER_TARGET=${{ matrix.subtest }} make keychain-linux-unit-tests
-  # tests-windows:
-  #   permissions:
-  #     id-token: write
-  #     contents: read
-  #   name: WindowsKeychainTests
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       os:
-  #         - windows-2022
-  #         - windows-2025
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Setup Go
-  #       uses: actions/setup-go@v5
-  #       with:
-  #         go-version-file: ./store/go.mod
-  #     - name: Test keychain
-  #       run: make keychain-unit-tests
+  tests-windows:
+    permissions:
+      id-token: write
+      contents: read
+    name: WindowsKeychainTests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2022
+          - windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./store/go.mod
+      - name: Test keychain
+        run: make keychain-unit-tests
   tests-macos:
     permissions:
       id-token: write
