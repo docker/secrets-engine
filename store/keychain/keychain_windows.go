@@ -8,6 +8,8 @@ import (
 
 	"github.com/danieljoos/wincred"
 	"github.com/docker/secrets-engine/store"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 var (
@@ -42,13 +44,19 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, err
 	}
 
-	g, err := wincred.GetGenericCredential(k.itemLabel(id))
+	gc, err := wincred.GetGenericCredential(k.itemLabel(id))
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
 	}
 
+	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+	blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
+	if err != nil {
+		return nil, err
+	}
+
 	secret := k.factory()
-	if err := secret.Unmarshal(g.CredentialBlob); err != nil {
+	if err := secret.Unmarshal(blob); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +119,13 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 		if err != nil {
 			return nil, mapWindowsCredentialError(err)
 		}
-		if err := secret.Unmarshal(gc.CredentialBlob); err != nil {
+
+		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+		blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
+		if err != nil {
+			return nil, err
+		}
+		if err := secret.Unmarshal(blob); err != nil {
 			return nil, err
 		}
 		secrets[id] = secret
@@ -130,11 +144,21 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		return err
 	}
 
+	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
+	blob, _, err := transform.Bytes(encoder, data)
+	if err != nil {
+		return err
+	}
+
 	g := wincred.NewGenericCredential(k.itemLabel(id))
 	g.UserName = id.String()
-	g.CredentialBlob = data
+	g.CredentialBlob = blob
 	g.Persist = wincred.PersistLocalMachine
 	g.Attributes = []wincred.CredentialAttribute{
+		{
+			Keyword: "id",
+			Value:   []byte(id.String()),
+		},
 		{
 			Keyword: "service:group",
 			Value:   []byte(k.serviceGroup),

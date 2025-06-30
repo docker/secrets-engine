@@ -10,6 +10,7 @@ require (
 	github.com/keybase/dbus v0.0.0-20220506165403-5aa21ea2c23a
 	github.com/keybase/go-keychain v0.0.1
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/text v0.21.0
 )
 
 require (
