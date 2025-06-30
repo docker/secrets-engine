@@ -2,7 +2,6 @@ package adaptation
 
 import (
 	"context"
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -64,10 +63,6 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
 	}, nil
 }
 
-var (
-	errIDMismatch = errors.New("id mismatch")
-)
-
 func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
 		SecretId: proto.String(request.ID.String()),
@@ -81,7 +76,7 @@ func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secret
 		return envelopeErr(request, err), err
 	}
 	if id != request.ID {
-		return envelopeErr(request, errIDMismatch), errIDMismatch
+		return envelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{
 		ID:       id,
