@@ -85,4 +85,10 @@ func TestKeychain(t *testing.T) {
 		_, err := ks.Get(t.Context(), id)
 		require.ErrorIs(t, err, store.ErrCredentialNotFound)
 	})
+
+	t.Run("delete non-existent credential", func(t *testing.T) {
+		id := store.ID("com.test.test/test/does-not-exist")
+		require.NoError(t, id.Valid())
+		require.NoError(t, ks.Delete(t.Context(), id))
+	})
 }
