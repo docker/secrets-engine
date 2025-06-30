@@ -37,7 +37,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 
 	err = g.Delete()
 	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
-		return err
+		return mapWindowsCredentialError(err)
 	}
 	return nil
 }
