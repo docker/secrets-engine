@@ -1,48 +1,56 @@
 # Keychain CI
 
+```mermaid
+flowchart TD
+    A[CI] -->|macOS vm| B(Run Test)
+    A[CI] -->|windows vm| C(Run Test)
+    A[CI] -->|linux vm| D[Buildkit]
+    D -->|fedora| E(Run Test)
+    D -->|ubuntu| F(Run Test)
+```
+
 The keychain tests are split between macOS, Linux and Windows. There are two
 make commands: `make keychain-unit-tests` and `make keychain-linux-unit-tests`.
 
-For local development, it would make the most sense to just run `keychain-unit-tests`
-since it's simply invoking `go test` for only the `keychain` package. CGO is
-enabled to support macOS.
-
 Since there are so many different scenarios in Linux, the GH runners would
-be a headache to setup and maintain and we don't have access to a variety of
-distros.
+be a headache to setup and maintain and we don't have access to the necessary
+variety of distros.
 
 Linux has two popular keychain backends: `gnome-keyring-daemon` and `kdewallet`.
-To cover a variety of environments, we setup `Ubuntu 24.04` and `Fedora 43` with
-both backends in different test runs.
+To cover a variety of environments, we run `Ubuntu` and `Fedora` tests using
+Docker with different keychain backend.
 
-To test this locally you can run `DOCKER_TARGET=ubuntu-24-gnome-keyring make keychain-linux-unit-tests`.
-This will use `buildkit` to target only the `ubuntu-24-gnome-keyring` label inside
-the `store/Dockerfile`.
-
-Each backend has a script to start them up and ensure they are running before
-any Go tests even run. They are located in `store/scripts/gnome-keyring` and
-`store/scripts/kdewallet`.
+Each keychain backend has a script to start them up and ensure they are running
+before any Go tests even run. They are located in `store/scripts/gnome-keyring`
+and `store/scripts/kdewallet`.
 
 ### Fedora
 
-On Fedora we install `gnome-keyring`, `kf6-kwallet` and `dbus-daemon`.
 We require `dbus-daemon` since it was removed in favor of `dbus-broker` over
 `systemd`. We then use `dbus-daemon` to start the `dbus` service and get the
 connection address for `gnome-keyring` and `kwalletd6`.
 
-Fedora 43 is the latest at the time of writing and has the latest packages and
-changes to `kdewallet` and `dbus`.
-
 ### Ubuntu
 
-On Ubuntu we install `libglib2.0-bin`, `dbus`, `gnome-keyring`, `kwalletmanager`.
 We require `libglib2.0-bin` since we require `gdbus` CLI to talk to the `dbus`
 APIs.
 
 ## Understand the Process
 
 The GitHub action spins up three jobs, `linux-keychain`,`test-macos` and `test-windows`.
+Each job is run in its own runner. For example `test-macos` runs inside a `macos`
+runner. The Linux job is run on an Ubuntu runner, but the actual tests are run
+through Docker Buildkit.
+
 For `linux-keychain` we then have four tests:
+
+```mermaid
+flowchart TD
+    A[Linux Keychain Test] -->|ubuntu| B(Run gnome-keyring)
+    A -->|ubuntu| C(Run kdewallet)
+    A -->|fedora| D(Run gnome-keyring)
+    A -->|fedora| E(Run kdewallet)
+```
 
 - `ubuntu-24-gnome-keyring`
 - `ubuntu-24-kdewallet`

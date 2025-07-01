@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# 1. Check relevant binaries available
+# 2. Creates the necessary files for the keyring daemon
+# 3. Starts the dbus daemon
+# 4. Sets the `DBUS_SESSION_BUS_ADDRESS` environment variable
+# 5. Starts the keyring
+# 6. Waits for the keyring to be active by polling dbus over `gdbus`
+# 7. Check if the registered `org.freedesktop.secrets` backend matches what we expect.
+
 set -eux pipefail
 
 if test -z $(command -v gnome-keyring-daemon); then
