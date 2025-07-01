@@ -5,6 +5,9 @@ and can be used directly with `keychain.New`.
 
 - Linux uses the [`org.freedesktop.secrets` API](https://specifications.freedesktop.org/secret-service-spec/latest/index.html).
 - macOS uses the [macOS Keychain services API](https://developer.apple.com/documentation/security/keychain-services).
+- Windows uses the [Windows Credential Manager API](https://learn.microsoft.com/en-us/windows/win32/api/wincred/)
+
+For more design implementation see [../docs/keychain/design.md](../docs/keychain/design.md).
 
 ## Quickstart
 
