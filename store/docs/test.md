@@ -1,6 +1,7 @@
 # Test
 
-The store can be test using `go test`.
+The store can be tested using the `go test` command. For the `keychain` package
+this might require further tweaks depending on the OS you are running on.
 
 ## Keychain tests
 
@@ -8,14 +9,15 @@ For local development, it would make the most sense to just run `keychain-unit-t
 since it's simply invoking `go test` for only the `keychain` package. CGO is
 enabled to support macOS.
 
-To tests Linux on other OSs (like macOS and Windows) or isolated from the host,
-you can use the `make keychain-linux-unit-tests` command.
+To test Linux on other OSs (like macOS and Windows) or isolated from the host,
+you can use the `make keychain-linux-unit-tests` command. It uses Docker to
+spin up the necessary environment required to run the test.
 
 ```console
 DOCKER_TARGET=ubuntu-24-gnome-keyring make keychain-linux-unit-tests
 ```
 
-For Linux we then have four tests:
+For Linux keychain we have four sub-tests:
 
 ```mermaid
 flowchart TD
