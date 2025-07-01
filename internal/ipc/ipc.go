@@ -8,27 +8,45 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/yamux"
 )
 
-func NewPluginIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error)) (io.Closer, *http.Client, error) {
+const (
+	defaultShutdownTimeout = 2 * time.Second
+)
+
+type cfg struct {
+	shutdownTimeout time.Duration
+}
+
+type Option func(*cfg) *cfg
+
+func WithShutdownTimeout(d time.Duration) Option {
+	return func(in *cfg) *cfg {
+		in.shutdownTimeout = d
+		return in
+	}
+}
+
+func NewPluginIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	// TODO: configure yamux logger
 	session, err := yamux.Client(sockConn, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux client: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler, onServerClosed)
+	i, c := newMuxedIPC(session, handler, onServerClosed, option...)
 	return i, c, nil
 }
 
-func NewRuntimeIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error)) (io.Closer, *http.Client, error) {
+func NewRuntimeIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	// TODO: configure yamux logger
 	session, err := yamux.Server(sockConn, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux server: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler, onServerClosed)
+	i, c := newMuxedIPC(session, handler, onServerClosed, option...)
 	return i, c, nil
 }
 
@@ -50,10 +68,17 @@ func newIpcServer(l net.Listener, handler http.Handler, onClose func(error) erro
 		if errors.Is(err, http.ErrServerClosed) { // not an error, client closed the connection
 			err = nil
 		}
-		result.err = errors.Join(err, onClose(err))
+		result.err = errors.Join(filterEOF(err), onClose(err)) // EOF: only forward to the onClose handler, but filter out internal forwarding
 		close(result.done)
 	}()
 	return result
+}
+
+func filterEOF(err error) error {
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }
 
 type ipcImpl struct {
@@ -61,7 +86,13 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(error)) (*ipcImpl, *http.Client) {
+func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(error), option ...Option) (*ipcImpl, *http.Client) {
+	// Note: Calling session.Close() needs to be done as the very last step as it shuts down all IPC!
+
+	cfg := &cfg{shutdownTimeout: defaultShutdownTimeout}
+	for _, o := range option {
+		cfg = o(cfg)
+	}
 	server := newIpcServer(session, handler, func(err error) error {
 		if onClose != nil {
 			onClose(err)
@@ -71,9 +102,11 @@ func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(erro
 	return &ipcImpl{
 		server: server,
 		teardown: sync.OnceValue(func() error {
-			err := errors.Join(server.server.Close(), session.Close())
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
+			defer cancel()
+			err := server.server.Shutdown(ctx)
 			<-server.done
-			return err
+			return errors.Join(err, session.Close(), server.err)
 		}),
 	}, createYamuxedClient(session)
 }
