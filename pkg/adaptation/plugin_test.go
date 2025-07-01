@@ -21,17 +21,35 @@ const (
 	mockSecretID    = secrets.ID("mockSecretID")
 )
 
-var (
-	mockPlugin = &mockedPlugin{
-		pattern: "*",
-		id:      mockSecretID,
-	}
-)
-
 type mockedPlugin struct {
 	pattern      string
 	id           secrets.ID
 	configureErr error
+}
+
+type MockedPluginOption func(*mockedPlugin)
+
+func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
+	m := &mockedPlugin{
+		pattern: "*",
+		id:      mockSecretID,
+	}
+	for _, opt := range options {
+		opt(m)
+	}
+	return m
+}
+
+func WithPattern(pattern string) MockedPluginOption {
+	return func(mp *mockedPlugin) {
+		mp.pattern = pattern
+	}
+}
+
+func WithID(id secrets.ID) MockedPluginOption {
+	return func(mp *mockedPlugin) {
+		mp.id = id
+	}
 }
 
 func (m mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
@@ -62,14 +80,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				doneRuntime := make(chan struct{})
 				go func() {
-					conn, err := l.Accept()
-					require.NoError(t, err)
-
-					p, err := newExternalPlugin(conn, setupValidator{
-						out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
-						acceptPattern: func(secrets.Pattern) error { return nil },
-					})
-					require.NoError(t, err)
+					p := mockExternalPluginRuntime(t, l)
 					e, err := p.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 					assert.NoError(t, err)
 					assert.Equal(t, mockSecretValue, string(e.Value))
@@ -77,9 +88,79 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(doneRuntime)
 				}()
 
-				s, err := p.New(mockPlugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				assert.NoError(t, s.Run(context.Background()))
+				<-doneRuntime
+			},
+		},
+		{
+			name: "plugin returns error on GetSecret",
+			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				doneRuntime := make(chan struct{})
+				go func() {
+					p := mockExternalPluginRuntime(t, l)
+					_, err := p.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+					assert.ErrorContains(t, err, "id mismatch")
+					assert.NoError(t, p.close())
+					close(doneRuntime)
+				}()
+
+				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				require.NoError(t, err)
+				assert.NoError(t, s.Run(context.Background()))
+				<-doneRuntime
+			},
+		},
+		{
+			name: "cancelling plugin.run() shuts down the runtime",
+			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				doneRuntime := make(chan struct{})
+				donePlugin := make(chan struct{})
+				downRuntime := make(chan struct{})
+				go func() {
+					p := mockExternalPluginRuntime(t, l)
+					e, err := p.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+					assert.NoError(t, err)
+					assert.Equal(t, mockSecretValue, string(e.Value))
+					close(doneRuntime)
+					<-donePlugin
+					assert.NoError(t, p.close())
+					close(downRuntime)
+				}()
+
+				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				require.NoError(t, err)
+				ctx, cancel := context.WithCancel(t.Context())
+
+				go func() {
+					assert.NoError(t, s.Run(ctx))
+					close(donePlugin)
+				}()
+				<-doneRuntime
+				cancel()
+				<-downRuntime
+			},
+		},
+		{
+			name: "plugins with invalid patterns are rejected",
+			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				doneRuntime := make(chan struct{})
+				go func() {
+					conn, err := l.Accept()
+					require.NoError(t, err)
+
+					_, err = newExternalPlugin(conn, setupValidator{
+						out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
+						acceptPattern: func(secrets.Pattern) error { return nil },
+					})
+					assert.ErrorContains(t, err, "invalid pattern")
+					close(doneRuntime)
+				}()
+
+				s, err := p.New(newMockedPlugin(WithPattern("a*a")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				require.NoError(t, err)
+				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
 			},
 		},
@@ -100,4 +181,16 @@ func Test_newExternalPlugin(t *testing.T) {
 			tt.test(t, l, conn)
 		})
 	}
+}
+
+func mockExternalPluginRuntime(t *testing.T, l net.Listener) *plugin {
+	conn, err := l.Accept()
+	require.NoError(t, err)
+
+	p, err := newExternalPlugin(conn, setupValidator{
+		out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
+		acceptPattern: func(secrets.Pattern) error { return nil },
+	})
+	require.NoError(t, err)
+	return p
 }
