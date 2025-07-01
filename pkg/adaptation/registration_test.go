@@ -149,14 +149,6 @@ func Test_RegisterPlugin(t *testing.T) {
 		test func(t *testing.T, resp *connect.Response[resolverv1.RegisterPluginResponse], err error)
 	}{
 		{
-			name: "invalid pattern",
-			r:    mockPluginRegistratorOK(t),
-			in:   pluginCfgIn{pattern: "*a*"},
-			test: func(t *testing.T, _ *connect.Response[resolverv1.RegisterPluginResponse], err error) {
-				assert.ErrorContains(t, err, "invalid pattern")
-			},
-		},
-		{
 			name: "registration fails",
 			r:    mockPluginRegistratorErr(t),
 			in:   mockPluginCfgIn,

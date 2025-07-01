@@ -42,16 +42,15 @@ type RegisterService struct {
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
 	logrus.Infof("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
-	pattern, err := secrets.ParsePattern(c.Msg.GetPattern())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
 	in := pluginCfgIn{
 		name:    c.Msg.GetName(),
 		version: c.Msg.GetVersion(),
-		pattern: pattern,
+		pattern: secrets.Pattern(c.Msg.GetPattern()),
 	}
 	out, err := r.r.register(ctx, in)
+	if errors.Is(err, secrets.ErrInvalidPattern) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

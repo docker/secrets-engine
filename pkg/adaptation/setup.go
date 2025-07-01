@@ -53,7 +53,7 @@ func setup(conn net.Conn, v setupValidator) (*setupResult, error) {
 	case r := <-chRegistrationResult:
 		if r.err != nil {
 			i.Close()
-			return nil, fmt.Errorf("failed to register plugin: %w", err)
+			return nil, fmt.Errorf("failed to register plugin: %w", r.err)
 		}
 		out = r.cfg
 	case err := <-chIpcErr:
@@ -72,6 +72,9 @@ func setup(conn net.Conn, v setupValidator) (*setupResult, error) {
 }
 
 func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
+	if err := in.pattern.Valid(); err != nil {
+		return nil, err
+	}
 	if p.name != "" && in.name != p.name {
 		return nil, errors.New("plugin name cannot be changed when launched by engine")
 	}
