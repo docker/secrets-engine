@@ -8,7 +8,7 @@ It solves a lot of the drawbacks of its predecessor, such as:
 - Support for Generic credentials
 - Native Go library that bundles with your application binary
 - Broader use cases: It can be used to store credentials or any secret.
-  It is designed so that the implemeter has more choice. The credential helper
+  It is designed so that the implementer has more choice. The credential helper
   was designed to only support credentials from remote services (e.g. Image Registry)
 - More secure: since it is a library, the implementer can decide how much
   data from the store they should expose outside of the application. With the
