@@ -18,7 +18,7 @@ It solves a lot of the drawbacks of its predecessor, such as:
 
 ## Linux
 
-Users running Linux with a Desktop Environment usually have access to the
+Users running Linux with a desktop environment usually have access to the
 [`org.freedesktop.secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) API
 via `gnome-keyring` or `kdewallet`.
 
@@ -35,19 +35,3 @@ it defaults finding the default keyring.
 
 To communicate with the `org.freedesktop.secrets` API, we are using `dbus`.
 It is a convenient way of communicating without needing any direct C library integration.
-
-At this point in time we have decided to integrate with [keybase/go-keychain](https://github.com/keybase/go-keychain)
-instead of implementing all of the `dbus` calls ourselves.
-
-The `keybase/go-keychain` library provides:
-
-- Secure cryptographic communication over the `dbus` connection
-- Easy to use API
-
-Some of the drawbacks are:
-
-- Relies on a forked archived [keybase/dbus](https://github.com/keybase/dbus) library
-- Low contribution activity
-
-In future we might update the [keybase/dbus](https://github.com/keybase/dbus) with
-a more up to date and maintained version, such as [godbus/dbus](https://github.com/godbus/dbus).
