@@ -34,7 +34,7 @@ func getPluginRegistrationTimeout() time.Duration {
 }
 
 var (
-	_ = (secrets.Resolver)((*plugin)(nil))
+	_ secrets.Resolver = &plugin{}
 )
 
 type plugin struct {
