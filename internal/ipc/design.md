@@ -30,32 +30,14 @@ flowchart TD
 
 ```
 
-## Choosing a multiplexer
-The multiplexer adds a custom layer on top of the socket that allows running servers on both ends of the socket.
 
-### nri/net/multiplex - a minimal multiplexer
-The plugin system in [containerd/nr](https://github.com/containerd/nri) implements its own simple frame-based multiplexer [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex). 
-It provides two streams on each side that need to be re-used for all communication.
-This works well for [ttrpc](https://github.com/containerd/ttrpc) which uses its own length-prefixed framing.
-However, the standard Go HTTP server inside `Server(net.Listener)` does one `Accept()`, gets one `net.Conn`, and then loops inside serveConn to decode requests. 
-But because that sub-connection isn’t a real socket—and because the mux delivers no further “new connections” and any pipelined data after the first request can get lost or stuck in the mux’s framing, and the server never sees it.
-
-Alternatively, HTTP/2 without TLS could be used as it gives control over the framing.
-Unfortunately, Go's `net/http` package does not easily support HTTP/2 without TLS and getting it to work comes with its own set of challenges, such as requiring a custom `net.Listener` implementation that handles the HTTP/2 framing.
-
-TLDR: [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex) is not ideal for general HTTP servers.
-
-### Yamux
-
-Yamux is a full-featured, multiplexing protocol that allows multiple streams to be sent over a single TCP connection. It is actively maintained by Hashicorp and is used by Hashicorp's Nomad.
-Using Yamux we get Go's `net/http` out-of-the-box.
 
 
 ## Decisions
 
 ---
 
-2025-07-02 IPC stack
+### 2025-07-02 settling on yamux + connect rpc for the IPC stack
 
 The IPC stack consists of multiple parts that need to play well together:
 - socket multiplexing
@@ -77,6 +59,30 @@ Plugins written in a different language would come at a high cost.
 
 We argue that in our use case since the networking only happens locally the overhead of GRPC over HTTP and the cost of opening a new yamux stream per API request are negligible. 
 In addition, the main performance bottleneck will be within the actual plugins due to IO operations, additional upstream network requests and potentially authentication.
+
+---
+
+### 2025-06-27 dropping nri/net/multiplex in favor of yamux
+
+The multiplexer adds a custom layer on top of the socket that allows running servers on both ends of the socket.
+
+#### nri/net/multiplex - a minimal multiplexer
+
+The plugin system in [containerd/nri](https://github.com/containerd/nri) implements its own simple frame-based multiplexer [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex).
+It provides two streams on each side that need to be re-used for all communication.
+This works well for [ttrpc](https://github.com/containerd/ttrpc) which uses its own length-prefixed framing.
+However, the standard Go HTTP server inside `Server(net.Listener)` does one `Accept()`, gets one `net.Conn`, and then loops inside serveConn to decode requests.
+I.e. it tries to create (and on completion closes) a new stream per request but using nri/net/multiplex gets stuck as nri/net/multiplex is only design to return one stream per lifetime.
+
+Alternatively, HTTP/2 without TLS could be used as it gives control over the framing.
+Unfortunately, Go's `net/http` package does not easily support HTTP/2 without TLS and getting it to work comes with its own set of challenges, such as requiring a custom `net.Listener` implementation that handles the HTTP/2 framing.
+
+TLDR: [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex) is not ideal for general HTTP servers.
+
+#### Yamux
+
+Yamux is a full-featured, multiplexing protocol that allows multiple streams to be sent over a single TCP connection. It is actively maintained by Hashicorp and is used by Hashicorp's Nomad.
+Using Yamux we get Go's `net/http` out-of-the-box.
 
 ---
 
