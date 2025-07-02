@@ -39,8 +39,8 @@ application might interact with the host keychain.
 You can build the CLI by running `go build` inside the `store/` root directory.
 
 ```console
-⋊> ~/G/s/store on keychain ⨯ go build -o keychain-cli ./keychain/cmd/
-⋊> ~/G/s/store on keychain ⨯ ./keychain-cli                                                                                                                       13:24:48
+$ go build -o keychain-cli ./keychain/cmd/
+$ ./keychain-cli
 Usage:
    [command]
 
