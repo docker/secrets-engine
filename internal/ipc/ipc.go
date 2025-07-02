@@ -147,6 +147,10 @@ func createYamuxedClient(session *yamux.Session) *http.Client {
 		DialContext: func(context.Context, string, string) (net.Conn, error) {
 			return session.Open()
 		},
+		// We don't want to use http keepalive because
+		// - we keep re-using the underlying socket anyway
+		// - it allows clean bookkeeping of yamux session / any yamux session means IPC happening and not stale keepalive connections
+		// -> we can check for session.NumStreams() on shutdown
 		DisableKeepAlives: true,
 	}
 	return &http.Client{Transport: transport}
