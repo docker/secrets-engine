@@ -9,6 +9,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mustMarshalError struct{}
+
+var _ store.Secret = &mustMarshalError{}
+
+func (m *mustMarshalError) Marshal() ([]byte, error) {
+	return nil, errors.New("i am failing on purpose")
+}
+
+func (m *mustMarshalError) Unmarshal(data []byte) error {
+	return nil
+}
+
+type mustUnmarshalError struct{}
+
+var _ store.Secret = &mustUnmarshalError{}
+
+func (m *mustUnmarshalError) Marshal() ([]byte, error) {
+	return []byte("eeyyy"), nil
+}
+
+func (m *mustUnmarshalError) Unmarshal(data []byte) error {
+	return errors.New("i am failing on purpose")
+}
+
 func setupKeychain(t *testing.T, secretFactory func() store.Secret) store.Store {
 	t.Helper()
 	if secretFactory == nil {
@@ -176,31 +200,3 @@ func TestKeychain(t *testing.T) {
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 }
-
-type mustMarshalError struct{}
-
-// Marshal implements store.Secret.
-func (m *mustMarshalError) Marshal() ([]byte, error) {
-	return nil, errors.New("i am failing on purpose")
-}
-
-// Unmarshal implements store.Secret.
-func (m *mustMarshalError) Unmarshal(data []byte) error {
-	return nil
-}
-
-var _ store.Secret = &mustMarshalError{}
-
-type mustUnmarshalError struct{}
-
-// Marshal implements store.Secret.
-func (m *mustUnmarshalError) Marshal() ([]byte, error) {
-	return []byte("eeyyy"), nil
-}
-
-// Unmarshal implements store.Secret.
-func (m *mustUnmarshalError) Unmarshal(data []byte) error {
-	return errors.New("i am failing on purpose")
-}
-
-var _ store.Secret = &mustUnmarshalError{}
