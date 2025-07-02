@@ -41,19 +41,4 @@ You can build the CLI by running `go build` inside the `store/` root directory.
 ```console
 $ go build -o keychain-cli ./keychain/cmd/
 $ ./keychain-cli
-Usage:
-   [command]
-
-Available Commands:
-  completion  Generate the autocompletion script for the specified shell
-  delete
-  get
-  help        Help about any command
-  list
-  store
-
-Flags:
-  -h, --help   help for this command
-
-Use " [command] --help" for more information about a command.
 ```
