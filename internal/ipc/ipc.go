@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/yamux"
@@ -69,7 +70,7 @@ func newIpcServer(l net.Listener, handler http.Handler, afterClose func(error) e
 		if errors.Is(err, http.ErrServerClosed) { // not an error, client closed the connection
 			err = nil
 		}
-		result.err = errors.Join(filterEOF(err), afterClose(err)) // EOF: only forward to the afterClose handler, but filter out internal forwarding
+		result.err = errors.Join(filterBrokenPipe(filterEOF(err)), afterClose(err)) // EOF: only forward to the afterClose handler, but filter out internal forwarding
 		close(result.done)
 	}()
 	return result
@@ -77,6 +78,13 @@ func newIpcServer(l net.Listener, handler http.Handler, afterClose func(error) e
 
 func filterEOF(err error) error {
 	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+func filterBrokenPipe(err error) error {
+	if errors.Is(err, syscall.EPIPE) {
 		return nil
 	}
 	return err
