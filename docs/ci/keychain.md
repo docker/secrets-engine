@@ -23,7 +23,9 @@ Docker with different keychain backend.
 Each keychain backend has a script to start them up and ensure they are running
 before any Go tests even run. They are located in `store/scripts/gnome-keyring`
 and `store/scripts/kdewallet`.
+## linux vm / buildkit
 
+For linux, instead of dealing with different GH linux distro runners, we use docker distro images and buildkit. Thus instead of having to manage different GH linux distros and customizing them, we only have to maintain a multistage Dockerfile which is way simpler.
 ### Fedora
 
 We require `dbus-daemon` since it was removed in favor of `dbus-broker` over
