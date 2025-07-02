@@ -132,9 +132,7 @@ func waitForClientToDisconnect(s *yamux.Session, t time.Duration) {
 			return
 		}
 		streams := s.NumStreams()
-		// 1 stream is the control stream (todo: verify)
-		// TODO: https://github.com/docker/secrets-engine/issues/71
-		if streams <= 1 {
+		if streams <= 0 {
 			return
 		}
 	}
@@ -149,6 +147,7 @@ func createYamuxedClient(session *yamux.Session) *http.Client {
 		DialContext: func(context.Context, string, string) (net.Conn, error) {
 			return session.Open()
 		},
+		DisableKeepAlives: true,
 	}
 	return &http.Client{Transport: transport}
 }
