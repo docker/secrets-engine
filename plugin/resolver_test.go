@@ -118,7 +118,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t, withMockResolverID("wrongID")), setupCompleted: done, registrationTimeout: 10 * time.Second}
 				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
-				assert.ErrorContains(t, err, "secret ID mismatch")
+				assert.ErrorIs(t, err, secrets.ErrIDMismatch)
 			},
 		},
 		{
