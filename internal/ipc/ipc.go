@@ -8,9 +8,11 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/yamux"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -56,7 +58,7 @@ type ipcServer struct {
 	err    error
 }
 
-func newIpcServer(l net.Listener, handler http.Handler, onClose func(error) error) *ipcServer {
+func newIpcServer(l net.Listener, handler http.Handler, afterClose func(error) error) *ipcServer {
 	result := &ipcServer{
 		done: make(chan struct{}),
 		server: &http.Server{
@@ -68,7 +70,7 @@ func newIpcServer(l net.Listener, handler http.Handler, onClose func(error) erro
 		if errors.Is(err, http.ErrServerClosed) { // not an error, client closed the connection
 			err = nil
 		}
-		result.err = errors.Join(filterEOF(err), onClose(err)) // EOF: only forward to the onClose handler, but filter out internal forwarding
+		result.err = errors.Join(filterBrokenPipe(filterEOF(err)), afterClose(err)) // EOF: only forward to the afterClose handler, but filter out internal forwarding
 		close(result.done)
 	}()
 	return result
@@ -76,6 +78,13 @@ func newIpcServer(l net.Listener, handler http.Handler, onClose func(error) erro
 
 func filterEOF(err error) error {
 	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+func filterBrokenPipe(err error) error {
+	if errors.Is(err, syscall.EPIPE) {
 		return nil
 	}
 	return err
@@ -99,16 +108,34 @@ func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(erro
 		}
 		return session.Close()
 	})
+	c := createYamuxedClient(session)
 	return &ipcImpl{
 		server: server,
 		teardown: sync.OnceValue(func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
-			defer cancel()
-			err := server.server.Shutdown(ctx)
+			_ = session.GoAway()
+			c.CloseIdleConnections()
+			waitForClientToDisconnect(session, cfg.shutdownTimeout)
+			err := server.server.Close()
 			<-server.done
-			return errors.Join(err, session.Close(), server.err)
+			return errors.Join(err, server.err)
 		}),
-	}, createYamuxedClient(session)
+	}, c
+}
+
+func waitForClientToDisconnect(s *yamux.Session, t time.Duration) {
+	timeout := time.After(t)
+	for {
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-timeout:
+			logrus.Debugf("Timeout expired but %d streams still open, shutting down server...", s.NumStreams())
+			return
+		}
+		streams := s.NumStreams()
+		if streams <= 0 {
+			return
+		}
+	}
 }
 
 func (i *ipcImpl) Close() error {
@@ -120,6 +147,11 @@ func createYamuxedClient(session *yamux.Session) *http.Client {
 		DialContext: func(context.Context, string, string) (net.Conn, error) {
 			return session.Open()
 		},
+		// We don't want to use http keepalive because
+		// - we keep re-using the underlying socket anyway
+		// - it allows clean bookkeeping of yamux session / any yamux session means IPC happening and not stale keepalive connections
+		// -> we can check for session.NumStreams() on shutdown
+		DisableKeepAlives: true,
 	}
 	return &http.Client{Transport: transport}
 }

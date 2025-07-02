@@ -9,6 +9,7 @@ import (
 var (
 	ErrNotFound     = errors.New("secret not found")
 	ErrAccessDenied = errors.New("access denied") // nuh, uh, uh!
+	ErrIDMismatch   = errors.New("id mismatch")
 )
 
 type Request struct {
