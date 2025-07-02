@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newCommand creates an example CLI that uses the keychain library
+// It supports windows, linux and macOS.
 func newCommand() (*cobra.Command, error) {
 	kc, err := keychain.New(
 		"io.docker.Secrets",
@@ -37,14 +39,15 @@ func newCommand() (*cobra.Command, error) {
 				return err
 			}
 
+			var e error
 			for k, v := range secrets {
 				vv, err := v.Marshal()
 				if err != nil {
-					return err
+					e = errors.Join(e, err)
 				}
-				fmt.Printf("\nID: %s\nValues: %s\n", k, vv)
+				fmt.Printf("\nID: %s\nValue: %s\n", k, vv)
 			}
-			return nil
+			return e
 		},
 	}
 
@@ -53,8 +56,8 @@ func newCommand() (*cobra.Command, error) {
 		password string
 	)
 	save := &cobra.Command{
-		Use:     "save",
-		Aliases: []string{"set"},
+		Use:     "store",
+		Aliases: []string{"set", "save"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := store.ParseID(path.Join("keystore-cli", username))
 			if err != nil {
@@ -87,13 +90,13 @@ func newCommand() (*cobra.Command, error) {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Secret:\nID:%s\nValues:%s\n", id.String(), val)
+			fmt.Printf("Secret:\nID:%s\nValue:%s\n", id.String(), val)
 			return nil
 		},
 	}
 
 	erase := &cobra.Command{
-		Use:     "erase",
+		Use:     "delete",
 		Args:    cobra.ExactArgs(1),
 		Aliases: []string{"rm", "remove"},
 		RunE: func(cmd *cobra.Command, args []string) error {
