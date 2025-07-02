@@ -1,20 +1,30 @@
 # Keyring
 
-The `keyring` package is the successor of the [docker-credential-helpers](https://github.com/docker/docker-credential-helpers/)
-and supports macOS, Linux and Windows applications.
+The `keyring` package is a convenient cross-platform library that supports
+storing any data inside the OS keychain.
 
-It solves a lot of the drawbacks of its predecessor, such as:
+## How does this compare to the [docker-credential-helpers](https://github.com/docker/docker-credential-helpers/)?
 
-- Support for Generic credentials
-- Native Go library that bundles with your application binary
-- Broader use cases: It can be used to store credentials or any secret.
-  It is designed so that the implementer has more choice. The credential helper
-  was designed to only support credentials from remote services (e.g. Image Registry)
-- More secure: since it is a library, the implementer can decide how much
-  data from the store they should expose outside of the application. With the
-  credential helper it is a standalone binary with the purpose of printing
-  credentials to `stdOut`, any application can by default access whatever the
-  credential helper has stored.
+It achieves a similar goal, but the main distinction is in its purpose.
+The `docker-credential-helpers` were created with the explicit intent of storing
+remote service credentials, such as Image Registry credentials. Each value is
+linked to a hostname instead of a generic key.
+
+The `keyring` package is tightly coupled to the secrets engine `secrets.ID` which
+allows for more generic identifiers but in a strict format. A key can be specified
+as `key=realm/group/application/username`.
+
+The drawbacks of the credential helper is that it is shipped as a separate binary.
+In the past this was necessary, so that external applications could access Docker
+specific credentials. It has, however, caused a lot of unexpected headache.
+
+Many users face the problem that the credential helper binary goes missing from
+the system PATH or the docker config file gets altered, breaking Docker Desktop
+or the Docker CLI from properly fetching login credentials.
+
+With the Secrets Engine the need for shipping a separate binary becomes uneccessary
+and moving the credential helper into a library would reduce the burden users
+are experiencing.
 
 ## Linux
 
