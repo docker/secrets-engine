@@ -22,7 +22,7 @@ Many users face the problem that the credential helper binary goes missing from
 the system PATH or the docker config file gets altered, breaking Docker Desktop
 or the Docker CLI from properly fetching login credentials.
 
-With the Secrets Engine the need for shipping a separate binary becomes uneccessary
+With the Secrets Engine the need for shipping a separate binary becomes unnecessary
 and moving the credential helper into a library would reduce the burden users
 are experiencing.
 
