@@ -1,6 +1,7 @@
 package keychain
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/docker/secrets-engine/store"
@@ -8,21 +9,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupKeychain(t *testing.T) store.Store {
+func setupKeychain(t *testing.T, secretFactory func() store.Secret) store.Store {
 	t.Helper()
-
-	ks, err := New("com.test.test", "test",
-		func() *mocks.MockCredential {
+	if secretFactory == nil {
+		secretFactory = func() store.Secret {
 			return &mocks.MockCredential{}
-		},
-	)
+		}
+	}
+
+	ks, err := New("com.test.test", "test", secretFactory)
 	require.NoError(t, err)
 	return ks
 }
 
 func TestKeychain(t *testing.T) {
 	t.Run("save credentials", func(t *testing.T) {
-		ks := setupKeychain(t)
+		ks := setupKeychain(t, nil)
 		id := store.ID("com.test.test/test/bob")
 		require.NoError(t, id.Valid())
 		creds := &mocks.MockCredential{
@@ -36,7 +38,7 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("get credential", func(t *testing.T) {
-		ks := setupKeychain(t)
+		ks := setupKeychain(t, nil)
 		id := store.ID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
@@ -58,7 +60,7 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("list all credentials", func(t *testing.T) {
-		ks := setupKeychain(t)
+		ks := setupKeychain(t, nil)
 
 		moreCreds := map[store.ID]*mocks.MockCredential{
 			"com.test.test/test/bob": {
@@ -97,7 +99,7 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
-		ks := setupKeychain(t)
+		ks := setupKeychain(t, nil)
 		id := store.ID("com.test.test/test/bob")
 		require.NoError(t, id.Valid())
 		creds := &mocks.MockCredential{
@@ -111,9 +113,94 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("delete non-existent credential", func(t *testing.T) {
-		ks := setupKeychain(t)
+		ks := setupKeychain(t, nil)
 		id := store.ID("com.test.test/test/does-not-exist")
 		require.NoError(t, id.Valid())
 		require.NoError(t, ks.Delete(t.Context(), id))
 	})
+
+	t.Run("invalid ID", func(t *testing.T) {
+		id := store.ID("completely*&@#$@invalid")
+		kc := setupKeychain(t, nil)
+
+		operations := []string{"save", "get", "delete"}
+
+		for _, op := range operations {
+			t.Run(op, func(t *testing.T) {
+				var err error
+				switch op {
+				case "save":
+					err = kc.Save(t.Context(), id, nil)
+				case "delete":
+					err = kc.Delete(t.Context(), id)
+				case "get":
+					_, err = kc.Get(t.Context(), id)
+				}
+				require.ErrorContains(t, err, "invalid identifier")
+			})
+		}
+	})
+
+	t.Run("marshal error on save", func(t *testing.T) {
+		kc := setupKeychain(t, nil)
+		id, err := store.ParseID("something/will/fail")
+		require.NoError(t, err)
+		require.ErrorContains(t, kc.Save(t.Context(), id, &mustMarshalError{}), "i am failing on purpose")
+	})
+
+	t.Run("unmarshal error on get", func(t *testing.T) {
+		kc := setupKeychain(t, func() store.Secret {
+			return &mustUnmarshalError{}
+		})
+		id, err := store.ParseID("something/will/fail")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, kc.Delete(t.Context(), id))
+		})
+		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
+		_, err = kc.Get(t.Context(), id)
+		require.ErrorContains(t, err, "i am failing on purpose")
+	})
+
+	t.Run("unmarshal error on getAll", func(t *testing.T) {
+		kc := setupKeychain(t, func() store.Secret {
+			return &mustUnmarshalError{}
+		})
+		id, err := store.ParseID("something/will/fail")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, kc.Delete(t.Context(), id))
+		})
+		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
+		_, err = kc.GetAll(t.Context())
+		require.ErrorContains(t, err, "i am failing on purpose")
+	})
 }
+
+type mustMarshalError struct{}
+
+// Marshal implements store.Secret.
+func (m *mustMarshalError) Marshal() ([]byte, error) {
+	return nil, errors.New("i am failing on purpose")
+}
+
+// Unmarshal implements store.Secret.
+func (m *mustMarshalError) Unmarshal(data []byte) error {
+	return nil
+}
+
+var _ store.Secret = &mustMarshalError{}
+
+type mustUnmarshalError struct{}
+
+// Marshal implements store.Secret.
+func (m *mustUnmarshalError) Marshal() ([]byte, error) {
+	return []byte("eeyyy"), nil
+}
+
+// Unmarshal implements store.Secret.
+func (m *mustUnmarshalError) Unmarshal(data []byte) error {
+	return errors.New("i am failing on purpose")
+}
+
+var _ store.Secret = &mustUnmarshalError{}
