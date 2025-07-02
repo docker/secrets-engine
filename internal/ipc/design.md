@@ -69,12 +69,14 @@ Also connect rpc is part of CNCF ([source](https://www.cncf.io/projects/connect-
 
 Potential drawbacks: Performance
 
-Using [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex) with [ttrpc](https://github.com/containerd/ttrpc) probably would be the most performance optimised solution. 
-It re-uses one stream over the multiplexed socket per direction and has overhead of the http protocol as protobuf gets streamed directly over the multiplexer. 
-However, it has stopped evolving and e.g. has not caught up on latest improvements on protobuf. 
-Another major downside is that it's mainly Go only, i.e., supporting alternative languages for plugins would come at a high cost.
-We argue that in our use case, as the networking only happens locally so the overhead of grpc over http and the cost of opening a new yamux stream are negligible.
-In addition, the main performance bottleneck will be within the actual plugins, e.g., because authentication needs to happen, disk access or because (slow) external networking access is required.
+Using [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex) with [ttrpc](https://github.com/containerd/ttrpc) probably would be the most performant solution.
+It re-uses one stream over the multiplexed socket per direction and does not have the overhead of the HTTP protocol as Protobuf gets streamed directly over the multiplexer.
+Although lightweight, it has stopped evolving and has not caught up to the latest improvements on Protobuf.
+Another major downside is that it's mainly Go only. 
+Plugins written in a different language would come at a high cost.
+
+We argue that in our use case since the networking only happens locally the overhead of GRPC over HTTP and the cost of opening a new yamux stream per API request are negligible. 
+In addition, the main performance bottleneck will be within the actual plugins due to IO operations, additional upstream network requests and potentially authentication.
 
 ---
 

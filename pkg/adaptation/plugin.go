@@ -47,7 +47,7 @@ type plugin struct {
 	close          func() error
 }
 
-// newExternalPlugin Create a plugin (stub) for an accepted external plugin connection.
+// newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
 func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
 	r, err := setup(conn, v)
 	if err != nil {

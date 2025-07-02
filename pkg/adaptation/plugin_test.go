@@ -80,13 +80,14 @@ func Test_newExternalPlugin(t *testing.T) {
 		{
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				t.Helper()
 				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
 				go m.run()
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
-				defer cancel()
+				t.Cleanup(cancel)
 
 				runtime, err := m.getRuntime()
 				assert.NoError(t, err)
@@ -102,13 +103,14 @@ func Test_newExternalPlugin(t *testing.T) {
 		{
 			name: "plugin returns error on GetSecret",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				t.Helper()
 				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
 				go m.run()
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
-				defer cancel()
+				t.Cleanup(cancel)
 
 				runtime, err := m.getRuntime()
 				assert.NoError(t, err)
@@ -123,6 +125,7 @@ func Test_newExternalPlugin(t *testing.T) {
 		{
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				t.Helper()
 				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
 				go m.run()
 
@@ -149,6 +152,7 @@ func Test_newExternalPlugin(t *testing.T) {
 		{
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
+				t.Helper()
 				doneRuntime := make(chan struct{})
 				go func() {
 					conn, err := l.Accept()
