@@ -46,7 +46,7 @@ func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[reso
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get secret %q: %w", msgID, err))
 	}
 	if envelope.ID != id {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("secret ID mismatch: expected %q, got %q", id, envelope.ID))
+		return nil, connect.NewError(connect.CodeInternal, secrets.ErrIDMismatch)
 	}
 	return connect.NewResponse(resolverv1.GetSecretResponse_builder{
 		SecretId:    proto.String(envelope.ID.String()),

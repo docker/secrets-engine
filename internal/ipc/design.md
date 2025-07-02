@@ -51,5 +51,32 @@ Yamux is a full-featured, multiplexing protocol that allows multiple streams to 
 Using Yamux we get Go's `net/http` out-of-the-box.
 
 
+## Decisions
 
+---
+
+2025-07-02 IPC stack
+
+The IPC stack consists of multiple parts that need to play well together:
+- socket multiplexing
+- API format (includes networking protocol + serialization format)
+
+At this point in time we have decided to go with yamux + connect rpc. 
+Connect rpc in itself uses protobuf for data serialization combined with gRPC over http for networking.
+A main advantage is that we can keep using Go's standard library's `net/http` stack for server and client.
+See [Connect: A better gRPC](https://buf.build/blog/connect-a-better-grpc) for a detailed comparison against e.g.`grpc-go`.
+Also connect rpc is part of CNCF ([source](https://www.cncf.io/projects/connect-rpc/)).
+
+Potential drawbacks: Performance
+
+Using [nri/net/multiplex](https://github.com/containerd/nri/tree/main/pkg/net/multiplex) with [ttrpc](https://github.com/containerd/ttrpc) probably would be the most performant solution.
+It re-uses one stream over the multiplexed socket per direction and does not have the overhead of the HTTP protocol as Protobuf gets streamed directly over the multiplexer.
+Although lightweight, it has stopped evolving and has not caught up to the latest improvements on Protobuf.
+Another major downside is that it's mainly Go only. 
+Plugins written in a different language would come at a high cost.
+
+We argue that in our use case since the networking only happens locally the overhead of GRPC over HTTP and the cost of opening a new yamux stream per API request are negligible. 
+In addition, the main performance bottleneck will be within the actual plugins due to IO operations, additional upstream network requests and potentially authentication.
+
+---
 
