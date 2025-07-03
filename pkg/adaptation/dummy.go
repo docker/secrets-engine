@@ -100,6 +100,7 @@ type dummyPluginCfg struct {
 	plugin.Config `json:",inline"`
 	E             *secrets.Envelope `json:"envelope,omitempty"`
 	ErrGetSecret  string            `json:"errGetSecret,omitempty"`
+	IgnoreSigint  bool              `json:"ignoreSigint,omitempty"`
 }
 
 func (c *dummyPluginCfg) toString() (string, error) {
@@ -121,8 +122,6 @@ func newDummyPluginCfg(in string) (*dummyPluginCfg, error) {
 // This is the equivalent of a main when normally implementing a plugin.
 // Here, it gets run by TestMain if dummyPluginCommand is used to re-launch the test binary (the binary built by go test).
 func dummyPluginProcess() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 	var logBuf bytes.Buffer
 	logrus.SetOutput(&logBuf)
 	cfgStr := os.Getenv(dummyPluginCfgEnv)
@@ -130,6 +129,14 @@ func dummyPluginProcess() {
 	if err != nil {
 		tryExitWithTestSetupErr(err)
 	}
+
+	ctx := context.Background()
+	if !cfg.IgnoreSigint {
+		ctxWithCancel, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		ctx = ctxWithCancel
+	}
+
 	d := &dummyPlugin{cfg: *cfg}
 	p, err := plugin.New(d)
 	if err != nil {
