@@ -68,7 +68,6 @@ type dummyPlugin struct {
 type dummyPluginResult struct {
 	GetSecret        []secrets.Request
 	ConfigRequests   int
-	Configure        []plugin.RuntimeConfig
 	ShutdownRequests int
 	Log              string
 	ErrTestSetup     string
@@ -91,16 +90,6 @@ func (d *dummyPlugin) Config() plugin.Config {
 	return d.cfg.Config
 }
 
-func (d *dummyPlugin) Configure(_ context.Context, config plugin.RuntimeConfig) error {
-	d.m.Lock()
-	defer d.m.Unlock()
-	d.result.Configure = append(d.result.Configure, config)
-	if d.cfg.ErrConfigure != "" {
-		return errors.New(d.cfg.ErrConfigure)
-	}
-	return nil
-}
-
 func (d *dummyPlugin) Shutdown(context.Context) {
 	d.m.Lock()
 	defer d.m.Unlock()
@@ -111,7 +100,6 @@ type dummyPluginCfg struct {
 	plugin.Config `json:",inline"`
 	E             *secrets.Envelope `json:"envelope,omitempty"`
 	ErrGetSecret  string            `json:"errGetSecret,omitempty"`
-	ErrConfigure  string            `json:"errConfigure,omitempty"`
 }
 
 func (c *dummyPluginCfg) toString() (string, error) {
