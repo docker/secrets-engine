@@ -6,8 +6,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -42,11 +40,10 @@ func getPluginRegistrationTimeout() time.Duration {
 }
 
 var (
-	_ secrets.Resolver = &plugin{}
+	_ secrets.Resolver = &runtime{}
 )
 
-type plugin struct {
-	sync.Mutex
+type runtime struct {
 	base           string
 	pattern        secrets.Pattern
 	version        string
@@ -59,12 +56,7 @@ type plugin struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(dir string, v setupValidator) (p *plugin, retErr error) {
-	fullPath := filepath.Join(dir, v.name)
-	if runtime.GOOS == "windows" {
-		fullPath += ".exe"
-	}
-
+func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 	sockets, err := nri.NewSocketPair()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
@@ -79,7 +71,6 @@ func newLaunchedPlugin(dir string, v setupValidator) (p *plugin, retErr error) {
 	peerFile := sockets.PeerFile()
 	defer peerFile.Close()
 
-	cmd := exec.Command(fullPath)
 	cmd.ExtraFiles = []*os.File{peerFile}
 	envCfg := ipc.PluginConfigFromEngine{
 		Name:                v.name,
@@ -91,12 +82,7 @@ func newLaunchedPlugin(dir string, v setupValidator) (p *plugin, retErr error) {
 		conn.Close()
 		return nil, err
 	}
-	cmd.Env = []string{api.PluginLaunchedByEngineVar + "=" + envCfgStr}
-
-	p = &plugin{
-		cmd:  cmd,
-		base: v.name,
-	}
+	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
 	if err = cmd.Start(); err != nil {
 		conn.Close()
@@ -116,7 +102,7 @@ func newLaunchedPlugin(dir string, v setupValidator) (p *plugin, retErr error) {
 		return nil, err
 	}
 
-	return &plugin{
+	return &runtime{
 		base:           v.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
@@ -128,12 +114,12 @@ func newLaunchedPlugin(dir string, v setupValidator) (p *plugin, retErr error) {
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
+func newExternalPlugin(conn net.Conn, v setupValidator) (*runtime, error) {
 	r, err := setup(conn, v)
 	if err != nil {
 		return nil, err
 	}
-	return &plugin{
+	return &runtime{
 		base:           r.cfg.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
@@ -143,11 +129,11 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
 	}, nil
 }
 
-func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (r *runtime) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
 		SecretId: proto.String(request.ID.String()),
 	}.Build())
-	resp, err := p.resolverClient.GetSecret(ctx, req)
+	resp, err := r.resolverClient.GetSecret(ctx, req)
 	if err != nil {
 		return envelopeErr(request, err), err
 	}
@@ -161,7 +147,7 @@ func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secret
 	return secrets.Envelope{
 		ID:       id,
 		Value:    []byte(resp.Msg.GetSecretValue()),
-		Provider: p.base,
+		Provider: r.base,
 	}, nil
 }
 
