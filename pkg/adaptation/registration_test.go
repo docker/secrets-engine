@@ -18,7 +18,6 @@ var (
 	errMockRegistrator = errors.New("mockRegistratorErr")
 
 	mockPluginCfgOut = pluginCfgOut{
-		config:         "mockConfig",
 		engineName:     "mockEngine",
 		engineVersion:  "1.0.0",
 		requestTimeout: 30 * time.Second,
@@ -164,7 +163,6 @@ func Test_RegisterPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockPluginCfgOut.engineName, resp.Msg.GetEngineName())
 				assert.Equal(t, mockPluginCfgOut.engineVersion, resp.Msg.GetEngineVersion())
-				assert.Equal(t, mockPluginCfgOut.config, resp.Msg.GetConfig())
 				assert.Equal(t, int64(mockPluginCfgOut.requestTimeout.Seconds()), resp.Msg.GetRequestTimeout())
 			},
 		},
