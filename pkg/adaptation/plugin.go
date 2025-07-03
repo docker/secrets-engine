@@ -2,13 +2,19 @@ package adaptation
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"os"
+	"os/exec"
 	"sync"
 	"time"
 
 	"connectrpc.com/connect"
+	nri "github.com/containerd/nri/pkg/net"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/pkg/api"
 	v1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
@@ -34,26 +40,81 @@ func getPluginRegistrationTimeout() time.Duration {
 }
 
 var (
-	_ secrets.Resolver = &plugin{}
+	_ secrets.Resolver = &runtime{}
 )
 
-type plugin struct {
-	sync.Mutex
+type runtime struct {
 	base           string
 	pattern        secrets.Pattern
 	version        string
+	cmd            *exec.Cmd
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
 }
 
+// newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
+func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
+	sockets, err := nri.NewSocketPair()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
+	}
+	defer sockets.Close()
+
+	conn, err := sockets.LocalConn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set up local connection for plugin %q: %w", v.name, err)
+	}
+
+	peerFile := sockets.PeerFile()
+	defer peerFile.Close()
+
+	cmd.ExtraFiles = []*os.File{peerFile}
+	envCfg := ipc.PluginConfigFromEngine{
+		Name:                v.name,
+		RegistrationTimeout: getPluginRegistrationTimeout(),
+		Fd:                  3, // 0, 1, and 2 are reserved for stdin, stdout, and stderr -> we get the next
+	}
+	envCfgStr, err := envCfg.ToString()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
+
+	if err = cmd.Start(); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to launch plugin %q: %w", v.name, err)
+	}
+	w := newCmdWatchWrapper(v.name, cmd)
+
+	r, err := setup(conn, v)
+	if err != nil {
+		conn.Close()
+		w.close()
+		return nil, err
+	}
+
+	return &runtime{
+		base:           v.name,
+		pattern:        r.cfg.pattern,
+		version:        r.cfg.version,
+		cmd:            cmd,
+		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
+		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
+		close: sync.OnceValue(func() error {
+			return errors.Join(r.close(), w.close())
+		}),
+	}, nil
+}
+
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
+func newExternalPlugin(conn net.Conn, v setupValidator) (*runtime, error) {
 	r, err := setup(conn, v)
 	if err != nil {
 		return nil, err
 	}
-	return &plugin{
+	return &runtime{
 		base:           r.cfg.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
@@ -63,11 +124,15 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (*plugin, error) {
 	}, nil
 }
 
-func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (r *runtime) Close() error {
+	return r.close()
+}
+
+func (r *runtime) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
 		SecretId: proto.String(request.ID.String()),
 	}.Build())
-	resp, err := p.resolverClient.GetSecret(ctx, req)
+	resp, err := r.resolverClient.GetSecret(ctx, req)
 	if err != nil {
 		return envelopeErr(request, err), err
 	}
@@ -81,7 +146,7 @@ func (p *plugin) GetSecret(ctx context.Context, request secrets.Request) (secret
 	return secrets.Envelope{
 		ID:       id,
 		Value:    []byte(resp.Msg.GetSecretValue()),
-		Provider: p.base,
+		Provider: r.base,
 	}, nil
 }
 

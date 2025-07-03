@@ -20,6 +20,8 @@ import (
 const (
 	mockSecretValue        = "mockSecretValue"
 	mockSecretID           = secrets.ID("mockSecretID")
+	mockEngineName         = "mockEngineName"
+	mockEngineVersion      = "mockEngineVersion"
 	mockRuntimeTestTimeout = 10 * time.Second
 )
 
@@ -70,6 +72,64 @@ func (m mockedPlugin) Configure(context.Context, p.RuntimeConfig) error {
 }
 
 func (m mockedPlugin) Shutdown(context.Context) {
+}
+
+// TestMain acts as a dispatcher to run as dummy plugin or normal test.
+// Inspired by: https://github.com/golang/go/blob/15d9fe43d648764d41a88c75889c84df5e580930/src/os/exec/exec_test.go#L69-L73
+func TestMain(m *testing.M) {
+	if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
+		dummyPluginProcess()
+	} else {
+		os.Exit(m.Run())
+	}
+}
+
+func Test_newPlugin(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "engine launched plugin",
+			test: func(t *testing.T) {
+				t.Helper()
+				pattern := "foo-bar"
+				version := "my-version"
+				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
+					Config: p.Config{
+						Version: version,
+						Pattern: pattern,
+					},
+					E: &secrets.Envelope{ID: mockSecretID, Value: []byte(mockSecretValue)},
+				})
+				p, err := newLaunchedPlugin(cmd, setupValidator{
+					name:          "dummy-plugin",
+					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
+					acceptPattern: func(secrets.Pattern) error { return nil },
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, p.pattern, secrets.Pattern(pattern))
+				assert.Equal(t, p.version, version)
+				s, err := p.GetSecret(context.Background(), secrets.Request{ID: mockSecretID})
+				assert.NoError(t, err)
+				assert.Equal(t, mockSecretValue, string(s.Value))
+				assert.NoError(t, p.Close())
+				r, err := parseOutput()
+				require.NoError(t, err)
+				require.Equal(t, 1, len(r.GetSecret))
+				assert.Equal(t, mockSecretID, r.GetSecret[0].ID)
+				assert.Equal(t, 1, r.ConfigRequests)
+				require.Equal(t, 1, len(r.Configure))
+				assert.Equal(t, mockEngineName, r.Configure[0].Engine)
+				assert.Equal(t, mockEngineVersion, r.Configure[0].Version)
+
+				t.Logf("plugin binary output:\n%s", r.Log)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
 }
 
 func Test_newExternalPlugin(t *testing.T) {
@@ -204,7 +264,7 @@ func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) erro
 
 type mockExternalRuntime struct {
 	l    net.Listener
-	p    *plugin
+	p    *runtime
 	err  error
 	done chan struct{}
 }
@@ -227,7 +287,7 @@ func (m *mockExternalRuntime) run() {
 	m.p = p
 }
 
-func (m *mockExternalRuntime) getRuntime() (*plugin, error) {
+func (m *mockExternalRuntime) getRuntime() (*runtime, error) {
 	select {
 	case <-m.done:
 		return m.p, m.err
