@@ -2,6 +2,7 @@ package adaptation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -22,7 +23,6 @@ import (
 
 var (
 	pluginRegistrationTimeout = api.DefaultPluginRegistrationTimeout
-	pluginShutdownTimeout     = 2 * time.Second
 	timeoutCfgLock            sync.RWMutex
 )
 
@@ -51,8 +51,6 @@ type runtime struct {
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
-
-	closed bool
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -88,17 +86,12 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 		conn.Close()
 		return nil, fmt.Errorf("failed to launch plugin %q: %w", v.name, err)
 	}
-	cmdDone := make(chan struct{})
-	go func() {
-		// TODO: do something useful here and deal with the error
-		_ = cmd.Wait()
-		close(cmdDone)
-	}()
+	w := newCmdWatchWrapper(cmd)
 
 	r, err := setup(conn, v)
 	if err != nil {
 		conn.Close()
-		shutdownCMD(cmd, cmdDone)
+		w.close()
 		return nil, err
 	}
 
@@ -109,8 +102,35 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 		cmd:            cmd,
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
-		close:          r.close,
+		close: sync.OnceValue(func() error {
+			return errors.Join(r.close(), w.close())
+		}),
 	}, nil
+}
+
+type cmdWatchWrapper struct {
+	cmd  *exec.Cmd
+	err  error
+	done chan struct{}
+}
+
+func newCmdWatchWrapper(cmd *exec.Cmd) *cmdWatchWrapper {
+	result := &cmdWatchWrapper{cmd: cmd, done: make(chan struct{})}
+	go func() {
+		result.err = cmd.Wait()
+		close(result.done)
+	}()
+	return result
+}
+
+func (w *cmdWatchWrapper) close() error {
+	select {
+	case <-w.done:
+		return w.err
+	default:
+	}
+	shutdownCMD(w.cmd, w.done)
+	return w.err
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
@@ -127,6 +147,10 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (*runtime, error) {
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close:          r.close,
 	}, nil
+}
+
+func (r *runtime) Close() error {
+	return r.close()
 }
 
 func (r *runtime) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
