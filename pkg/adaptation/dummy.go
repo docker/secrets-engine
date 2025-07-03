@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -125,6 +127,8 @@ func newDummyPluginCfg(in string) (*dummyPluginCfg, error) {
 }
 
 func DummyPluginProcess() {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 	var logBuf bytes.Buffer
 	logrus.SetOutput(&logBuf)
 	cfgStr := os.Getenv(dummyPluginCfgEnv)
@@ -137,7 +141,7 @@ func DummyPluginProcess() {
 	if err != nil {
 		panic(err)
 	}
-	if err := p.Run(context.Background()); err != nil {
+	if err := p.Run(ctx); err != nil {
 		panic(err)
 	}
 	result := d.result
