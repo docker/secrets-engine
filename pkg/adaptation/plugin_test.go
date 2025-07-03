@@ -204,7 +204,7 @@ func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) erro
 
 type mockExternalRuntime struct {
 	l    net.Listener
-	p    *plugin
+	p    *runtime
 	err  error
 	done chan struct{}
 }
@@ -227,7 +227,7 @@ func (m *mockExternalRuntime) run() {
 	m.p = p
 }
 
-func (m *mockExternalRuntime) getRuntime() (*plugin, error) {
+func (m *mockExternalRuntime) getRuntime() (*runtime, error) {
 	select {
 	case <-m.done:
 		return m.p, m.err
