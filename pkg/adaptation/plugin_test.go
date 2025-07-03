@@ -78,7 +78,7 @@ func (m mockedPlugin) Shutdown(context.Context) {
 // Inspired by: https://github.com/golang/go/blob/15d9fe43d648764d41a88c75889c84df5e580930/src/os/exec/exec_test.go#L69-L73
 func TestMain(m *testing.M) {
 	if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
-		DummyPluginProcess()
+		dummyPluginProcess()
 	} else {
 		os.Exit(m.Run())
 	}
@@ -92,9 +92,10 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
+				t.Helper()
 				pattern := "foo-bar"
 				version := "my-version"
-				cmd, parseOutput := DummyPluginCommand(t, dummyPluginCfg{
+				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
 					Config: p.Config{
 						Version: version,
 						Pattern: pattern,
@@ -122,7 +123,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.Equal(t, mockEngineName, r.Configure[0].Engine)
 				assert.Equal(t, mockEngineVersion, r.Configure[0].Version)
 
-				r.prettyPrintLogs()
+				t.Logf("plugin binary output:\n%s", r.Log)
 			},
 		},
 	}
