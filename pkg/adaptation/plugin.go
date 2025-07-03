@@ -86,7 +86,7 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 		conn.Close()
 		return nil, fmt.Errorf("failed to launch plugin %q: %w", v.name, err)
 	}
-	w := newCmdWatchWrapper(cmd)
+	w := newCmdWatchWrapper(v.name, cmd)
 
 	r, err := setup(conn, v)
 	if err != nil {
@@ -106,31 +106,6 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 			return errors.Join(r.close(), w.close())
 		}),
 	}, nil
-}
-
-type cmdWatchWrapper struct {
-	cmd  *exec.Cmd
-	err  error
-	done chan struct{}
-}
-
-func newCmdWatchWrapper(cmd *exec.Cmd) *cmdWatchWrapper {
-	result := &cmdWatchWrapper{cmd: cmd, done: make(chan struct{})}
-	go func() {
-		result.err = cmd.Wait()
-		close(result.done)
-	}()
-	return result
-}
-
-func (w *cmdWatchWrapper) close() error {
-	select {
-	case <-w.done:
-		return w.err
-	default:
-	}
-	shutdownCMD(w.cmd, w.done)
-	return w.err
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
