@@ -30,7 +30,7 @@ func newRegisterClient(c *http.Client, pluginName string, plugin Plugin, timeout
 	}
 }
 
-func (c *registerClient) register(ctx context.Context) (*RuntimeConfig, error) {
+func (c *registerClient) register(ctx context.Context) (*runtimeConfig, error) {
 	logrus.Infof("Registering plugin %s...", c.pluginName)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -44,14 +44,18 @@ func (c *registerClient) register(ctx context.Context) (*RuntimeConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to register with secrets engine: %w", err)
 	}
-	return &RuntimeConfig{
-		Config:  resp.Msg.GetConfig(),
+	return &runtimeConfig{
 		Engine:  resp.Msg.GetEngineName(),
 		Version: resp.Msg.GetEngineVersion(),
 	}, nil
 }
 
-func doRegister(ctx context.Context, c *http.Client, pluginName string, plugin Plugin, timeout time.Duration) (*RuntimeConfig, error) {
+type runtimeConfig struct {
+	Engine  string
+	Version string
+}
+
+func doRegister(ctx context.Context, c *http.Client, pluginName string, plugin Plugin, timeout time.Duration) (*runtimeConfig, error) {
 	client := newRegisterClient(c, pluginName, plugin, timeout)
 	resp, err := client.register(ctx)
 	if err != nil {
