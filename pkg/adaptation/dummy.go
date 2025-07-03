@@ -24,7 +24,11 @@ const (
 	dummyPluginCfgEnv = "DUMMY_PLUGIN_CFG"
 )
 
-func DummyPluginCommand(t *testing.T, cfg dummyPluginCfg) (*exec.Cmd, func() (*dummyPluginResult, error)) {
+// dummyPluginCommand can be called from within tests. The returned *exec.Cmd runs the dummyPluginProcess()
+// that implements the plugin.Plugin interface, i.e., we get a normal external plugin binary.
+// Under the hood, it re-runs the existing test binary (created by go test) with different parameters.
+// The TestMain acts as a switch to then instead running as normal test to run dummyPluginProcess().
+func dummyPluginCommand(t *testing.T, cfg dummyPluginCfg) (*exec.Cmd, func() (*dummyPluginResult, error)) {
 	t.Helper()
 	cfgStr, err := cfg.toString()
 	assert.NoError(t, err)
@@ -37,6 +41,7 @@ func DummyPluginCommand(t *testing.T, cfg dummyPluginCfg) (*exec.Cmd, func() (*d
 		dummyPluginCfgEnv+"="+cfgStr,
 	)
 	return cmd, func() (*dummyPluginResult, error) {
+		t.Helper()
 		if stdErr := stderrBuf.String(); stdErr != "" {
 			return nil, errors.New(stdErr)
 		}
@@ -44,6 +49,9 @@ func DummyPluginCommand(t *testing.T, cfg dummyPluginCfg) (*exec.Cmd, func() (*d
 		stdOut := stdoutBuf.String()
 		if err := json.Unmarshal([]byte(stdOut), &result); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal '%s': %w", stdOut, err)
+		}
+		if result.ErrTestSetup != "" {
+			return nil, errors.New(result.ErrTestSetup)
 		}
 		return &result, nil
 	}
@@ -63,11 +71,7 @@ type dummyPluginResult struct {
 	Configure        []plugin.RuntimeConfig
 	ShutdownRequests int
 	Log              string
-}
-
-func (r *dummyPluginResult) prettyPrintLogs() {
-	fmt.Println("--- dummy plugin logs ---")
-	fmt.Println(r.Log)
+	ErrTestSetup     string
 }
 
 func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -126,7 +130,9 @@ func newDummyPluginCfg(in string) (*dummyPluginCfg, error) {
 	return &result, nil
 }
 
-func DummyPluginProcess() {
+// This is the equivalent of a main when normally implementing a plugin.
+// Here, it gets run by TestMain if dummyPluginCommand is used to re-launch the test binary (the binary built by go test).
+func dummyPluginProcess() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	var logBuf bytes.Buffer
@@ -134,15 +140,15 @@ func DummyPluginProcess() {
 	cfgStr := os.Getenv(dummyPluginCfgEnv)
 	cfg, err := newDummyPluginCfg(cfgStr)
 	if err != nil {
-		panic(err)
+		tryExitWithTestSetupErr(err)
 	}
 	d := &dummyPlugin{cfg: *cfg}
 	p, err := plugin.New(d)
 	if err != nil {
-		panic(err)
+		tryExitWithTestSetupErr(err)
 	}
 	if err := p.Run(ctx); err != nil {
-		panic(err)
+		tryExitWithTestSetupErr(err)
 	}
 	result := d.result
 	result.Log = logBuf.String()
@@ -151,4 +157,13 @@ func DummyPluginProcess() {
 		panic(err)
 	}
 	fmt.Println(string(resultStr))
+}
+
+func tryExitWithTestSetupErr(err error) {
+	str, err := json.Marshal(dummyPluginResult{ErrTestSetup: err.Error()})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(str))
+	os.Exit(1)
 }
