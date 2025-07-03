@@ -19,7 +19,6 @@ var _ resolverv1connect.EngineServiceHandler = &RegisterService{}
 
 // config to be sent to the plugin
 type pluginCfgOut struct {
-	config         string
 	engineName     string
 	engineVersion  string
 	requestTimeout time.Duration
@@ -57,7 +56,6 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
 		EngineName:     proto.String(out.engineName),
 		EngineVersion:  proto.String(out.engineVersion),
-		Config:         proto.String(out.config),
 		RequestTimeout: proto.Int64(int64(out.requestTimeout.Seconds())),
 	}.Build()), nil
 }

@@ -169,10 +169,9 @@ func (b0 RegisterPluginRequest_builder) Build() *RegisterPluginRequest {
 
 type RegisterPluginResponse struct {
 	state                     protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Config         *string                `protobuf:"bytes,1,opt,name=config"`
-	xxx_hidden_EngineName     *string                `protobuf:"bytes,2,opt,name=engine_name,json=engineName"`
-	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,3,opt,name=engine_version,json=engineVersion"`
-	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,4,opt,name=request_timeout,json=requestTimeout"`
+	xxx_hidden_EngineName     *string                `protobuf:"bytes,1,opt,name=engine_name,json=engineName"`
+	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,2,opt,name=engine_version,json=engineVersion"`
+	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,3,opt,name=request_timeout,json=requestTimeout"`
 	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
 	XXX_presence              [1]uint32
 	unknownFields             protoimpl.UnknownFields
@@ -204,16 +203,6 @@ func (x *RegisterPluginResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RegisterPluginResponse) GetConfig() string {
-	if x != nil {
-		if x.xxx_hidden_Config != nil {
-			return *x.xxx_hidden_Config
-		}
-		return ""
-	}
-	return ""
-}
-
 func (x *RegisterPluginResponse) GetEngineName() string {
 	if x != nil {
 		if x.xxx_hidden_EngineName != nil {
@@ -241,79 +230,60 @@ func (x *RegisterPluginResponse) GetRequestTimeout() int64 {
 	return 0
 }
 
-func (x *RegisterPluginResponse) SetConfig(v string) {
-	x.xxx_hidden_Config = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
-}
-
 func (x *RegisterPluginResponse) SetEngineName(v string) {
 	x.xxx_hidden_EngineName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 3)
 }
 
 func (x *RegisterPluginResponse) SetEngineVersion(v string) {
 	x.xxx_hidden_EngineVersion = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
 }
 
 func (x *RegisterPluginResponse) SetRequestTimeout(v int64) {
 	x.xxx_hidden_RequestTimeout = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
-}
-
-func (x *RegisterPluginResponse) HasConfig() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 3)
 }
 
 func (x *RegisterPluginResponse) HasEngineName() bool {
 	if x == nil {
 		return false
 	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *RegisterPluginResponse) HasEngineVersion() bool {
 	if x == nil {
 		return false
 	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
 func (x *RegisterPluginResponse) HasRequestTimeout() bool {
 	if x == nil {
 		return false
 	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
-}
-
-func (x *RegisterPluginResponse) ClearConfig() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_Config = nil
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
 func (x *RegisterPluginResponse) ClearEngineName() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_EngineName = nil
 }
 
 func (x *RegisterPluginResponse) ClearEngineVersion() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
 	x.xxx_hidden_EngineVersion = nil
 }
 
 func (x *RegisterPluginResponse) ClearRequestTimeout() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
 	x.xxx_hidden_RequestTimeout = 0
 }
 
 type RegisterPluginResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Any plugin-specific data, if present among the engine configuration.
-	Config *string
 	// Name of the runtime engine is running in.
 	EngineName *string
 	// Version of the runtime engine is running in.
@@ -326,20 +296,16 @@ func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
 	m0 := &RegisterPluginResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	if b.Config != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
-		x.xxx_hidden_Config = b.Config
-	}
 	if b.EngineName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 3)
 		x.xxx_hidden_EngineName = b.EngineName
 	}
 	if b.EngineVersion != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 3)
 		x.xxx_hidden_EngineVersion = b.EngineVersion
 	}
 	if b.RequestTimeout != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 3)
 		x.xxx_hidden_RequestTimeout = *b.RequestTimeout
 	}
 	return m0
@@ -631,13 +597,12 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x15RegisterPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
-	"\apattern\x18\x03 \x01(\tR\apattern\"\xa1\x01\n" +
-	"\x16RegisterPluginResponse\x12\x16\n" +
-	"\x06config\x18\x01 \x01(\tR\x06config\x12\x1f\n" +
-	"\vengine_name\x18\x02 \x01(\tR\n" +
+	"\apattern\x18\x03 \x01(\tR\apattern\"\x89\x01\n" +
+	"\x16RegisterPluginResponse\x12\x1f\n" +
+	"\vengine_name\x18\x01 \x01(\tR\n" +
 	"engineName\x12%\n" +
-	"\x0eengine_version\x18\x03 \x01(\tR\rengineVersion\x12'\n" +
-	"\x0frequest_timeout\x18\x04 \x01(\x03R\x0erequestTimeout\"\x11\n" +
+	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12'\n" +
+	"\x0frequest_timeout\x18\x03 \x01(\x03R\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
 	"\x10ShutdownResponse\"/\n" +
 	"\x10GetSecretRequest\x12\x1b\n" +

@@ -26,9 +26,8 @@ const (
 )
 
 type mockedPlugin struct {
-	pattern      string
-	id           secrets.ID
-	configureErr error
+	pattern string
+	id      secrets.ID
 }
 
 type MockedPluginOption func(*mockedPlugin)
@@ -65,10 +64,6 @@ func (m mockedPlugin) Config() p.Config {
 		Version: "v1",
 		Pattern: m.pattern,
 	}
-}
-
-func (m mockedPlugin) Configure(context.Context, p.RuntimeConfig) error {
-	return m.configureErr
 }
 
 func (m mockedPlugin) Shutdown(context.Context) {
@@ -119,9 +114,6 @@ func Test_newPlugin(t *testing.T) {
 				require.Equal(t, 1, len(r.GetSecret))
 				assert.Equal(t, mockSecretID, r.GetSecret[0].ID)
 				assert.Equal(t, 1, r.ConfigRequests)
-				require.Equal(t, 1, len(r.Configure))
-				assert.Equal(t, mockEngineName, r.Configure[0].Engine)
-				assert.Equal(t, mockEngineVersion, r.Configure[0].Version)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
