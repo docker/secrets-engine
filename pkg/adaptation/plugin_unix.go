@@ -10,6 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	pluginShutdownTimeout = 2 * time.Second
+)
+
 func shutdownCMD(cmd *exec.Cmd, done chan struct{}) {
 	if cmd.Process == nil {
 		return
