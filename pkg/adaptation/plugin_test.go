@@ -87,7 +87,6 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
-				t.Helper()
 				pattern := "foo-bar"
 				version := "my-version"
 				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
@@ -116,6 +115,75 @@ func Test_newPlugin(t *testing.T) {
 				assert.Equal(t, 1, r.ConfigRequests)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
+			},
+		},
+		{
+			name: "plugin returns no secret but an error",
+			test: func(t *testing.T) {
+				errGetSecret := "you do not get my secret"
+				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
+					Config: p.Config{
+						Version: "my-version",
+						Pattern: "foo-bar",
+					},
+					ErrGetSecret: errGetSecret,
+				})
+				p, err := newLaunchedPlugin(cmd, setupValidator{
+					name:          "dummy-plugin",
+					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
+					acceptPattern: func(secrets.Pattern) error { return nil },
+				})
+				assert.NoError(t, err)
+				_, err = p.GetSecret(context.Background(), secrets.Request{ID: mockSecretID})
+				assert.ErrorContains(t, err, errGetSecret)
+				assert.NoError(t, p.Close())
+				r, err := parseOutput()
+				require.NoError(t, err)
+				require.Equal(t, 1, len(r.GetSecret))
+			},
+		},
+		{
+			// Note: The SIGINT error could only be returned by cmd.Wait() on linux.
+			// So on other platforms this doesn't really test anything.
+			name: "plugin ignoring SIGINT does not break the runtime",
+			test: func(t *testing.T) {
+				cmd, _ := dummyPluginCommand(t, dummyPluginCfg{
+					Config: p.Config{
+						Version: "my-version",
+						Pattern: "foo-bar",
+					},
+					IgnoreSigint: true,
+				})
+				p, err := newLaunchedPlugin(cmd, setupValidator{
+					name:          "dummy-plugin",
+					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
+					acceptPattern: func(secrets.Pattern) error { return nil },
+				})
+				assert.NoError(t, err)
+				assert.NoError(t, p.Close())
+			},
+		},
+		{
+			name: "plugin process crashes unexpectedly",
+			test: func(t *testing.T) {
+				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
+					Config: p.Config{
+						Version: "my-version",
+						Pattern: "foo-bar",
+					},
+					IgnoreSigint: true,
+				})
+				p, err := newLaunchedPlugin(cmd, setupValidator{
+					name:          "dummy-plugin",
+					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
+					acceptPattern: func(secrets.Pattern) error { return nil },
+				})
+				assert.NoError(t, err)
+				_ = cmd.Process.Kill()
+				_ = cmd.Process.Release()
+				_, err = parseOutput()
+				assert.ErrorContains(t, err, "failed to unmarshal ''")
+				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed: signal: killed")
 			},
 		},
 	}

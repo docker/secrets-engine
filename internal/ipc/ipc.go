@@ -33,8 +33,9 @@ func WithShutdownTimeout(d time.Duration) Option {
 }
 
 func NewPluginIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
-	// TODO: configure yamux logger
-	session, err := yamux.Client(sockConn, nil)
+	cfg := yamux.DefaultConfig()
+	cfg.LogOutput = logrus.StandardLogger().Out
+	session, err := yamux.Client(sockConn, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux client: %w", err)
 	}
@@ -43,8 +44,9 @@ func NewPluginIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(e
 }
 
 func NewRuntimeIPC(sockConn net.Conn, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
-	// TODO: configure yamux logger
-	session, err := yamux.Server(sockConn, nil)
+	cfg := yamux.DefaultConfig()
+	cfg.LogOutput = logrus.StandardLogger().Out
+	session, err := yamux.Server(sockConn, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux server: %w", err)
 	}
