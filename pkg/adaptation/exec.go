@@ -2,6 +2,7 @@ package adaptation
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"syscall"
 
@@ -23,6 +24,9 @@ func newCmdWatchWrapper(name string, cmd *exec.Cmd) *cmdWatchWrapper {
 		if isSigint(err) {
 			logrus.Infof("Plugin %s returned sigint error. Is SIGINT signal being properly handled?", name)
 			err = nil
+		}
+		if err != nil {
+			err = fmt.Errorf("plugin %s crashed: %w", name, err)
 		}
 		result.err = err
 		close(result.done)
