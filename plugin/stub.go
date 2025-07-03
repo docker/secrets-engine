@@ -22,15 +22,7 @@ type Plugin interface {
 
 	Config() Config
 
-	Configure(context.Context, RuntimeConfig) error
-
 	Shutdown(context.Context)
-}
-
-type RuntimeConfig struct {
-	Config  string
-	Engine  string
-	Version string
 }
 
 type Config struct {
@@ -110,11 +102,7 @@ func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout ti
 		ipc.Close()
 		return nil, err
 	}
-	if err := p.Configure(ctx, *runtimeCfg); err != nil {
-		ipc.Close()
-		return nil, fmt.Errorf("failed to configure plugin %q: %w", name, err)
-	}
-	logrus.Infof("Started plugin %s...", name)
+	logrus.Infof("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, name)
 	close(setupCompleted)
 	return ipc, nil
 }

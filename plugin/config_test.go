@@ -23,7 +23,7 @@ func (m mockPlugin) Config() Config {
 	return Config{}
 }
 
-func (m mockPlugin) Configure(context.Context, RuntimeConfig) error {
+func (m mockPlugin) Configure(context.Context, runtimeConfig) error {
 	return nil
 }
 
