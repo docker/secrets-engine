@@ -43,14 +43,22 @@ var (
 	_ secrets.Resolver = &runtime{}
 )
 
+type pluginType string
+
+const (
+	internalPlugin pluginType = "internal" // launched by the engine
+	externalPlugin pluginType = "external" // launched externally
+	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
+)
+
 type runtime struct {
-	base           string
+	name           string
 	pattern        secrets.Pattern
 	version        string
-	cmd            *exec.Cmd
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
+	pluginType
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -96,15 +104,15 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 	}
 
 	return &runtime{
-		base:           v.name,
+		name:           v.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
-		cmd:            cmd,
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
 			return errors.Join(r.close(), w.close())
 		}),
+		pluginType: internalPlugin,
 	}, nil
 }
 
@@ -115,12 +123,13 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (*runtime, error) {
 		return nil, err
 	}
 	return &runtime{
-		base:           r.cfg.name,
+		name:           r.cfg.name,
 		pattern:        r.cfg.pattern,
 		version:        r.cfg.version,
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close:          r.close,
+		pluginType:     externalPlugin,
 	}, nil
 }
 
@@ -146,7 +155,7 @@ func (r *runtime) GetSecret(ctx context.Context, request secrets.Request) (secre
 	return secrets.Envelope{
 		ID:       id,
 		Value:    []byte(resp.Msg.GetSecretValue()),
-		Provider: r.base,
+		Provider: r.name,
 	}, nil
 }
 
