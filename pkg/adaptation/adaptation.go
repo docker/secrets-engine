@@ -15,22 +15,26 @@ const (
 
 type Engine interface {
 	Start() error
-	Stop()
+	Stop() error
 }
 
-type adaptation struct {
+type config struct {
 	name       string
 	version    string
 	pluginPath string
 	socketPath string
 }
 
+type adaptation struct {
+	config
+}
+
 // Option to apply to the secrets engine.
-type Option func(*adaptation) error
+type Option func(*config) error
 
 // WithPluginPath returns an option to override the default plugin path.
 func WithPluginPath(path string) Option {
-	return func(r *adaptation) error {
+	return func(r *config) error {
 		r.pluginPath = path
 		return nil
 	}
@@ -38,7 +42,7 @@ func WithPluginPath(path string) Option {
 
 // WithSocketPath returns an option to override the default socket path.
 func WithSocketPath(path string) Option {
-	return func(r *adaptation) error {
+	return func(r *config) error {
 		r.socketPath = path
 		return nil
 	}
@@ -46,7 +50,7 @@ func WithSocketPath(path string) Option {
 
 // New creates a new NRI Runtime.
 func New(name, version string, opts ...Option) (Engine, error) {
-	r := &adaptation{
+	cfg := &config{
 		name:       name,
 		version:    version,
 		pluginPath: DefaultPluginPath,
@@ -54,19 +58,20 @@ func New(name, version string, opts ...Option) (Engine, error) {
 	}
 
 	for _, o := range opts {
-		if err := o(r); err != nil {
+		if err := o(cfg); err != nil {
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 
-	return r, nil
+	return &adaptation{config: *cfg}, nil
 }
 
-func (r *adaptation) Start() error {
+func (a *adaptation) Start() error {
 	logrus.Infof("secrets engine starting up...")
 	return nil
 }
 
-func (r *adaptation) Stop() {
+func (a *adaptation) Stop() error {
 	logrus.Infof("secrets engine shutting down...")
+	return nil
 }
