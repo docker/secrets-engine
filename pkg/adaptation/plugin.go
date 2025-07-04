@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -40,8 +41,16 @@ func getPluginRegistrationTimeout() time.Duration {
 }
 
 var (
-	_ secrets.Resolver = &runtime{}
+	_ secrets.Resolver = &runtimeImpl{}
 )
+
+type runtime interface {
+	secrets.Resolver
+
+	io.Closer
+
+	Data() pluginData
+}
 
 type pluginType string
 
@@ -51,18 +60,22 @@ const (
 	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
 )
 
-type runtime struct {
-	name           string
-	pattern        secrets.Pattern
-	version        string
-	pluginClient   resolverv1connect.PluginServiceClient
-	resolverClient resolverv1connect.ResolverServiceClient
-	close          func() error
+type pluginData struct {
+	name    string
+	pattern secrets.Pattern
+	version string
 	pluginType
 }
 
+type runtimeImpl struct {
+	pluginData
+	pluginClient   resolverv1connect.PluginServiceClient
+	resolverClient resolverv1connect.ResolverServiceClient
+	close          func() error
+}
+
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
+func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 	sockets, err := nri.NewSocketPair()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
@@ -103,41 +116,49 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (*runtime, error) {
 		return nil, err
 	}
 
-	return &runtime{
-		name:           v.name,
-		pattern:        r.cfg.pattern,
-		version:        r.cfg.version,
+	return &runtimeImpl{
+		pluginData: pluginData{
+			name:       v.name,
+			pattern:    r.cfg.pattern,
+			version:    r.cfg.version,
+			pluginType: internalPlugin,
+		},
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
 			return errors.Join(r.close(), w.close())
 		}),
-		pluginType: internalPlugin,
 	}, nil
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, v setupValidator) (*runtime, error) {
+func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
 	r, err := setup(conn, v)
 	if err != nil {
 		return nil, err
 	}
-	return &runtime{
-		name:           r.cfg.name,
-		pattern:        r.cfg.pattern,
-		version:        r.cfg.version,
+	return &runtimeImpl{
+		pluginData: pluginData{
+			name:       r.cfg.name,
+			pattern:    r.cfg.pattern,
+			version:    r.cfg.version,
+			pluginType: externalPlugin,
+		},
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close:          r.close,
-		pluginType:     externalPlugin,
 	}, nil
 }
 
-func (r *runtime) Close() error {
+func (r *runtimeImpl) Close() error {
 	return r.close()
 }
 
-func (r *runtime) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (r *runtimeImpl) Data() pluginData {
+	return r.pluginData
+}
+
+func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
 		SecretId: proto.String(request.ID.String()),
 	}.Build())
