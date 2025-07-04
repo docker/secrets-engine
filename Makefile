@@ -19,7 +19,7 @@ endif
 
 
 # golangci-lint must be pinned - linters can become more strict on upgrade
-GOLANGCI_LINT_VERSION := v1.64.5
+GOLANGCI_LINT_VERSION := v2.2.1
 export GO_VERSION GOPRIVATE GOLANGCI_LINT_VERSION GIT_COMMIT GIT_TAG
 
 BUILDER=buildx-multiarch
@@ -78,7 +78,7 @@ proto-generate:
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-generate .
 
 proto-lint:
-	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-lint .
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=proto-lint .
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
