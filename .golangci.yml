@@ -1,12 +1,9 @@
+version: "2"
 linters:
-  enable-all: false
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - gocyclo
-    - gofmt
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - lll
@@ -15,26 +12,56 @@ linters:
     - nolintlint
     - revive
     - staticcheck
-    - typecheck
     - unconvert
     - unparam
     - unused
-linters-settings:
-  gocritic:
-    disabled-checks:
-      - dupArg
-      - assignOp
-      - captLocal
-      - ifElseChain
-      - singleCaseSwitch
-      - dupSubExpr
-      - appendAssign
-      - exitAfterDefer
-      - unslice
-  gocyclo:
-    min-complexity: 16
-  goimports:
-    local-prefixes: github.com/docker/secrets-engine
-  lll:
-    line-length: 200
-
+  settings:
+    gocritic:
+      disabled-checks:
+        - dupArg
+        - assignOp
+        - captLocal
+        - ifElseChain
+        - singleCaseSwitch
+        - dupSubExpr
+        - appendAssign
+        - exitAfterDefer
+        - unslice
+    gocyclo:
+      min-complexity: 16
+    lll:
+      line-length: 200
+      tab-width: 1
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - vendor$
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/docker/secrets-engine
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - vendor$
+run:
+  timeout: 30m
+  modules-download-mode: vendor
+  allow-parallel-runners: true
