@@ -75,7 +75,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
+func newLaunchedPlugin(cmd *exec.Cmd, onClose func(), v setupValidator) (runtime, error) {
 	sockets, err := nri.NewSocketPair()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
@@ -109,7 +109,7 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 	}
 	w := newCmdWatchWrapper(v.name, cmd)
 
-	r, err := setup(conn, v)
+	r, err := setup(conn, onClose, v)
 	if err != nil {
 		conn.Close()
 		w.close()
@@ -132,8 +132,8 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
-	r, err := setup(conn, v)
+func newExternalPlugin(conn net.Conn, onClose func(), v setupValidator) (runtime, error) {
+	r, err := setup(conn, onClose, v)
 	if err != nil {
 		return nil, err
 	}

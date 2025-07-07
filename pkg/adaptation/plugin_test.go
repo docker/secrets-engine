@@ -97,7 +97,8 @@ func Test_newPlugin(t *testing.T) {
 					},
 					E: &secrets.Envelope{ID: mockSecretID, Value: []byte(mockSecretValue)},
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
+				cb, checkOnClose := onCloseCheck()
+				p, err := newLaunchedPlugin(cmd, cb, setupValidator{
 					name:          "dummy-plugin",
 					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 					acceptPattern: func(secrets.Pattern) error { return nil },
@@ -113,6 +114,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(s.Value))
 				assert.NoError(t, p.Close())
+				assert.NoError(t, checkOnClose())
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
@@ -133,7 +135,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					ErrGetSecret: errGetSecret,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
+				p, err := newLaunchedPlugin(cmd, func() {}, setupValidator{
 					name:          "dummy-plugin",
 					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 					acceptPattern: func(secrets.Pattern) error { return nil },
@@ -159,13 +161,15 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
+				cb, checkOnClose := onCloseCheck()
+				p, err := newLaunchedPlugin(cmd, cb, setupValidator{
 					name:          "dummy-plugin",
 					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 					acceptPattern: func(secrets.Pattern) error { return nil },
 				})
 				assert.NoError(t, err)
 				assert.NoError(t, p.Close())
+				assert.NoError(t, checkOnClose())
 			},
 		},
 		{
@@ -178,7 +182,8 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
+				cb, checkOnClose := onCloseCheck()
+				p, err := newLaunchedPlugin(cmd, cb, setupValidator{
 					name:          "dummy-plugin",
 					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 					acceptPattern: func(secrets.Pattern) error { return nil },
@@ -189,6 +194,7 @@ func Test_newPlugin(t *testing.T) {
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed: signal: killed")
+				assert.NoError(t, checkOnClose())
 			},
 		},
 	}
@@ -206,7 +212,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
+				m := newMockExternalRuntime(l)
 				go m.run()
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -226,6 +232,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
+				assert.NoError(t, m.onCloseCheck())
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -235,7 +242,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugin returns error on GetSecret",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
+				m := newMockExternalRuntime(l)
 				go m.run()
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -248,6 +255,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
+				assert.NoError(t, m.onCloseCheck())
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -257,7 +265,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := &mockExternalRuntime{l: l, done: make(chan struct{})}
+				m := newMockExternalRuntime(l)
 				go m.run()
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -278,6 +286,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				cancel()
 				<-done
 				assert.NoError(t, r.Close())
+				assert.NoError(t, m.onCloseCheck())
 			},
 		},
 		{
@@ -285,11 +294,12 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				doneRuntime := make(chan struct{})
+				cb, checkOnClose := onCloseCheck()
 				go func() {
 					conn, err := l.Accept()
 					require.NoError(t, err)
 
-					_, err = newExternalPlugin(conn, setupValidator{
+					_, err = newExternalPlugin(conn, cb, setupValidator{
 						out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 						acceptPattern: func(secrets.Pattern) error { return nil },
 					})
@@ -301,6 +311,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				require.NoError(t, err)
 				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
+				assert.NoError(t, checkOnClose())
 			},
 		},
 	}
@@ -333,11 +344,30 @@ func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) erro
 	return runErr, cancel
 }
 
+func onCloseCheck() (func(), func() error) {
+	onCloseCalled := make(chan struct{})
+	return func() {
+			close(onCloseCalled)
+		}, func() error {
+			select {
+			case <-onCloseCalled:
+				return nil
+			case <-time.After(2 * time.Second):
+				return errors.New("plugin did not close after timeout")
+			}
+		}
+}
+
 type mockExternalRuntime struct {
-	l    net.Listener
-	p    runtime
-	err  error
-	done chan struct{}
+	l          net.Listener
+	p          runtime
+	closeCheck func() error
+	err        error
+	done       chan struct{}
+}
+
+func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
+	return &mockExternalRuntime{l: l, done: make(chan struct{}), closeCheck: func() error { return errors.New("no onCloseCheck") }}
 }
 
 func (m *mockExternalRuntime) run() {
@@ -347,7 +377,8 @@ func (m *mockExternalRuntime) run() {
 		m.err = err
 		return
 	}
-	p, err := newExternalPlugin(conn, setupValidator{
+	cb, checkOnClose := onCloseCheck()
+	p, err := newExternalPlugin(conn, cb, setupValidator{
 		out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 		acceptPattern: func(secrets.Pattern) error { return nil },
 	})
@@ -356,6 +387,11 @@ func (m *mockExternalRuntime) run() {
 		return
 	}
 	m.p = p
+	m.closeCheck = checkOnClose
+}
+
+func (m *mockExternalRuntime) onCloseCheck() error {
+	return m.closeCheck()
 }
 
 func (m *mockExternalRuntime) getRuntime() (runtime, error) {
