@@ -20,6 +20,7 @@ import (
 const (
 	mockSecretValue        = "mockSecretValue"
 	mockSecretID           = secrets.ID("mockSecretID")
+	mockPattern            = "mockPattern"
 	mockEngineName         = "mockEngineName"
 	mockEngineVersion      = "mockEngineVersion"
 	mockRuntimeTestTimeout = 10 * time.Second
@@ -34,7 +35,7 @@ type MockedPluginOption func(*mockedPlugin)
 
 func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	m := &mockedPlugin{
-		pattern: "*",
+		pattern: mockPattern,
 		id:      mockSecretID,
 	}
 	for _, opt := range options {
@@ -102,8 +103,12 @@ func Test_newPlugin(t *testing.T) {
 					acceptPattern: func(secrets.Pattern) error { return nil },
 				})
 				assert.NoError(t, err)
-				assert.Equal(t, p.pattern, secrets.Pattern(pattern))
-				assert.Equal(t, p.version, version)
+				assert.Equal(t, p.Data(), pluginData{
+					name:       "dummy-plugin",
+					pattern:    secrets.Pattern(pattern),
+					version:    version,
+					pluginType: internalPlugin,
+				})
 				s, err := p.GetSecret(context.Background(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(s.Value))
@@ -209,12 +214,18 @@ func Test_newExternalPlugin(t *testing.T) {
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
 				t.Cleanup(cancel)
 
-				runtime, err := m.getRuntime()
+				r, err := m.getRuntime()
+				assert.Equal(t, r.Data(), pluginData{
+					name:       "my-plugin",
+					pattern:    mockPattern,
+					version:    "v1",
+					pluginType: externalPlugin,
+				})
 				assert.NoError(t, err)
-				e, err := runtime.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
-				assert.NoError(t, runtime.close())
+				assert.NoError(t, r.Close())
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -232,11 +243,11 @@ func Test_newExternalPlugin(t *testing.T) {
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
 				t.Cleanup(cancel)
 
-				runtime, err := m.getRuntime()
+				r, err := m.getRuntime()
 				assert.NoError(t, err)
-				_, err = runtime.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
-				assert.NoError(t, runtime.close())
+				assert.NoError(t, r.Close())
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -258,15 +269,15 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(done)
 				}()
 
-				runtime, err := m.getRuntime()
+				r, err := m.getRuntime()
 				assert.NoError(t, err)
-				e, err := runtime.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 
 				cancel()
 				<-done
-				assert.NoError(t, runtime.close())
+				assert.NoError(t, r.Close())
 			},
 		},
 		{
@@ -324,7 +335,7 @@ func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) erro
 
 type mockExternalRuntime struct {
 	l    net.Listener
-	p    *runtime
+	p    runtime
 	err  error
 	done chan struct{}
 }
@@ -347,7 +358,7 @@ func (m *mockExternalRuntime) run() {
 	m.p = p
 }
 
-func (m *mockExternalRuntime) getRuntime() (*runtime, error) {
+func (m *mockExternalRuntime) getRuntime() (runtime, error) {
 	select {
 	case <-m.done:
 		return m.p, m.err
