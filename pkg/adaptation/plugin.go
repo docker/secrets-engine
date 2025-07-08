@@ -40,9 +40,7 @@ func getPluginRegistrationTimeout() time.Duration {
 	return pluginRegistrationTimeout
 }
 
-var (
-	_ secrets.Resolver = &runtimeImpl{}
-)
+var _ secrets.Resolver = &runtimeImpl{}
 
 type runtime interface {
 	secrets.Resolver

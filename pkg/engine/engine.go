@@ -65,7 +65,7 @@ func envelopeErr(req secrets.Request, err error) secrets.Envelope {
 
 type pluginRegistration struct {
 	name string
-	//version  string
+	// version  string
 	pattern  secrets.Pattern
 	provider secrets.Resolver
 }

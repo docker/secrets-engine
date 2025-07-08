@@ -9,9 +9,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/docker/secrets-engine/store"
 	"github.com/keybase/dbus"
 	kc "github.com/keybase/go-keychain/secretservice"
+
+	"github.com/docker/secrets-engine/store"
 )
 
 const (
