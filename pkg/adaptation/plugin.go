@@ -67,6 +67,10 @@ type pluginData struct {
 	pluginType
 }
 
+func (d pluginData) qualifiedName() string {
+	return fmt.Sprintf("%s:%q@%s (%s)", d.pluginType, d.name, d.version, d.pattern)
+}
+
 type runtimeImpl struct {
 	pluginData
 	pluginClient   resolverv1connect.PluginServiceClient
