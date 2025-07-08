@@ -1,6 +1,8 @@
 package adaptation
 
+type removeFunc func()
+
 type registry interface {
-	Add(plugin ...runtime)
+	Register(plugin runtime) (removeFunc, error)
 	GetAll() []runtime
 }
