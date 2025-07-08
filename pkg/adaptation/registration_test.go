@@ -54,7 +54,7 @@ func mockValidatorErr(t *testing.T) pluginCfgInValidator {
 	}
 }
 
-func Test_register(t *testing.T) {
+func Test_registration(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
