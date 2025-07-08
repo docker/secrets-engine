@@ -4,10 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 // Runs all io.Close() calls in parallel so shutdown time is T(1) and not T(n) for n plugins.
@@ -28,6 +32,41 @@ func parallelStop(plugins []runtime) error {
 		errs = errors.Join(errs, err)
 	}
 	return errs
+}
+
+func startPlugins(cfg config, reg registry) error {
+	logrus.Infof("starting plugins...")
+	discoveredPlugins, err := discoverPlugins(cfg.pluginPath)
+	if err != nil {
+		return err
+	}
+	g := sync.WaitGroup{}
+	for _, p := range discoveredPlugins {
+		name, l := newLauncher(cfg, p)
+		g.Add(1)
+		go func() {
+			logrus.Infof("starting pre-installed plugin '%s'...", name)
+			if err := register(reg, l); err != nil {
+				logrus.Warnf("failed to initialize pre-installed plugin '%s': %v", name, err)
+			}
+			g.Done()
+		}()
+	}
+	g.Wait()
+	return nil
+}
+
+func newLauncher(cfg config, pluginFile string) (string, Launcher) {
+	name := toDisplayName(pluginFile)
+	return name, func() (runtime, error) {
+		return newLaunchedPlugin(exec.Command(filepath.Join(cfg.pluginPath, pluginFile)), setupValidator{
+			out:  pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()},
+			name: name,
+			acceptPattern: func(secrets.Pattern) error {
+				return nil
+			},
+		})
+	}
 }
 
 type Launcher func() (runtime, error)
