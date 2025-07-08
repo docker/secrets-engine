@@ -3,7 +3,8 @@ package adaptation
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -42,8 +43,8 @@ func (m *manager) Register(plugin runtime) (removeFunc, error) {
 }
 
 func (m *manager) sort() {
-	sort.Slice(m.plugins, func(i, j int) bool {
-		return m.plugins[i].Data().name < m.plugins[j].Data().name
+	slices.SortFunc(m.plugins, func(a, b runtime) int {
+		return strings.Compare(a.Data().name, b.Data().name)
 	})
 	if len(m.plugins) > 0 {
 		logrus.Infof("plugin priority order")
