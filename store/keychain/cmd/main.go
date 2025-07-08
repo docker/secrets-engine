@@ -7,10 +7,11 @@ import (
 	"log"
 	"path"
 
+	"github.com/spf13/cobra"
+
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/keychain"
 	"github.com/docker/secrets-engine/store/mocks"
-	"github.com/spf13/cobra"
 )
 
 // newCommand creates an example CLI that uses the keychain library

@@ -90,9 +90,7 @@ func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	return cfg, nil
 }
 
-var (
-	errPluginNotLaunchedByEngine = errors.New("plugin not launched by secrets engine")
-)
+var errPluginNotLaunchedByEngine = errors.New("plugin not launched by secrets engine")
 
 func restoreConfig(p Plugin) (*cfg, error) {
 	cfgString := os.Getenv(api.PluginLaunchedByEngineVar)

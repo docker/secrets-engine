@@ -16,8 +16,7 @@ import (
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
-type mockPlugin struct {
-}
+type mockPlugin struct{}
 
 func (m mockPlugin) Config() Config {
 	return Config{}
@@ -51,7 +50,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
 				socketPath := api.DefaultSocketPath()
 				os.Remove(socketPath)
-				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0755))
+				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
 				listener, err := net.Listen("unix", socketPath)
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)

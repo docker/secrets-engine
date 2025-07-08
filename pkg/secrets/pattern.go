@@ -5,9 +5,7 @@ import (
 	"fmt"
 )
 
-var (
-	ErrInvalidPattern = errors.New("invalid pattern")
-)
+var ErrInvalidPattern = errors.New("invalid pattern")
 
 // Pattern can be used to match secret identifiers.
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
