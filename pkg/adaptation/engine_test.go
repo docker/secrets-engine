@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
@@ -147,11 +148,11 @@ func Test_Register(t *testing.T) {
 func Test_discoverPlugins(t *testing.T) {
 	t.Run("only discover plugins but ignore everything else", func(t *testing.T) {
 		dir := t.TempDir()
-		assert.NoError(t, os.MkdirAll(filepath.Join(dir, "could-be-a-plugin"), 0755))
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0644))
+		assert.NoError(t, os.MkdirAll(filepath.Join(dir, "could-be-a-plugin"), 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
 		// TODO: port to windows once we run our tests on windows
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, "binary-file"), []byte(""), 0755))
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, "my-plugin"), []byte(""), 0755))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "binary-file"), []byte(""), 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "my-plugin"), []byte(""), 0o755))
 		plugins, err := discoverPlugins(dir)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
@@ -169,4 +170,25 @@ func Test_discoverPlugins(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
+}
+
+func Test_startPlugins(t *testing.T) {
+	exe, err := os.Executable()
+	assert.NoError(t, err)
+	dir := t.TempDir()
+	assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginOk)))
+	assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginFail)))
+	reg := &manager{}
+	require.NoError(t, startPlugins(config{
+		name:       "test-engine",
+		version:    "test-version",
+		pluginPath: dir,
+	}, reg))
+	plugins := reg.GetAll()
+	assert.Len(t, plugins, 1)
+	assert.Equal(t, dummyPluginOk, plugins[0].Data().name)
+	for _, plugin := range plugins {
+		assert.NoError(t, plugin.Close())
+	}
+	assert.Empty(t, reg.GetAll())
 }
