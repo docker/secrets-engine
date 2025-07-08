@@ -16,6 +16,10 @@ type mockSlowRuntime struct {
 	name string
 }
 
+func (m *mockSlowRuntime) Closed() <-chan struct{} {
+	return nil
+}
+
 func (m *mockSlowRuntime) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{}, nil
 }
@@ -52,6 +56,7 @@ func Test_parallelStop(t *testing.T) {
 type mockRuntime struct {
 	name        string
 	closeCalled int
+	closed      chan struct{}
 }
 
 func (m *mockRuntime) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
@@ -61,6 +66,10 @@ func (m *mockRuntime) GetSecret(context.Context, secrets.Request) (secrets.Envel
 func (m *mockRuntime) Close() error {
 	m.closeCalled++
 	return nil
+}
+
+func (m *mockRuntime) Closed() <-chan struct{} {
+	return m.closed
 }
 
 func (m *mockRuntime) Data() pluginData {
@@ -92,8 +101,8 @@ func Test_Register(t *testing.T) {
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
 		reg := &mockRegistry{}
 		launchErr := errors.New("launch error")
-		l := func() (runtime, <-chan struct{}, error) {
-			return nil, nil, launchErr
+		l := func() (runtime, error) {
+			return nil, launchErr
 		}
 		assert.ErrorIs(t, register(reg, l), launchErr)
 	})
@@ -101,22 +110,21 @@ func Test_Register(t *testing.T) {
 		errRegister := errors.New("register error")
 		reg := &mockRegistry{err: errRegister}
 		r := &mockRuntime{}
-		l := func() (runtime, <-chan struct{}, error) {
-			return r, nil, nil
+		l := func() (runtime, error) {
+			return r, nil
 		}
 		assert.ErrorIs(t, register(reg, l), errRegister)
 		assert.Equal(t, 1, r.closeCalled)
 	})
 	t.Run("runtime gets unregistered when channel is closed", func(t *testing.T) {
 		reg := &mockRegistry{removed: make(chan struct{})}
-		r := &mockRuntime{}
-		done := make(chan struct{})
-		l := func() (runtime, <-chan struct{}, error) {
-			return r, done, nil
+		r := &mockRuntime{closed: make(chan struct{})}
+		l := func() (runtime, error) {
+			return r, nil
 		}
 		assert.NoError(t, register(reg, l))
 		assert.Equal(t, 0, reg.removeCalled)
-		close(done)
+		close(r.closed)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
 		assert.Equal(t, 0, r.closeCalled)
@@ -124,8 +132,8 @@ func Test_Register(t *testing.T) {
 	t.Run("runtime gets unregistered when channel is nil", func(t *testing.T) {
 		reg := &mockRegistry{removed: make(chan struct{})}
 		r := &mockRuntime{}
-		l := func() (runtime, <-chan struct{}, error) {
-			return r, nil, nil
+		l := func() (runtime, error) {
+			return r, nil
 		}
 		assert.NoError(t, register(reg, l))
 		<-reg.removed
