@@ -27,10 +27,10 @@ func parallelStop(plugins []runtime) error {
 	return errs
 }
 
-type Launcher func() (runtime, <-chan struct{}, error)
+type Launcher func() (runtime, error)
 
 func register(reg registry, launch Launcher) error {
-	run, closed, err := launch()
+	run, err := launch()
 	if err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func register(reg registry, launch Launcher) error {
 		return err
 	}
 	go func() {
-		if closed != nil {
-			<-closed
+		if run.Closed() != nil {
+			<-run.Closed()
 		}
 		removeFunc()
 	}()

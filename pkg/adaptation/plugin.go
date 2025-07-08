@@ -50,6 +50,8 @@ type runtime interface {
 	io.Closer
 
 	Data() pluginData
+
+	Closed() <-chan struct{}
 }
 
 type pluginType string
@@ -76,10 +78,11 @@ type runtimeImpl struct {
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
+	closed         <-chan struct{}
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cmd *exec.Cmd, onClose func(), v setupValidator) (runtime, error) {
+func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 	sockets, err := nri.NewSocketPair()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
@@ -113,7 +116,9 @@ func newLaunchedPlugin(cmd *exec.Cmd, onClose func(), v setupValidator) (runtime
 	}
 	w := newCmdWatchWrapper(v.name, cmd)
 
-	r, err := setup(conn, onClose, v)
+	closed := make(chan struct{})
+	once := sync.OnceFunc(func() { close(closed) })
+	r, err := setup(conn, once, v)
 	if err != nil {
 		conn.Close()
 		w.close()
@@ -132,12 +137,15 @@ func newLaunchedPlugin(cmd *exec.Cmd, onClose func(), v setupValidator) (runtime
 		close: sync.OnceValue(func() error {
 			return errors.Join(r.close(), w.close())
 		}),
+		closed: closed,
 	}, nil
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, onClose func(), v setupValidator) (runtime, error) {
-	r, err := setup(conn, onClose, v)
+func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
+	closed := make(chan struct{})
+	once := sync.OnceFunc(func() { close(closed) })
+	r, err := setup(conn, once, v)
 	if err != nil {
 		return nil, err
 	}
@@ -151,11 +159,16 @@ func newExternalPlugin(conn net.Conn, onClose func(), v setupValidator) (runtime
 		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close:          r.close,
+		closed:         closed,
 	}, nil
 }
 
 func (r *runtimeImpl) Close() error {
 	return r.close()
+}
+
+func (r *runtimeImpl) Closed() <-chan struct{} {
+	return r.closed
 }
 
 func (r *runtimeImpl) Data() pluginData {
