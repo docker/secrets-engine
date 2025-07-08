@@ -4,9 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
-	"github.com/stretchr/testify/require"
 )
 
 type mustMarshalError struct{}

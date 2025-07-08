@@ -57,7 +57,7 @@ func (p *plugin) Configure(_ context.Context, config, runtime, version string) (
 	}
 
 	if cfg.LogFile != oldCfg.LogFile {
-		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			log.Errorf("failed to open log file %q: %v", cfg.LogFile, err)
 			return 0, fmt.Errorf("failed to open log file %q: %w", cfg.LogFile, err)
@@ -192,7 +192,7 @@ func main() {
 	flag.Parse()
 
 	if cfg.LogFile != "" {
-		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(cfg.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			log.Fatalf("failed to open log file %q: %v", cfg.LogFile, err)
 		}
