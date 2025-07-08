@@ -50,6 +50,7 @@ func Test_parallelStop(t *testing.T) {
 }
 
 type mockRuntime struct {
+	name        string
 	closeCalled int
 }
 
@@ -63,7 +64,7 @@ func (m *mockRuntime) Close() error {
 }
 
 func (m *mockRuntime) Data() pluginData {
-	return pluginData{}
+	return pluginData{name: m.name}
 }
 
 type mockRegistry struct {
