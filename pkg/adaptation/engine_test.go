@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -139,5 +141,32 @@ func Test_Register(t *testing.T) {
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
 		assert.Equal(t, 0, r.closeCalled)
+	})
+}
+
+func Test_discoverPlugins(t *testing.T) {
+	t.Run("only discover plugins but ignore everything else", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.NoError(t, os.MkdirAll(filepath.Join(dir, "could-be-a-plugin"), 0755))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0644))
+		// TODO: port to windows once we run our tests on windows
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "binary-file"), []byte(""), 0755))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "my-plugin"), []byte(""), 0755))
+		plugins, err := discoverPlugins(dir)
+		assert.NoError(t, err)
+		assert.Len(t, plugins, 2)
+		assert.Contains(t, plugins, "binary-file")
+		assert.Contains(t, plugins, "my-plugin")
+	})
+	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
+		dir := t.TempDir()
+		plugins, err := discoverPlugins(filepath.Join(dir, "does-not-exist"))
+		assert.NoError(t, err)
+		assert.Empty(t, plugins)
+	})
+	t.Run("empty dir string", func(t *testing.T) {
+		plugins, err := discoverPlugins("")
+		assert.NoError(t, err)
+		assert.Empty(t, plugins)
 	})
 }
