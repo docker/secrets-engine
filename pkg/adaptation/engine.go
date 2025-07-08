@@ -2,6 +2,9 @@ package adaptation
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -49,4 +52,43 @@ func register(reg registry, launch Launcher) error {
 		removeFunc()
 	}()
 	return nil
+}
+
+func discoverPlugins(pluginPath string) ([]string, error) {
+	if pluginPath == "" {
+		return nil, nil
+	}
+
+	var result []string
+
+	entries, err := os.ReadDir(pluginPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logrus.Warnf("Plugin directory does not exist: %s", pluginPath)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to discover plugins in %s: %w", pluginPath, err)
+	}
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if !isExecutable(info) {
+			continue
+		}
+
+		logrus.Infof("discovered plugin %s", toDisplayName(e.Name()))
+		result = append(result, e.Name())
+	}
+
+	return result, nil
+}
+
+func toDisplayName(filename string) string {
+	return strings.TrimSuffix(filename, ".exe")
 }
