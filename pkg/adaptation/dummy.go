@@ -9,20 +9,23 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/pkg/api"
 	"github.com/docker/secrets-engine/pkg/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
 
 const (
 	dummyPluginCfgEnv = "DUMMY_PLUGIN_CFG"
-	dummyPluginOk     = "plugin-ok"
 	dummyPluginFail   = "plugin-fail"
 	mockVersion       = "mockVersion"
 	mockSecretValue   = "mockSecretValue"
@@ -30,18 +33,46 @@ const (
 	mockPattern       = "mockPattern"
 )
 
+// Configures and runs a dummy plugin process.
+// To be used from TestMain.
 func dummyPluginProcessFromBinaryName(name string) {
-	if name == dummyPluginOk {
+	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail {
+		val := strings.TrimPrefix(name, "plugin-")
 		dummyPluginProcess(&dummyPluginCfg{
 			Config: plugin.Config{
 				Version: mockVersion,
-				Pattern: mockPattern,
+				Pattern: "*",
 			},
-			E: &secrets.Envelope{ID: mockSecretID, Value: []byte(mockSecretValue)},
+			E: []secrets.Envelope{
+				{ID: secrets.ID(val), Value: []byte(val + "-value")},
+				{ID: mockSecretID, Value: []byte(mockSecretValue)},
+			},
 		})
 	} else {
 		dummyPluginProcess(&dummyPluginCfg{ErrConfigPanic: "fake crash"})
 	}
+}
+
+type dummyPlugins struct {
+	failPlugin bool
+	okPlugins  []string
+}
+
+// Use it in a test to create a set of dummy plugins that behave like normal plugins
+// but under the hood re-use the test binary.
+// This is the counterpart to dummyPluginProcessFromBinaryName().
+func createDummyPlugins(t *testing.T, cfg dummyPlugins) string {
+	exe, err := os.Executable()
+	assert.NoError(t, err)
+	dir := t.TempDir()
+	if cfg.failPlugin {
+		assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginFail)))
+	}
+	for _, p := range cfg.okPlugins {
+		require.True(t, strings.HasPrefix(p, "plugin-"))
+		assert.NoError(t, os.Symlink(exe, filepath.Join(dir, p)))
+	}
+	return dir
 }
 
 // dummyPluginCommand can be called from within tests. The returned *exec.Cmd runs the dummyPluginProcess()
@@ -100,7 +131,13 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	if d.cfg.ErrGetSecret != "" {
 		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
 	}
-	return *d.cfg.E, nil
+	for _, s := range d.cfg.E {
+		if request.ID == s.ID {
+			return s, nil
+		}
+	}
+	err := errors.New("secret not found")
+	return api.EnvelopeErr(request, err), err
 }
 
 func (d *dummyPlugin) Config() plugin.Config {
@@ -121,10 +158,10 @@ func (d *dummyPlugin) Shutdown(context.Context) {
 
 type dummyPluginCfg struct {
 	plugin.Config  `json:",inline"`
-	E              *secrets.Envelope `json:"envelope,omitempty"`
-	ErrGetSecret   string            `json:"errGetSecret,omitempty"`
-	IgnoreSigint   bool              `json:"ignoreSigint,omitempty"`
-	ErrConfigPanic string            `json:"errConfigPanic,omitempty"`
+	E              []secrets.Envelope `json:"envelope,omitempty"`
+	ErrGetSecret   string             `json:"errGetSecret,omitempty"`
+	IgnoreSigint   bool               `json:"ignoreSigint,omitempty"`
+	ErrConfigPanic string             `json:"errConfigPanic,omitempty"`
 }
 
 func (c *dummyPluginCfg) toString() (string, error) {
