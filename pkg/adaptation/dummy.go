@@ -62,6 +62,7 @@ type dummyPlugins struct {
 // but under the hood re-use the test binary.
 // This is the counterpart to dummyPluginProcessFromBinaryName().
 func createDummyPlugins(t *testing.T, cfg dummyPlugins) string {
+	t.Helper()
 	exe, err := os.Executable()
 	assert.NoError(t, err)
 	dir := t.TempDir()
