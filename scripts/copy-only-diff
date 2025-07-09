@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# This script only copies changes detected by git diff
+# It will start copying from the current directory to the specified out directory
+#
+# Usage: ./copy-only-diff dir/out
+#
+
+set -euo pipefail
+
+if [ -z "$1" ] || [ ! -d "$1" ]; then
+    echo "Error: Not a valid directory path"
+    exit 1
+fi
+
+git config core.autocrlf false
+git config core.eol lf
+
+if [ ! -d .git ]; then
+    echo "no git repo detected"
+    exit 1
+fi
+
+if ! git diff --quiet; then
+    echo "Detected modified files:"
+    git diff --name-only | xargs -I{} cp --parents {} "$1"
+else
+    echo "No changes detected"
+fi
