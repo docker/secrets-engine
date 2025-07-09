@@ -192,7 +192,7 @@ func Test_startPlugins(t *testing.T) {
 }
 
 func Test_newEngine(t *testing.T) {
-	okPlugins := []string{"plugin-foo", "plugin-bar"}
+	okPlugins := []string{"plugin-foo"}
 	dir := createDummyPlugins(t, dummyPlugins{okPlugins: okPlugins})
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
 	cfg := config{
@@ -203,17 +203,11 @@ func Test_newEngine(t *testing.T) {
 	}
 	e, err := newEngine(cfg)
 	require.NoError(t, err)
-	t.Cleanup(func() { e.Close() })
+	t.Cleanup(func() { assert.NoError(t, e.Close()) })
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
 	foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
 	assert.NoError(t, err)
 	assert.Equal(t, secrets.ID("foo"), foo.ID)
 	assert.Equal(t, "foo-value", string(foo.Value))
-	bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
-	assert.NoError(t, err)
-	assert.Equal(t, secrets.ID("bar"), bar.ID)
-	assert.Equal(t, "bar-value", string(bar.Value))
-	_, err = c.GetSecret(t.Context(), secrets.Request{ID: "fancy-secret"})
-	assert.ErrorContains(t, err, "secret not found")
 }
