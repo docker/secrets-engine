@@ -24,6 +24,7 @@ import (
 
 var (
 	pluginRegistrationTimeout = api.DefaultPluginRegistrationTimeout
+	pluginRequestTimeout      = api.DefaultPluginRequestTimeout
 	timeoutCfgLock            sync.RWMutex
 )
 
@@ -38,6 +39,19 @@ func getPluginRegistrationTimeout() time.Duration {
 	timeoutCfgLock.RLock()
 	defer timeoutCfgLock.RUnlock()
 	return pluginRegistrationTimeout
+}
+
+// SetPluginRequestTimeout sets the timeout for plugins to handle a request.
+func SetPluginRequestTimeout(t time.Duration) {
+	timeoutCfgLock.Lock()
+	defer timeoutCfgLock.Unlock()
+	pluginRequestTimeout = t
+}
+
+func getPluginRequestTimeout() time.Duration {
+	timeoutCfgLock.RLock()
+	defer timeoutCfgLock.RUnlock()
+	return pluginRequestTimeout
 }
 
 var _ secrets.Resolver = &runtimeImpl{}
@@ -68,7 +82,7 @@ type pluginData struct {
 }
 
 func (d pluginData) qualifiedName() string {
-	return fmt.Sprintf("%s:%q@%s (%s)", d.pluginType, d.name, d.version, d.pattern)
+	return fmt.Sprintf("%s:%s@%s (%s)", d.pluginType, d.name, d.version, d.pattern)
 }
 
 type runtimeImpl struct {
