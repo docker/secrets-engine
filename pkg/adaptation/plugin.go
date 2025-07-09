@@ -193,22 +193,18 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	}.Build())
 	resp, err := r.resolverClient.GetSecret(ctx, req)
 	if err != nil {
-		return envelopeErr(request, err), err
+		return api.EnvelopeErr(request, err), err
 	}
 	id, err := secrets.ParseID(resp.Msg.GetSecretId())
 	if err != nil {
-		return envelopeErr(request, err), err
+		return api.EnvelopeErr(request, err), err
 	}
 	if id != request.ID {
-		return envelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
+		return api.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{
 		ID:       id,
 		Value:    []byte(resp.Msg.GetSecretValue()),
 		Provider: r.name,
 	}, nil
-}
-
-func envelopeErr(req secrets.Request, err error) secrets.Envelope {
-	return secrets.Envelope{ID: req.ID, ResolvedAt: time.Now(), Error: err.Error()}
 }
