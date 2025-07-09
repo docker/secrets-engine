@@ -1,18 +1,68 @@
 package adaptation
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
+
+const (
+	engineShutdownTimeout = 2 * time.Second
+)
+
+type engine struct {
+	close func() error
+}
+
+func newEngine(cfg config) (io.Closer, error) {
+	l, err := createListener(cfg.socketPath)
+	if err != nil {
+		return nil, err
+	}
+
+	reg := &manager{}
+	if err := startPlugins(cfg, reg); err != nil {
+		return nil, err
+	}
+	server := newServer(reg)
+	done := make(chan struct{})
+	var serverErr error
+	go func() {
+		serverErr = server.Serve(l)
+		close(done)
+	}()
+	return &engine{
+		close: sync.OnceValue(func() error {
+			defer l.Close()
+			select {
+			case <-done:
+				return serverErr
+			default:
+			}
+			stopErr := parallelStop(reg.GetAll())
+			ctx, cancel := context.WithTimeout(context.Background(), engineShutdownTimeout)
+			defer cancel()
+			return errors.Join(server.Shutdown(ctx), stopErr)
+		}),
+	}, nil
+}
+
+func (e *engine) Close() error {
+	return e.close()
+}
 
 // Runs all io.Close() calls in parallel so shutdown time is T(1) and not T(n) for n plugins.
 func parallelStop(plugins []runtime) error {
@@ -128,6 +178,30 @@ func discoverPlugins(pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func toDisplayName(filename string) string {
-	return strings.TrimSuffix(filename, ".exe")
+func newServer(reg registry) *http.Server {
+	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	r := &resolver{reg: reg}
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
+	return &http.Server{
+		Handler: httpMux,
+	}
+}
+
+func createListener(socketPath string) (net.Listener, error) {
+	os.Remove(socketPath)
+	if err := os.MkdirAll(filepath.Dir(socketPath), 0o700); err != nil {
+		return nil, fmt.Errorf("failed to create socket %q: %w", socketPath, err)
+	}
+	l, err := net.ListenUnix("unix", &net.UnixAddr{
+		Name: socketPath,
+		Net:  "unix",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create socket %q: %w", socketPath, err)
+	}
+	return l, nil
 }

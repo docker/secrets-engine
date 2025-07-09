@@ -1,7 +1,11 @@
 package adaptation
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -27,6 +31,9 @@ type config struct {
 
 type adaptation struct {
 	config
+
+	m sync.Mutex
+	e io.Closer
 }
 
 // Option to apply to the secrets engine.
@@ -67,11 +74,32 @@ func New(name, version string, opts ...Option) (Engine, error) {
 }
 
 func (a *adaptation) Start() error {
+	a.m.Lock()
+	defer a.m.Unlock()
+	if a.e != nil {
+		return errors.New("already started")
+	}
 	logrus.Infof("secrets engine starting up...")
+	e, err := newEngine(a.config)
+	if err != nil {
+		return err
+	}
+	a.e = e
 	return nil
 }
 
 func (a *adaptation) Stop() error {
+	a.m.Lock()
+	defer a.m.Unlock()
+	if a.e == nil {
+		return nil
+	}
 	logrus.Infof("secrets engine shutting down...")
-	return nil
+	err := a.e.Close()
+	a.e = nil
+	return err
+}
+
+func toDisplayName(filename string) string {
+	return strings.TrimSuffix(filename, ".exe")
 }
