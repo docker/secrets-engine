@@ -136,7 +136,6 @@ func TestResolverService_GetSecret(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			tt.test(t)
 		})
 	}

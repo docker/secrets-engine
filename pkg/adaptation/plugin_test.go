@@ -315,7 +315,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
 			socketPath := api.DefaultSocketPath()
 			os.Remove(socketPath)
-			require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0755))
+			require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
 			l, err := net.ListenUnix("unix", &net.UnixAddr{
 				Name: socketPath,
 				Net:  "unix",

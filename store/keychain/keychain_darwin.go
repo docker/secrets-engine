@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/secrets-engine/store"
 	kc "github.com/keybase/go-keychain"
+
+	"github.com/docker/secrets-engine/store"
 )
 
 var (

@@ -19,7 +19,7 @@ endif
 
 
 # golangci-lint must be pinned - linters can become more strict on upgrade
-GOLANGCI_LINT_VERSION := v1.64.5
+GOLANGCI_LINT_VERSION := v2.2.1
 export GO_VERSION GOPRIVATE GOLANGCI_LINT_VERSION GIT_COMMIT GIT_TAG
 
 BUILDER=buildx-multiarch
@@ -61,7 +61,7 @@ keychain-unit-tests:
 	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
 
 nri-plugin:
-	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w ${GO_LDFLAGS}" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
+	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
 
 nri-plugin-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-nri-plugin --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
@@ -78,10 +78,10 @@ proto-generate:
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-generate .
 
 proto-lint:
-	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-lint .
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=proto-lint .
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint unit-tests cross x-package clean help generate docker-mcp keychain-linux-unit-tests keychain-unit-tests
+.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests
