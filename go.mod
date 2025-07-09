@@ -10,7 +10,6 @@ require (
 	github.com/containerd/nri v0.9.0
 	github.com/docker/secrets-engine/plugin v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/yamux v0.1.2
-	github.com/keybase/go-keychain v0.0.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/protobuf v1.36.6

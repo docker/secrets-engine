@@ -7,10 +7,11 @@ import (
 	"strings"
 
 	"github.com/danieljoos/wincred"
-	"github.com/docker/secrets-engine/store"
 	"golang.org/x/sys/windows"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
+
+	"github.com/docker/secrets-engine/store"
 )
 
 var (
