@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,9 +19,6 @@ import (
 )
 
 const (
-	mockSecretValue        = "mockSecretValue"
-	mockSecretID           = secrets.ID("mockSecretID")
-	mockPattern            = "mockPattern"
 	mockEngineName         = "mockEngineName"
 	mockEngineVersion      = "mockEngineVersion"
 	mockRuntimeTestTimeout = 10 * time.Second
@@ -70,11 +68,23 @@ func (m mockedPlugin) Config() p.Config {
 func (m mockedPlugin) Shutdown(context.Context) {
 }
 
+func getTestBinaryName() string {
+	if len(os.Args) == 0 {
+		return ""
+	}
+	return filepath.Base(os.Args[0])
+}
+
 // TestMain acts as a dispatcher to run as dummy plugin or normal test.
 // Inspired by: https://github.com/golang/go/blob/15d9fe43d648764d41a88c75889c84df5e580930/src/os/exec/exec_test.go#L69-L73
 func TestMain(m *testing.M) {
-	if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
-		dummyPluginProcess()
+	binaryName := getTestBinaryName()
+	if strings.HasPrefix(binaryName, "plugin") {
+		// This allows tests to call the test binary as plugin by creating a symlink prefixed with "plugin-" to it.
+		// We then based on the suffix in dummyPluginProcessFromBinaryName() set the behavior of the plugin.
+		dummyPluginProcessFromBinaryName(binaryName)
+	} else if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
+		dummyPluginProcess(nil)
 	} else {
 		os.Exit(m.Run())
 	}

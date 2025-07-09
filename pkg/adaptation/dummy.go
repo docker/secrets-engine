@@ -22,7 +22,27 @@ import (
 
 const (
 	dummyPluginCfgEnv = "DUMMY_PLUGIN_CFG"
+	dummyPluginOk     = "plugin-ok"
+	dummyPluginFail   = "plugin-fail"
+	mockVersion       = "mockVersion"
+	mockSecretValue   = "mockSecretValue"
+	mockSecretID      = secrets.ID("mockSecretID")
+	mockPattern       = "mockPattern"
 )
+
+func dummyPluginProcessFromBinaryName(name string) {
+	if name == dummyPluginOk {
+		dummyPluginProcess(&dummyPluginCfg{
+			Config: plugin.Config{
+				Version: mockVersion,
+				Pattern: mockPattern,
+			},
+			E: &secrets.Envelope{ID: mockSecretID, Value: []byte(mockSecretValue)},
+		})
+	} else {
+		dummyPluginProcess(&dummyPluginCfg{ErrConfigPanic: "fake crash"})
+	}
+}
 
 // dummyPluginCommand can be called from within tests. The returned *exec.Cmd runs the dummyPluginProcess()
 // that implements the plugin.Plugin interface, i.e., we get a normal external plugin binary.
@@ -86,6 +106,9 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 func (d *dummyPlugin) Config() plugin.Config {
 	d.m.Lock()
 	defer d.m.Unlock()
+	if d.cfg.ErrConfigPanic != "" {
+		panic(errors.New(d.cfg.ErrConfigPanic))
+	}
 	d.result.ConfigRequests++
 	return d.cfg.Config
 }
@@ -97,10 +120,11 @@ func (d *dummyPlugin) Shutdown(context.Context) {
 }
 
 type dummyPluginCfg struct {
-	plugin.Config `json:",inline"`
-	E             *secrets.Envelope `json:"envelope,omitempty"`
-	ErrGetSecret  string            `json:"errGetSecret,omitempty"`
-	IgnoreSigint  bool              `json:"ignoreSigint,omitempty"`
+	plugin.Config  `json:",inline"`
+	E              *secrets.Envelope `json:"envelope,omitempty"`
+	ErrGetSecret   string            `json:"errGetSecret,omitempty"`
+	IgnoreSigint   bool              `json:"ignoreSigint,omitempty"`
+	ErrConfigPanic string            `json:"errConfigPanic,omitempty"`
 }
 
 func (c *dummyPluginCfg) toString() (string, error) {
@@ -119,15 +143,22 @@ func newDummyPluginCfg(in string) (*dummyPluginCfg, error) {
 	return &result, nil
 }
 
-// This is the equivalent of a main when normally implementing a plugin.
-// Here, it gets run by TestMain if dummyPluginCommand is used to re-launch the test binary (the binary built by go test).
-func dummyPluginProcess() {
-	var logBuf bytes.Buffer
-	logrus.SetOutput(&logBuf)
+func getCfgFromEnv() *dummyPluginCfg {
 	cfgStr := os.Getenv(dummyPluginCfgEnv)
 	cfg, err := newDummyPluginCfg(cfgStr)
 	if err != nil {
 		tryExitWithTestSetupErr(err)
+	}
+	return cfg
+}
+
+// This is the equivalent of a main when normally implementing a plugin.
+// Here, it gets run by TestMain if dummyPluginCommand is used to re-launch the test binary (the binary built by go test).
+func dummyPluginProcess(cfg *dummyPluginCfg) {
+	var logBuf bytes.Buffer
+	logrus.SetOutput(&logBuf)
+	if cfg == nil {
+		cfg = getCfgFromEnv()
 	}
 
 	ctx := context.Background()
