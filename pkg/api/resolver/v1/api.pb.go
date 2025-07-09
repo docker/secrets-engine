@@ -9,6 +9,7 @@ package resolverv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	unsafe "unsafe"
 )
@@ -399,7 +400,8 @@ func (b0 ShutdownResponse_builder) Build() *ShutdownResponse {
 
 type GetSecretRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SecretId    *string                `protobuf:"bytes,1,opt,name=secret_id,json=secretId"`
+	xxx_hidden_Id          *string                `protobuf:"bytes,1,opt,name=id"`
+	xxx_hidden_Provider    *string                `protobuf:"bytes,2,opt,name=provider"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -431,55 +433,93 @@ func (x *GetSecretRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *GetSecretRequest) GetSecretId() string {
+func (x *GetSecretRequest) GetId() string {
 	if x != nil {
-		if x.xxx_hidden_SecretId != nil {
-			return *x.xxx_hidden_SecretId
+		if x.xxx_hidden_Id != nil {
+			return *x.xxx_hidden_Id
 		}
 		return ""
 	}
 	return ""
 }
 
-func (x *GetSecretRequest) SetSecretId(v string) {
-	x.xxx_hidden_SecretId = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+func (x *GetSecretRequest) GetProvider() string {
+	if x != nil {
+		if x.xxx_hidden_Provider != nil {
+			return *x.xxx_hidden_Provider
+		}
+		return ""
+	}
+	return ""
 }
 
-func (x *GetSecretRequest) HasSecretId() bool {
+func (x *GetSecretRequest) SetId(v string) {
+	x.xxx_hidden_Id = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+}
+
+func (x *GetSecretRequest) SetProvider(v string) {
+	x.xxx_hidden_Provider = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+}
+
+func (x *GetSecretRequest) HasId() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *GetSecretRequest) ClearSecretId() {
+func (x *GetSecretRequest) HasProvider() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *GetSecretRequest) ClearId() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_SecretId = nil
+	x.xxx_hidden_Id = nil
+}
+
+func (x *GetSecretRequest) ClearProvider() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_Provider = nil
 }
 
 type GetSecretRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// ID of the secret to resolve.
-	SecretId *string
+	Id       *string
+	Provider *string
 }
 
 func (b0 GetSecretRequest_builder) Build() *GetSecretRequest {
 	m0 := &GetSecretRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	if b.SecretId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
-		x.xxx_hidden_SecretId = b.SecretId
+	if b.Id != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_Id = b.Id
+	}
+	if b.Provider != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		x.xxx_hidden_Provider = b.Provider
 	}
 	return m0
 }
 
 type GetSecretResponse struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SecretId    *string                `protobuf:"bytes,1,opt,name=secret_id,json=secretId"`
-	xxx_hidden_SecretValue *string                `protobuf:"bytes,2,opt,name=secret_value,json=secretValue"`
+	xxx_hidden_Id          *string                `protobuf:"bytes,1,opt,name=id"`
+	xxx_hidden_Value       []byte                 `protobuf:"bytes,2,opt,name=value"`
+	xxx_hidden_Provider    *string                `protobuf:"bytes,3,opt,name=provider"`
+	xxx_hidden_Version     *string                `protobuf:"bytes,4,opt,name=version"`
+	xxx_hidden_Error       *string                `protobuf:"bytes,5,opt,name=error"`
+	xxx_hidden_CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt"`
+	xxx_hidden_ResolvedAt  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=resolved_at,json=resolvedAt"`
+	xxx_hidden_ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -511,81 +551,249 @@ func (x *GetSecretResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *GetSecretResponse) GetSecretId() string {
+func (x *GetSecretResponse) GetId() string {
 	if x != nil {
-		if x.xxx_hidden_SecretId != nil {
-			return *x.xxx_hidden_SecretId
+		if x.xxx_hidden_Id != nil {
+			return *x.xxx_hidden_Id
 		}
 		return ""
 	}
 	return ""
 }
 
-func (x *GetSecretResponse) GetSecretValue() string {
+func (x *GetSecretResponse) GetValue() []byte {
 	if x != nil {
-		if x.xxx_hidden_SecretValue != nil {
-			return *x.xxx_hidden_SecretValue
+		return x.xxx_hidden_Value
+	}
+	return nil
+}
+
+func (x *GetSecretResponse) GetProvider() string {
+	if x != nil {
+		if x.xxx_hidden_Provider != nil {
+			return *x.xxx_hidden_Provider
 		}
 		return ""
 	}
 	return ""
 }
 
-func (x *GetSecretResponse) SetSecretId(v string) {
-	x.xxx_hidden_SecretId = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+func (x *GetSecretResponse) GetVersion() string {
+	if x != nil {
+		if x.xxx_hidden_Version != nil {
+			return *x.xxx_hidden_Version
+		}
+		return ""
+	}
+	return ""
 }
 
-func (x *GetSecretResponse) SetSecretValue(v string) {
-	x.xxx_hidden_SecretValue = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+func (x *GetSecretResponse) GetError() string {
+	if x != nil {
+		if x.xxx_hidden_Error != nil {
+			return *x.xxx_hidden_Error
+		}
+		return ""
+	}
+	return ""
 }
 
-func (x *GetSecretResponse) HasSecretId() bool {
+func (x *GetSecretResponse) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_CreatedAt
+	}
+	return nil
+}
+
+func (x *GetSecretResponse) GetResolvedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_ResolvedAt
+	}
+	return nil
+}
+
+func (x *GetSecretResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_ExpiresAt
+	}
+	return nil
+}
+
+func (x *GetSecretResponse) SetId(v string) {
+	x.xxx_hidden_Id = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 8)
+}
+
+func (x *GetSecretResponse) SetValue(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Value = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 8)
+}
+
+func (x *GetSecretResponse) SetProvider(v string) {
+	x.xxx_hidden_Provider = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 8)
+}
+
+func (x *GetSecretResponse) SetVersion(v string) {
+	x.xxx_hidden_Version = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 8)
+}
+
+func (x *GetSecretResponse) SetError(v string) {
+	x.xxx_hidden_Error = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 8)
+}
+
+func (x *GetSecretResponse) SetCreatedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_CreatedAt = v
+}
+
+func (x *GetSecretResponse) SetResolvedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_ResolvedAt = v
+}
+
+func (x *GetSecretResponse) SetExpiresAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *GetSecretResponse) HasId() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *GetSecretResponse) HasSecretValue() bool {
+func (x *GetSecretResponse) HasValue() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
-func (x *GetSecretResponse) ClearSecretId() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_SecretId = nil
+func (x *GetSecretResponse) HasProvider() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
 }
 
-func (x *GetSecretResponse) ClearSecretValue() {
+func (x *GetSecretResponse) HasVersion() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
+}
+
+func (x *GetSecretResponse) HasError() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
+}
+
+func (x *GetSecretResponse) HasCreatedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_CreatedAt != nil
+}
+
+func (x *GetSecretResponse) HasResolvedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ResolvedAt != nil
+}
+
+func (x *GetSecretResponse) HasExpiresAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ExpiresAt != nil
+}
+
+func (x *GetSecretResponse) ClearId() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Id = nil
+}
+
+func (x *GetSecretResponse) ClearValue() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_SecretValue = nil
+	x.xxx_hidden_Value = nil
+}
+
+func (x *GetSecretResponse) ClearProvider() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	x.xxx_hidden_Provider = nil
+}
+
+func (x *GetSecretResponse) ClearVersion() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	x.xxx_hidden_Version = nil
+}
+
+func (x *GetSecretResponse) ClearError() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
+	x.xxx_hidden_Error = nil
+}
+
+func (x *GetSecretResponse) ClearCreatedAt() {
+	x.xxx_hidden_CreatedAt = nil
+}
+
+func (x *GetSecretResponse) ClearResolvedAt() {
+	x.xxx_hidden_ResolvedAt = nil
+}
+
+func (x *GetSecretResponse) ClearExpiresAt() {
+	x.xxx_hidden_ExpiresAt = nil
 }
 
 type GetSecretResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// ID of the secret to resolve.
-	SecretId *string
+	Id *string
 	// The resolved secret value.
-	SecretValue *string
+	Value      []byte
+	Provider   *string
+	Version    *string
+	Error      *string
+	CreatedAt  *timestamppb.Timestamp
+	ResolvedAt *timestamppb.Timestamp
+	ExpiresAt  *timestamppb.Timestamp
 }
 
 func (b0 GetSecretResponse_builder) Build() *GetSecretResponse {
 	m0 := &GetSecretResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	if b.SecretId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
-		x.xxx_hidden_SecretId = b.SecretId
+	if b.Id != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 8)
+		x.xxx_hidden_Id = b.Id
 	}
-	if b.SecretValue != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
-		x.xxx_hidden_SecretValue = b.SecretValue
+	if b.Value != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 8)
+		x.xxx_hidden_Value = b.Value
 	}
+	if b.Provider != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 8)
+		x.xxx_hidden_Provider = b.Provider
+	}
+	if b.Version != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 8)
+		x.xxx_hidden_Version = b.Version
+	}
+	if b.Error != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 8)
+		x.xxx_hidden_Error = b.Error
+	}
+	x.xxx_hidden_CreatedAt = b.CreatedAt
+	x.xxx_hidden_ResolvedAt = b.ResolvedAt
+	x.xxx_hidden_ExpiresAt = b.ExpiresAt
 	return m0
 }
 
@@ -593,7 +801,7 @@ var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x15resolver/v1/api.proto\x12\vresolver.v1\"_\n" +
+	"\x15resolver/v1/api.proto\x12\vresolver.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"_\n" +
 	"\x15RegisterPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
@@ -604,12 +812,22 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12'\n" +
 	"\x0frequest_timeout\x18\x03 \x01(\x03R\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
-	"\x10ShutdownResponse\"/\n" +
-	"\x10GetSecretRequest\x12\x1b\n" +
-	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\"S\n" +
-	"\x11GetSecretResponse\x12\x1b\n" +
-	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12!\n" +
-	"\fsecret_value\x18\x02 \x01(\tR\vsecretValue2j\n" +
+	"\x10ShutdownResponse\">\n" +
+	"\x10GetSecretRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\bprovider\x18\x02 \x01(\tR\bprovider\"\xb8\x02\n" +
+	"\x11GetSecretResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value\x12\x1a\n" +
+	"\bprovider\x18\x03 \x01(\tR\bprovider\x12\x18\n" +
+	"\aversion\x18\x04 \x01(\tR\aversion\x12\x14\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vresolved_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"resolvedAt\x129\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2j\n" +
 	"\rEngineService\x12Y\n" +
 	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2X\n" +
 	"\rPluginService\x12G\n" +
@@ -626,19 +844,23 @@ var file_resolver_v1_api_proto_goTypes = []any{
 	(*ShutdownResponse)(nil),       // 3: resolver.v1.ShutdownResponse
 	(*GetSecretRequest)(nil),       // 4: resolver.v1.GetSecretRequest
 	(*GetSecretResponse)(nil),      // 5: resolver.v1.GetSecretResponse
+	(*timestamppb.Timestamp)(nil),  // 6: google.protobuf.Timestamp
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	0, // 0: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	2, // 1: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	4, // 2: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
-	1, // 3: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 4: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	5, // 5: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: resolver.v1.GetSecretResponse.created_at:type_name -> google.protobuf.Timestamp
+	6, // 1: resolver.v1.GetSecretResponse.resolved_at:type_name -> google.protobuf.Timestamp
+	6, // 2: resolver.v1.GetSecretResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0, // 3: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
+	2, // 4: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4, // 5: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
+	1, // 6: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 7: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5, // 8: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }

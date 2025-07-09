@@ -2,6 +2,8 @@ edition = "2023";
 
 package resolver.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/docker/secrets-engine/pkg/api/resolver/v1;resolverv1";
 
 service EngineService {
@@ -43,12 +45,26 @@ service ResolverService {
 
 message GetSecretRequest {
   // ID of the secret to resolve.
-  string secret_id = 1;
+  string id = 1;
+
+  string provider = 2;
 }
 
 message GetSecretResponse {
   // ID of the secret to resolve.
-  string secret_id = 1;
+  string id = 1;
   // The resolved secret value.
-  string secret_value = 2;
+  bytes value = 2;
+
+  string provider = 3;
+
+  string version = 4;
+
+  string error = 5;
+
+  google.protobuf.Timestamp created_at = 6;
+
+  google.protobuf.Timestamp resolved_at = 7;
+
+  google.protobuf.Timestamp expires_at = 8;
 }

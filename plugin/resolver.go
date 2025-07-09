@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
@@ -24,7 +25,7 @@ type resolverService struct {
 }
 
 func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
-	logrus.Debugf("GetSecret request (ID %q)", c.Msg.GetSecretId())
+	logrus.Debugf("GetSecret request (ID %q)", c.Msg.GetId())
 	select {
 	case <-r.setupCompleted:
 	case <-ctx.Done():
@@ -32,13 +33,13 @@ func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[reso
 	case <-time.After(r.registrationTimeout):
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("registration incomplete (timeout after %s)", r.registrationTimeout))
 	}
-	msgID := c.Msg.GetSecretId()
+	msgID := c.Msg.GetId()
 	id, err := secrets.ParseID(msgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret ID %q: %w", msgID, err))
 	}
 
-	envelope, err := r.resolver.GetSecret(ctx, secrets.Request{ID: id})
+	envelope, err := r.resolver.GetSecret(ctx, secrets.Request{ID: id, Provider: c.Msg.GetProvider()})
 	if err != nil {
 		if errors.Is(err, secrets.ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("secret %q not found: %w", msgID, err))
@@ -49,7 +50,13 @@ func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[reso
 		return nil, connect.NewError(connect.CodeInternal, secrets.ErrIDMismatch)
 	}
 	return connect.NewResponse(resolverv1.GetSecretResponse_builder{
-		SecretId:    proto.String(envelope.ID.String()),
-		SecretValue: proto.String(string(envelope.Value)),
+		Id:         proto.String(envelope.ID.String()),
+		Value:      envelope.Value,
+		Provider:   proto.String(envelope.Provider),
+		Version:    proto.String(envelope.Version),
+		Error:      proto.String(envelope.Error),
+		CreatedAt:  timestamppb.New(envelope.CreatedAt),
+		ResolvedAt: timestamppb.New(envelope.ResolvedAt),
+		ExpiresAt:  timestamppb.New(envelope.ExpiresAt),
 	}.Build()), nil
 }
