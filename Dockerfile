@@ -45,6 +45,7 @@ RUN --mount=type=bind,target=.,ro \
     set -euo pipefail
     go mod tidy --diff
     (cd client && go mod tidy --diff)
+    (cd engine && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
     (cd store && go mod tidy --diff)
     golangci-lint run -v
