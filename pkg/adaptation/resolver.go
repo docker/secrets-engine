@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/pkg/api"
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
 	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
@@ -53,7 +54,7 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 	var errs []error
 
 	if err := req.ID.Valid(); err != nil {
-		return envelopeErr(req, err), err
+		return api.EnvelopeErr(req, err), err
 	}
 
 	for _, plugin := range r.reg.GetAll() {
@@ -86,5 +87,5 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 	} else {
 		err = errors.Join(errs...)
 	}
-	return envelopeErr(req, err), err
+	return api.EnvelopeErr(req, err), err
 }
