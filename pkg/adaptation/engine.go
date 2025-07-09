@@ -37,11 +37,20 @@ func newEngine(cfg config) (io.Closer, error) {
 	if err := startPlugins(cfg, reg); err != nil {
 		return nil, err
 	}
+	m := sync.Mutex{}
+	stopPlugins := func() error {
+		m.Lock()
+		defer m.Unlock()
+		return parallelStop(reg.GetAll())
+	}
 	server := newServer(reg)
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
-		serverErr = server.Serve(l)
+		if err := server.Serve(l); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
+			serverErr = errors.Join(serverErr, err)
+		}
+		serverErr = errors.Join(serverErr, stopPlugins())
 		close(done)
 	}()
 	return &engine{
@@ -52,10 +61,10 @@ func newEngine(cfg config) (io.Closer, error) {
 				return serverErr
 			default:
 			}
-			stopErr := parallelStop(reg.GetAll())
+			stopErr := stopPlugins()
 			ctx, cancel := context.WithTimeout(context.Background(), engineShutdownTimeout)
 			defer cancel()
-			return errors.Join(server.Shutdown(ctx), stopErr)
+			return errors.Join(server.Shutdown(ctx), stopErr, serverErr)
 		}),
 	}, nil
 }
