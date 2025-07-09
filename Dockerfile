@@ -44,6 +44,7 @@ RUN --mount=type=bind,target=.,ro \
     --mount=type=cache,target=/root/.cache <<EOT
     set -euo pipefail
     go mod tidy --diff
+    (cd client && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
     (cd store && go mod tidy --diff)
     golangci-lint run -v
