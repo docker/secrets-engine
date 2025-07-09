@@ -74,18 +74,29 @@ func New(options ...Option) (secrets.Resolver, error) {
 
 func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
-		SecretId: proto.String(request.ID.String()),
+		Id:       proto.String(request.ID.String()),
+		Provider: proto.String(request.Provider),
 	}.Build())
 	resp, err := c.resolverClient.GetSecret(ctx, req)
 	if err != nil {
 		return api.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetSecretId())
+	id, err := secrets.ParseID(resp.Msg.GetId())
 	if err != nil {
 		return api.EnvelopeErr(request, err), err
 	}
-	return secrets.Envelope{
-		ID:    id,
-		Value: []byte(resp.Msg.GetSecretValue()),
-	}, nil
+	e := secrets.Envelope{
+		ID:         id,
+		Value:      resp.Msg.GetValue(),
+		Provider:   resp.Msg.GetProvider(),
+		Version:    resp.Msg.GetVersion(),
+		Error:      resp.Msg.GetError(),
+		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),
+		ResolvedAt: resp.Msg.GetResolvedAt().AsTime(),
+		ExpiresAt:  resp.Msg.GetExpiresAt().AsTime(),
+	}
+	if e.Error != "" {
+		return e, errors.New(e.Error)
+	}
+	return e, nil
 }
