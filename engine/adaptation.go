@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/secrets-engine/pkg/api"
+	"github.com/docker/secrets-engine/internal/api"
 )
 
 const (

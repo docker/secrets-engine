@@ -8,8 +8,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/pkg/handlers"
-	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 type Engine struct {

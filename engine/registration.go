@@ -10,9 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
-	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
-	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/pkg/secrets"
+	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
+	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 var _ resolverv1connect.EngineServiceHandler = &RegisterService{}
