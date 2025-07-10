@@ -189,13 +189,14 @@ func (r *runtimeImpl) Data() pluginData {
 
 func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
-		SecretId: proto.String(request.ID.String()),
+		Id:       proto.String(request.ID.String()),
+		Provider: proto.String(request.Provider),
 	}.Build())
 	resp, err := r.resolverClient.GetSecret(ctx, req)
 	if err != nil {
 		return api.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetSecretId())
+	id, err := secrets.ParseID(resp.Msg.GetId())
 	if err != nil {
 		return api.EnvelopeErr(request, err), err
 	}
@@ -203,8 +204,13 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 		return api.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{
-		ID:       id,
-		Value:    []byte(resp.Msg.GetSecretValue()),
-		Provider: r.name,
+		ID:         id,
+		Value:      resp.Msg.GetValue(),
+		Provider:   r.name,
+		Version:    resp.Msg.GetVersion(),
+		Error:      resp.Msg.GetError(),
+		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),
+		ResolvedAt: resp.Msg.GetResolvedAt().AsTime(),
+		ExpiresAt:  resp.Msg.GetExpiresAt().AsTime(),
 	}, nil
 }

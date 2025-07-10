@@ -14,6 +14,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -134,6 +135,8 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	}
 	for _, s := range d.cfg.E {
 		if request.ID == s.ID {
+			s.CreatedAt = time.Now().Add(-time.Hour)
+			s.ExpiresAt = time.Now().Add(time.Hour)
 			return s, nil
 		}
 	}
