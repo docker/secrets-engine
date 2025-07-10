@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
@@ -173,11 +174,8 @@ func Test_discoverPlugins(t *testing.T) {
 }
 
 func Test_startPlugins(t *testing.T) {
-	exe, err := os.Executable()
-	assert.NoError(t, err)
-	dir := t.TempDir()
-	assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginOk)))
-	assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginFail)))
+	okPlugin := "plugin-ok"
+	dir := createDummyPlugins(t, dummyPlugins{failPlugin: true, okPlugins: []string{okPlugin}})
 	reg := &manager{}
 	require.NoError(t, startPlugins(config{
 		name:       "test-engine",
@@ -186,9 +184,36 @@ func Test_startPlugins(t *testing.T) {
 	}, reg))
 	plugins := reg.GetAll()
 	assert.Len(t, plugins, 1)
-	assert.Equal(t, dummyPluginOk, plugins[0].Data().name)
+	assert.Equal(t, okPlugin, plugins[0].Data().name)
 	for _, plugin := range plugins {
 		assert.NoError(t, plugin.Close())
 	}
 	assert.Empty(t, reg.GetAll())
+}
+
+func Test_newEngine(t *testing.T) {
+	okPlugins := []string{"plugin-foo", "plugin-bar"}
+	dir := createDummyPlugins(t, dummyPlugins{okPlugins: okPlugins})
+	socketPath := filepath.Join(t.TempDir(), "test.sock")
+	cfg := config{
+		name:       "test-engine",
+		version:    "test-version",
+		pluginPath: dir,
+		socketPath: socketPath,
+	}
+	e, err := newEngine(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { e.Close() })
+	c, err := client.New(client.WithSocketPath(socketPath))
+	require.NoError(t, err)
+	foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+	assert.NoError(t, err)
+	assert.Equal(t, secrets.ID("foo"), foo.ID)
+	assert.Equal(t, "foo-value", string(foo.Value))
+	bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+	assert.NoError(t, err)
+	assert.Equal(t, secrets.ID("bar"), bar.ID)
+	assert.Equal(t, "bar-value", string(bar.Value))
+	_, err = c.GetSecret(t.Context(), secrets.Request{ID: "fancy-secret"})
+	assert.ErrorContains(t, err, "secret not found")
 }
