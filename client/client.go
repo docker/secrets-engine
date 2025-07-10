@@ -16,6 +16,12 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
+type (
+	Request  = secrets.Request
+	Envelope = secrets.Envelope
+	ID       = secrets.ID
+)
+
 var _ secrets.Resolver = &client{}
 
 type Option func(c *config) error
