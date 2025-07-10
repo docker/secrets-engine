@@ -15,9 +15,9 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/pkg/handlers"
 	"github.com/docker/secrets-engine/pkg/providers/local"
-	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
 func main() {

@@ -3,7 +3,7 @@ package local
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/pkg/secrets"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type Store struct{}

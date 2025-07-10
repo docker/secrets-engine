@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
-	"github.com/docker/secrets-engine/pkg/secrets"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 const (
