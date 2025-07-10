@@ -15,7 +15,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 

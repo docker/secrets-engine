@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
-	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
+	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
+	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/pkg/secrets"
 )
 
