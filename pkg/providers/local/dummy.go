@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/secrets-engine/pkg/secrets"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 var errNotImplemented = errors.New("not implemented")

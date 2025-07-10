@@ -833,8 +833,8 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\rPluginService\x12G\n" +
 	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponse2]\n" +
 	"\x0fResolverService\x12J\n" +
-	"\tGetSecret\x12\x1d.resolver.v1.GetSecretRequest\x1a\x1e.resolver.v1.GetSecretResponseB\xa9\x01\n" +
-	"\x0fcom.resolver.v1B\bApiProtoP\x01Z?github.com/docker/secrets-engine/pkg/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
+	"\tGetSecret\x12\x1d.resolver.v1.GetSecretRequest\x1a\x1e.resolver.v1.GetSecretResponseB\xae\x01\n" +
+	"\x0fcom.resolver.v1B\bApiProtoP\x01ZDgithub.com/docker/secrets-engine/internal/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
 var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_resolver_v1_api_proto_goTypes = []any{

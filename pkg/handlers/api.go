@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/docker/secrets-engine/pkg/secrets"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 func Resolver(provider secrets.Resolver) (string, http.Handler) {
