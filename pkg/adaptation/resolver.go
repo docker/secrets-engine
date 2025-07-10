@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/docker/secrets-engine/pkg/api"
 	resolverv1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
@@ -22,13 +23,13 @@ type resolverService struct {
 }
 
 func (r resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
-	msgID := c.Msg.GetSecretId()
+	msgID := c.Msg.GetId()
 	id, err := secrets.ParseID(msgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret ID %q: %w", msgID, err))
 	}
 
-	envelope, err := r.resolver.GetSecret(ctx, secrets.Request{ID: id})
+	envelope, err := r.resolver.GetSecret(ctx, secrets.Request{ID: id, Provider: c.Msg.GetProvider()})
 	if err != nil {
 		if errors.Is(err, secrets.ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("secret %q not found: %w", msgID, err))
@@ -39,8 +40,14 @@ func (r resolverService) GetSecret(ctx context.Context, c *connect.Request[resol
 		return nil, connect.NewError(connect.CodeInternal, secrets.ErrIDMismatch)
 	}
 	return connect.NewResponse(resolverv1.GetSecretResponse_builder{
-		SecretId:    proto.String(envelope.ID.String()),
-		SecretValue: proto.String(string(envelope.Value)),
+		Id:         proto.String(envelope.ID.String()),
+		Value:      envelope.Value,
+		Provider:   proto.String(envelope.Provider),
+		Version:    proto.String(envelope.Version),
+		Error:      proto.String(envelope.Error),
+		CreatedAt:  timestamppb.New(envelope.CreatedAt),
+		ResolvedAt: timestamppb.New(envelope.ResolvedAt),
+		ExpiresAt:  timestamppb.New(envelope.ExpiresAt),
 	}.Build()), nil
 }
 
