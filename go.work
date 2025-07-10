@@ -3,6 +3,7 @@ go 1.24.3
 use (
 	.
 	./client
+	./engine
 	./plugin
 	./store
 )

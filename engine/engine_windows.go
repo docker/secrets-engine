@@ -1,6 +1,6 @@
 //go:build windows
 
-package adaptation
+package engine
 
 import (
 	"os"
