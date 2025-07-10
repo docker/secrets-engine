@@ -105,7 +105,7 @@ func Test_newPlugin(t *testing.T) {
 						Version: version,
 						Pattern: pattern,
 					},
-					E: &secrets.Envelope{ID: mockSecretID, Value: []byte(mockSecretValue)},
+					E: []secrets.Envelope{{ID: mockSecretID, Value: []byte(mockSecretValue)}},
 				})
 				p, err := newLaunchedPlugin(cmd, setupValidator{
 					name:          "dummy-plugin",
