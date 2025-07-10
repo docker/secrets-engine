@@ -60,6 +60,9 @@ keychain-linux-unit-tests:
 keychain-unit-tests:
 	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
 
+engine-unit-tests:
+	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
+
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
 
