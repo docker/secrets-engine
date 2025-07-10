@@ -10,10 +10,16 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/docker/secrets-engine/pkg/api"
-	v1 "github.com/docker/secrets-engine/pkg/api/resolver/v1"
-	"github.com/docker/secrets-engine/pkg/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/pkg/secrets"
+	"github.com/docker/secrets-engine/internal/api"
+	v1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
+	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/internal/secrets"
+)
+
+type (
+	Request  = secrets.Request
+	Envelope = secrets.Envelope
+	ID       = secrets.ID
 )
 
 var _ secrets.Resolver = &client{}

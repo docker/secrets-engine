@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/secrets-engine/pkg/api"
+	"github.com/docker/secrets-engine/internal/api"
 )
 
 type PluginConfigFromEngine struct {
