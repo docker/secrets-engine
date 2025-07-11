@@ -9,7 +9,7 @@ The two main tasks of the engine are:
 - [x] plugins are started/stopped in parallel to minimize startup/shutdown time
 - [ ] cross-platform support for
   - [x] Linux
-  - [ ] Mac
+  - [x] Mac
   - [ ] Windows
 - [ ] plugin runtime that supports
   - [x] engine launched plugins (binaries are located in a plugin folder)

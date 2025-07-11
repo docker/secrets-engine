@@ -1,0 +1,28 @@
+name: Engine
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'engine/**'
+
+jobs:
+  tests-macos:
+    permissions:
+      id-token: write
+      contents: read
+    name: MacOSEngineTests
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test engine
+        run: make engine-unit-tests
