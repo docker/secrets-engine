@@ -37,6 +37,35 @@ flowchart TD
 
 ---
 
+### 2025-07-15 Windows IPC: Using a pair of uni-directional pipes
+
+On windows, there are at least 3 different ways to achieve IPC that's equivalent to a socket+2fd on unix:
+- Using a pair of [pipes](https://learn.microsoft.com/en-us/windows/win32/ipc/pipes) and combining them into a duplex communication channel.
+- Using [Windows Sockets 2](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/)
+- Using bidirectional [named pipes](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipes)
+
+#### Understanding our requirements: bidirectional communication + pair of inheritable handlers/FDs
+The engine requires that communication between itself and the plugin have anonymity and robust inheritance.
+Anonymity helps avoid clashes with other applications/services running on the host. Inheritance is the process of passing along the required information to a child process (i.e. a plugin) so that it can setup IPC back to the engine.
+That means:
+- No ports: Ports are a potential hassle with firewalls and can conflict with other programs/services. There are also security gaps as anyone can interfere with them.
+- No filepaths: They have the same drawbacks that ports have.
+- File descriptors / handlers: If we don't want to rely on ports or paths, inheritance is achieved by getting the underlying OS primitives (file descriptors or handlers) and passing one end to the child process.
+See also [Time to use AF_UNIX](https://lwn.net/Articles/984841/) article on LWN.net for related discussion.
+
+#### The tradeoffs (Windows)
+
+On Linux and macOS, sockets with file descriptors are supported.
+On Windows it is unfortunately a bit more complicated.
+
+Winsock2 comes closest to what we ideally need. It's effectively available on all supported Windows version (and unsupported from Windows 7) and is used in the Go standard library. Unfortunately, despite the [announcement](https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/), **Windows does not implement abstract sockets**. Winsock2 always binds to a port and if not explicitly set the next available one will be assigned by the OS. More information on the topic can be found in this [WSL issue](https://github.com/microsoft/WSL/issues/4240).
+
+Named pipes: They always require a name. Based on the sources of [go-winio](https://github.com/microsoft/go-winio) it seems that there might be a possibility to use that technology with handlers only, but unfortunately it's neither documented nor implemented.
+
+A pair of win32 pipes: They are anonymous and inheritable, however, lack the _atomic removal_ property we need to close both at the same time. Fortunately, we can work around it and would be the best choice based on what is currently supported.
+
+---
+
 ### 2025-07-02 settling on yamux + connect rpc for the IPC stack
 
 The IPC stack consists of multiple parts that need to play well together:

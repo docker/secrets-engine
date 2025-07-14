@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/docker/secrets-engine/internal/api"
@@ -39,15 +38,4 @@ func NewPluginConfigFromEngineEnv(in string) (*PluginConfigFromEngine, error) {
 		return nil, err
 	}
 	return &result, nil
-}
-
-type PipeConn struct {
-	R *os.File
-	W *os.File
-}
-
-func (p *PipeConn) Read(b []byte) (int, error)  { return p.R.Read(b) }
-func (p *PipeConn) Write(b []byte) (int, error) { return p.W.Write(b) }
-func (p *PipeConn) Close() error {
-	return errors.Join(p.R.Close(), p.W.Close())
 }
