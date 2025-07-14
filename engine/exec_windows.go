@@ -2,17 +2,12 @@
 
 package engine
 
-import "os/exec"
+import (
+	"os/exec"
 
-// TODO
-//
-//	We should attempt a graceful shutdown of the process here...
-//	  - send it SIGINT
-//	  - give the it some slack waiting with a timeout
-//	  - butcher it with SIGKILL after the timeout
-func shutdownCMD(*exec.Cmd, chan struct{}) {
-	// cmd.Process.Kill()
-	// cmd.Process.Wait()
-	// cmd.Process.Release()
-	panic("not implemented yet")
+	"golang.org/x/sys/windows"
+)
+
+func askProcessToStop(cmd *exec.Cmd) error {
+	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(cmd.Process.Pid))
 }
