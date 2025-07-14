@@ -52,7 +52,10 @@ clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
 
 unit-tests:
-	CGO_ENABLED=0 go test -v -tags="gen" $$(go list ./... | grep -v /store/)
+	CGO_ENABLED=0 go test -v $$(go list ./client/...)
+	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
+	CGO_ENABLED=0 go test -v $$(go list ./plugin/...)
+	CGO_ENABLED=0 go test -v -tags="gen" $$(go list ./...)
 
 keychain-linux-unit-tests:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=$(DOCKER_TARGET) --file store/Dockerfile .
