@@ -11,7 +11,7 @@ require (
 	github.com/keybase/go-keychain v0.0.1
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sys v0.29.0
+	golang.org/x/sys v0.34.0
 	golang.org/x/text v0.21.0
 )
 
