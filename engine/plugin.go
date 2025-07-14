@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"sync"
 	"time"
 
 	"connectrpc.com/connect"
-	nri "github.com/containerd/nri/pkg/net"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/docker/secrets-engine/internal/api"
@@ -108,44 +106,35 @@ type runtimeImpl struct {
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
 func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
-	sockets, err := nri.NewSocketPair()
+	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create plugin connection for plugin %q: %w", v.name, err)
+		return nil, err
 	}
-	defer sockets.Close()
+	defer fd.Close()
 
-	conn, err := sockets.LocalConn()
-	if err != nil {
-		return nil, fmt.Errorf("failed to set up local connection for plugin %q: %w", v.name, err)
-	}
-
-	peerFile := sockets.PeerFile()
-	defer peerFile.Close()
-
-	cmd.ExtraFiles = []*os.File{peerFile}
-	envCfg := ipc.PluginConfigFromEngine{
+	envCfg := &ipc.PluginConfigFromEngine{
 		Name:                v.name,
 		RegistrationTimeout: getPluginRegistrationTimeout(),
-		Fd:                  3, // 0, 1, and 2 are reserved for stdin, stdout, and stderr -> we get the next
+		Custom:              fd.ToCustomCfg(),
 	}
 	envCfgStr, err := envCfg.ToString()
 	if err != nil {
-		conn.Close()
+		rwc.Close()
 		return nil, err
 	}
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
 	if err = cmd.Start(); err != nil {
-		conn.Close()
+		rwc.Close()
 		return nil, fmt.Errorf("failed to launch plugin %q: %w", v.name, err)
 	}
 	w := newCmdWatchWrapper(v.name, cmd)
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(rwc, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
-		conn.Close()
+		rwc.Close()
 		w.close()
 		return nil, err
 	}

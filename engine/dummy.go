@@ -37,7 +37,8 @@ const (
 // Configures and runs a dummy plugin process.
 // To be used from TestMain.
 func dummyPluginProcessFromBinaryName(name string) {
-	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail+suffix {
+	name = strings.TrimSuffix(name, suffix)
+	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail {
 		val := strings.TrimPrefix(name, "plugin-")
 		dummyPluginProcess(&dummyPluginCfg{
 			Config: plugin.Config{
@@ -219,7 +220,7 @@ func dummyPluginProcess(cfg *dummyPluginCfg) {
 
 	ctx := context.Background()
 	if !cfg.IgnoreSigint {
-		ctxWithCancel, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		ctxWithCancel, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 		ctx = ctxWithCancel
 	}
