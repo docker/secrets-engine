@@ -3,6 +3,7 @@ edition = "2023";
 package resolver.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 option go_package = "github.com/docker/secrets-engine/internal/api/resolver/v1;resolverv1";
 
@@ -26,7 +27,7 @@ message RegisterPluginResponse {
   // Version of the runtime engine is running in.
   string engine_version = 2;
   // Configured request processing timeout in milliseconds.
-  int64 request_timeout = 3;
+  google.protobuf.Duration request_timeout = 3;
 }
 
 service PluginService {
