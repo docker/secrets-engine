@@ -129,8 +129,8 @@ func TestResolverService_GetSecret(t *testing.T) {
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
 				resp, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
 				assert.NoError(t, err)
-				assert.Equal(t, mockSecretID.String(), resp.Msg.GetSecretId())
-				assert.Equal(t, mockSecretValue, resp.Msg.GetSecretValue())
+				assert.Equal(t, mockSecretID.String(), resp.Msg.GetId())
+				assert.Equal(t, mockSecretValue, string(resp.Msg.GetValue()))
 			},
 		},
 	}
@@ -143,6 +143,6 @@ func TestResolverService_GetSecret(t *testing.T) {
 
 func newGetSecretRequest(secretID secrets.ID) *connect.Request[resolverv1.GetSecretRequest] {
 	return connect.NewRequest(resolverv1.GetSecretRequest_builder{
-		SecretId: proto.String(string(secretID)),
+		Id: proto.String(string(secretID)),
 	}.Build())
 }
