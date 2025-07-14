@@ -3,10 +3,16 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	pluginShutdownTimeout = 2 * time.Second
 )
 
 type cmdWatchWrapper struct {
@@ -53,7 +59,30 @@ func isSigint(err error) bool {
 		return false
 	}
 	if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-		return ws.Signaled() && ws.Signal() == syscall.SIGINT
+		return ws.Signaled() && ws.Signal() == os.Interrupt
 	}
 	return false
+}
+
+func shutdownCMD(cmd *exec.Cmd, done chan struct{}) {
+	if cmd.Process == nil {
+		return
+	}
+	if err := askProcessToStop(cmd); err != nil {
+		logrus.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin: %v", err)
+		kill(cmd)
+		return
+	}
+	select {
+	case <-done:
+		return
+	case <-time.After(pluginShutdownTimeout):
+	}
+	kill(cmd)
+}
+
+func kill(cmd *exec.Cmd) {
+	if err := cmd.Process.Kill(); err != nil {
+		logrus.Errorf("sending SIGKILL to plugin: %v", err)
+	}
 }
