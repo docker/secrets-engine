@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
@@ -56,7 +57,7 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
 		EngineName:     proto.String(out.engineName),
 		EngineVersion:  proto.String(out.engineVersion),
-		RequestTimeout: proto.Int64(int64(out.requestTimeout.Seconds())),
+		RequestTimeout: durationpb.New(out.requestTimeout),
 	}.Build()), nil
 }
 

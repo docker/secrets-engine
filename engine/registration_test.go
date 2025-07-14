@@ -163,7 +163,7 @@ func Test_RegisterPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockPluginCfgOut.engineName, resp.Msg.GetEngineName())
 				assert.Equal(t, mockPluginCfgOut.engineVersion, resp.Msg.GetEngineVersion())
-				assert.Equal(t, int64(mockPluginCfgOut.requestTimeout.Seconds()), resp.Msg.GetRequestTimeout())
+				assert.Equal(t, mockPluginCfgOut.requestTimeout, resp.Msg.GetRequestTimeout().AsDuration())
 			},
 		},
 	}
