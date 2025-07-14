@@ -101,7 +101,7 @@ func restoreConfig(p Plugin) (*cfg, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := connectionFromFileDescriptor(*c)
+	conn, err := ipc.FromCustomCfg(c.Custom)
 	if err != nil {
 		return nil, err
 	}
