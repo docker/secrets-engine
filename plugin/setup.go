@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -15,7 +14,7 @@ import (
 	"github.com/docker/secrets-engine/internal/ipc"
 )
 
-func setup(ctx context.Context, conn net.Conn, name string, p Plugin, timeout time.Duration, onClose func(err error)) (io.Closer, error) {
+func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, timeout time.Duration, onClose func(err error)) (io.Closer, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
