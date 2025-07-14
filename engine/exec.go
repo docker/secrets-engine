@@ -68,22 +68,21 @@ func shutdownCMD(cmd *exec.Cmd, done chan struct{}) {
 	if cmd.Process == nil {
 		return
 	}
-	defer func() {
-		if err := cmd.Process.Release(); err != nil {
-			logrus.Errorf("release process err: %v", err)
-		}
-	}()
 	if err := askProcessToStop(cmd); err != nil {
 		logrus.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin: %v", err)
-	} else {
-		select {
-		case <-done:
-			return
-		case <-time.After(pluginShutdownTimeout):
-		}
+		kill(cmd)
+		return
 	}
+	select {
+	case <-done:
+		return
+	case <-time.After(pluginShutdownTimeout):
+	}
+	kill(cmd)
+}
+
+func kill(cmd *exec.Cmd) {
 	if err := cmd.Process.Kill(); err != nil {
 		logrus.Errorf("sending SIGKILL to plugin: %v", err)
 	}
-	<-done // wait before calling Release()
 }
