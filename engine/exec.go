@@ -11,10 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	pluginShutdownTimeout = 2 * time.Second
-)
-
 type cmdWatchWrapper struct {
 	cmd  *exec.Cmd
 	err  error

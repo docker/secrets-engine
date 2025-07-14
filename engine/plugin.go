@@ -25,6 +25,7 @@ import (
 var (
 	pluginRegistrationTimeout = api.DefaultPluginRegistrationTimeout
 	pluginRequestTimeout      = api.DefaultPluginRequestTimeout
+	pluginShutdownTimeout     = 2 * time.Second
 	timeoutCfgLock            sync.RWMutex
 )
 
@@ -52,6 +53,19 @@ func getPluginRequestTimeout() time.Duration {
 	timeoutCfgLock.RLock()
 	defer timeoutCfgLock.RUnlock()
 	return pluginRequestTimeout
+}
+
+// SetPluginShutdownTimeout sets the timeout for plugins to handle a request.
+func SetPluginShutdownTimeout(t time.Duration) {
+	timeoutCfgLock.Lock()
+	defer timeoutCfgLock.Unlock()
+	pluginShutdownTimeout = t
+}
+
+func getPluginShutdownTimeout() time.Duration {
+	timeoutCfgLock.RLock()
+	defer timeoutCfgLock.RUnlock()
+	return pluginShutdownTimeout
 }
 
 var _ secrets.Resolver = &runtimeImpl{}
@@ -130,13 +144,13 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(conn, once, v)
+	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		conn.Close()
 		w.close()
 		return nil, err
 	}
-
+	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	return &runtimeImpl{
 		pluginData: pluginData{
 			name:       v.name,
@@ -144,23 +158,36 @@ func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
 			version:    r.cfg.version,
 			pluginType: internalPlugin,
 		},
-		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
+		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
-			return errors.Join(r.close(), w.close())
+			return errors.Join(callPluginShutdown(c, closed), r.close(), w.close())
 		}),
 		closed: closed,
 	}, nil
+}
+
+func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan struct{}) error {
+	select {
+	case <-done:
+		return nil
+	default:
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), getPluginShutdownTimeout())
+	defer cancel()
+	_, err := c.Shutdown(ctx, connect.NewRequest(v1.ShutdownRequest_builder{}.Build()))
+	return err
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
 func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(conn, once, v)
+	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}
+	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	return &runtimeImpl{
 		pluginData: pluginData{
 			name:       r.cfg.name,
@@ -168,10 +195,12 @@ func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
 			version:    r.cfg.version,
 			pluginType: externalPlugin,
 		},
-		pluginClient:   resolverv1connect.NewPluginServiceClient(r.client, "http://unix"),
+		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
-		close:          r.close,
-		closed:         closed,
+		close: sync.OnceValue(func() error {
+			return errors.Join(callPluginShutdown(c, closed), r.close())
+		}),
+		closed: closed,
 	}, nil
 }
 
