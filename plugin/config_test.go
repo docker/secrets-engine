@@ -16,21 +16,24 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
-type mockPlugin struct{}
+type mockPlugin struct {
+	shutdownRequests int
+}
 
-func (m mockPlugin) Config() Config {
+func (m *mockPlugin) Config() Config {
 	return Config{}
 }
 
-func (m mockPlugin) Configure(context.Context, runtimeConfig) error {
+func (m *mockPlugin) Configure(context.Context, runtimeConfig) error {
 	return nil
 }
 
-func (m mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
+func (m *mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{}, nil
 }
 
-func (m mockPlugin) Shutdown(context.Context) {
+func (m *mockPlugin) Shutdown(context.Context) {
+	m.shutdownRequests++
 }
 
 func Test_newCfgForManualLaunch(t *testing.T) {
@@ -60,7 +63,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 					os.Remove(socketPath)
 				})
 
-				m := mockPlugin{}
+				m := &mockPlugin{}
 				c, err := newCfgForManualLaunch(m)
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", c.name)
@@ -77,7 +80,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 					client.Close()
 					server.Close()
 				})
-				cfg, err := newCfgForManualLaunch(mockPlugin{},
+				cfg, err := newCfgForManualLaunch(&mockPlugin{},
 					WithPluginName("test-plugin"),
 					WithRegistrationTimeout(10*api.DefaultPluginRegistrationTimeout),
 					WithConnection(client),
@@ -104,7 +107,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "no config from the engine",
 			test: func(t *testing.T) {
-				_, err := restoreConfig(mockPlugin{})
+				_, err := restoreConfig(&mockPlugin{})
 				assert.ErrorIs(t, err, errPluginNotLaunchedByEngine)
 			},
 		},
@@ -112,7 +115,7 @@ func Test_restoreConfig(t *testing.T) {
 			name: "invalid config from the engine",
 			test: func(t *testing.T) {
 				t.Setenv(api.PluginLaunchedByEngineVar, "test-plugin")
-				_, err := restoreConfig(mockPlugin{})
+				_, err := restoreConfig(&mockPlugin{})
 				assert.Error(t, err)
 			},
 		},
@@ -136,7 +139,7 @@ func Test_restoreConfig(t *testing.T) {
 				require.NoError(t, err)
 				t.Setenv(api.PluginLaunchedByEngineVar, cfgString)
 
-				cfg, err := restoreConfig(mockPlugin{})
+				cfg, err := restoreConfig(&mockPlugin{})
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
