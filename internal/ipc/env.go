@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/docker/secrets-engine/internal/api"
@@ -12,7 +13,7 @@ import (
 type PluginConfigFromEngine struct {
 	Name                string        `json:"name"`
 	RegistrationTimeout time.Duration `json:"timeout"`
-	Fd                  int           `json:"fd"`
+	Custom
 }
 
 func (c *PluginConfigFromEngine) ToString() (string, error) {
@@ -34,9 +35,19 @@ func NewPluginConfigFromEngineEnv(in string) (*PluginConfigFromEngine, error) {
 	if result.RegistrationTimeout == 0 {
 		return nil, errors.New("plugin registration timeout is required")
 	}
-	if result.Fd <= 2 {
-		// File descriptors 0, 1, and 2 are reserved for stdin, stdout, and stderr.
-		return nil, errors.New("invalid file descriptor for plugin connection")
+	if err := result.isValid(); err != nil {
+		return nil, err
 	}
 	return &result, nil
+}
+
+type PipeConn struct {
+	R *os.File
+	W *os.File
+}
+
+func (p *PipeConn) Read(b []byte) (int, error)  { return p.R.Read(b) }
+func (p *PipeConn) Write(b []byte) (int, error) { return p.W.Write(b) }
+func (p *PipeConn) Close() error {
+	return errors.Join(p.R.Close(), p.W.Close())
 }
