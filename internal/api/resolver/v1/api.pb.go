@@ -9,6 +9,7 @@ package resolverv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	unsafe "unsafe"
@@ -172,7 +173,7 @@ type RegisterPluginResponse struct {
 	state                     protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_EngineName     *string                `protobuf:"bytes,1,opt,name=engine_name,json=engineName"`
 	xxx_hidden_EngineVersion  *string                `protobuf:"bytes,2,opt,name=engine_version,json=engineVersion"`
-	xxx_hidden_RequestTimeout int64                  `protobuf:"varint,3,opt,name=request_timeout,json=requestTimeout"`
+	xxx_hidden_RequestTimeout *durationpb.Duration   `protobuf:"bytes,3,opt,name=request_timeout,json=requestTimeout"`
 	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
 	XXX_presence              [1]uint32
 	unknownFields             protoimpl.UnknownFields
@@ -224,11 +225,11 @@ func (x *RegisterPluginResponse) GetEngineVersion() string {
 	return ""
 }
 
-func (x *RegisterPluginResponse) GetRequestTimeout() int64 {
+func (x *RegisterPluginResponse) GetRequestTimeout() *durationpb.Duration {
 	if x != nil {
 		return x.xxx_hidden_RequestTimeout
 	}
-	return 0
+	return nil
 }
 
 func (x *RegisterPluginResponse) SetEngineName(v string) {
@@ -241,9 +242,8 @@ func (x *RegisterPluginResponse) SetEngineVersion(v string) {
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
 }
 
-func (x *RegisterPluginResponse) SetRequestTimeout(v int64) {
+func (x *RegisterPluginResponse) SetRequestTimeout(v *durationpb.Duration) {
 	x.xxx_hidden_RequestTimeout = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 3)
 }
 
 func (x *RegisterPluginResponse) HasEngineName() bool {
@@ -264,7 +264,7 @@ func (x *RegisterPluginResponse) HasRequestTimeout() bool {
 	if x == nil {
 		return false
 	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
+	return x.xxx_hidden_RequestTimeout != nil
 }
 
 func (x *RegisterPluginResponse) ClearEngineName() {
@@ -278,8 +278,7 @@ func (x *RegisterPluginResponse) ClearEngineVersion() {
 }
 
 func (x *RegisterPluginResponse) ClearRequestTimeout() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
-	x.xxx_hidden_RequestTimeout = 0
+	x.xxx_hidden_RequestTimeout = nil
 }
 
 type RegisterPluginResponse_builder struct {
@@ -290,7 +289,7 @@ type RegisterPluginResponse_builder struct {
 	// Version of the runtime engine is running in.
 	EngineVersion *string
 	// Configured request processing timeout in milliseconds.
-	RequestTimeout *int64
+	RequestTimeout *durationpb.Duration
 }
 
 func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
@@ -305,10 +304,7 @@ func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
 		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 3)
 		x.xxx_hidden_EngineVersion = b.EngineVersion
 	}
-	if b.RequestTimeout != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 3)
-		x.xxx_hidden_RequestTimeout = *b.RequestTimeout
-	}
+	x.xxx_hidden_RequestTimeout = b.RequestTimeout
 	return m0
 }
 
@@ -801,16 +797,16 @@ var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x15resolver/v1/api.proto\x12\vresolver.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"_\n" +
+	"\x15resolver/v1/api.proto\x12\vresolver.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\"_\n" +
 	"\x15RegisterPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
-	"\apattern\x18\x03 \x01(\tR\apattern\"\x89\x01\n" +
+	"\apattern\x18\x03 \x01(\tR\apattern\"\xa4\x01\n" +
 	"\x16RegisterPluginResponse\x12\x1f\n" +
 	"\vengine_name\x18\x01 \x01(\tR\n" +
 	"engineName\x12%\n" +
-	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12'\n" +
-	"\x0frequest_timeout\x18\x03 \x01(\x03R\x0erequestTimeout\"\x11\n" +
+	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12B\n" +
+	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
 	"\x10ShutdownResponse\">\n" +
 	"\x10GetSecretRequest\x12\x0e\n" +
@@ -844,23 +840,25 @@ var file_resolver_v1_api_proto_goTypes = []any{
 	(*ShutdownResponse)(nil),       // 3: resolver.v1.ShutdownResponse
 	(*GetSecretRequest)(nil),       // 4: resolver.v1.GetSecretRequest
 	(*GetSecretResponse)(nil),      // 5: resolver.v1.GetSecretResponse
-	(*timestamppb.Timestamp)(nil),  // 6: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),    // 6: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),  // 7: google.protobuf.Timestamp
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	6, // 0: resolver.v1.GetSecretResponse.created_at:type_name -> google.protobuf.Timestamp
-	6, // 1: resolver.v1.GetSecretResponse.resolved_at:type_name -> google.protobuf.Timestamp
-	6, // 2: resolver.v1.GetSecretResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 3: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	2, // 4: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	4, // 5: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
-	1, // 6: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 7: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	5, // 8: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
+	7, // 1: resolver.v1.GetSecretResponse.created_at:type_name -> google.protobuf.Timestamp
+	7, // 2: resolver.v1.GetSecretResponse.resolved_at:type_name -> google.protobuf.Timestamp
+	7, // 3: resolver.v1.GetSecretResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0, // 4: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
+	2, // 5: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4, // 6: resolver.v1.ResolverService.GetSecret:input_type -> resolver.v1.GetSecretRequest
+	1, // 7: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 8: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5, // 9: resolver.v1.ResolverService.GetSecret:output_type -> resolver.v1.GetSecretResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }
