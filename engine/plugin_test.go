@@ -25,16 +25,18 @@ const (
 )
 
 type mockedPlugin struct {
-	pattern string
-	id      secrets.ID
+	pattern  string
+	id       secrets.ID
+	shutdown chan struct{}
 }
 
 type MockedPluginOption func(*mockedPlugin)
 
 func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	m := &mockedPlugin{
-		pattern: mockPattern,
-		id:      mockSecretID,
+		pattern:  mockPattern,
+		id:       mockSecretID,
+		shutdown: make(chan struct{}),
 	}
 	for _, opt := range options {
 		opt(m)
@@ -54,18 +56,19 @@ func WithID(id secrets.ID) MockedPluginOption {
 	}
 }
 
-func (m mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
+func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{ID: m.id, Value: []byte(mockSecretValue)}, nil
 }
 
-func (m mockedPlugin) Config() p.Config {
+func (m *mockedPlugin) Config() p.Config {
 	return p.Config{
 		Version: "v1",
 		Pattern: m.pattern,
 	}
 }
 
-func (m mockedPlugin) Shutdown(context.Context) {
+func (m *mockedPlugin) Shutdown(context.Context) {
+	close(m.shutdown)
 }
 
 func getTestBinaryName() string {
@@ -129,6 +132,7 @@ func Test_newPlugin(t *testing.T) {
 				require.Equal(t, 1, len(r.GetSecret))
 				assert.Equal(t, mockSecretID, r.GetSecret[0].ID)
 				assert.Equal(t, 1, r.ConfigRequests)
+				assert.Equal(t, 1, r.ShutdownRequests)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
@@ -156,6 +160,7 @@ func Test_newPlugin(t *testing.T) {
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
+				assert.Equal(t, 1, r.ShutdownRequests)
 			},
 		},
 		{
@@ -222,7 +227,8 @@ func Test_newExternalPlugin(t *testing.T) {
 				m := newMockExternalRuntime(l)
 				go m.run()
 
-				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				plugin := newMockedPlugin()
+				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
 				t.Cleanup(cancel)
@@ -243,6 +249,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				err = <-runErr
 				assert.NoError(t, err)
+				assert.NoError(t, assertShutdownHasBeenCalled(plugin))
 			},
 		},
 		{
@@ -292,8 +299,8 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				cancel()
 				<-done
-				assert.NoError(t, r.Close())
 				assert.NoError(t, checkClosed(r.Closed()))
+				assert.NoError(t, r.Close())
 			},
 		},
 		{
@@ -337,6 +344,15 @@ func Test_newExternalPlugin(t *testing.T) {
 			conn.Close()
 			l.Close()
 		})
+	}
+}
+
+func assertShutdownHasBeenCalled(m *mockedPlugin) error {
+	select {
+	case <-m.shutdown:
+		return nil
+	case <-time.After(5 * time.Second):
+		return errors.New("timeout")
 	}
 }
 
