@@ -37,7 +37,7 @@ const (
 // Configures and runs a dummy plugin process.
 // To be used from TestMain.
 func dummyPluginProcessFromBinaryName(name string) {
-	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail {
+	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail+suffix {
 		val := strings.TrimPrefix(name, "plugin-")
 		dummyPluginProcess(&dummyPluginCfg{
 			Config: plugin.Config{
@@ -68,13 +68,28 @@ func createDummyPlugins(t *testing.T, cfg dummyPlugins) string {
 	assert.NoError(t, err)
 	dir := t.TempDir()
 	if cfg.failPlugin {
-		assert.NoError(t, os.Symlink(exe, filepath.Join(dir, dummyPluginFail)))
+		assert.NoError(t, copyFile(exe, filepath.Join(dir, dummyPluginFail+suffix)))
 	}
 	for _, p := range cfg.okPlugins {
 		require.True(t, strings.HasPrefix(p, "plugin-"))
-		assert.NoError(t, os.Symlink(exe, filepath.Join(dir, p)))
+		assert.NoError(t, copyFile(exe, filepath.Join(dir, p+suffix)))
 	}
 	return dir
+}
+
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return &os.PathError{Op: "read", Path: src, Err: err}
+	}
+	info, err := os.Stat(src)
+	if err != nil {
+		return &os.PathError{Op: "stat", Path: src, Err: err}
+	}
+	if err := os.WriteFile(dst, data, info.Mode().Perm()); err != nil {
+		return &os.PathError{Op: "write", Path: dst, Err: err}
+	}
+	return nil
 }
 
 // dummyPluginCommand can be called from within tests. The returned *exec.Cmd runs the dummyPluginProcess()
