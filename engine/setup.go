@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"time"
 
@@ -29,7 +28,7 @@ type setupValidator struct {
 	acceptPattern func(secrets.Pattern) error
 }
 
-func setup(conn net.Conn, cb func(), v setupValidator, option ...ipc.Option) (*setupResult, error) {
+func setup(conn io.ReadWriteCloser, cb func(), v setupValidator, option ...ipc.Option) (*setupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {

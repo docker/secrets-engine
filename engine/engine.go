@@ -205,10 +205,7 @@ func createListener(socketPath string) (net.Listener, error) {
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create socket %q: %w", socketPath, err)
 	}
-	l, err := net.ListenUnix("unix", &net.UnixAddr{
-		Name: socketPath,
-		Net:  "unix",
-	})
+	l, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create socket %q: %w", socketPath, err)
 	}

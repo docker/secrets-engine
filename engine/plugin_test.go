@@ -333,10 +333,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			socketPath := api.DefaultSocketPath()
 			os.Remove(socketPath)
 			require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
-			l, err := net.ListenUnix("unix", &net.UnixAddr{
-				Name: socketPath,
-				Net:  "unix",
-			})
+			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
 			conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socketPath, Net: "unix"})
 			require.NoError(t, err)

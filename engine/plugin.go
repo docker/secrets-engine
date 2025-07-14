@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"sync"
@@ -180,7 +179,7 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn net.Conn, v setupValidator) (runtime, error) {
+func newExternalPlugin(conn io.ReadWriteCloser, v setupValidator) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
 	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))

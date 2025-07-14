@@ -150,10 +150,7 @@ func Test_newExternalPlugin(t *testing.T) {
 func newListener(t *testing.T, socketPath string) net.Listener {
 	os.Remove(socketPath)
 	require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
-	l, err := net.ListenUnix("unix", &net.UnixAddr{
-		Name: socketPath,
-		Net:  "unix",
-	})
+	l, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { l.Close() })
 	return l
