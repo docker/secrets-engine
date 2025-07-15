@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 const (
@@ -25,8 +23,4 @@ func DefaultSocketPath() string {
 		return filepath.Join(home, ".cache", "secrets-engine", "engine.sock")
 	}
 	return filepath.Join(os.TempDir(), "secrets-engine", "engine.sock")
-}
-
-func EnvelopeErr(req secrets.Request, err error) secrets.Envelope {
-	return secrets.Envelope{ID: req.ID, ResolvedAt: time.Now(), Error: err.Error()}
 }

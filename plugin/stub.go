@@ -24,7 +24,7 @@ type Plugin interface {
 type Config struct {
 	Version string
 
-	Pattern string
+	Pattern secrets.Pattern
 }
 
 // Stub is the interface the stub provides for the plugin implementation.
