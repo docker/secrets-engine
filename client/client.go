@@ -85,11 +85,11 @@ func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets
 	}.Build())
 	resp, err := c.resolverClient.GetSecret(ctx, req)
 	if err != nil {
-		return api.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErr(request, err), err
 	}
 	id, err := secrets.ParseID(resp.Msg.GetId())
 	if err != nil {
-		return api.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErr(request, err), err
 	}
 	e := secrets.Envelope{
 		ID:         id,
