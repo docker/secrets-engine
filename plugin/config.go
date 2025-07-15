@@ -3,10 +3,10 @@ package plugin
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/docker/secrets-engine/internal/api"
@@ -50,7 +50,7 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 type cfg struct {
 	plugin              Plugin
 	name                string
-	conn                net.Conn
+	conn                io.ReadWriteCloser
 	registrationTimeout time.Duration
 }
 
@@ -101,9 +101,9 @@ func restoreConfig(p Plugin) (*cfg, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := connectionFromFileDescriptor(c.Fd)
+	conn, err := ipc.FromCustomCfg(c.Custom)
 	if err != nil {
-		return nil, fmt.Errorf("invalid socket (%d) in environment: %w", c.Fd, err)
+		return nil, err
 	}
 	return &cfg{
 		plugin:              p,
@@ -111,17 +111,4 @@ func restoreConfig(p Plugin) (*cfg, error) {
 		conn:                conn,
 		registrationTimeout: c.RegistrationTimeout,
 	}, nil
-}
-
-func connectionFromFileDescriptor(fd int) (net.Conn, error) {
-	f := os.NewFile(uintptr(fd), "fd #"+strconv.Itoa(fd))
-	if f == nil {
-		return nil, fmt.Errorf("failed to open FD %d", fd)
-	}
-	defer f.Close()
-	conn, err := net.FileConn(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create net.Conn for fd #%d: %w", fd, err)
-	}
-	return conn, nil
 }
