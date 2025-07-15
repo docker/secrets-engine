@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
@@ -165,7 +164,7 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 		}
 	}
 	err := errors.New("secret not found")
-	return api.EnvelopeErr(request, err), err
+	return secrets.EnvelopeErr(request, err), err
 }
 
 func (d *dummyPlugin) Config() plugin.Config {

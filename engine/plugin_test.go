@@ -63,7 +63,7 @@ func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Enve
 func (m *mockedPlugin) Config() p.Config {
 	return p.Config{
 		Version: "v1",
-		Pattern: m.pattern,
+		Pattern: secrets.Pattern(m.pattern),
 	}
 }
 
@@ -101,7 +101,7 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
-				pattern := "foo-bar"
+				pattern := secrets.Pattern("foo-bar")
 				version := "my-version"
 				cmd, parseOutput := dummyPluginCommand(t, dummyPluginCfg{
 					Config: p.Config{
@@ -118,7 +118,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, p.Data(), pluginData{
 					name:       "dummy-plugin",
-					pattern:    secrets.Pattern(pattern),
+					pattern:    pattern,
 					version:    version,
 					pluginType: internalPlugin,
 				})

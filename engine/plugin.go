@@ -222,14 +222,14 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	}.Build())
 	resp, err := r.resolverClient.GetSecret(ctx, req)
 	if err != nil {
-		return api.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErr(request, err), err
 	}
 	id, err := secrets.ParseID(resp.Msg.GetId())
 	if err != nil {
-		return api.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErr(request, err), err
 	}
 	if id != request.ID {
-		return api.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
+		return secrets.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{
 		ID:         id,

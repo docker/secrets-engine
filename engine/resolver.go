@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/docker/secrets-engine/internal/api"
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/secrets"
@@ -61,7 +60,7 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 	var errs []error
 
 	if err := req.ID.Valid(); err != nil {
-		return api.EnvelopeErr(req, err), err
+		return secrets.EnvelopeErr(req, err), err
 	}
 
 	for _, plugin := range r.reg.GetAll() {
@@ -94,5 +93,5 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 	} else {
 		err = errors.Join(errs...)
 	}
-	return api.EnvelopeErr(req, err), err
+	return secrets.EnvelopeErr(req, err), err
 }
