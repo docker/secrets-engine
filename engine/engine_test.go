@@ -151,14 +151,13 @@ func Test_discoverPlugins(t *testing.T) {
 		dir := t.TempDir()
 		assert.NoError(t, os.MkdirAll(filepath.Join(dir, "could-be-a-plugin"), 0o755))
 		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
-		// TODO: port to windows once we run our tests on windows
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, "binary-file"), []byte(""), 0o755))
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, "my-plugin"), []byte(""), 0o755))
+		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "binary-file")))
+		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "my-plugin")))
 		plugins, err := discoverPlugins(dir)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
-		assert.Contains(t, plugins, "binary-file")
-		assert.Contains(t, plugins, "my-plugin")
+		assert.Contains(t, plugins, "binary-file"+suffix)
+		assert.Contains(t, plugins, "my-plugin"+suffix)
 	})
 	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
 		dir := t.TempDir()
