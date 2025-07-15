@@ -11,7 +11,6 @@ import (
 
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
-	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type setupResult struct {
@@ -20,15 +19,14 @@ type setupResult struct {
 	close  func() error
 }
 
-var _ pluginCfgInValidator = &setupValidator{}
+var _ pluginCfgInValidator = &runtimeCfg{}
 
-type setupValidator struct {
-	out           pluginCfgOut
-	name          string
-	acceptPattern func(secrets.Pattern) error
+type runtimeCfg struct {
+	out  pluginCfgOut
+	name string
 }
 
-func setup(conn io.ReadWriteCloser, cb func(), v setupValidator, option ...ipc.Option) (*setupResult, error) {
+func setup(conn io.ReadWriteCloser, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -71,7 +69,7 @@ func setup(conn io.ReadWriteCloser, cb func(), v setupValidator, option ...ipc.O
 	}, nil
 }
 
-func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
+func (p runtimeCfg) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
 	if err := in.pattern.Valid(); err != nil {
 		return nil, err
 	}
@@ -80,9 +78,6 @@ func (p setupValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
 	}
 	if p.name == "" && in.name == "" {
 		return nil, errors.New("plugin name is required when not launched by engine")
-	}
-	if err := p.acceptPattern(in.pattern); err != nil {
-		return nil, err
 	}
 	return &p.out, nil
 }

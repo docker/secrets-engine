@@ -110,10 +110,9 @@ func Test_newPlugin(t *testing.T) {
 					},
 					E: []secrets.Envelope{{ID: mockSecretID, Value: []byte(mockSecretValue)}},
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
-					name:          "dummy-plugin",
-					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-					acceptPattern: func(secrets.Pattern) error { return nil },
+				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+					name: "dummy-plugin",
+					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, p.Data(), pluginData{
@@ -148,10 +147,9 @@ func Test_newPlugin(t *testing.T) {
 					},
 					ErrGetSecret: errGetSecret,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
-					name:          "dummy-plugin",
-					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-					acceptPattern: func(secrets.Pattern) error { return nil },
+				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+					name: "dummy-plugin",
+					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				_, err = p.GetSecret(context.Background(), secrets.Request{ID: mockSecretID})
@@ -175,10 +173,9 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
-					name:          "dummy-plugin",
-					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-					acceptPattern: func(secrets.Pattern) error { return nil },
+				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+					name: "dummy-plugin",
+					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				assert.NoError(t, p.Close())
@@ -195,10 +192,9 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, setupValidator{
-					name:          "dummy-plugin",
-					out:           pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-					acceptPattern: func(secrets.Pattern) error { return nil },
+				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+					name: "dummy-plugin",
+					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
@@ -312,9 +308,8 @@ func Test_newExternalPlugin(t *testing.T) {
 					conn, err := l.Accept()
 					require.NoError(t, err)
 
-					_, err = newExternalPlugin(conn, setupValidator{
-						out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
-						acceptPattern: func(secrets.Pattern) error { return nil },
+					_, err = newExternalPlugin(conn, runtimeCfg{
+						out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 					})
 					assert.ErrorContains(t, err, "invalid pattern")
 					close(doneRuntime)
@@ -389,9 +384,8 @@ func (m *mockExternalRuntime) run() {
 		m.err = err
 		return
 	}
-	p, err := newExternalPlugin(conn, setupValidator{
-		out:           pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
-		acceptPattern: func(secrets.Pattern) error { return nil },
+	p, err := newExternalPlugin(conn, runtimeCfg{
+		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
 	if err != nil {
 		m.err = err
