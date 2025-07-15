@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -78,16 +79,24 @@ func createDummyPlugins(t *testing.T, cfg dummyPlugins) string {
 }
 
 func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
+	f, err := os.Open(src)
 	if err != nil {
-		return &os.PathError{Op: "read", Path: src, Err: err}
+		return err
 	}
-	info, err := os.Stat(src)
+	defer f.Close()
+
+	info, err := f.Stat()
 	if err != nil {
-		return &os.PathError{Op: "stat", Path: src, Err: err}
+		return err
 	}
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
 	if err := os.WriteFile(dst, data, info.Mode().Perm()); err != nil {
-		return &os.PathError{Op: "write", Path: dst, Err: err}
+		return err
 	}
 	return nil
 }
