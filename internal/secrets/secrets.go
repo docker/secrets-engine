@@ -36,3 +36,7 @@ type Envelope struct {
 type Resolver interface {
 	GetSecret(ctx context.Context, request Request) (Envelope, error)
 }
+
+func EnvelopeErr(req Request, err error) Envelope {
+	return Envelope{ID: req.ID, ResolvedAt: time.Now(), Error: err.Error()}
+}
