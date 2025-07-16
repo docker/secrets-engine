@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 const (
@@ -118,12 +117,9 @@ func startPlugins(cfg config, reg registry) error {
 func newLauncher(cfg config, pluginFile string) (string, Launcher) {
 	name := toDisplayName(pluginFile)
 	return name, func() (runtime, error) {
-		return newLaunchedPlugin(exec.Command(filepath.Join(cfg.pluginPath, pluginFile)), setupValidator{
+		return newLaunchedPlugin(exec.Command(filepath.Join(cfg.pluginPath, pluginFile)), runtimeCfg{
 			out:  pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()},
 			name: name,
-			acceptPattern: func(secrets.Pattern) error {
-				return nil
-			},
 		})
 	}
 }

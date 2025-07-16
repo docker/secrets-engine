@@ -105,7 +105,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cmd *exec.Cmd, v setupValidator) (runtime, error) {
+func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn io.ReadWriteCloser, v setupValidator) (runtime, error) {
+func newExternalPlugin(conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
 	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
