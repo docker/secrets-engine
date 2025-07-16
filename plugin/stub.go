@@ -17,8 +17,6 @@ type Plugin interface {
 	secrets.Resolver
 
 	Config() Config
-
-	Shutdown(context.Context)
 }
 
 type Config struct {

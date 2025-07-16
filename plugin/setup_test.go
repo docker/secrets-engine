@@ -57,7 +57,6 @@ func Test_setup(t *testing.T) {
 		assert.NoError(t, assertClosed(pluginClosed))
 		assert.NoError(t, closer.Close())
 		assert.NoError(t, assertClosed(runtimeClosed))
-		assert.Equal(t, 1, mPlugin.shutdownRequests)
 	})
 }
 
