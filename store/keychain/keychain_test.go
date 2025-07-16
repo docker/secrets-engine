@@ -18,7 +18,7 @@ func (m *mustMarshalError) Marshal() ([]byte, error) {
 	return nil, errors.New("i am failing on purpose")
 }
 
-func (m *mustMarshalError) Unmarshal(data []byte) error {
+func (m *mustMarshalError) Unmarshal([]byte) error {
 	return nil
 }
 
@@ -30,7 +30,7 @@ func (m *mustUnmarshalError) Marshal() ([]byte, error) {
 	return []byte("eeyyy"), nil
 }
 
-func (m *mustUnmarshalError) Unmarshal(data []byte) error {
+func (m *mustUnmarshalError) Unmarshal([]byte) error {
 	return errors.New("i am failing on purpose")
 }
 

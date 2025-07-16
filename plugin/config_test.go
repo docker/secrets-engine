@@ -133,7 +133,7 @@ func Test_restoreConfig(t *testing.T) {
 				engineCfg := ipc.PluginConfigFromEngine{
 					Name:                "test-plugin",
 					RegistrationTimeout: 10 * api.DefaultPluginRegistrationTimeout,
-					Fd:                  int(peerFile.Fd()),
+					Custom:              ipc.FakeTestCustom(int(peerFile.Fd())),
 				}
 				cfgString, err := engineCfg.ToString()
 				require.NoError(t, err)
