@@ -25,18 +25,16 @@ const (
 )
 
 type mockedPlugin struct {
-	pattern  string
-	id       secrets.ID
-	shutdown chan struct{}
+	pattern string
+	id      secrets.ID
 }
 
 type MockedPluginOption func(*mockedPlugin)
 
 func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	m := &mockedPlugin{
-		pattern:  mockPattern,
-		id:       mockSecretID,
-		shutdown: make(chan struct{}),
+		pattern: mockPattern,
+		id:      mockSecretID,
 	}
 	for _, opt := range options {
 		opt(m)
@@ -65,10 +63,6 @@ func (m *mockedPlugin) Config() p.Config {
 		Version: "v1",
 		Pattern: secrets.Pattern(m.pattern),
 	}
-}
-
-func (m *mockedPlugin) Shutdown(context.Context) {
-	close(m.shutdown)
 }
 
 func getTestBinaryName() string {
@@ -131,7 +125,6 @@ func Test_newPlugin(t *testing.T) {
 				require.Equal(t, 1, len(r.GetSecret))
 				assert.Equal(t, mockSecretID, r.GetSecret[0].ID)
 				assert.Equal(t, 1, r.ConfigRequests)
-				assert.Equal(t, 1, r.ShutdownRequests)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
@@ -158,7 +151,6 @@ func Test_newPlugin(t *testing.T) {
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
-				assert.Equal(t, 1, r.ShutdownRequests)
 			},
 		},
 		{
@@ -245,7 +237,6 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				err = <-runErr
 				assert.NoError(t, err)
-				assert.NoError(t, assertShutdownHasBeenCalled(plugin))
 			},
 		},
 		{
@@ -336,15 +327,6 @@ func Test_newExternalPlugin(t *testing.T) {
 			conn.Close()
 			l.Close()
 		})
-	}
-}
-
-func assertShutdownHasBeenCalled(m *mockedPlugin) error {
-	select {
-	case <-m.shutdown:
-		return nil
-	case <-time.After(5 * time.Second):
-		return errors.New("timeout")
 	}
 }
 

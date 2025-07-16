@@ -22,8 +22,7 @@ func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, 
 	})
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{func(ctx context.Context) {
-		p.Shutdown(ctx)
+	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{func(context.Context) {
 		once()
 	}}))
 	setupCompleted := make(chan struct{})

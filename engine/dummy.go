@@ -143,11 +143,10 @@ type dummyPlugin struct {
 }
 
 type dummyPluginResult struct {
-	GetSecret        []secrets.Request
-	ConfigRequests   int
-	ShutdownRequests int
-	Log              string
-	ErrTestSetup     string
+	GetSecret      []secrets.Request
+	ConfigRequests int
+	Log            string
+	ErrTestSetup   string
 }
 
 func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -176,12 +175,6 @@ func (d *dummyPlugin) Config() plugin.Config {
 	}
 	d.result.ConfigRequests++
 	return d.cfg.Config
-}
-
-func (d *dummyPlugin) Shutdown(context.Context) {
-	d.m.Lock()
-	defer d.m.Unlock()
-	d.result.ShutdownRequests++
 }
 
 type dummyPluginCfg struct {
