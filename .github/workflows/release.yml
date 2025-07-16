@@ -15,13 +15,23 @@ permissions:
 
 jobs:
   release:
-    name: Release NRI Plugin
+    name: Release
     runs-on: ubuntu-latest
     env:
       GITHUB_WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TAG: ${{ github.event.inputs.tag }}
+      BRANCH: ${{ github.event.inputs.branch }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: "Release tag '${{ github.event.inputs.tag }}' should be semver prefixed with 'v'"
+        shell: bash
+        run: |
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid tag '${TAG}'. Tags must start with 'v' and follow semver (vMAJOR.MINOR.PATCH[-PRERELEASE])."
+            exit 1
+          fi
 
       - name: Hub login
         uses: docker/login-action@v3
@@ -44,7 +54,19 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           artifacts: "./dist/*.tar.gz"
-          draft: false
-          tag: ${{ github.event.inputs.tag }}
-          commit: ${{ github.event.inputs.branch }}
+          draft: true
+          tag: ${{ env.TAG }}
+          commit: ${{ env.BRANCH }}
           generateReleaseNotes: true
+
+      - name: Create module tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag client/${TAG}
+          git tag engine/${TAG}
+          git tag plugin/${TAG}
+          git tag store/${TAG}
+
+      - name: Push tags
+        run: git push origin --tags
