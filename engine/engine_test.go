@@ -102,6 +102,7 @@ func (m *mockRegistry) GetAll() []runtime {
 }
 
 func Test_Register(t *testing.T) {
+	t.Parallel()
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
 		reg := &mockRegistry{}
 		launchErr := errors.New("launch error")
@@ -147,6 +148,7 @@ func Test_Register(t *testing.T) {
 }
 
 func Test_discoverPlugins(t *testing.T) {
+	t.Parallel()
 	t.Run("only discover plugins but ignore everything else", func(t *testing.T) {
 		dir := t.TempDir()
 		assert.NoError(t, os.MkdirAll(filepath.Join(dir, "could-be-a-plugin"), 0o755))
