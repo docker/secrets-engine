@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/api"
+	"github.com/docker/secrets-engine/plugin"
 )
 
 const (
@@ -20,6 +22,12 @@ const (
 type Engine interface {
 	Start() error
 	Stop() error
+}
+
+type Plugin interface {
+	plugin.Plugin
+
+	Run(ctx context.Context) error
 }
 
 type config struct {
