@@ -19,8 +19,8 @@ var (
 	ErrInvalidCredentialFlags     = errors.New("an invalid flag was specified for the flags parameter")
 	ErrInvalidCredentialParameter = errors.New("protected field does not match provided value for an existing credential")
 	ErrNoLogonSession             = errors.New("logon session does not exist or there is no credential set associated with this logon session")
-	sysErrInvalidCredentialFlags  = windows.Errno(windows.ERROR_INVALID_FLAGS)
-	sysErrNoSuchLogonSession      = windows.Errno(windows.ERROR_NO_SUCH_LOGON_SESSION)
+	sysErrInvalidCredentialFlags  = windows.ERROR_INVALID_FLAGS
+	sysErrNoSuchLogonSession      = windows.ERROR_NO_SUCH_LOGON_SESSION
 )
 
 // encodeSecret marshals the secret into a slice of bytes in UTF16 format
@@ -50,7 +50,7 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 	return secret.Unmarshal(val)
 }
 
-func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	if err := id.Valid(); err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func findServiceCredentials[T store.Secret](k *keychainStore[T], credentials []*
 	}
 }
 
-func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -151,7 +151,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	return secrets, nil
 }
 
-func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}

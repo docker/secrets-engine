@@ -64,7 +64,7 @@ func getItemWithData[T store.Secret](id string, k *keychainStore[T]) (*kc.QueryR
 	return &results[0], nil
 }
 
-func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	if err := id.Valid(); err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -128,7 +128,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	return creds, nil
 }
 
-func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}
