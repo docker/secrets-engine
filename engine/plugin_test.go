@@ -88,6 +88,7 @@ func TestMain(m *testing.M) {
 }
 
 func Test_newPlugin(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		test func(t *testing.T)
