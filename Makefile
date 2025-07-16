@@ -52,11 +52,19 @@ clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
 
 unit-tests:
-	go test -v $$(go list ./client/...) & \
-	go test -v $$(go list ./engine/...) & \
-	go test -v $$(go list ./plugin/...) & \
-	go test -v $$(go list ./...)      & \
-	wait
+	pids=""; \
+	err=0; \
+	go test -v $(shell go list ./client/...) & pids="$$pids $$!"; \
+	go test -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
+	go test -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
+	go test -v $(shell go list ./...)       & pids="$$pids $$!"; \
+	for p in $$pids; do \
+		wait $$p || err=$$?; \
+	done; \
+	if [ $$err -ne 0 ]; then \
+		echo "ERROR: $$err"; \
+		exit $$err; \
+	fi
 
 keychain-linux-unit-tests:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=$(DOCKER_TARGET) --file store/Dockerfile .
