@@ -110,7 +110,7 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service *kc.SecretServ
 	return errCollectionLocked
 }
 
-func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	return service.DeleteItem(items[0])
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	if err := id.Valid(); err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (k *keychainStore[T]) GetAll(ctx context.Context) (map[store.ID]store.Secre
 	return credentials, nil
 }
 
-func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
 	if err := id.Valid(); err != nil {
 		return err
 	}

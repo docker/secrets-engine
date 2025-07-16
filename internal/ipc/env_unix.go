@@ -24,7 +24,7 @@ func (c *Custom) isValid() error {
 	return nil
 }
 
-func fakeCustom(fd int) Custom {
+func FakeTestCustom(fd int) Custom {
 	return Custom{fd}
 }
 

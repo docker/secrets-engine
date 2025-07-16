@@ -30,7 +30,7 @@ func newCommand() (*cobra.Command, error) {
 	list := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			secrets, err := kc.GetAll(cmd.Context())
 			if errors.Is(err, store.ErrCredentialNotFound) {
 				fmt.Println("No Secrets found")
@@ -59,7 +59,7 @@ func newCommand() (*cobra.Command, error) {
 	save := &cobra.Command{
 		Use:     "store",
 		Aliases: []string{"set", "save"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			id, err := store.ParseID(path.Join("keystore-cli", username))
 			if err != nil {
 				return err
