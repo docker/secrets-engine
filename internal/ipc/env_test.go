@@ -13,7 +13,7 @@ func TestPluginConfigFromEngine_ToString(t *testing.T) {
 	in := PluginConfigFromEngine{
 		Name:                strings.Repeat("ab", 250), // 500 characters
 		RegistrationTimeout: 27 * time.Nanosecond,
-		Custom:              fakeCustom(10),
+		Custom:              FakeTestCustom(10),
 	}
 	out, err := in.ToString()
 	assert.NoError(t, err)
@@ -47,7 +47,7 @@ func TestNewPluginConfigFromEngineFromString(t *testing.T) {
 			in: PluginConfigFromEngine{
 				Name:                "test-plugin",
 				RegistrationTimeout: 10 * time.Second,
-				Custom:              fakeCustom(2),
+				Custom:              FakeTestCustom(2),
 			},
 			err: "invalid file descriptor",
 		},
@@ -56,7 +56,7 @@ func TestNewPluginConfigFromEngineFromString(t *testing.T) {
 			in: PluginConfigFromEngine{
 				Name:                "test-plugin",
 				RegistrationTimeout: 10 * time.Second,
-				Custom:              fakeCustom(10),
+				Custom:              FakeTestCustom(10),
 			},
 		},
 	}
