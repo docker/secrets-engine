@@ -16,9 +16,7 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
-type mockPlugin struct {
-	shutdownRequests int
-}
+type mockPlugin struct{}
 
 func (m *mockPlugin) Config() Config {
 	return Config{}
@@ -30,10 +28,6 @@ func (m *mockPlugin) Configure(context.Context, runtimeConfig) error {
 
 func (m *mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{}, nil
-}
-
-func (m *mockPlugin) Shutdown(context.Context) {
-	m.shutdownRequests++
 }
 
 func Test_newCfgForManualLaunch(t *testing.T) {
