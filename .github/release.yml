@@ -1,0 +1,8 @@
+changelog:
+  exclude:
+    labels: []
+    authors: []
+  categories:
+    - title: "What's Changed"
+      labels:
+        - "*"
