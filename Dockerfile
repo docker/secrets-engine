@@ -41,15 +41,22 @@ COPY --link --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
 WORKDIR /app
 ENV CGO_ENABLED=1
 RUN --mount=type=bind,target=.,ro \
-    --mount=type=cache,target=/root/.cache <<EOT
+    --mount=type=cache,target=/go/pkg/mod <<EOT
     set -euo pipefail
     go mod tidy --diff
     (cd client && go mod tidy --diff)
     (cd engine && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
     (cd store && go mod tidy --diff)
-    golangci-lint run -v
 EOT
+RUN --mount=type=bind,target=.,ro \
+    --mount=type=cache,target=/root/.cache <<EOT
+    set -euo pipefail
+    # golangci-lint works mainly like go run/go test, ie., per go module
+    # https://github.com/golangci/golangci-lint/issues/2654#issuecomment-1606439587
+    golangci-lint run -v $(go list -f '{{.Dir}}/...' -m | xargs)
+EOT
+
 
 FROM golang AS gofumpt
 ARG GOFUMPT_VERSION=v0.8.0
