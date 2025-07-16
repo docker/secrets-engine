@@ -26,6 +26,7 @@ func TestPluginConfigFromEngine_ToString(t *testing.T) {
 }
 
 func TestNewPluginConfigFromEngineFromString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   PluginConfigFromEngine
