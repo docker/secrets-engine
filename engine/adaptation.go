@@ -35,6 +35,7 @@ type config struct {
 	version    string
 	pluginPath string
 	socketPath string
+	plugins    map[string]Plugin
 }
 
 type adaptation struct {
@@ -59,6 +60,14 @@ func WithPluginPath(path string) Option {
 func WithSocketPath(path string) Option {
 	return func(r *config) error {
 		r.socketPath = path
+		return nil
+	}
+}
+
+// WithPlugins sets a list of plugins that get bundled with the engine (batteries included plugins)
+func WithPlugins(plugins map[string]Plugin) Option {
+	return func(r *config) error {
+		r.plugins = plugins
 		return nil
 	}
 }

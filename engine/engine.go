@@ -33,6 +33,7 @@ func newEngine(cfg config) (io.Closer, error) {
 	}
 
 	reg := &manager{}
+	startBuiltins(context.Background(), reg, cfg.plugins)
 	if err := startPlugins(cfg, reg); err != nil {
 		return nil, err
 	}

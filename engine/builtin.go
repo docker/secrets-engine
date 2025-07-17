@@ -116,3 +116,13 @@ func (i *internalRuntime) Data() pluginData {
 func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
+
+func startBuiltins(ctx context.Context, reg registry, plugins map[string]Plugin) {
+	for name, p := range plugins {
+		launcher := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
+		logrus.Infof("starting builtin plugin '%s'...", name)
+		if err := register(reg, launcher); err != nil {
+			logrus.Warnf("failed to initialize builtin plugin '%s': %v", name, err)
+		}
+	}
+}
