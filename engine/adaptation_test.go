@@ -16,14 +16,17 @@ func Test_SecretsEngine(t *testing.T) {
 	okPlugins := []string{"plugin-foo", "plugin-bar"}
 	dir := createDummyPlugins(t, dummyPlugins{okPlugins: okPlugins})
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
-	e, err := New("test-engine", "test-version", WithSocketPath(socketPath), WithPluginPath(dir))
+	e, err := New("test-engine", "test-version",
+		WithSocketPath(socketPath),
+		WithPluginPath(dir),
+		WithPlugins(map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{"my-secret": "some-value"}}}))
 	assert.NoError(t, err)
 	require.NoError(t, e.Start())
 	t.Cleanup(func() { assert.NoError(t, e.Stop()) })
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
 
-	t.Run("unique existing secrets", func(t *testing.T) {
+	t.Run("unique existing secrets (internal and external plugins)", func(t *testing.T) {
 		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
 		assert.NoError(t, err)
 		assert.Equal(t, secrets.ID("foo"), foo.ID)
@@ -37,6 +40,11 @@ func Test_SecretsEngine(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, secrets.ID("bar"), bar.ID)
 		assert.Equal(t, "bar-value", string(bar.Value))
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		assert.NoError(t, err)
+		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, "some-value", string(mySecret.Value))
+		assert.Equal(t, "my-builtin", mySecret.Provider)
 	})
 	t.Run("non existing secrets", func(t *testing.T) {
 		secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "fancy-secret"})

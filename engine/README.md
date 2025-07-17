@@ -14,7 +14,7 @@ The two main tasks of the engine are:
 - [ ] plugin runtime that supports
   - [x] engine launched plugins (binaries are located in a plugin folder)
   - [ ] externally launched plugins (binaries connect to the engine socket from the outside)
-  - [ ] internal plugins (plugins are shipped as part of the engine binary)
+  - [x] internal plugins (plugins are shipped as part of the engine binary)
 - [ ] validation of external plugins against existing / already loaded plugins
 - [ ] configuration
   - [ ] retry behaviour when plugins crash
