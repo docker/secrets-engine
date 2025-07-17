@@ -148,6 +148,7 @@ func Test_newExternalPlugin(t *testing.T) {
 }
 
 func newListener(t *testing.T, socketPath string) net.Listener {
+	t.Helper()
 	os.Remove(socketPath)
 	require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
 	l, err := net.Listen("unix", socketPath)
@@ -165,6 +166,7 @@ func newPingPongHandler(suffix string) http.Handler {
 }
 
 func assertCommunicationToServer(t *testing.T, c *http.Client, response string) {
+	t.Helper()
 	req, _ := http.NewRequest("GET", "http://unused"+mockPingPath, nil)
 	resp, err := c.Do(req)
 	require.NoError(t, err)
