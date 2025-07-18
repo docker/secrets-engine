@@ -37,7 +37,7 @@ func Test_hijacking(t *testing.T) {
 	connClient, err := net.Dial("unix", socketPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { connClient.Close() })
-	require.NoError(t, Hijackify(connClient))
+	require.NoError(t, Hijackify(connClient, hijackTimeout))
 	connServer, err := getServerConnWithTimeout(acceptor.NextHijackedConn(), 2*time.Second)
 	require.NoError(t, err)
 
