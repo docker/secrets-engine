@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,6 +53,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
+				go runUncheckedDummyAcceptor(listener)
 				t.Cleanup(func() {
 					listener.Close()
 					os.Remove(socketPath)
@@ -69,20 +71,24 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 		{
 			name: "with all custom options",
 			test: func(t *testing.T) {
-				client, server := net.Pipe()
-				t.Cleanup(func() {
-					client.Close()
-					server.Close()
-				})
+				socket := "test.sock"
+				l, err := net.Listen("unix", socket)
+				require.NoError(t, err)
+				t.Cleanup(func() { l.Close() })
+				go runUncheckedDummyAcceptor(l)
+				conn, err := net.Dial("unix", socket)
+				require.NoError(t, err)
+				t.Cleanup(func() { conn.Close() })
+
 				cfg, err := newCfgForManualLaunch(&mockPlugin{},
 					WithPluginName("test-plugin"),
 					WithRegistrationTimeout(10*api.DefaultPluginRegistrationTimeout),
-					WithConnection(client),
+					WithConnection(conn),
 				)
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
-				assert.Equal(t, client, cfg.conn)
+				assert.Equal(t, conn, cfg.conn)
 			},
 		},
 	}
@@ -91,6 +97,18 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 			tt.test(t)
 		})
 	}
+}
+
+// We on purpose never actually deal with accepted hijacked connections or server errors
+// as in the context of where this function is used we don't care.
+func runUncheckedDummyAcceptor(listener net.Listener) {
+	httpMux := http.NewServeMux()
+	acceptor := ipc.NewHijackAcceptor()
+	httpMux.Handle(acceptor.Handler())
+	server := &http.Server{Handler: httpMux}
+	go func() {
+		_ = server.Serve(listener)
+	}()
 }
 
 func Test_restoreConfig(t *testing.T) {
