@@ -127,7 +127,7 @@ func TestWithDisableDynamicPlugins(t *testing.T) {
 	require.NoError(t, err)
 	plugin := newMockedPlugin()
 	_, err = p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
-	assert.ErrorIs(t, err, p.ErrExternalPluginRejected)
+	assert.ErrorContains(t, err, "external plugin rejected")
 }
 
 type externalPluginTestConfig struct {

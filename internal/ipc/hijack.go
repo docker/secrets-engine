@@ -21,7 +21,7 @@ const (
 // Tells the server to perform hijack operation on the connection which means the server
 // will retrieve the underlying tcp connection and hand it over / no longer serves requests to it.
 // -> we can use it as a long-running server-client connection and re-purpose it to run our IPC/yamux stack on top.
-func Hijackify(conn net.Conn) error {
+func Hijackify(conn net.Conn, timeout time.Duration) error {
 	// When we set up a TCP connection for hijack, there could be long periods
 	// of inactivity (a long running command with no output) that in certain
 	// network setups may cause ECONNTIMEOUT, leaving the client in an unknown
@@ -36,11 +36,11 @@ func Hijackify(conn net.Conn) error {
 		}
 	}
 
-	if err := hijackRequest(conn, hijackTimeout); err != nil {
+	if err := hijackRequest(conn, timeout); err != nil {
 		return err
 	}
 
-	if err := writeAckWithTimeout(conn, hijackTimeout); err != nil {
+	if err := writeAckWithTimeout(conn, timeout); err != nil {
 		return err
 	}
 
