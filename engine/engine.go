@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/internal/ipc"
 )
 
 const (
@@ -43,7 +44,7 @@ func newEngine(cfg config) (io.Closer, error) {
 		defer m.Unlock()
 		return parallelStop(reg.GetAll())
 	}
-	server := newServer(reg)
+	server := newServer(cfg, reg)
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
@@ -184,7 +185,7 @@ func discoverPlugins(pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func newServer(reg registry) *http.Server {
+func newServer(cfg config, reg registry) *http.Server {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -192,6 +193,20 @@ func newServer(reg registry) *http.Server {
 	})
 	r := &resolver{reg: reg}
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
+	if !cfg.dynamicPluginsDisabled {
+		acceptor := ipc.NewHijackAcceptor()
+		httpMux.Handle(acceptor.Handler())
+		go func() {
+			for conn := range acceptor.NextHijackedConn() {
+				launcher := Launcher(func() (runtime, error) {
+					return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
+				})
+				if err := register(reg, launcher); err != nil {
+					logrus.Errorf("registering dynamic plugin: %v", err)
+				}
+			}
+		}()
+	}
 	return &http.Server{
 		Handler: httpMux,
 	}

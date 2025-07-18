@@ -25,7 +25,7 @@ const (
 )
 
 type mockedPlugin struct {
-	pattern string
+	pattern secrets.Pattern
 	id      secrets.ID
 }
 
@@ -42,7 +42,7 @@ func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	return m
 }
 
-func WithPattern(pattern string) MockedPluginOption {
+func WithPattern(pattern secrets.Pattern) MockedPluginOption {
 	return func(mp *mockedPlugin) {
 		mp.pattern = pattern
 	}
@@ -61,7 +61,7 @@ func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Enve
 func (m *mockedPlugin) Config() p.Config {
 	return p.Config{
 		Version: "v1",
-		Pattern: secrets.Pattern(m.pattern),
+		Pattern: m.pattern,
 	}
 }
 
