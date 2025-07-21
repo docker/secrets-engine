@@ -1,11 +1,8 @@
 package engine
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"os/exec"
-	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -44,20 +41,6 @@ func (w *cmdWatchWrapper) close() error {
 	}
 	shutdownCMD(w.cmd, w.done)
 	return w.err
-}
-
-func isSigint(err error) bool {
-	if err == nil {
-		return false
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		return false
-	}
-	if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-		return ws.Signaled() && ws.Signal() == os.Interrupt
-	}
-	return false
 }
 
 func shutdownCMD(cmd *exec.Cmd, done chan struct{}) {

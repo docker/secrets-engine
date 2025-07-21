@@ -155,8 +155,9 @@ func Test_newPlugin(t *testing.T) {
 			},
 		},
 		{
-			// Note: The SIGINT error could only be returned by cmd.Wait() on linux.
-			// So on other platforms this doesn't really test anything.
+			// Note: The SIGINT/STATUS_CONTROL_C_EXIT error could only be returned by cmd.Wait() on linux/windows.
+			// On darwin this doesn't really test anything.
+			// TODO(investigate): On windows cmd.Wait() returning STATUS_CONTROL_C_EXIT is very unreliable through this test.
 			name: "plugin ignoring SIGINT does not break the runtime",
 			test: func(t *testing.T) {
 				cmd, _ := dummyPluginCommand(t, dummyPluginCfg{
