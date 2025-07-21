@@ -34,21 +34,19 @@ func Test_hijacking(t *testing.T) {
 	go func() {
 		serverErr <- server.Serve(l)
 	}()
-	connUnhijacked, err := net.Dial("unix", socketPath)
+	connClient, err := net.Dial("unix", socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { connUnhijacked.Close() })
-	connHijacked, err := Hijackify(connUnhijacked)
-	require.NoError(t, err)
+	t.Cleanup(func() { connClient.Close() })
+	require.NoError(t, Hijackify(connClient))
 	connServer, err := getServerConnWithTimeout(acceptor.NextHijackedConn(), 2*time.Second)
 	require.NoError(t, err)
 
-	assert.NoError(t, writeLine(connHijacked, "ping"))
+	assert.NoError(t, writeLine(connClient, "ping"))
 	assert.Equal(t, "ping", readLine(connServer))
 	assert.NoError(t, writeLine(connServer, "pong"))
-	assert.Equal(t, "pong", readLine(connHijacked))
+	assert.Equal(t, "pong", readLine(connClient))
 	assert.NoError(t, connServer.Close())
-	assert.NoError(t, connHijacked.Close())
-	assert.ErrorContains(t, connUnhijacked.Close(), "use of closed network connection")
+	assert.NoError(t, connClient.Close())
 
 	// The server should still be up and also be available for normal/non-hijack stuff
 	health, err := requestHealthCheck(socketPath)
@@ -57,6 +55,23 @@ func Test_hijacking(t *testing.T) {
 
 	assert.NoError(t, server.Close())
 	assert.ErrorIs(t, waitForErrorWithTimeout(serverErr), http.ErrServerClosed)
+}
+
+func TestHijackify_ack(t *testing.T) {
+	timeoutLong := time.Second
+	timeoutShort := 100 * time.Millisecond
+	a, b := net.Pipe()
+	t.Cleanup(func() { a.Close() })
+	t.Cleanup(func() { b.Close() })
+	assert.ErrorContains(t, readAckWithTimeout(b, timeoutShort), "timeout")
+	done := make(chan struct{})
+	go func() {
+		assert.NoError(t, writeAckWithTimeout(a, timeoutLong))
+		close(done)
+	}()
+	assert.NoError(t, readAckWithTimeout(b, timeoutLong))
+	<-done
+	assert.ErrorContains(t, writeAckWithTimeout(a, timeoutShort), "timeout")
 }
 
 func readLine(conn net.Conn) string {
