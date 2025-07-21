@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -12,8 +13,8 @@ import (
 )
 
 const (
-	hijackPath = "/hijack"
-	ackTimeout = 2 * time.Second
+	hijackPath    = "/hijack"
+	hijackTimeout = 2 * time.Second
 )
 
 // Hijackify to be used in conjunction with HijackAcceptor.
@@ -35,19 +36,21 @@ func Hijackify(conn net.Conn) error {
 		}
 	}
 
-	if err := hijackRequest(conn); err != nil {
+	if err := hijackRequest(conn, hijackTimeout); err != nil {
 		return err
 	}
 
-	if err := writeAckWithTimeout(conn, ackTimeout); err != nil {
+	if err := writeAckWithTimeout(conn, hijackTimeout); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func hijackRequest(conn net.Conn) error {
-	req, err := http.NewRequest("GET", "http://secrets-engine.localhost"+hijackPath, nil)
+func hijackRequest(conn net.Conn, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://secrets-engine.localhost"+hijackPath, nil)
 	if err != nil {
 		return err
 	}
@@ -58,6 +61,10 @@ func hijackRequest(conn net.Conn) error {
 		return fmt.Errorf("making hijack request: %s", err)
 	}
 
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return fmt.Errorf("clearing deadline: %w", err)
+	}
+	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
 	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		return err
@@ -145,5 +152,5 @@ func (h *HijackAcceptor) NextHijackedConn() <-chan net.Conn {
 }
 
 func NewHijackAcceptor() *HijackAcceptor {
-	return &HijackAcceptor{hijackHandler{chConn: make(chan net.Conn), ackTimeout: ackTimeout}}
+	return &HijackAcceptor{hijackHandler{chConn: make(chan net.Conn), ackTimeout: hijackTimeout}}
 }
