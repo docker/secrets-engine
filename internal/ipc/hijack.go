@@ -107,25 +107,22 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "hijacking connection", http.StatusInternalServerError)
 		return
 	}
+
+	f, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "server does not support flushing", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Connection", "upgrade")
+	w.Header().Set("Upgrade", "tcp")
+	w.WriteHeader(http.StatusSwitchingProtocols)
+	f.Flush()
+
 	conn, _, err := hj.Hijack()
 	if err != nil {
 		logrus.Errorf("hijack error: %v", err)
 		return
 	}
-
-	// Flush the options to make sure the client sets the raw mode
-	_, _ = conn.Write([]byte{})
-	if _, ok := r.Header["Upgrade"]; ok {
-		fmt.Fprint(conn, "HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n")
-	} else {
-		fmt.Fprint(conn, "HTTP/1.1 200 OK\r\n")
-	}
-	// copy headers that were removed as part of hijack
-	if err := w.Header().WriteSubset(conn, nil); err != nil {
-		logrus.Errorf("copying headers: %v", err)
-		return
-	}
-	fmt.Fprint(conn, "\r\n")
 
 	h.chConn <- conn
 }
