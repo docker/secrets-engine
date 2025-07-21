@@ -57,6 +57,17 @@ func Test_hijacking(t *testing.T) {
 	assert.ErrorIs(t, waitForErrorWithTimeout(serverErr), http.ErrServerClosed)
 }
 
+func TestHijackify_hijackRequest_timeout(t *testing.T) {
+	socket := "test.sock"
+	l, err := net.Listen("unix", socket)
+	require.NoError(t, err)
+	t.Cleanup(func() { l.Close() })
+	conn, err := net.Dial("unix", socket)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	assert.ErrorContains(t, hijackRequest(conn, 100*time.Millisecond), "i/o timeout")
+}
+
 func TestHijackify_ack(t *testing.T) {
 	timeoutLong := time.Second
 	timeoutShort := 100 * time.Millisecond
