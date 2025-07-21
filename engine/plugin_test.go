@@ -194,10 +194,10 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
-				_, err = parseOutput()
-				assert.ErrorContains(t, err, "failed to unmarshal ''")
 				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
 				assert.NoError(t, checkClosed(p.Closed()))
+				_, err = parseOutput()
+				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
 		},
 	}

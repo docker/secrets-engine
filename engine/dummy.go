@@ -119,6 +119,7 @@ func dummyPluginCommand(t *testing.T, cfg dummyPluginCfg) (*exec.Cmd, func() (*d
 	)
 	return cmd, func() (*dummyPluginResult, error) {
 		t.Helper()
+		require.NotNil(t, cmd.ProcessState)
 		if stdErr := stderrBuf.String(); stdErr != "" {
 			return nil, errors.New(stdErr)
 		}
