@@ -106,7 +106,7 @@ type CloseWriter interface {
 }
 
 type hijackHandler struct {
-	chConn     chan net.Conn
+	cb         func(net.Conn)
 	ackTimeout time.Duration
 }
 
@@ -126,21 +126,10 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		logrus.Errorf("hijack error: %v", err)
 		return
 	}
-	h.chConn <- conn
+
+	h.cb(conn)
 }
 
-type HijackAcceptor struct {
-	h hijackHandler
-}
-
-func (h *HijackAcceptor) Handler() (string, http.Handler) {
-	return hijackPath, &h.h
-}
-
-func (h *HijackAcceptor) NextHijackedConn() <-chan net.Conn {
-	return h.h.chConn
-}
-
-func NewHijackAcceptor() *HijackAcceptor {
-	return &HijackAcceptor{hijackHandler{chConn: make(chan net.Conn), ackTimeout: hijackTimeout}}
+func NewHijackAcceptor(cb func(conn net.Conn)) (string, http.Handler) {
+	return hijackPath, &hijackHandler{cb: cb, ackTimeout: hijackTimeout}
 }

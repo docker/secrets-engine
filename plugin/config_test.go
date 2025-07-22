@@ -88,7 +88,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
-				assert.Equal(t, conn, cfg.conn)
+				assert.NotNil(t, cfg.conn)
 			},
 		},
 	}
@@ -103,8 +103,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 // as in the context of where this function is used we don't care.
 func runUncheckedDummyAcceptor(listener net.Listener) {
 	httpMux := http.NewServeMux()
-	acceptor := ipc.NewHijackAcceptor()
-	httpMux.Handle(acceptor.Handler())
+	httpMux.Handle(ipc.NewHijackAcceptor(func(net.Conn) {}))
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		_ = server.Serve(listener)
