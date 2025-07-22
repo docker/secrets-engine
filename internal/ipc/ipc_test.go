@@ -17,7 +17,7 @@ const (
 	mockPingPath = "/ping"
 )
 
-func Test_newExternalPlugin(t *testing.T) {
+func Test_ipc(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -149,8 +149,6 @@ func Test_newExternalPlugin(t *testing.T) {
 
 func newListener(t *testing.T, socketPath string) net.Listener {
 	t.Helper()
-	os.Remove(socketPath)
-	require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
 	l, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { l.Close() })

@@ -13,6 +13,8 @@ import (
 	"github.com/docker/secrets-engine/internal/ipc"
 )
 
+const hijackTimeout = 2 * time.Second
+
 // ManualLaunchOption to apply to a plugin during its creation
 // when it's manually launched (not by the secrets engine).
 type ManualLaunchOption func(c *cfg) error
@@ -42,7 +44,11 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 		if s.conn != nil {
 			return errors.New("connection already set")
 		}
-		s.conn = conn
+		hijackedConn, err := ipc.Hijackify(conn, hijackTimeout)
+		if err != nil {
+			return fmt.Errorf("external plugin rejected: %w", err)
+		}
+		s.conn = hijackedConn
 		return nil
 	}
 }
@@ -78,7 +84,11 @@ func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to default socket %q: %w", defaultSocketPath, err)
 		}
-		cfg.conn = conn
+		hijackedConn, err := ipc.Hijackify(conn, hijackTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("external plugin rejected: %w", err)
+		}
+		cfg.conn = hijackedConn
 	}
 	if cfg.name == "" {
 		if len(os.Args) == 0 {
