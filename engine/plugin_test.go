@@ -349,20 +349,20 @@ func checkClosed(closed <-chan struct{}) error {
 
 type mockExternalRuntime struct {
 	server    *http.Server
-	acceptor  *ipc.HijackAcceptor
+	chConn    chan net.Conn
 	serverErr chan error
 }
 
 func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
 	httpMux := http.NewServeMux()
-	acceptor := ipc.NewHijackAcceptor()
-	httpMux.Handle(acceptor.Handler())
+	chConn := make(chan net.Conn)
+	httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) { chConn <- conn }))
 	serverErr := make(chan error, 1)
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		serverErr <- server.Serve(l)
 	}()
-	return &mockExternalRuntime{server: server, acceptor: acceptor, serverErr: serverErr}
+	return &mockExternalRuntime{server: server, chConn: chConn, serverErr: serverErr}
 }
 
 func (m *mockExternalRuntime) shutdown() error {
@@ -376,7 +376,7 @@ func (m *mockExternalRuntime) shutdown() error {
 }
 
 func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
-	conn, err := getServerConnWithTimeout(m.acceptor.NextHijackedConn(), 2*time.Second)
+	conn, err := getServerConnWithTimeout(m.chConn, 2*time.Second)
 	if err != nil {
 		return nil, err
 	}

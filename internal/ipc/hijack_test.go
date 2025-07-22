@@ -23,8 +23,8 @@ func Test_hijacking(t *testing.T) {
 	t.Cleanup(func() { l.Close() })
 
 	httpMux := http.NewServeMux()
-	acceptor := NewHijackAcceptor()
-	httpMux.Handle(acceptor.Handler())
+	acceptor := newHijackAcceptor()
+	httpMux.Handle(acceptor.handler())
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -39,7 +39,7 @@ func Test_hijacking(t *testing.T) {
 	t.Cleanup(func() { connClient.Close() })
 	connHijacked, err := Hijackify(connClient, hijackTimeout)
 	require.NoError(t, err)
-	connServer, err := getServerConnWithTimeout(acceptor.NextHijackedConn(), 2*time.Second)
+	connServer, err := getServerConnWithTimeout(acceptor.nextHijackedConn(), 2*time.Second)
 	require.NoError(t, err)
 
 	assert.NoError(t, writeLine(connHijacked, "ping"))
@@ -56,6 +56,25 @@ func Test_hijacking(t *testing.T) {
 
 	assert.NoError(t, server.Close())
 	assert.ErrorIs(t, waitForErrorWithTimeout(serverErr), http.ErrServerClosed)
+}
+
+type testHijackAcceptor struct {
+	h      hijackHandler
+	chConn chan net.Conn
+}
+
+func newHijackAcceptor() *testHijackAcceptor {
+	chConn := make(chan net.Conn)
+	h := &hijackHandler{cb: func(conn net.Conn) { chConn <- conn }, ackTimeout: hijackTimeout}
+	return &testHijackAcceptor{chConn: chConn, h: *h}
+}
+
+func (h *testHijackAcceptor) handler() (string, http.Handler) {
+	return hijackPath, &h.h
+}
+
+func (h *testHijackAcceptor) nextHijackedConn() <-chan net.Conn {
+	return h.chConn
 }
 
 func TestHijackify_hijackRequest_timeout(t *testing.T) {

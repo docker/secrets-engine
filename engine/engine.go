@@ -194,18 +194,14 @@ func newServer(cfg config, reg registry) *http.Server {
 	r := &resolver{reg: reg}
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
 	if !cfg.dynamicPluginsDisabled {
-		acceptor := ipc.NewHijackAcceptor()
-		httpMux.Handle(acceptor.Handler())
-		go func() {
-			for conn := range acceptor.NextHijackedConn() {
-				launcher := Launcher(func() (runtime, error) {
-					return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
-				})
-				if err := register(reg, launcher); err != nil {
-					logrus.Errorf("registering dynamic plugin: %v", err)
-				}
+		httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) {
+			launcher := Launcher(func() (runtime, error) {
+				return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
+			})
+			if err := register(reg, launcher); err != nil {
+				logrus.Errorf("registering dynamic plugin: %v", err)
 			}
-		}()
+		}))
 	}
 	return &http.Server{
 		Handler: httpMux,
