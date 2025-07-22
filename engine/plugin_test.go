@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/internal/api"
+	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/secrets"
 	p "github.com/docker/secrets-engine/plugin"
 )
@@ -25,7 +26,7 @@ const (
 )
 
 type mockedPlugin struct {
-	pattern string
+	pattern secrets.Pattern
 	id      secrets.ID
 }
 
@@ -42,7 +43,7 @@ func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	return m
 }
 
-func WithPattern(pattern string) MockedPluginOption {
+func WithPattern(pattern secrets.Pattern) MockedPluginOption {
 	return func(mp *mockedPlugin) {
 		mp.pattern = pattern
 	}
@@ -61,7 +62,7 @@ func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Enve
 func (m *mockedPlugin) Config() p.Config {
 	return p.Config{
 		Version: "v1",
-		Pattern: secrets.Pattern(m.pattern),
+		Pattern: m.pattern,
 	}
 }
 
@@ -193,10 +194,10 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
-				_, err = parseOutput()
-				assert.ErrorContains(t, err, "failed to unmarshal ''")
 				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
 				assert.NoError(t, checkClosed(p.Closed()))
+				_, err = parseOutput()
+				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
 		},
 	}
@@ -206,6 +207,7 @@ func Test_newPlugin(t *testing.T) {
 }
 
 func Test_newExternalPlugin(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		test func(t *testing.T, listener net.Listener, conn net.Conn)
@@ -215,7 +217,6 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(l)
-				go m.run()
 
 				plugin := newMockedPlugin()
 				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -223,14 +224,14 @@ func Test_newExternalPlugin(t *testing.T) {
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
 				t.Cleanup(cancel)
 
-				r, err := m.getRuntime()
+				r, err := m.waitForNextRuntimeWithTimeout()
+				require.NoError(t, err)
 				assert.Equal(t, r.Data(), pluginData{
 					name:       "my-plugin",
 					pattern:    mockPattern,
 					version:    "v1",
 					pluginType: externalPlugin,
 				})
-				assert.NoError(t, err)
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
@@ -239,6 +240,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				err = <-runErr
 				assert.NoError(t, err)
+				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},
 		{
@@ -246,15 +248,14 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(l)
-				go m.run()
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
 				t.Cleanup(cancel)
 
-				r, err := m.getRuntime()
-				assert.NoError(t, err)
+				r, err := m.waitForNextRuntimeWithTimeout()
+				require.NoError(t, err)
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
@@ -262,6 +263,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				err = <-runErr
 				assert.NoError(t, err)
+				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},
 		{
@@ -269,7 +271,6 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(l)
-				go m.run()
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -280,8 +281,8 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(done)
 				}()
 
-				r, err := m.getRuntime()
-				assert.NoError(t, err)
+				r, err := m.waitForNextRuntimeWithTimeout()
+				require.NoError(t, err)
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
@@ -290,20 +291,18 @@ func Test_newExternalPlugin(t *testing.T) {
 				<-done
 				assert.NoError(t, checkClosed(r.Closed()))
 				assert.NoError(t, r.Close())
+				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},
 		{
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
+				m := newMockExternalRuntime(l)
+
 				doneRuntime := make(chan struct{})
 				go func() {
-					conn, err := l.Accept()
-					require.NoError(t, err)
-
-					_, err = newExternalPlugin(conn, runtimeCfg{
-						out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
-					})
+					_, err := m.waitForNextRuntimeWithTimeout()
 					assert.ErrorContains(t, err, "invalid pattern")
 					close(doneRuntime)
 				}()
@@ -312,18 +311,16 @@ func Test_newExternalPlugin(t *testing.T) {
 				require.NoError(t, err)
 				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
+				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-			socketPath := api.DefaultSocketPath()
-			os.Remove(socketPath)
-			require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
+			socketPath := "test.sock"
 			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
-			conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socketPath, Net: "unix"})
+			conn, err := net.Dial("unix", socketPath)
 			require.NoError(t, err)
 			tt.test(t, l, conn)
 			conn.Close()
@@ -351,39 +348,48 @@ func checkClosed(closed <-chan struct{}) error {
 }
 
 type mockExternalRuntime struct {
-	l    net.Listener
-	p    runtime
-	err  error
-	done chan struct{}
+	server    *http.Server
+	chConn    chan net.Conn
+	serverErr chan error
 }
 
 func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
-	return &mockExternalRuntime{l: l, done: make(chan struct{})}
+	httpMux := http.NewServeMux()
+	chConn := make(chan net.Conn)
+	httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) { chConn <- conn }))
+	serverErr := make(chan error, 1)
+	server := &http.Server{Handler: httpMux}
+	go func() {
+		serverErr <- server.Serve(l)
+	}()
+	return &mockExternalRuntime{server: server, chConn: chConn, serverErr: serverErr}
 }
 
-func (m *mockExternalRuntime) run() {
-	defer close(m.done)
-	conn, err := m.l.Accept()
-	if err != nil {
-		m.err = err
-		return
+func (m *mockExternalRuntime) shutdown() error {
+	m.server.Close()
+	select {
+	case err := <-m.serverErr:
+		return err
+	case <-time.After(2 * time.Second):
+		return errors.New("timeout waiting for server to shutdown")
 	}
-	p, err := newExternalPlugin(conn, runtimeCfg{
+}
+
+func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
+	conn, err := getServerConnWithTimeout(m.chConn, 2*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return newExternalPlugin(conn, runtimeCfg{
 		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
-	if err != nil {
-		m.err = err
-		return
-	}
-	m.p = p
 }
 
-func (m *mockExternalRuntime) getRuntime() (runtime, error) {
+func getServerConnWithTimeout(chConn <-chan net.Conn, timeout time.Duration) (net.Conn, error) {
 	select {
-	case <-m.done:
-		return m.p, m.err
-	case <-time.After(mockRuntimeTestTimeout):
-		m.l.Close() // abort runtime
+	case conn := <-chConn:
+		return conn, nil
+	case <-time.After(timeout):
 		return nil, errors.New("timeout")
 	}
 }

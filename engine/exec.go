@@ -43,7 +43,7 @@ func (w *cmdWatchWrapper) close() error {
 	return w.err
 }
 
-func shutdownCMD(cmd *exec.Cmd, done chan struct{}) {
+func shutdownCMD(cmd *exec.Cmd, done <-chan struct{}) {
 	if cmd.Process == nil {
 		return
 	}

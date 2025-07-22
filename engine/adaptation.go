@@ -31,11 +31,12 @@ type Plugin interface {
 }
 
 type config struct {
-	name       string
-	version    string
-	pluginPath string
-	socketPath string
-	plugins    map[string]Plugin
+	name                   string
+	version                string
+	pluginPath             string
+	socketPath             string
+	plugins                map[string]Plugin
+	dynamicPluginsDisabled bool
 }
 
 type adaptation struct {
@@ -68,6 +69,13 @@ func WithSocketPath(path string) Option {
 func WithPlugins(plugins map[string]Plugin) Option {
 	return func(r *config) error {
 		r.plugins = plugins
+		return nil
+	}
+}
+
+func WithDisableDynamicPlugins() Option {
+	return func(r *config) error {
+		r.dynamicPluginsDisabled = true
 		return nil
 	}
 }

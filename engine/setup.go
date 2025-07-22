@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/yamux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
@@ -65,7 +66,16 @@ func setup(conn io.ReadWriteCloser, cb func(), v runtimeCfg, option ...ipc.Optio
 	return &setupResult{
 		client: c,
 		cfg:    out,
-		close:  i.Close,
+		close: func() error {
+			err := i.Close()
+			// We might see this in rare circumstances when the server has sent the shutdown request to the client
+			// but the client was faster in shutting down than the server completing.
+			// -> it's not an error here as the intent is to shut down, and it doesn't matter who is faster
+			if errors.Is(err, yamux.ErrSessionShutdown) {
+				return nil
+			}
+			return err
+		},
 	}, nil
 }
 
