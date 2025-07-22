@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/docker/secrets-engine/internal/ipc"
 )
 
-func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, timeout time.Duration, onClose func(err error)) (io.Closer, error) {
+func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -26,10 +25,10 @@ func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, 
 		once()
 	}}))
 	setupCompleted := make(chan struct{})
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{p, setupCompleted, timeout}))
-	ipc, c, err := ipc.NewPluginIPC(conn, httpMux, func(err error) {
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{config.plugin, setupCompleted, config.registrationTimeout}))
+	ipc, c, err := ipc.NewPluginIPC(config.conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
-			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", name)
+			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", config.name)
 			err = nil // In the context of a plugin, the runtime shutting down IPC/plugin is not an error.
 		}
 		onClose(err)
@@ -37,7 +36,7 @@ func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, 
 	if err != nil {
 		return nil, err
 	}
-	runtimeCfg, err := doRegister(ctx, c, name, p, timeout)
+	runtimeCfg, err := doRegister(ctx, c, config.name, config.plugin, config.registrationTimeout)
 	if err != nil {
 		ipc.Close()
 		return nil, err
@@ -46,7 +45,7 @@ func setup(ctx context.Context, conn io.ReadWriteCloser, name string, p Plugin, 
 		<-closed
 		ipc.Close()
 	}()
-	logrus.Infof("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, name)
+	logrus.Infof("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, config.name)
 	close(setupCompleted)
 	return ipc, nil
 }
