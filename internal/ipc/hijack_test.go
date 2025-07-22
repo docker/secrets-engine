@@ -37,16 +37,17 @@ func Test_hijacking(t *testing.T) {
 	connClient, err := net.Dial("unix", socketPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { connClient.Close() })
-	require.NoError(t, Hijackify(connClient, hijackTimeout))
+	connHijacked, err := Hijackify(connClient, hijackTimeout)
+	require.NoError(t, err)
 	connServer, err := getServerConnWithTimeout(acceptor.NextHijackedConn(), 2*time.Second)
 	require.NoError(t, err)
 
-	assert.NoError(t, writeLine(connClient, "ping"))
+	assert.NoError(t, writeLine(connHijacked, "ping"))
 	assert.Equal(t, "ping", readLine(connServer))
 	assert.NoError(t, writeLine(connServer, "pong"))
-	assert.Equal(t, "pong", readLine(connClient))
+	assert.Equal(t, "pong", readLine(connHijacked))
 	assert.NoError(t, connServer.Close())
-	assert.NoError(t, connClient.Close())
+	assert.NoError(t, connHijacked.Close())
 
 	// The server should still be up and also be available for normal/non-hijack stuff
 	health, err := requestHealthCheck(socketPath)
@@ -65,24 +66,8 @@ func TestHijackify_hijackRequest_timeout(t *testing.T) {
 	conn, err := net.Dial("unix", socket)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
-	assert.ErrorContains(t, hijackRequest(conn, 100*time.Millisecond), "i/o timeout")
-}
-
-func TestHijackify_ack(t *testing.T) {
-	timeoutLong := time.Second
-	timeoutShort := 100 * time.Millisecond
-	a, b := net.Pipe()
-	t.Cleanup(func() { a.Close() })
-	t.Cleanup(func() { b.Close() })
-	assert.ErrorContains(t, readAckWithTimeout(b, timeoutShort), "timeout")
-	done := make(chan struct{})
-	go func() {
-		assert.NoError(t, writeAckWithTimeout(a, timeoutLong))
-		close(done)
-	}()
-	assert.NoError(t, readAckWithTimeout(b, timeoutLong))
-	<-done
-	assert.ErrorContains(t, writeAckWithTimeout(a, timeoutShort), "timeout")
+	_, err = hijackRequest(conn, 100*time.Millisecond)
+	assert.ErrorContains(t, err, "i/o timeout")
 }
 
 func readLine(conn net.Conn) string {
