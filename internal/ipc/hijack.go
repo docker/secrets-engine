@@ -71,14 +71,10 @@ func hijackRequest(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 		respBody, _ = io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
-	// If there is buffered content, wrap the connection.  We return an
-	// object that implements CloseWrite if the underlying connection
-	// implements it.
-	if _, ok := conn.(CloseWriter); ok {
-		return &hijackedConnCloseWriter{&hijackedConn{conn, br}}, nil
-	}
 	return &hijackedConn{conn, br}, nil
 }
+
+var _ CloseWriter = &hijackedConn{}
 
 type hijackedConn struct {
 	net.Conn
@@ -89,16 +85,16 @@ func (c *hijackedConn) Read(b []byte) (int, error) {
 	return c.r.Read(b)
 }
 
-// hijackedConnCloseWriter is a hijackedConn which additionally implements
-// CloseWrite().  It is returned by setupHijackConn in the case the
-// underlying net.Conn *does* implement CloseWrite().
-type hijackedConnCloseWriter struct {
-	*hijackedConn
+func (c *hijackedConn) Close() error {
+	return c.Conn.Close()
 }
 
-func (c *hijackedConnCloseWriter) CloseWrite() error {
-	conn := c.Conn.(CloseWriter)
-	return conn.CloseWrite()
+func (c *hijackedConn) CloseWrite() error {
+	// If the underlying connection implements CloseWrite, we forward it.
+	if cw, ok := c.Conn.(CloseWriter); ok {
+		return cw.CloseWrite()
+	}
+	return nil
 }
 
 type CloseWriter interface {
