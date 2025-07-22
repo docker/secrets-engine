@@ -44,10 +44,11 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 		if s.conn != nil {
 			return errors.New("connection already set")
 		}
-		if err := ipc.Hijackify(conn, hijackTimeout); err != nil {
+		hijackedConn, err := ipc.Hijackify(conn, hijackTimeout)
+		if err != nil {
 			return fmt.Errorf("external plugin rejected: %w", err)
 		}
-		s.conn = conn
+		s.conn = hijackedConn
 		return nil
 	}
 }
@@ -83,10 +84,11 @@ func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to default socket %q: %w", defaultSocketPath, err)
 		}
-		if err := ipc.Hijackify(conn, hijackTimeout); err != nil {
+		hijackedConn, err := ipc.Hijackify(conn, hijackTimeout)
+		if err != nil {
 			return nil, fmt.Errorf("external plugin rejected: %w", err)
 		}
-		cfg.conn = conn
+		cfg.conn = hijackedConn
 	}
 	if cfg.name == "" {
 		if len(os.Args) == 0 {
