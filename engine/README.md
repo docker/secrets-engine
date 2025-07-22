@@ -21,5 +21,5 @@ The two main tasks of the engine are:
 - [ ] configuration
   - [ ] retry behaviour when plugins crash
   - [ ] logging
-  - [ ] permanently disable engine launched plugins
+  - [x] permanently disable engine launched plugins
   - [x] permanently disable externally launched plugins

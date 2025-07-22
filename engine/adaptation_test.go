@@ -112,12 +112,12 @@ func Test_SecretsEngine(t *testing.T) {
 	})
 }
 
-func TestWithDisableDynamicPlugins(t *testing.T) {
+func TestWithDynamicPluginsDisabled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "e.sock")
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(path),
 		WithPluginPath(t.TempDir()),
-		WithDisableDynamicPlugins(),
+		WithExternallyLaunchedPluginsDisabled(),
 	)
 	assert.NoError(t, err)
 	require.NoError(t, e.Start())
@@ -128,6 +128,55 @@ func TestWithDisableDynamicPlugins(t *testing.T) {
 	plugin := newMockedPlugin()
 	_, err = p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 	assert.ErrorContains(t, err, "external plugin rejected")
+}
+
+func TestWithEnginePluginsDisabled(t *testing.T) {
+	tests := []struct {
+		name                              string
+		shouldGetSecretFromExternalPlugin bool
+		extraOption                       Option
+	}{
+		{
+			name:                              "external plugins enabled",
+			shouldGetSecretFromExternalPlugin: true,
+		},
+		{
+			name:        "external plugins disabled",
+			extraOption: WithEngineLaunchedPluginsDisabled(),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := createDummyPlugins(t, dummyPlugins{okPlugins: []string{"plugin-foo"}})
+			socketPath := "foo.sock"
+			options := []Option{
+				WithSocketPath(socketPath),
+				WithPluginPath(dir),
+				WithExternallyLaunchedPluginsDisabled(),
+				WithPlugins(map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{"my-secret": "some-value"}}}),
+			}
+			if test.extraOption != nil {
+				options = append(options, test.extraOption)
+			}
+			e, err := New("test-engine", "test-version", options...)
+			assert.NoError(t, err)
+			require.NoError(t, e.Start())
+			t.Cleanup(func() { assert.NoError(t, e.Stop()) })
+			c, err := client.New(client.WithSocketPath(socketPath))
+			require.NoError(t, err)
+			_, err = c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+			if test.shouldGetSecretFromExternalPlugin {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+			assert.NoError(t, err)
+			assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+			assert.Equal(t, "some-value", string(mySecret.Value))
+			assert.Equal(t, "my-builtin", mySecret.Provider)
+		})
+	}
 }
 
 type externalPluginTestConfig struct {

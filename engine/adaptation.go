@@ -37,6 +37,7 @@ type config struct {
 	socketPath             string
 	plugins                map[string]Plugin
 	dynamicPluginsDisabled bool
+	enginePluginsDisabled  bool
 }
 
 type adaptation struct {
@@ -73,9 +74,19 @@ func WithPlugins(plugins map[string]Plugin) Option {
 	}
 }
 
-func WithDisableDynamicPlugins() Option {
+// WithExternallyLaunchedPluginsDisabled disables accepting plugin registration requests coming
+// from plugins that have been launched externally
+func WithExternallyLaunchedPluginsDisabled() Option {
 	return func(r *config) error {
 		r.dynamicPluginsDisabled = true
+		return nil
+	}
+}
+
+// WithEngineLaunchedPluginsDisabled disables launching any plugins from the plugin directory
+func WithEngineLaunchedPluginsDisabled() Option {
+	return func(r *config) error {
+		r.enginePluginsDisabled = true
 		return nil
 	}
 }
