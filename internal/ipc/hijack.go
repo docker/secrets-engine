@@ -21,7 +21,7 @@ const (
 // Tells the server to perform hijack operation on the connection which means the server
 // will retrieve the underlying tcp connection and hand it over / no longer serves requests to it.
 // -> we can use it as a long-running server-client connection and re-purpose it to run our IPC/yamux stack on top.
-func Hijackify(conn net.Conn, timeout time.Duration) error {
+func Hijackify(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 	// When we set up a TCP connection for hijack, there could be long periods
 	// of inactivity (a long running command with no output) that in certain
 	// network setups may cause ECONNTIMEOUT, leaving the client in an unknown
@@ -36,60 +36,73 @@ func Hijackify(conn net.Conn, timeout time.Duration) error {
 		}
 	}
 
-	if err := hijackRequest(conn, timeout); err != nil {
-		return err
+	hijackedConn, err := hijackRequest(conn, timeout)
+	if err != nil {
+		return nil, err
 	}
-
-	if err := writeAckWithTimeout(conn, timeout); err != nil {
-		return err
-	}
-
-	return nil
+	return hijackedConn, nil
 }
 
-func hijackRequest(conn net.Conn, timeout time.Duration) error {
+func hijackRequest(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://secrets-engine.localhost"+hijackPath, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Connection", "upgrade")
 	req.Header.Set("Upgrade", "tcp")
 
 	if err := req.Write(conn); err != nil {
-		return fmt.Errorf("making hijack request: %s", err)
+		return nil, fmt.Errorf("making hijack request: %s", err)
 	}
 
 	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		return fmt.Errorf("clearing deadline: %w", err)
+		return nil, fmt.Errorf("clearing deadline: %w", err)
 	}
 	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		var respBody []byte
 		respBody, _ = io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
-	return nil
+	// If there is buffered content, wrap the connection.  We return an
+	// object that implements CloseWrite if the underlying connection
+	// implements it.
+	if _, ok := conn.(CloseWriter); ok {
+		return &hijackedConnCloseWriter{&hijackedConn{conn, br}}, nil
+	}
+	return &hijackedConn{conn, br}, nil
 }
 
-func writeAckWithTimeout(conn net.Conn, timeout time.Duration) error {
-	if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-		return fmt.Errorf("clearing deadline: %w", err)
-	}
-	defer func() { _ = conn.SetWriteDeadline(time.Time{}) }()
+type hijackedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
 
-	// We tell the server that we have fully read the response by sending a single byte ack.
-	// This prevents the server from starting to send traffic while we are still reading the previous HTTP response.
-	if _, err := conn.Write([]byte{0}); err != nil {
-		return fmt.Errorf("write ack: %w", err)
-	}
-	return nil
+func (c *hijackedConn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
+}
+
+// hijackedConnCloseWriter is a hijackedConn which additionally implements
+// CloseWrite().  It is returned by setupHijackConn in the case the
+// underlying net.Conn *does* implement CloseWrite().
+type hijackedConnCloseWriter struct {
+	*hijackedConn
+}
+
+func (c *hijackedConnCloseWriter) CloseWrite() error {
+	conn := c.Conn.(CloseWriter)
+	return conn.CloseWrite()
+}
+
+type CloseWriter interface {
+	CloseWrite() error
 }
 
 type hijackHandler struct {
@@ -113,30 +126,7 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		logrus.Errorf("hijack error: %v", err)
 		return
 	}
-
-	if err := readAckWithTimeout(conn, h.ackTimeout); err != nil {
-		conn.Close()
-		logrus.Errorf("waiting for ack: %v", err)
-		return
-	}
-
 	h.chConn <- conn
-}
-
-func readAckWithTimeout(conn net.Conn, timeout time.Duration) error {
-	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		return fmt.Errorf("clearing deadline: %w", err)
-	}
-	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
-
-	// The client confirms it has fully read the hijack response and is ready to serve whatever might come next.
-	// This prevents race conditions where we start using the connection on the server for something else already
-	// before the response has been fully read, which can mix traffic.
-	ack := make([]byte, 1)
-	if _, err := conn.Read(ack); err != nil {
-		return fmt.Errorf("reading ack: %w", err)
-	}
-	return nil
 }
 
 type HijackAcceptor struct {
