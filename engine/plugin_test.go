@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"net"
 	"net/http"
@@ -123,7 +122,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(s.Value))
 				assert.NoError(t, p.Close())
-				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
@@ -183,7 +182,7 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				assert.NoError(t, p.Close())
-				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 			},
 		},
 		{
@@ -204,7 +203,7 @@ func Test_newPlugin(t *testing.T) {
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
 				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
-				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
@@ -230,8 +229,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				plugin := newMockedPlugin()
 				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
-				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
-				t.Cleanup(cancel)
+				runErr := runAsync(t.Context(), s.Run)
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
@@ -245,10 +243,9 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
-				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
 
-				err = <-runErr
-				assert.NoError(t, err)
+				assert.NoError(t, testhelper.WaitForErrorWithTimeout(runErr))
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},
@@ -260,15 +257,14 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
-				runErr, cancel := runAsyncWithTimeout(t.Context(), s.Run)
-				t.Cleanup(cancel)
+				runErr := runAsync(t.Context(), s.Run)
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
-				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -298,7 +294,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				cancel()
 				<-done
-				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
 				assert.NoError(t, r.Close())
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
@@ -347,13 +343,12 @@ func randString(n int) string {
 	return string(b)
 }
 
-func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) error) (chan error, context.CancelFunc) {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, mockRuntimeTestTimeout)
+func runAsync(ctx context.Context, run func(ctx context.Context) error) chan error {
 	runErr := make(chan error)
 	go func() {
-		runErr <- run(ctxWithTimeout)
+		runErr <- run(ctx)
 	}()
-	return runErr, cancel
+	return runErr
 }
 
 type mockExternalRuntime struct {
@@ -376,7 +371,7 @@ func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
 
 func (m *mockExternalRuntime) shutdown() error {
 	m.server.Close()
-	return testhelper.WaitForWithTimeout(m.serverErr)
+	return testhelper.WaitForErrorWithTimeout(m.serverErr)
 }
 
 func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
