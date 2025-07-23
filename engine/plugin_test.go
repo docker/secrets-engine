@@ -151,7 +151,14 @@ func Test_newPlugin(t *testing.T) {
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
 				r, err := parseOutput()
-				require.NoError(t, err)
+				// TODO: investigate
+				// This keeps randomly failing on CI with:
+				// failed to unmarshal '': unexpected end of JSON input
+				//
+				// It means the plugin hasn't been shutdown yet though we believe it should have
+				// or the plugin somehow didn't manage to send stuff to STDOUT.
+				// Either way, when we try to parse what we believe is STDOUT, it's empty.
+				require.NoError(t, err, "could not parse plugin binary output")
 				require.Equal(t, 1, len(r.GetSecret))
 			},
 		},
