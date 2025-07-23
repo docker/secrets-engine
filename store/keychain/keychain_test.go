@@ -110,6 +110,10 @@ func TestKeychain(t *testing.T) {
 			"com.test.test/test/bob": {
 				Username: "bob",
 				Password: "bob-password",
+				Attributes: map[string]string{
+					"color": "blue",
+					"game":  "elden ring",
+				},
 			},
 			"com.test.test/test/jeff": {
 				Username: "jeff",
@@ -139,24 +143,17 @@ func TestKeychain(t *testing.T) {
 		}
 
 		expected := moreCreds
-		for k, v := range expected {
+		for _, v := range expected {
 			// listing credentials from the store won't retrieve the actual
 			// credentials, only the metadata.
 			// That is why we set username and password to empty
 			v.Username = ""
 			v.Password = ""
-
-			// the store sets some attributes internally, which we need to setup
-			// here on our expected map.
 			if v.Attributes == nil {
 				v.Attributes = make(map[string]string)
 			}
-			v.Attributes["id"] = k.String()
-			v.Attributes["service:group"] = "com.test.test"
-			v.Attributes["service:name"] = "test"
 		}
 		assert.EqualValues(t, expected, actual)
-		require.NoError(t, err)
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
