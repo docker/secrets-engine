@@ -148,7 +148,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dir := createDummyPlugins(t, dummyPlugins{okPlugins: []string{"plugin-foo"}})
-			socketPath := "foo.sock"
+			socketPath := testhelper.RandomShortSocketName()
 			options := []Option{
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
@@ -185,8 +185,8 @@ func runEngineAsync(t *testing.T, e Engine) {
 	go func() {
 		errEngine <- e.Run(t.Context(), func() { close(done) })
 	}()
-	assert.NoError(t, testhelper.WaitForWithTimeout(done))
-	t.Cleanup(func() { assert.NoError(t, testhelper.WaitForWithTimeout(errEngine)) })
+	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
+	t.Cleanup(func() { assert.NoError(t, testhelper.WaitForErrorWithTimeout(errEngine)) })
 }
 
 type externalPluginTestConfig struct {

@@ -16,6 +16,7 @@ import (
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 type mockPlugin struct{}
@@ -72,7 +73,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 		{
 			name: "with all custom options",
 			test: func(t *testing.T) {
-				socket := "test.sock"
+				socket := testhelper.RandomShortSocketName()
 				l, err := net.Listen("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { l.Close() })

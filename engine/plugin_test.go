@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"math/rand"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -109,12 +109,12 @@ func Test_newPlugin(t *testing.T) {
 					E: []secrets.Envelope{{ID: mockSecretID, Value: []byte(mockSecretValue)}},
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, p.Data(), pluginData{
-					name:       "dummy-plugin",
+					name:       pluginNameFromTestName(t),
 					pattern:    pattern,
 					version:    version,
 					pluginType: internalPlugin,
@@ -145,7 +145,7 @@ func Test_newPlugin(t *testing.T) {
 					ErrGetSecret: errGetSecret,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
@@ -178,7 +178,7 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
@@ -197,13 +197,13 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
-				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
+				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
@@ -213,6 +213,11 @@ func Test_newPlugin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
+}
+
+func pluginNameFromTestName(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("plugin-%s", strings.ToLower(strings.ReplaceAll(t.Name(), "/", "_")))
 }
 
 func Test_newExternalPlugin(t *testing.T) {
@@ -323,7 +328,7 @@ func Test_newExternalPlugin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			socketPath := randString(6) + ".sock" // avoid socket name clashes with parallel running tests
+			socketPath := testhelper.RandomShortSocketName()
 			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
 			conn, err := net.Dial("unix", socketPath)
@@ -333,15 +338,6 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
-}
-
-func randString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func runAsync(ctx context.Context, run func(ctx context.Context) error) chan error {
