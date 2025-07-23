@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/keybase/dbus"
-	kc "github.com/keybase/go-keychain/secretservice"
+	kc "github.com/Benehiko/go-keychain/v2/secretservice"
+	dbus "github.com/godbus/dbus/v5"
 
 	"github.com/docker/secrets-engine/store"
 )

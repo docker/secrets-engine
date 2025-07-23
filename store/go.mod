@@ -5,10 +5,10 @@ go 1.24.3
 replace github.com/docker/secrets-engine => ../
 
 require (
+	github.com/Benehiko/go-keychain/v2 v2.0.0
 	github.com/danieljoos/wincred v1.2.2
 	github.com/docker/secrets-engine v0.0.0-00010101000000-000000000000
-	github.com/keybase/dbus v0.0.0-20220506165403-5aa21ea2c23a
-	github.com/keybase/go-keychain v0.0.1
+	github.com/godbus/dbus/v5 v5.1.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sys v0.34.0

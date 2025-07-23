@@ -1,8 +1,12 @@
+//+build !windows,!solaris,!darwin
+
 package dbus
 
-import "os"
+import (
+	"os"
+)
 
-const defaultSystemBusAddress = "tcp:host=127.0.0.1,port=12434"
+const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
 func getSystemBusPlatformAddress() string {
 	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
