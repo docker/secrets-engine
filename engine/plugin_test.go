@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -324,7 +325,7 @@ func Test_newExternalPlugin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			socketPath := "test.sock"
+			socketPath := randString(6) + ".sock" // avoid socket name clashes with parallel running tests
 			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
 			conn, err := net.Dial("unix", socketPath)
@@ -334,6 +335,15 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
+}
+
+func randString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) error) (chan error, context.CancelFunc) {
