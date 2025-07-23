@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
 	p "github.com/docker/secrets-engine/plugin"
@@ -224,7 +225,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				plugin := newMockedPlugin()
 				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -253,7 +254,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugin returns error on GetSecret",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -275,7 +276,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -303,7 +304,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				doneRuntime := make(chan struct{})
 				go func() {
@@ -357,10 +358,10 @@ type mockExternalRuntime struct {
 	serverErr chan error
 }
 
-func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
+func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternalRuntime {
 	httpMux := http.NewServeMux()
 	chConn := make(chan net.Conn)
-	httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) { chConn <- conn }))
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(conn net.Conn) { chConn <- conn }))
 	serverErr := make(chan error, 1)
 	server := &http.Server{Handler: httpMux}
 	go func() {

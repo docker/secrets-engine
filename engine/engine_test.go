@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
@@ -101,6 +102,16 @@ func (m *mockRegistry) GetAll() []runtime {
 	return nil
 }
 
+func testLoggerCtx(t *testing.T) context.Context {
+	t.Helper()
+	return logging.WithLogger(t.Context(), logging.NewDefaultLogger(t.Name()))
+}
+
+func testLogger(t *testing.T) logging.Logger {
+	t.Helper()
+	return logging.NewDefaultLogger(t.Name())
+}
+
 func Test_Register(t *testing.T) {
 	t.Parallel()
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
@@ -109,7 +120,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return nil, launchErr
 		}
-		assert.ErrorIs(t, register(reg, l), launchErr)
+		assert.ErrorIs(t, register(testLogger(t), reg, l), launchErr)
 	})
 	t.Run("when Register() returns an error, Close() is called", func(t *testing.T) {
 		errRegister := errors.New("register error")
@@ -118,7 +129,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.ErrorIs(t, register(reg, l), errRegister)
+		assert.ErrorIs(t, register(testLogger(t), reg, l), errRegister)
 		assert.Equal(t, 1, r.closeCalled)
 	})
 	t.Run("runtime gets unregistered when channel is closed", func(t *testing.T) {
@@ -127,7 +138,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.NoError(t, register(reg, l))
+		assert.NoError(t, register(testLogger(t), reg, l))
 		assert.Equal(t, 0, reg.removeCalled)
 		close(r.closed)
 		<-reg.removed
@@ -140,7 +151,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.NoError(t, register(reg, l))
+		assert.NoError(t, register(testLogger(t), reg, l))
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
 		assert.Equal(t, 0, r.closeCalled)
@@ -155,7 +166,7 @@ func Test_discoverPlugins(t *testing.T) {
 		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "binary-file")))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "my-plugin")))
-		plugins, err := discoverPlugins(dir)
+		plugins, err := discoverPlugins(testLogger(t), dir)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
 		assert.Contains(t, plugins, "binary-file"+suffix)
@@ -163,12 +174,12 @@ func Test_discoverPlugins(t *testing.T) {
 	})
 	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
 		dir := t.TempDir()
-		plugins, err := discoverPlugins(filepath.Join(dir, "does-not-exist"))
+		plugins, err := discoverPlugins(testLogger(t), filepath.Join(dir, "does-not-exist"))
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
 	t.Run("empty dir string", func(t *testing.T) {
-		plugins, err := discoverPlugins("")
+		plugins, err := discoverPlugins(testLogger(t), "")
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
@@ -182,6 +193,7 @@ func Test_startPlugins(t *testing.T) {
 		name:       "test-engine",
 		version:    "test-version",
 		pluginPath: dir,
+		logger:     logging.NewDefaultLogger(""),
 	}, reg))
 	plugins := reg.GetAll()
 	assert.Len(t, plugins, 1)
@@ -201,8 +213,9 @@ func Test_newEngine(t *testing.T) {
 		version:    "test-version",
 		pluginPath: dir,
 		socketPath: socketPath,
+		logger:     logging.NewDefaultLogger(""),
 	}
-	e, err := newEngine(cfg)
+	e, err := newEngine(testLoggerCtx(t), cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, e.Close()) })
 	c, err := client.New(client.WithSocketPath(socketPath))

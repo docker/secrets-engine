@@ -13,10 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 const (
@@ -27,14 +26,16 @@ type engine struct {
 	close func() error
 }
 
-func newEngine(cfg config) (io.Closer, error) {
+func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 	l, err := createListener(cfg.socketPath)
 	if err != nil {
 		return nil, err
 	}
 
 	reg := &manager{}
-	startBuiltins(context.Background(), reg, cfg.plugins)
+	if err := startBuiltins(ctx, reg, cfg.plugins); err != nil {
+		return nil, err
+	}
 	if !cfg.enginePluginsDisabled {
 		if err := startPlugins(cfg, reg); err != nil {
 			return nil, err
@@ -65,7 +66,7 @@ func newEngine(cfg config) (io.Closer, error) {
 			default:
 			}
 			stopErr := stopPlugins()
-			ctx, cancel := context.WithTimeout(context.Background(), engineShutdownTimeout)
+			ctx, cancel := context.WithTimeout(ctx, engineShutdownTimeout)
 			defer cancel()
 			return errors.Join(server.Shutdown(ctx), stopErr, serverErr)
 		}),
@@ -97,8 +98,8 @@ func parallelStop(plugins []runtime) error {
 }
 
 func startPlugins(cfg config, reg registry) error {
-	logrus.Infof("starting plugins...")
-	discoveredPlugins, err := discoverPlugins(cfg.pluginPath)
+	cfg.logger.Printf("starting plugins...")
+	discoveredPlugins, err := discoverPlugins(cfg.logger, cfg.pluginPath)
 	if err != nil {
 		return err
 	}
@@ -107,9 +108,9 @@ func startPlugins(cfg config, reg registry) error {
 		name, l := newLauncher(cfg, p)
 		g.Add(1)
 		go func() {
-			logrus.Infof("starting pre-installed plugin '%s'...", name)
-			if err := register(reg, l); err != nil {
-				logrus.Warnf("failed to initialize pre-installed plugin '%s': %v", name, err)
+			cfg.logger.Printf("starting pre-installed plugin '%s'...", name)
+			if err := register(cfg.logger, reg, l); err != nil {
+				cfg.logger.Errorf("failed to initialize pre-installed plugin '%s': %v", name, err)
 			}
 			g.Done()
 		}()
@@ -130,7 +131,7 @@ func newLauncher(cfg config, pluginFile string) (string, Launcher) {
 
 type Launcher func() (runtime, error)
 
-func register(reg registry, launch Launcher) error {
+func register(logger logging.Logger, reg registry, launch Launcher) error {
 	run, err := launch()
 	if err != nil {
 		return err
@@ -139,7 +140,7 @@ func register(reg registry, launch Launcher) error {
 	if err != nil {
 		// TODO: Maybe we should send the shutdown reason to the plugin before shutting down?
 		if err := run.Close(); err != nil {
-			logrus.Error(err)
+			logger.Errorf(err.Error())
 		}
 		return err
 	}
@@ -152,7 +153,7 @@ func register(reg registry, launch Launcher) error {
 	return nil
 }
 
-func discoverPlugins(pluginPath string) ([]string, error) {
+func discoverPlugins(logger logging.Logger, pluginPath string) ([]string, error) {
 	if pluginPath == "" {
 		return nil, nil
 	}
@@ -162,7 +163,7 @@ func discoverPlugins(pluginPath string) ([]string, error) {
 	entries, err := os.ReadDir(pluginPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logrus.Warnf("Plugin directory does not exist: %s", pluginPath)
+			logger.Warnf("Plugin directory does not exist: %s", pluginPath)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to discover plugins in %s: %w", pluginPath, err)
@@ -180,7 +181,7 @@ func discoverPlugins(pluginPath string) ([]string, error) {
 			continue
 		}
 
-		logrus.Infof("discovered plugin %s", toDisplayName(e.Name()))
+		logger.Printf("discovered plugin %s", toDisplayName(e.Name()))
 		result = append(result, e.Name())
 	}
 
@@ -196,12 +197,12 @@ func newServer(cfg config, reg registry) *http.Server {
 	r := &resolver{reg: reg}
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
 	if !cfg.dynamicPluginsDisabled {
-		httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) {
+		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(conn net.Conn) {
 			launcher := Launcher(func() (runtime, error) {
 				return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
-			if err := register(reg, launcher); err != nil {
-				logrus.Errorf("registering dynamic plugin: %v", err)
+			if err := register(cfg.logger, reg, launcher); err != nil {
+				cfg.logger.Errorf("registering dynamic plugin: %v", err)
 			}
 		}))
 	}
