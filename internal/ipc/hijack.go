@@ -126,7 +126,7 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	// Note: Don't try to pass r.Context() in here.
+	// Note: Be careful when trying to pass r.Context() in here.
 	// r.Context() gets cancelled when this function returns, but conn will live much longer which is misleading.
 	h.cb(conn)
 }

@@ -2,6 +2,7 @@ package testhelper
 
 import (
 	"errors"
+	"math/rand"
 	"time"
 )
 
@@ -37,4 +38,23 @@ func WaitForWithExplicitTimeoutV[T any](ch <-chan T, timeout time.Duration) (T, 
 	case <-time.After(timeout):
 		return zero, errors.New("timeout")
 	}
+}
+
+// RandomShortSocketName creates a socket name string that avoids common pitfalls in tests.
+// There are a bunch of opposing problems in unit tests with sockets:
+// Ideally, we'd like to use t.TmpDir+something.sock -> too long socket name
+// We can't just use local short file name -> clashes when running tests in parallel
+// We can't use t.ChDir + short name -> t.ChDir does not allow t.Parallel
+// -> we use a short local but randomized socket path
+func RandomShortSocketName() string {
+	return randString(6) + ".sock"
+}
+
+func randString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
