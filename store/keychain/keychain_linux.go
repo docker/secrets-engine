@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	kc "github.com/Benehiko/go-keychain/v2/secretservice"
@@ -201,6 +202,9 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	}
 
 	secret := k.factory()
+	if err := secret.SetMetadata(attributes); err != nil {
+		return nil, err
+	}
 	if err := secret.Unmarshal(value); err != nil {
 		return nil, err
 	}
@@ -208,7 +212,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -247,11 +251,6 @@ func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, e
 
 	credentials := make(map[store.ID]store.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
-		value, err := service.GetSecret(itemPath, *session)
-		if err != nil {
-			return nil, err
-		}
-
 		attributes, err := service.GetAttributes(itemPath)
 		if err != nil {
 			return nil, err
@@ -262,14 +261,16 @@ func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, e
 			return nil, errors.New("secret attributes does not contain `id` field")
 		}
 
-		secret := k.factory()
-		if err := secret.Unmarshal(value); err != nil {
-			return nil, err
-		}
 		secretID, err := store.ParseID(attrID)
 		if err != nil {
 			return nil, err
 		}
+
+		secret := k.factory()
+		if err := secret.SetMetadata(attributes); err != nil {
+			return nil, err
+		}
+
 		credentials[secretID] = secret
 	}
 
@@ -318,6 +319,8 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	}
 
 	attributes := newItemAttributes(id.String(), k)
+	maps.Copy(attributes, secret.Metadata())
+
 	label := k.itemLabel(id)
 	properties := kc.NewSecretProperties(label, attributes)
 

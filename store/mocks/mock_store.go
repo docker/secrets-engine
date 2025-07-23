@@ -43,7 +43,7 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 }
 
 // GetAll implements Store.
-func (m *MockStore) GetAll(_ context.Context) (map[store.ID]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
