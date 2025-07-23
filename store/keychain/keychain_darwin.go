@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	kc "github.com/keybase/go-keychain"
+	kc "github.com/Benehiko/go-keychain/v2"
 
 	"github.com/docker/secrets-engine/store"
 )
