@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 	"github.com/docker/secrets-engine/plugin"
 )
 
@@ -77,7 +78,7 @@ func Test_internalRuntime(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, resp.Value, []byte(mockSecretValue))
 		assert.NoError(t, r.Close())
-		assert.NoError(t, checkClosed(r.Closed()))
+		assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 		assert.ErrorContains(t, err, "plugin foo has been shutdown")
 	})
@@ -95,13 +96,13 @@ func Test_internalRuntime(t *testing.T) {
 		r, err := newInternalRuntime(t.Context(), "foo", m)
 		assert.NoError(t, err)
 		assert.ErrorContains(t, r.Close(), "timeout")
-		assert.NoError(t, checkClosed(r.Closed()))
+		assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 	})
 	t.Run("panic in Run() is handled and does not block get secret", func(t *testing.T) {
 		m := &mockInternalPlugin{pattern: "*", runPanics: true}
 		r, err := newInternalRuntime(t.Context(), "foo", m)
 		assert.NoError(t, err)
-		assert.NoError(t, checkClosed(r.Closed()))
+		assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 		assert.ErrorContains(t, err, "panic in foo:")
 		assert.ErrorContains(t, r.Close(), "panic in foo:")

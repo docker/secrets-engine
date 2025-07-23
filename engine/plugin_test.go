@@ -17,6 +17,7 @@ import (
 
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 	p "github.com/docker/secrets-engine/plugin"
 )
 
@@ -122,7 +123,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(s.Value))
 				assert.NoError(t, p.Close())
-				assert.NoError(t, checkClosed(p.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
@@ -182,7 +183,7 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				assert.NoError(t, p.Close())
-				assert.NoError(t, checkClosed(p.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
 			},
 		},
 		{
@@ -203,7 +204,7 @@ func Test_newPlugin(t *testing.T) {
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
 				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
-				assert.NoError(t, checkClosed(p.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(p.Closed()))
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
@@ -244,7 +245,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
-				assert.NoError(t, checkClosed(r.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -267,7 +268,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
-				assert.NoError(t, checkClosed(r.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -297,7 +298,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				cancel()
 				<-done
-				assert.NoError(t, checkClosed(r.Closed()))
+				assert.NoError(t, testhelper.WaitForWithTimeout(r.Closed()))
 				assert.NoError(t, r.Close())
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
@@ -355,15 +356,6 @@ func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) erro
 	return runErr, cancel
 }
 
-func checkClosed(closed <-chan struct{}) error {
-	select {
-	case <-closed:
-		return nil
-	case <-time.After(2 * time.Second):
-		return errors.New("plugin did not close after timeout")
-	}
-}
-
 type mockExternalRuntime struct {
 	server    *http.Server
 	chConn    chan net.Conn
@@ -384,29 +376,15 @@ func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
 
 func (m *mockExternalRuntime) shutdown() error {
 	m.server.Close()
-	select {
-	case err := <-m.serverErr:
-		return err
-	case <-time.After(2 * time.Second):
-		return errors.New("timeout waiting for server to shutdown")
-	}
+	return testhelper.WaitForWithTimeout(m.serverErr)
 }
 
 func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
-	conn, err := getServerConnWithTimeout(m.chConn, 2*time.Second)
+	conn, err := testhelper.WaitForWithTimeoutV(m.chConn)
 	if err != nil {
 		return nil, err
 	}
 	return newExternalPlugin(conn, runtimeCfg{
 		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
-}
-
-func getServerConnWithTimeout(chConn <-chan net.Conn, timeout time.Duration) (net.Conn, error) {
-	select {
-	case conn := <-chConn:
-		return conn, nil
-	case <-time.After(timeout):
-		return nil, errors.New("timeout")
-	}
 }

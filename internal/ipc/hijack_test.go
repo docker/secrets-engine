@@ -3,7 +3,6 @@ package ipc
 import (
 	"bufio"
 	"context"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 func Test_hijacking(t *testing.T) {
@@ -39,7 +40,7 @@ func Test_hijacking(t *testing.T) {
 	t.Cleanup(func() { connClient.Close() })
 	connHijacked, err := Hijackify(connClient, hijackTimeout)
 	require.NoError(t, err)
-	connServer, err := getServerConnWithTimeout(acceptor.nextHijackedConn(), 2*time.Second)
+	connServer, err := testhelper.WaitForWithTimeoutV(acceptor.nextHijackedConn())
 	require.NoError(t, err)
 
 	assert.NoError(t, writeLine(connHijacked, "ping"))
@@ -55,7 +56,7 @@ func Test_hijacking(t *testing.T) {
 	assert.Equal(t, "ok", health)
 
 	assert.NoError(t, server.Close())
-	assert.ErrorIs(t, waitForErrorWithTimeout(serverErr), http.ErrServerClosed)
+	assert.ErrorIs(t, testhelper.WaitForWithTimeout(serverErr), http.ErrServerClosed)
 }
 
 type testHijackAcceptor struct {
@@ -101,24 +102,6 @@ func readLine(conn net.Conn) string {
 func writeLine(conn net.Conn, line string) error {
 	_, err := conn.Write([]byte(line + "\r\n"))
 	return err
-}
-
-func waitForErrorWithTimeout(chErr <-chan error) error {
-	select {
-	case err := <-chErr:
-		return err
-	case <-time.After(2 * time.Second):
-		return errors.New("timeout")
-	}
-}
-
-func getServerConnWithTimeout(chConn <-chan net.Conn, timeout time.Duration) (net.Conn, error) {
-	select {
-	case conn := <-chConn:
-		return conn, nil
-	case <-time.After(timeout):
-		return nil, errors.New("timeout")
-	}
 }
 
 func requestHealthCheck(socketPath string) (string, error) {
