@@ -1,6 +1,7 @@
 package keychain
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestKeychain(t *testing.T) {
 			Password: "bob-password",
 		}
 		t.Cleanup(func() {
-			require.NoError(t, ks.Delete(t.Context(), id))
+			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 		require.NoError(t, ks.Save(t.Context(), id, creds))
 	})
@@ -85,7 +86,7 @@ func TestKeychain(t *testing.T) {
 			Password: "bob-password",
 		}
 		t.Cleanup(func() {
-			require.NoError(t, ks.Delete(t.Context(), id))
+			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 		require.NoError(t, ks.Save(t.Context(), id, creds))
 		require.NoError(t, id.Valid())
@@ -126,7 +127,7 @@ func TestKeychain(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				require.NoError(t, ks.Delete(t.Context(), id))
+				require.NoError(t, ks.Delete(context.Background(), id))
 			}
 		})
 
@@ -213,7 +214,7 @@ func TestKeychain(t *testing.T) {
 		id, err := store.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			require.NoError(t, kc.Delete(t.Context(), id))
+			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
 		_, err = kc.Get(t.Context(), id)
@@ -227,7 +228,7 @@ func TestKeychain(t *testing.T) {
 		id, err := store.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			require.NoError(t, kc.Delete(t.Context(), id))
+			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
 		_, err = kc.GetAllMetadata(t.Context())
