@@ -124,21 +124,29 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 	}
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
-	if err = cmd.Start(); err != nil {
-		rwc.Close()
-		return nil, fmt.Errorf("failed to launch plugin %q: %w", v.name, err)
-	}
-	w := newCmdWatchWrapper(v.name, cmd)
+	cmdWrapper := launchCmdWatched(v.name, cmd)
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
 	r, err := setup(rwc, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
-		w.close()
+		cmdWrapper.close()
 		return nil, err
 	}
+
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
+	finalCloseEverything := sync.OnceValue(func() error {
+		return errors.Join(callPluginShutdown(c, closed), r.close(), cmdWrapper.close())
+	})
+
+	go func() {
+		<-cmdWrapper.closed()
+		// The error is stored in the sync.OnceValue and will be fetched later
+		// when runtime.Close() is called.
+		_ = finalCloseEverything()
+	}()
+
 	return &runtimeImpl{
 		pluginData: pluginData{
 			name:       v.name,
@@ -148,10 +156,8 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 		},
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
-		close: sync.OnceValue(func() error {
-			return errors.Join(callPluginShutdown(c, closed), r.close(), w.close())
-		}),
-		closed: closed,
+		close:          finalCloseEverything,
+		closed:         closed,
 	}, nil
 }
 

@@ -8,16 +8,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type cmdWrapper interface {
+	close() error
+	closed() <-chan struct{}
+}
+
 type cmdWatchWrapper struct {
 	cmd  *exec.Cmd
 	err  error
 	done chan struct{}
+	name string
 }
 
-func newCmdWatchWrapper(name string, cmd *exec.Cmd) *cmdWatchWrapper {
-	result := &cmdWatchWrapper{cmd: cmd, done: make(chan struct{})}
+func launchCmdWatched(name string, cmd *exec.Cmd) cmdWrapper {
+	result := &cmdWatchWrapper{name: name, cmd: cmd, done: make(chan struct{})}
 	go func() {
-		err := cmd.Wait()
+		err := cmd.Run()
 		// On linux, if the process doesn't listen to SIGINT / explicitly handles it, cmd.Wait() returns an error.
 		// It's not an error for us, but logging it could help giving feedback to improve the plugin implementation.
 		if isSigint(err) {
@@ -33,22 +39,26 @@ func newCmdWatchWrapper(name string, cmd *exec.Cmd) *cmdWatchWrapper {
 	return result
 }
 
+func (w *cmdWatchWrapper) closed() <-chan struct{} {
+	return w.done
+}
+
 func (w *cmdWatchWrapper) close() error {
 	select {
 	case <-w.done:
 		return w.err
 	default:
 	}
-	shutdownCMD(w.cmd, w.done)
+	shutdownCMD(w.name, w.cmd, w.done)
 	return w.err
 }
 
-func shutdownCMD(cmd *exec.Cmd, done <-chan struct{}) {
+func shutdownCMD(name string, cmd *exec.Cmd, done <-chan struct{}) {
 	if cmd.Process == nil {
 		return
 	}
 	if err := askProcessToStop(cmd); err != nil {
-		logrus.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin: %v", err)
+		logrus.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin '%s': %v", name, err)
 		kill(cmd)
 		return
 	}
@@ -56,6 +66,7 @@ func shutdownCMD(cmd *exec.Cmd, done <-chan struct{}) {
 	case <-done:
 		return
 	case <-time.After(pluginShutdownTimeout):
+		logrus.Warnf("plugin '%s' did not shut down after timeout", name)
 	}
 	kill(cmd)
 }

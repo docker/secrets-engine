@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -151,7 +152,14 @@ func Test_newPlugin(t *testing.T) {
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
 				r, err := parseOutput()
-				require.NoError(t, err)
+				// TODO: investigate
+				// This keeps randomly failing on CI with:
+				// failed to unmarshal '': unexpected end of JSON input
+				//
+				// It means the plugin hasn't been shutdown yet though we believe it should have
+				// or the plugin somehow didn't manage to send stuff to STDOUT.
+				// Either way, when we try to parse what we believe is STDOUT, it's empty.
+				require.NoError(t, err, "could not parse plugin binary output")
 				require.Equal(t, 1, len(r.GetSecret))
 			},
 		},
@@ -317,7 +325,7 @@ func Test_newExternalPlugin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			socketPath := "test.sock"
+			socketPath := randString(6) + ".sock" // avoid socket name clashes with parallel running tests
 			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
 			conn, err := net.Dial("unix", socketPath)
@@ -327,6 +335,15 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
+}
+
+func randString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 func runAsyncWithTimeout(ctx context.Context, run func(ctx context.Context) error) (chan error, context.CancelFunc) {
