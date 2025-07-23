@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 const (
@@ -104,6 +106,7 @@ type CloseWriter interface {
 type hijackHandler struct {
 	cb         func(net.Conn)
 	ackTimeout time.Duration
+	logger     logging.Logger
 }
 
 func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
@@ -119,13 +122,15 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 
 	conn, _, err := hj.Hijack()
 	if err != nil {
-		logrus.Errorf("hijack error: %v", err)
+		h.logger.Errorf("hijack error: %v", err)
 		return
 	}
 
+	// Note: Don't try to pass r.Context() in here.
+	// r.Context() gets cancelled when this function returns, but conn will live much longer which is misleading.
 	h.cb(conn)
 }
 
-func NewHijackAcceptor(cb func(conn net.Conn)) (string, http.Handler) {
-	return hijackPath, &hijackHandler{cb: cb, ackTimeout: hijackTimeout}
+func NewHijackAcceptor(logger logging.Logger, cb func(conn net.Conn)) (string, http.Handler) {
+	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }
