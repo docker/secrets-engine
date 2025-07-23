@@ -56,7 +56,7 @@ func Test_hijacking(t *testing.T) {
 	assert.Equal(t, "ok", health)
 
 	assert.NoError(t, server.Close())
-	assert.ErrorIs(t, testhelper.WaitForWithTimeout(serverErr), http.ErrServerClosed)
+	assert.ErrorIs(t, testhelper.WaitForErrorWithTimeout(serverErr), http.ErrServerClosed)
 }
 
 type testHijackAcceptor struct {

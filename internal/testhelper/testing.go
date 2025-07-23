@@ -5,21 +5,19 @@ import (
 	"time"
 )
 
-func WaitForWithTimeout[T any](ch <-chan T) error {
-	return WaitForWithExplicitTimeout(ch, 2*time.Second)
+func WaitForErrorWithTimeout(in <-chan error) error {
+	val, err := WaitForWithExplicitTimeoutV(in, 2*time.Second)
+	if err != nil {
+		return err
+	}
+	return val
 }
 
-func WaitForWithExplicitTimeout[T any](ch <-chan T, timeout time.Duration) error {
+func WaitForClosedWithTimeout(in <-chan struct{}) error {
 	select {
-	case val, ok := <-ch:
-		if !ok {
-			return nil
-		}
-		if err, isErr := any(val).(error); isErr {
-			return err
-		}
+	case <-in:
 		return nil
-	case <-time.After(timeout):
+	case <-time.After(2 * time.Second):
 		return errors.New("timeout")
 	}
 }

@@ -54,8 +54,8 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		_, err = resolverv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(resolverv1.ShutdownRequest_builder{}.Build()))
 		assert.NoError(t, err)
-		assert.NoError(t, testhelper.WaitForWithTimeout(pluginClosed))
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(pluginClosed))
 		assert.NoError(t, closer.Close())
-		assert.NoError(t, testhelper.WaitForWithTimeout(runtimeClosed))
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(runtimeClosed))
 	})
 }
