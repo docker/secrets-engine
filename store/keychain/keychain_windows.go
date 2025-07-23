@@ -74,8 +74,11 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 		return nil, mapWindowsCredentialError(err)
 	}
 
+	attributes := mapFromWindowsAttributes(gc.Attributes)
+	k.safelyCleanMetadata(attributes)
+
 	secret := k.factory()
-	if err := secret.SetMetadata(mapFromWindowsAttributes(gc.Attributes)); err != nil {
+	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
 	if err := decodeSecret(gc.CredentialBlob, secret); err != nil {
@@ -85,7 +88,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 }
 
 // isServiceCredential checks if a credential attribute contains the
-// `service:group` and `service:name` attribute.
+// [serviceGroupKey] and [serviceNameKey] attribute.
 //
 // The keychainStore serviceGroup and serviceName should match what is stored
 // in the attributes.
@@ -97,9 +100,9 @@ func isServiceCredential[T store.Secret](k *keychainStore[T], attrs []wincred.Cr
 	)
 	for _, attr := range attrs {
 		switch attr.Keyword {
-		case "service:group":
+		case serviceGroupKey:
 			serviceGroup = string(attr.Value)
-		case "service:name":
+		case serviceNameKey:
 			serviceName = string(attr.Value)
 		}
 	}
@@ -147,15 +150,18 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 
 	onlyLabelPrefix := k.itemLabel(store.ID(""))
 
-	secrets := make(map[store.ID]store.Secret, len(credentials))
+	secrets := make(map[store.ID]store.Secret)
 	for cred := range findServiceCredentials(k, credentials) {
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			return nil, err
 		}
 
+		attributes := mapFromWindowsAttributes(cred.Attributes)
+		k.safelyCleanMetadata(attributes)
+
 		secret := k.factory()
-		if err := secret.SetMetadata(mapFromWindowsAttributes(cred.Attributes)); err != nil {
+		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
 		secrets[id] = secret
@@ -176,10 +182,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 
 	attributes := make(map[string]string)
 	maps.Copy(attributes, secret.Metadata())
-
-	attributes["id"] = id.String()
-	attributes["service:group"] = k.serviceGroup
-	attributes["service:name"] = k.serviceName
+	k.safelySetMetadata(id.String(), attributes)
 
 	g := wincred.NewGenericCredential(k.itemLabel(id))
 	g.UserName = id.String()
