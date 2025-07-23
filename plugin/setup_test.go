@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 type mockRegistrationHandler struct {
@@ -54,17 +54,8 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		_, err = resolverv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(resolverv1.ShutdownRequest_builder{}.Build()))
 		assert.NoError(t, err)
-		assert.NoError(t, assertClosed(pluginClosed))
+		assert.NoError(t, testhelper.WaitForWithTimeout(pluginClosed))
 		assert.NoError(t, closer.Close())
-		assert.NoError(t, assertClosed(runtimeClosed))
+		assert.NoError(t, testhelper.WaitForWithTimeout(runtimeClosed))
 	})
-}
-
-func assertClosed(closed <-chan struct{}) error {
-	select {
-	case <-closed:
-		return nil
-	case <-time.After(2 * time.Second):
-		return errors.New("plugin did not close after timeout")
-	}
 }
