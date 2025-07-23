@@ -64,7 +64,7 @@ func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
 	stub := &stub{
 		name: cfg.name,
 		factory: func(ctx context.Context, onClose func(error)) (io.Closer, error) {
-			return setup(ctx, cfg.conn, cfg.name, p, cfg.registrationTimeout, onClose)
+			return setup(ctx, *cfg, onClose)
 		},
 	}
 	logrus.Infof("Created plugin %s", cfg.name)
