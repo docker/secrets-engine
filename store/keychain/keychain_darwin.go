@@ -102,13 +102,14 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 		return nil, err
 	}
 
-	attr, err := convertAttributes(result.Attributes)
+	attributes, err := convertAttributes(result.Attributes)
 	if err != nil {
 		return nil, err
 	}
+	k.safelyCleanMetadata(attributes)
 
 	secret := k.factory()
-	if err := secret.SetMetadata(attr); err != nil {
+	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
 	if err := secret.Unmarshal(result.Data); err != nil {
@@ -136,12 +137,14 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err != nil {
 			return nil, err
 		}
-		attr, err := convertAttributes(result.Attributes)
+		attributes, err := convertAttributes(result.Attributes)
 		if err != nil {
 			return nil, err
 		}
+		k.safelyCleanMetadata(attributes)
+
 		secret := k.factory()
-		if err := secret.SetMetadata(attr); err != nil {
+		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
 		creds[id] = secret
@@ -167,9 +170,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 
 	metadata := make(map[string]string)
 	maps.Copy(metadata, secret.Metadata())
-	metadata["id"] = id.String()
-	metadata["service:group"] = k.serviceGroup
-	metadata["service:name"] = k.serviceName
+	k.safelySetMetadata(id.String(), metadata)
 
 	metadataAny := make(map[string]any)
 	for k, v := range metadata {
