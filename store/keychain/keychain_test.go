@@ -334,3 +334,37 @@ func TestSafelyCleanMetadata(t *testing.T) {
 		assert.Empty(t, attributes)
 	})
 }
+
+func TestInternalMetadata(t *testing.T) {
+	kc := &keychainStore[*mocks.MockCredential]{
+		serviceGroup: "com.test.test",
+		serviceName:  "test",
+	}
+
+	t.Run("metadata can safely be set and cleaned afterwards", func(t *testing.T) {
+		attributes := map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"id":                 "avoid clash",
+			"x_already-prefixed": "prefixed",
+		}
+		kc.safelySetMetadata("username", attributes)
+		assert.EqualValues(t, map[string]string{
+			"x_color":              "blue",
+			"x_game":               "elden ring",
+			"x_id":                 "avoid clash",
+			"x_x_already-prefixed": "prefixed",
+			secretIDKey:            "username",
+			serviceGroupKey:        "com.test.test",
+			serviceNameKey:         "test",
+		}, attributes)
+
+		kc.safelyCleanMetadata(attributes)
+		assert.EqualValues(t, map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"x_already-prefixed": "prefixed",
+			"id":                 "avoid clash",
+		}, attributes)
+	})
+}
