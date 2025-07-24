@@ -8,8 +8,20 @@ import (
 )
 
 type MockCredential struct {
-	Username string
-	Password string
+	Username   string
+	Password   string
+	Attributes map[string]string
+}
+
+// Metadata implements store.Secret.
+func (m *MockCredential) Metadata() map[string]string {
+	return m.Attributes
+}
+
+// SetMetadata implements store.Secret.
+func (m *MockCredential) SetMetadata(attributes map[string]string) error {
+	m.Attributes = attributes
+	return nil
 }
 
 var _ store.Secret = &MockCredential{}

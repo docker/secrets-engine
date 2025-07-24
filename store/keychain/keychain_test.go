@@ -4,13 +4,26 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
 )
 
-type mustMarshalError struct{}
+type attributes struct{}
+
+func (a attributes) Metadata() map[string]string {
+	return nil
+}
+
+func (a attributes) SetMetadata(_ map[string]string) error {
+	return errors.New("i am failing on purpose")
+}
+
+type mustMarshalError struct {
+	attributes
+}
 
 var _ store.Secret = &mustMarshalError{}
 
@@ -22,7 +35,9 @@ func (m *mustMarshalError) Unmarshal([]byte) error {
 	return nil
 }
 
-type mustUnmarshalError struct{}
+type mustUnmarshalError struct {
+	attributes
+}
 
 var _ store.Secret = &mustUnmarshalError{}
 
@@ -79,9 +94,13 @@ func TestKeychain(t *testing.T) {
 
 		actual, ok := secret.(*mocks.MockCredential)
 		require.True(t, ok)
+		// we haven't set any attributes, but the underlying store might've
+		// since this is store specific, let's drop the attributes in this
+		// test
+		actual.Attributes = nil
 
 		expected := creds
-		require.EqualValues(t, expected, actual)
+		assert.EqualValues(t, expected, actual)
 	})
 
 	t.Run("list all credentials", func(t *testing.T) {
@@ -110,17 +129,34 @@ func TestKeychain(t *testing.T) {
 		for id, anotherCred := range moreCreds {
 			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
 		}
-		secrets, err := ks.GetAll(t.Context())
+		secrets, err := ks.GetAllMetadata(t.Context())
 		require.NoError(t, err)
+		assert.Len(t, secrets, 3)
 
 		actual := make(map[store.ID]*mocks.MockCredential)
-		for id, s := range secrets {
-			actual[id] = s.(*mocks.MockCredential)
+		for k, v := range secrets {
+			actual[k] = v.(*mocks.MockCredential)
 		}
-		require.Len(t, actual, 3)
 
 		expected := moreCreds
-		require.Equal(t, expected, actual)
+		for k, v := range expected {
+			// listing credentials from the store won't retrieve the actual
+			// credentials, only the metadata.
+			// That is why we set username and password to empty
+			v.Username = ""
+			v.Password = ""
+
+			// the store sets some attributes internally, which we need to setup
+			// here on our expected map.
+			if v.Attributes == nil {
+				v.Attributes = make(map[string]string)
+			}
+			v.Attributes["id"] = k.String()
+			v.Attributes["service:group"] = "com.test.test"
+			v.Attributes["service:name"] = "test"
+		}
+		assert.EqualValues(t, expected, actual)
+		require.NoError(t, err)
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
@@ -187,7 +223,7 @@ func TestKeychain(t *testing.T) {
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 
-	t.Run("unmarshal error on getAll", func(t *testing.T) {
+	t.Run("set metadata error on getAllMetadata", func(t *testing.T) {
 		kc := setupKeychain(t, func() store.Secret {
 			return &mustUnmarshalError{}
 		})
@@ -197,7 +233,7 @@ func TestKeychain(t *testing.T) {
 			require.NoError(t, kc.Delete(t.Context(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
-		_, err = kc.GetAll(t.Context())
+		_, err = kc.GetAllMetadata(t.Context())
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 }

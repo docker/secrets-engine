@@ -3,6 +3,8 @@ package keychain
 import (
 	"context"
 	"errors"
+	"fmt"
+	"maps"
 
 	kc "github.com/Benehiko/go-keychain/v2"
 
@@ -64,6 +66,19 @@ func getItemWithData[T store.Secret](id string, k *keychainStore[T]) (*kc.QueryR
 	return &results[0], nil
 }
 
+func convertAttributes(attributes map[string]any) (map[string]string, error) {
+	attr := make(map[string]string, len(attributes))
+	for k, v := range attributes {
+		switch t := v.(type) {
+		case string:
+			attr[k] = t
+		default:
+			return nil, fmt.Errorf("attributes of key %s has unsupported type %T", k, t)
+		}
+	}
+	return attr, nil
+}
+
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	if err := id.Valid(); err != nil {
 		return err
@@ -87,14 +102,22 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 		return nil, err
 	}
 
+	attr, err := convertAttributes(result.Attributes)
+	if err != nil {
+		return nil, err
+	}
+
 	secret := k.factory()
+	if err := secret.SetMetadata(attr); err != nil {
+		return nil, err
+	}
 	if err := secret.Unmarshal(result.Data); err != nil {
 		return nil, err
 	}
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -113,14 +136,12 @@ func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, e
 		if err != nil {
 			return nil, err
 		}
-
-		i, err := getItemWithData(id.String(), k)
+		attr, err := convertAttributes(result.Attributes)
 		if err != nil {
 			return nil, err
 		}
-
 		secret := k.factory()
-		if err := secret.Unmarshal(i.Data); err != nil {
+		if err := secret.SetMetadata(attr); err != nil {
 			return nil, err
 		}
 		creds[id] = secret
@@ -143,6 +164,19 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	// it is a user-friendly name for the item, which is displayed in the keychain UI.
 	// https://developer.apple.com/documentation/security/ksecattrlabel
 	item.SetLabel(k.itemLabel(id))
+
+	metadata := make(map[string]string)
+	maps.Copy(metadata, secret.Metadata())
+	metadata["id"] = id.String()
+	metadata["service:group"] = k.serviceGroup
+	metadata["service:name"] = k.serviceName
+
+	metadataAny := make(map[string]any)
+	for k, v := range metadata {
+		metadataAny[k] = v
+	}
+	item.SetGenericMetadata(metadataAny)
+
 	return mapKeychainError(kc.AddItem(item))
 }
 
