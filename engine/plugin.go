@@ -124,24 +124,24 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 	}
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
-	cmdWrapper := launchCmdWatched(v.name, cmd)
+	cmdWrapper := launchCmdWatched(v.name, fromCmd(cmd), getPluginShutdownTimeout())
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
 	r, err := setup(rwc, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
-		cmdWrapper.close()
+		cmdWrapper.Close()
 		return nil, err
 	}
 
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	finalCloseEverything := sync.OnceValue(func() error {
-		return errors.Join(callPluginShutdown(c, closed), r.close(), cmdWrapper.close())
+		return errors.Join(callPluginShutdown(c, closed), r.close(), cmdWrapper.Close())
 	})
 
 	go func() {
-		<-cmdWrapper.closed()
+		<-cmdWrapper.Closed()
 		// The error is stored in the sync.OnceValue and will be fetched later
 		// when runtime.Close() is called.
 		_ = finalCloseEverything()

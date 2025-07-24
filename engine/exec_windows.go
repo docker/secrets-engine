@@ -9,8 +9,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func askProcessToStop(cmd *exec.Cmd) error {
-	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(cmd.Process.Pid))
+func askProcessToStop(p proc) error {
+	pid := p.PID()
+	if pid <= 0 {
+		return nil
+	}
+	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(pid))
 }
 
 func isSigint(err error) bool {
