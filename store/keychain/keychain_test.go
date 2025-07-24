@@ -1,6 +1,7 @@
 package keychain
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestKeychain(t *testing.T) {
 			Password: "bob-password",
 		}
 		t.Cleanup(func() {
-			require.NoError(t, ks.Delete(t.Context(), id))
+			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 		require.NoError(t, ks.Save(t.Context(), id, creds))
 	})
@@ -85,7 +86,7 @@ func TestKeychain(t *testing.T) {
 			Password: "bob-password",
 		}
 		t.Cleanup(func() {
-			require.NoError(t, ks.Delete(t.Context(), id))
+			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 		require.NoError(t, ks.Save(t.Context(), id, creds))
 		require.NoError(t, id.Valid())
@@ -110,6 +111,10 @@ func TestKeychain(t *testing.T) {
 			"com.test.test/test/bob": {
 				Username: "bob",
 				Password: "bob-password",
+				Attributes: map[string]string{
+					"color": "blue",
+					"game":  "elden ring",
+				},
 			},
 			"com.test.test/test/jeff": {
 				Username: "jeff",
@@ -122,7 +127,7 @@ func TestKeychain(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				require.NoError(t, ks.Delete(t.Context(), id))
+				require.NoError(t, ks.Delete(context.Background(), id))
 			}
 		})
 
@@ -139,24 +144,17 @@ func TestKeychain(t *testing.T) {
 		}
 
 		expected := moreCreds
-		for k, v := range expected {
+		for _, v := range expected {
 			// listing credentials from the store won't retrieve the actual
 			// credentials, only the metadata.
 			// That is why we set username and password to empty
 			v.Username = ""
 			v.Password = ""
-
-			// the store sets some attributes internally, which we need to setup
-			// here on our expected map.
 			if v.Attributes == nil {
 				v.Attributes = make(map[string]string)
 			}
-			v.Attributes["id"] = k.String()
-			v.Attributes["service:group"] = "com.test.test"
-			v.Attributes["service:name"] = "test"
 		}
 		assert.EqualValues(t, expected, actual)
-		require.NoError(t, err)
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
@@ -216,7 +214,7 @@ func TestKeychain(t *testing.T) {
 		id, err := store.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			require.NoError(t, kc.Delete(t.Context(), id))
+			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
 		_, err = kc.Get(t.Context(), id)
@@ -230,7 +228,7 @@ func TestKeychain(t *testing.T) {
 		id, err := store.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			require.NoError(t, kc.Delete(t.Context(), id))
+			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
 		_, err = kc.GetAllMetadata(t.Context())
