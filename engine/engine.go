@@ -66,7 +66,8 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 			default:
 			}
 			stopErr := stopPlugins()
-			ctx, cancel := context.WithTimeout(ctx, engineShutdownTimeout)
+			// Close() has its own context that's derived from the initial context passed to the engine
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), engineShutdownTimeout)
 			defer cancel()
 			return errors.Join(server.Shutdown(ctx), stopErr, serverErr)
 		}),
