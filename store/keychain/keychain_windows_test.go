@@ -3,6 +3,8 @@
 package keychain
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/danieljoos/wincred"
@@ -15,7 +17,7 @@ func TestMapWindowsAttributes(t *testing.T) {
 			"color": "green",
 			"game":  "elden ring",
 		}
-		assert.EqualValues(t, []wincred.CredentialAttribute{
+		expected := []wincred.CredentialAttribute{
 			{
 				Keyword: "color",
 				Value:   []byte("green"),
@@ -24,7 +26,12 @@ func TestMapWindowsAttributes(t *testing.T) {
 				Keyword: "game",
 				Value:   []byte("elden ring"),
 			},
-		}, mapToWindowsAttributes(attributes))
+		}
+		actual := mapToWindowsAttributes(attributes)
+		slices.SortFunc(actual, func(a, b wincred.CredentialAttribute) int {
+			return strings.Compare(a.Keyword, b.Keyword)
+		})
+		assert.EqualValues(t, expected, actual)
 	})
 	t.Run("can map from windows attributes", func(t *testing.T) {
 		wa := []wincred.CredentialAttribute{
