@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
@@ -117,12 +118,17 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func startBuiltins(ctx context.Context, reg registry, plugins map[string]Plugin) {
+func startBuiltins(ctx context.Context, reg registry, plugins map[string]Plugin) error {
+	logger, err := logging.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 	for name, p := range plugins {
 		launcher := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
-		logrus.Infof("starting builtin plugin '%s'...", name)
-		if err := register(reg, launcher); err != nil {
-			logrus.Warnf("failed to initialize builtin plugin '%s': %v", name, err)
+		logger.Printf("starting builtin plugin '%s'...", name)
+		if err := register(logger, reg, launcher); err != nil {
+			logger.Warnf("failed to initialize builtin plugin '%s': %v", name, err)
 		}
 	}
+	return nil
 }

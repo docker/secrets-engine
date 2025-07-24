@@ -79,7 +79,7 @@ func (h *testHijackAcceptor) nextHijackedConn() <-chan net.Conn {
 }
 
 func TestHijackify_hijackRequest_timeout(t *testing.T) {
-	socket := "test.sock"
+	socket := testhelper.RandomShortSocketName()
 	l, err := net.Listen("unix", socket)
 	require.NoError(t, err)
 	t.Cleanup(func() { l.Close() })

@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"math/rand"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
 	p "github.com/docker/secrets-engine/plugin"
@@ -108,12 +109,12 @@ func Test_newPlugin(t *testing.T) {
 					E: []secrets.Envelope{{ID: mockSecretID, Value: []byte(mockSecretValue)}},
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, p.Data(), pluginData{
-					name:       "dummy-plugin",
+					name:       pluginNameFromTestName(t),
 					pattern:    pattern,
 					version:    version,
 					pluginType: internalPlugin,
@@ -144,7 +145,7 @@ func Test_newPlugin(t *testing.T) {
 					ErrGetSecret: errGetSecret,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
@@ -177,7 +178,7 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
@@ -196,13 +197,13 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(cmd, runtimeCfg{
-					name: "dummy-plugin",
+					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
-				assert.ErrorContains(t, p.Close(), "plugin dummy-plugin crashed:")
+				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
@@ -212,6 +213,11 @@ func Test_newPlugin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
+}
+
+func pluginNameFromTestName(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("plugin-%s", strings.ToLower(strings.ReplaceAll(t.Name(), "/", "_")))
 }
 
 func Test_newExternalPlugin(t *testing.T) {
@@ -224,7 +230,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				plugin := newMockedPlugin()
 				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -253,7 +259,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugin returns error on GetSecret",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -275,7 +281,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -303,7 +309,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(l)
+				m := newMockExternalRuntime(testLogger(t), l)
 
 				doneRuntime := make(chan struct{})
 				go func() {
@@ -322,7 +328,7 @@ func Test_newExternalPlugin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			socketPath := randString(6) + ".sock" // avoid socket name clashes with parallel running tests
+			socketPath := testhelper.RandomShortSocketName()
 			l, err := net.Listen("unix", socketPath)
 			require.NoError(t, err)
 			conn, err := net.Dial("unix", socketPath)
@@ -332,15 +338,6 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
-}
-
-func randString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func runAsync(ctx context.Context, run func(ctx context.Context) error) chan error {
@@ -357,10 +354,10 @@ type mockExternalRuntime struct {
 	serverErr chan error
 }
 
-func newMockExternalRuntime(l net.Listener) *mockExternalRuntime {
+func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternalRuntime {
 	httpMux := http.NewServeMux()
 	chConn := make(chan net.Conn)
-	httpMux.Handle(ipc.NewHijackAcceptor(func(conn net.Conn) { chConn <- conn }))
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(conn net.Conn) { chConn <- conn }))
 	serverErr := make(chan error, 1)
 	server := &http.Server{Handler: httpMux}
 	go func() {

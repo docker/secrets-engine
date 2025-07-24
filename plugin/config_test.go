@@ -14,7 +14,9 @@ import (
 
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 type mockPlugin struct{}
@@ -53,7 +55,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
-				go runUncheckedDummyAcceptor(listener)
+				go runUncheckedDummyAcceptor(testLogger(t), listener)
 				t.Cleanup(func() {
 					listener.Close()
 					os.Remove(socketPath)
@@ -71,11 +73,11 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 		{
 			name: "with all custom options",
 			test: func(t *testing.T) {
-				socket := "test.sock"
+				socket := testhelper.RandomShortSocketName()
 				l, err := net.Listen("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { l.Close() })
-				go runUncheckedDummyAcceptor(l)
+				go runUncheckedDummyAcceptor(testLogger(t), l)
 				conn, err := net.Dial("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })
@@ -99,11 +101,16 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 	}
 }
 
+func testLogger(t *testing.T) logging.Logger {
+	t.Helper()
+	return logging.NewDefaultLogger(t.Name())
+}
+
 // We on purpose never actually deal with accepted hijacked connections or server errors
 // as in the context of where this function is used we don't care.
-func runUncheckedDummyAcceptor(listener net.Listener) {
+func runUncheckedDummyAcceptor(logger logging.Logger, listener net.Listener) {
 	httpMux := http.NewServeMux()
-	httpMux.Handle(ipc.NewHijackAcceptor(func(net.Conn) {}))
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(net.Conn) {}))
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		_ = server.Serve(listener)

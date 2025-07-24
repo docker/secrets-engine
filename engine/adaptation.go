@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/secrets-engine/internal/api"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/plugin"
 )
 
@@ -20,8 +18,9 @@ const (
 )
 
 type Engine interface {
-	Start() error
-	Stop() error
+	// Run the engine. Calling Cancel() on the context will stop the engine.
+	// Optionally pass in callbacks that get called once the engine is ready to accept requests.
+	Run(ctx context.Context, up ...func()) error
 }
 
 type Plugin interface {
@@ -38,13 +37,13 @@ type config struct {
 	plugins                map[string]Plugin
 	dynamicPluginsDisabled bool
 	enginePluginsDisabled  bool
+	logger                 logging.Logger
 }
 
 type adaptation struct {
 	config
 
 	m sync.Mutex
-	e io.Closer
 }
 
 // Option to apply to the secrets engine.
@@ -91,6 +90,13 @@ func WithEngineLaunchedPluginsDisabled() Option {
 	}
 }
 
+func WithLogger(logger logging.Logger) Option {
+	return func(r *config) error {
+		r.logger = logger
+		return nil
+	}
+}
+
 // New creates a new NRI Runtime.
 func New(name, version string, opts ...Option) (Engine, error) {
 	cfg := &config{
@@ -105,35 +111,30 @@ func New(name, version string, opts ...Option) (Engine, error) {
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
+	if cfg.logger == nil {
+		cfg.logger = logging.NewDefaultLogger("engine")
+	}
 
 	return &adaptation{config: *cfg}, nil
 }
 
-func (a *adaptation) Start() error {
-	a.m.Lock()
-	defer a.m.Unlock()
-	if a.e != nil {
+func (a *adaptation) Run(ctx context.Context, up ...func()) error {
+	if !a.m.TryLock() {
 		return errors.New("already started")
 	}
-	logrus.Infof("secrets engine starting up...")
-	e, err := newEngine(a.config)
+	defer a.m.Unlock()
+	a.logger.Printf("secrets engine starting up...")
+	e, err := newEngine(logging.WithLogger(ctx, a.logger), a.config)
 	if err != nil {
 		return err
 	}
-	a.e = e
-	return nil
-}
-
-func (a *adaptation) Stop() error {
-	a.m.Lock()
-	defer a.m.Unlock()
-	if a.e == nil {
-		return nil
+	a.logger.Printf("secrets engine ready")
+	for _, cb := range up {
+		go cb()
 	}
-	logrus.Infof("secrets engine shutting down...")
-	err := a.e.Close()
-	a.e = nil
-	return err
+	<-ctx.Done()
+	a.logger.Printf("secrets engine shutting down...")
+	return e.Close()
 }
 
 func toDisplayName(filename string) string {

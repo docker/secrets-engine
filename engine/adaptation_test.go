@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 	p "github.com/docker/secrets-engine/plugin"
 )
 
@@ -25,8 +26,8 @@ func Test_SecretsEngine(t *testing.T) {
 		WithPluginPath(dir),
 		WithPlugins(map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{"my-secret": "some-value"}}}))
 	assert.NoError(t, err)
-	require.NoError(t, e.Start())
-	t.Cleanup(func() { assert.NoError(t, e.Stop()) })
+	runEngineAsync(t, e)
+	assert.ErrorContains(t, e.Run(t.Context()), "already started")
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
 
@@ -120,8 +121,7 @@ func TestWithDynamicPluginsDisabled(t *testing.T) {
 		WithExternallyLaunchedPluginsDisabled(),
 	)
 	assert.NoError(t, err)
-	require.NoError(t, e.Start())
-	t.Cleanup(func() { assert.NoError(t, e.Stop()) })
+	runEngineAsync(t, e)
 
 	conn, err := net.Dial("unix", path)
 	require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dir := createDummyPlugins(t, dummyPlugins{okPlugins: []string{"plugin-foo"}})
-			socketPath := "foo.sock"
+			socketPath := testhelper.RandomShortSocketName()
 			options := []Option{
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
@@ -160,8 +160,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			}
 			e, err := New("test-engine", "test-version", options...)
 			assert.NoError(t, err)
-			require.NoError(t, e.Start())
-			t.Cleanup(func() { assert.NoError(t, e.Stop()) })
+			runEngineAsync(t, e)
 			c, err := client.New(client.WithSocketPath(socketPath))
 			require.NoError(t, err)
 			_, err = c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
@@ -177,6 +176,17 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			assert.Equal(t, "my-builtin", mySecret.Provider)
 		})
 	}
+}
+
+func runEngineAsync(t *testing.T, e Engine) {
+	t.Helper()
+	errEngine := make(chan error)
+	done := make(chan struct{})
+	go func() {
+		errEngine <- e.Run(t.Context(), func() { close(done) })
+	}()
+	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
+	t.Cleanup(func() { assert.NoError(t, testhelper.WaitForErrorWithTimeout(errEngine)) })
 }
 
 type externalPluginTestConfig struct {
