@@ -39,24 +39,6 @@ const (
 	secretServiceIsCollectionLockedProperty = "org.freedesktop.Secret.Collection.Locked"
 )
 
-// newItemAttributes configures the default attributes for each item in the keychain
-//
-// It sets the `service:group` and `service:name` attributes as well as the
-// secret id.
-//
-// id can also be empty and is used in cases were we only want to filter on the
-// service:group and service:name attributes.
-func newItemAttributes[T store.Secret](id string, k *keychainStore[T]) map[string]string {
-	attributes := map[string]string{
-		"service:group": k.serviceGroup,
-		"service:name":  k.serviceName,
-	}
-	if id != "" {
-		attributes["id"] = id
-	}
-	return attributes
-}
-
 // getDefaultCollection gets the secret service collection dbus object path.
 //
 // It prefers the loginKeychainObjectPath, since most users on X11 would have
@@ -142,7 +124,9 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 		}
 	}
 
-	attributes := newItemAttributes(id.String(), k)
+	attributes := make(map[string]string)
+	k.safelySetMetadata(id.String(), attributes)
+
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
 		return err
@@ -186,8 +170,10 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 		}
 	}
 
-	attributes := newItemAttributes(id.String(), k)
-	items, err := service.SearchCollection(objectPath, attributes)
+	searchMetadata := make(map[string]string)
+	k.safelySetMetadata(id.String(), searchMetadata)
+
+	items, err := service.SearchCollection(objectPath, searchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
@@ -196,11 +182,16 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 		return nil, store.ErrCredentialNotFound
 	}
 
+	attributes, err := service.GetAttributes(items[0])
+	if err != nil {
+		return nil, err
+	}
+	k.safelyCleanMetadata(attributes)
+
 	value, err := service.GetSecret(items[0], *session)
 	if err != nil {
 		return nil, err
 	}
-
 	secret := k.factory()
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
@@ -239,8 +230,10 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		}
 	}
 
-	attributes := newItemAttributes("", k)
-	itemPaths, err := service.SearchCollection(objectPath, attributes)
+	searchMetadata := make(map[string]string)
+	k.safelySetMetadata("", searchMetadata)
+
+	itemPaths, err := service.SearchCollection(objectPath, searchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
@@ -265,6 +258,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err != nil {
 			return nil, err
 		}
+		k.safelyCleanMetadata(attributes)
 
 		secret := k.factory()
 		if err := secret.SetMetadata(attributes); err != nil {
@@ -318,8 +312,9 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 		return err
 	}
 
-	attributes := newItemAttributes(id.String(), k)
+	attributes := make(map[string]string)
 	maps.Copy(attributes, secret.Metadata())
+	k.safelySetMetadata(id.String(), attributes)
 
 	label := k.itemLabel(id)
 	properties := kc.NewSecretProperties(label, attributes)
