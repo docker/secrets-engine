@@ -2,6 +2,9 @@ package keychain
 
 import (
 	"errors"
+	"maps"
+	"slices"
+	"strings"
 
 	"github.com/docker/secrets-engine/store"
 )
@@ -56,4 +59,44 @@ func New[T store.Secret](serviceGroup, serviceName string, factory Factory[T]) (
 // e.g. group:name:id
 func (k *keychainStore[T]) itemLabel(id store.ID) string {
 	return k.serviceGroup + ":" + k.serviceName + ":" + id.String()
+}
+
+const (
+	serviceGroupKey = "service:group"
+	serviceNameKey  = "service:name"
+	secretIDKey     = "id"
+)
+
+// safelySetMetadata prefixes each key with `x_` so that no collissions can ever
+// occur with internal fields.
+func (k *keychainStore[T]) safelySetMetadata(id string, attributes map[string]string) {
+	// prefix whatever is already in attributes
+	keys := slices.Collect(maps.Keys(attributes))
+	for _, k := range keys {
+		attributes["x_"+k] = attributes[k]
+		delete(attributes, k)
+	}
+
+	attributes[serviceGroupKey] = k.serviceGroup
+	attributes[serviceNameKey] = k.serviceName
+	if id != "" {
+		attributes[secretIDKey] = id
+	}
+}
+
+// safelyCleanMetadata removes internal metadata and removes the `x_` prefix
+// on all keys containing it.
+func (k *keychainStore[T]) safelyCleanMetadata(attributes map[string]string) {
+	delete(attributes, serviceGroupKey)
+	delete(attributes, serviceNameKey)
+	delete(attributes, secretIDKey)
+
+	keys := slices.Collect(maps.Keys(attributes))
+	for _, key := range keys {
+		after, found := strings.CutPrefix(key, "x_")
+		if found {
+			attributes[after] = attributes[key]
+			delete(attributes, key)
+		}
+	}
 }
