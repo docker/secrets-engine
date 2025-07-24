@@ -9,8 +9,8 @@ import (
 	"syscall"
 )
 
-func askProcessToStop(cmd *exec.Cmd) error {
-	return cmd.Process.Signal(os.Interrupt)
+func askProcessToStop(p proc) error {
+	return p.Signal(os.Interrupt)
 }
 
 func isSigint(err error) bool {
