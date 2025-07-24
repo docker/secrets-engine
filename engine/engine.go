@@ -110,7 +110,7 @@ func startPlugins(cfg config, reg registry) error {
 		g.Add(1)
 		go func() {
 			cfg.logger.Printf("starting pre-installed plugin '%s'...", name)
-			if err := register(cfg.logger, reg, l); err != nil {
+			if _, err := register(cfg.logger, reg, l); err != nil {
 				cfg.logger.Errorf("failed to initialize pre-installed plugin '%s': %v", name, err)
 			}
 			g.Done()
@@ -132,10 +132,10 @@ func newLauncher(cfg config, pluginFile string) (string, Launcher) {
 
 type Launcher func() (runtime, error)
 
-func register(logger logging.Logger, reg registry, launch Launcher) error {
+func register(logger logging.Logger, reg registry, launch Launcher) (<-chan error, error) {
 	run, err := launch()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	removeFunc, err := reg.Register(run)
 	if err != nil {
@@ -143,15 +143,17 @@ func register(logger logging.Logger, reg registry, launch Launcher) error {
 		if err := run.Close(); err != nil {
 			logger.Errorf(err.Error())
 		}
-		return err
+		return nil, err
 	}
+	errClosed := make(chan error, 1)
 	go func() {
 		if run.Closed() != nil {
 			<-run.Closed()
 		}
 		removeFunc()
+		errClosed <- run.Close() // close only pulls the error here but doesn't actually re-run close
 	}()
-	return nil
+	return errClosed, nil
 }
 
 func discoverPlugins(logger logging.Logger, pluginPath string) ([]string, error) {
@@ -202,7 +204,7 @@ func newServer(cfg config, reg registry) *http.Server {
 			launcher := Launcher(func() (runtime, error) {
 				return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
-			if err := register(cfg.logger, reg, launcher); err != nil {
+			if _, err := register(cfg.logger, reg, launcher); err != nil {
 				cfg.logger.Errorf("registering dynamic plugin: %v", err)
 			}
 		}))
