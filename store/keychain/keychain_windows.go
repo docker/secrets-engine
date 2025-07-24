@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"maps"
 	"strings"
 
 	"github.com/danieljoos/wincred"
@@ -74,6 +75,9 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	}
 
 	secret := k.factory()
+	if err := secret.SetMetadata(mapFromWindowsAttributes(gc.Attributes)); err != nil {
+		return nil, err
+	}
 	if err := decodeSecret(gc.CredentialBlob, secret); err != nil {
 		return nil, err
 	}
@@ -116,7 +120,26 @@ func findServiceCredentials[T store.Secret](k *keychainStore[T], credentials []*
 	}
 }
 
-func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, error) {
+func mapToWindowsAttributes(attributes map[string]string) []wincred.CredentialAttribute {
+	winAttrs := make([]wincred.CredentialAttribute, 0, len(attributes))
+	for k, v := range attributes {
+		winAttrs = append(winAttrs, wincred.CredentialAttribute{
+			Keyword: k,
+			Value:   []byte(v),
+		})
+	}
+	return winAttrs
+}
+
+func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string]string {
+	attributes := make(map[string]string, len(winAttrs))
+	for _, attr := range winAttrs {
+		attributes[attr.Keyword] = string(attr.Value)
+	}
+	return attributes
+}
+
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -126,23 +149,13 @@ func (k *keychainStore[T]) GetAll(context.Context) (map[store.ID]store.Secret, e
 
 	secrets := make(map[store.ID]store.Secret, len(credentials))
 	for cred := range findServiceCredentials(k, credentials) {
-		secret := k.factory()
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			return nil, err
 		}
 
-		gc, err := wincred.GetGenericCredential(cred.TargetName)
-		if err != nil {
-			return nil, mapWindowsCredentialError(err)
-		}
-
-		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-		blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
-		if err != nil {
-			return nil, err
-		}
-		if err := secret.Unmarshal(blob); err != nil {
+		secret := k.factory()
+		if err := secret.SetMetadata(mapFromWindowsAttributes(cred.Attributes)); err != nil {
 			return nil, err
 		}
 		secrets[id] = secret
@@ -161,24 +174,18 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 		return err
 	}
 
+	attributes := make(map[string]string)
+	maps.Copy(attributes, secret.Metadata())
+
+	attributes["id"] = id.String()
+	attributes["service:group"] = k.serviceGroup
+	attributes["service:name"] = k.serviceName
+
 	g := wincred.NewGenericCredential(k.itemLabel(id))
 	g.UserName = id.String()
 	g.CredentialBlob = blob
 	g.Persist = wincred.PersistLocalMachine
-	g.Attributes = []wincred.CredentialAttribute{
-		{
-			Keyword: "id",
-			Value:   []byte(id.String()),
-		},
-		{
-			Keyword: "service:group",
-			Value:   []byte(k.serviceGroup),
-		},
-		{
-			Keyword: "service:name",
-			Value:   []byte(k.serviceName),
-		},
-	}
+	g.Attributes = mapToWindowsAttributes(attributes)
 	return mapWindowsCredentialError(g.Write())
 }
 

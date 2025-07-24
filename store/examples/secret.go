@@ -10,6 +10,18 @@ import (
 type secret struct {
 	AccessToken  string
 	RefreshToken string
+	Attributes   map[string]string
+}
+
+// Metadata implements store.Secret.
+func (s *secret) Metadata() map[string]string {
+	return s.Attributes
+}
+
+// SetMetadata implements store.Secret.
+func (s *secret) SetMetadata(attributes map[string]string) error {
+	s.Attributes = attributes
+	return nil
 }
 
 var _ secrets.Secret = &secret{}

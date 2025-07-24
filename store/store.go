@@ -39,6 +39,12 @@ type Secret interface {
 	Marshal() ([]byte, error)
 	// Unmarshal the secret from a slice of bytes into its structured format
 	Unmarshal(data []byte) error
+	// Metadata returns a key-value pair of non-sensitive data about the secret
+	Metadata() map[string]string
+	// SetMetadata allows the caller to set the secrets non-sensitive data
+	// A secret may expects certain keys or values from the map and may return
+	// an error.
+	SetMetadata(map[string]string) error
 }
 
 // Store defines a strict format for secrets to conform to when interacting
@@ -48,8 +54,12 @@ type Store interface {
 	Delete(ctx context.Context, id ID) error
 	// Get retrieves credentials from the store for a given ID.
 	Get(ctx context.Context, id ID) (Secret, error)
-	// GetAll retrieves all the credentials from the store.
-	GetAll(ctx context.Context) (map[ID]Secret, error)
+	// GetAllMetadata retrieves all the credentials from the store.
+	// Credentials retrieved will only call [Secret.SetMetadata] so that the
+	// underlying store does not get queried for each secret's sensitive data.
+	// This could be very taxing on the underlying store and cause a poor User
+	// Experience.
+	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
 }

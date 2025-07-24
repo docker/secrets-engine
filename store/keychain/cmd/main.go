@@ -31,7 +31,7 @@ func newCommand() (*cobra.Command, error) {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			secrets, err := kc.GetAll(cmd.Context())
+			secrets, err := kc.GetAllMetadata(cmd.Context())
 			if errors.Is(err, store.ErrCredentialNotFound) {
 				fmt.Println("No Secrets found")
 				return nil
@@ -40,15 +40,11 @@ func newCommand() (*cobra.Command, error) {
 				return err
 			}
 
-			var e error
-			for k, v := range secrets {
-				vv, err := v.Marshal()
-				if err != nil {
-					e = errors.Join(e, err)
-				}
-				fmt.Printf("\nID: %s\nValue: %s\n", k, vv)
+			for id, v := range secrets {
+				fmt.Printf("\nID: %s\n", id.String())
+				fmt.Printf("\nMetadata: %+v", v.Metadata())
 			}
-			return e
+			return nil
 		},
 	}
 
