@@ -237,3 +237,100 @@ func TestKeychain(t *testing.T) {
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 }
+
+func TestSafelySetMetadata(t *testing.T) {
+	kc := &keychainStore[*mocks.MockCredential]{
+		serviceGroup: "com.test.test",
+		serviceName:  "test",
+	}
+
+	t.Run("avoid clashing by adding prefix", func(t *testing.T) {
+		attributes := map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"id":                 "avoid clash",
+			"x_already-prefixed": "prefixed",
+		}
+		kc.safelySetMetadata("username", attributes)
+		assert.EqualValues(t, map[string]string{
+			"x_color":              "blue",
+			"x_game":               "elden ring",
+			"x_id":                 "avoid clash",
+			"x_x_already-prefixed": "prefixed",
+			secretIDKey:            "username",
+			serviceGroupKey:        "com.test.test",
+			serviceNameKey:         "test",
+		}, attributes)
+	})
+
+	t.Run("empty keys will also be prefixed", func(t *testing.T) {
+		attributes := map[string]string{
+			"": "something",
+		}
+		kc.safelySetMetadata("", attributes)
+		assert.EqualValues(t, map[string]string{
+			"x_":            "something",
+			serviceGroupKey: "com.test.test",
+			serviceNameKey:  "test",
+		}, attributes)
+	})
+
+	t.Run("empty map will get internal data added", func(t *testing.T) {
+		attributes := map[string]string{}
+		kc.safelySetMetadata("username", attributes)
+		assert.EqualValues(t, map[string]string{
+			secretIDKey:     "username",
+			serviceGroupKey: "com.test.test",
+			serviceNameKey:  "test",
+		}, attributes)
+	})
+
+	t.Run("empty id parameter won't add the id attribute", func(t *testing.T) {
+		attributes := map[string]string{}
+		kc.safelySetMetadata("", attributes)
+		assert.EqualValues(t, map[string]string{
+			serviceGroupKey: "com.test.test",
+			serviceNameKey:  "test",
+		}, attributes)
+	})
+}
+
+func TestSafelyCleanMetadata(t *testing.T) {
+	kc := &keychainStore[*mocks.MockCredential]{
+		serviceGroup: "com.test.test",
+		serviceName:  "test",
+	}
+	t.Run("can remove prefix and internal metadata", func(t *testing.T) {
+		attributes := map[string]string{
+			"x_color":              "blue",
+			"x_game":               "elden ring",
+			"x_id":                 "avoid clash",
+			"x_x_already-prefixed": "prefixed",
+			secretIDKey:            "username",
+			serviceGroupKey:        "com.test.test",
+			serviceNameKey:         "test",
+		}
+		kc.safelyCleanMetadata(attributes)
+		assert.EqualValues(t, map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"x_already-prefixed": "prefixed",
+			"id":                 "avoid clash",
+		}, attributes)
+	})
+	t.Run("empty map won't cause any panics", func(t *testing.T) {
+		attributes := make(map[string]string)
+		kc.safelyCleanMetadata(attributes)
+		assert.Empty(t, attributes)
+	})
+
+	t.Run("internal attributes are always removed", func(t *testing.T) {
+		attributes := map[string]string{
+			secretIDKey:     "username",
+			serviceGroupKey: "com.test.test",
+			serviceNameKey:  "test",
+		}
+		kc.safelyCleanMetadata(attributes)
+		assert.Empty(t, attributes)
+	})
+}
