@@ -126,17 +126,12 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func startBuiltins(ctx context.Context, reg registry, plugins map[string]Plugin) error {
-	logger, err := logging.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[string]Plugin) []launchPlan {
+	var result []launchPlan
 	for name, p := range plugins {
-		launcher := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
-		logger.Printf("starting builtin plugin '%s'...", name)
-		if _, err := register(logger, reg, launcher); err != nil {
-			logger.Warnf("failed to initialize builtin plugin '%s': %v", name, err)
-		}
+		l := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
+		result = append(result, launchPlan{l, builtinPlugin, name})
+		logger.Printf("discovered builtin plugin: %s", name)
 	}
-	return nil
+	return result
 }

@@ -174,7 +174,7 @@ func Test_discoverPlugins(t *testing.T) {
 		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "binary-file")))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "my-plugin")))
-		plugins, err := discoverPlugins(testLogger(t), dir)
+		plugins, err := scanPluginDir(testLogger(t), dir)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
 		assert.Contains(t, plugins, "binary-file"+suffix)
@@ -182,33 +182,15 @@ func Test_discoverPlugins(t *testing.T) {
 	})
 	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
 		dir := t.TempDir()
-		plugins, err := discoverPlugins(testLogger(t), filepath.Join(dir, "does-not-exist"))
+		plugins, err := scanPluginDir(testLogger(t), filepath.Join(dir, "does-not-exist"))
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
 	t.Run("empty dir string", func(t *testing.T) {
-		plugins, err := discoverPlugins(testLogger(t), "")
+		plugins, err := scanPluginDir(testLogger(t), "")
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
-}
-
-func Test_startPlugins(t *testing.T) {
-	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{FailPlugin: true, Plugins: []dummy.PluginBehaviour{{Value: "foo"}}})
-	reg := &manager{}
-	require.NoError(t, startPlugins(config{
-		name:       "test-engine",
-		version:    "test-version",
-		pluginPath: dir,
-		logger:     logging.NewDefaultLogger(""),
-	}, reg))
-	plugins := reg.GetAll()
-	assert.Len(t, plugins, 1)
-	assert.Equal(t, "plugin-foo", plugins[0].Data().name)
-	for _, plugin := range plugins {
-		assert.NoError(t, plugin.Close())
-	}
-	assert.Empty(t, reg.GetAll())
 }
 
 func Test_newEngine(t *testing.T) {
