@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseID(t *testing.T) {
+func TestNewID(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
@@ -25,7 +25,7 @@ func TestParseID(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ParseID(tc.input)
+			_, err := NewID(tc.input)
 			if tc.mustError {
 				assert.Error(t, err)
 			} else {
@@ -37,46 +37,65 @@ func TestParseID(t *testing.T) {
 
 func TestMatch(t *testing.T) {
 	tests := []struct {
-		pattern   Pattern
-		matches   []string
-		noMatches []string
+		pattern  string
+		ids      []string
+		expected bool
 	}{
 		{
-			pattern: "**",
-			matches: []string{"foo", "foo/bar", "foo/bar/baz"},
+			pattern:  "**",
+			ids:      []string{"foo", "foo/bar", "foo/bar/baz"},
+			expected: true,
 		},
 		{
-			pattern:   "foo/bar",
-			matches:   []string{"foo/bar"},
-			noMatches: []string{"foo/bar/baz", "foo"},
+			pattern:  "foo/bar",
+			ids:      []string{"foo/bar/baz", "foo"},
+			expected: false,
 		},
 		{
-			pattern:   "foo/*",
-			matches:   []string{"foo/bar"},
-			noMatches: []string{"foo/bar/baz", "foo"},
+			pattern:  "foo/*",
+			ids:      []string{"foo/bar"},
+			expected: true,
 		},
 		{
-			pattern:   "*/bar",
-			matches:   []string{"foo/bar"},
-			noMatches: []string{"foo/bar/baz", "foo"},
+			pattern:  "foo/*",
+			ids:      []string{"foo/bar/baz", "foo"},
+			expected: false,
 		},
 		{
-			pattern:   "foo/**/baz",
-			matches:   []string{"foo/bar/baz", "foo/baz", "foo/bar/something/baz"},
-			noMatches: []string{"foo/bar", "foo/bar/baz/qux"},
+			pattern:  "*/bar",
+			ids:      []string{"foo/bar"},
+			expected: true,
+		},
+		{
+			pattern:  "*/bar",
+			ids:      []string{"foo/bar/baz", "foo"},
+			expected: false,
+		},
+		{
+			pattern:  "foo/**/baz",
+			ids:      []string{"foo/bar/baz", "foo/baz", "foo/bar/something/baz"},
+			expected: true,
+		},
+		{
+			pattern:  "foo/**/baz",
+			ids:      []string{"foo/bar", "foo/bar/baz/qux"},
+			expected: false,
+		},
+		{
+			pattern:  "com.test.test/**",
+			ids:      []string{"com.test.test/test/bob", "com.test.test/test/alice"},
+			expected: true,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(string(tc.pattern), func(t *testing.T) {
-			for _, m := range tc.matches {
-				id, err := ParseID(m)
+			t.Logf("ids: %+v", tc.ids)
+			for _, m := range tc.ids {
+				id, err := NewID(m)
 				assert.NoError(t, err)
-				assert.True(t, id.Match(tc.pattern), "expected %q to match %q", m, tc.pattern)
-			}
-			for _, nm := range tc.noMatches {
-				id, err := ParseID(nm)
+				pattern, err := ParsePattern(tc.pattern)
 				assert.NoError(t, err)
-				assert.False(t, id.Match(tc.pattern), "expected %q to not match %q", nm, tc.pattern)
+				assert.Equalf(t, tc.expected, id.Match(pattern), "unexpected match for id `%q` to and pattern `%q`", m, tc.pattern)
 			}
 		})
 	}

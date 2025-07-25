@@ -11,27 +11,31 @@ import (
 // For storage, we don't really differentiate much about the ID format but
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
-type ID string
+type ID struct {
+	value string
+}
 
-func ParseID(s string) (ID, error) {
-	id := ID(s)
-	if err := id.Valid(); err != nil {
-		return "", fmt.Errorf("parsing id: %w", err)
+func NewID(id string) (*ID, error) {
+	if err := valid(id); err != nil {
+		return nil, fmt.Errorf("parsing id: %w", err)
 	}
-
-	return id, nil
+	return &ID{id}, nil
 }
 
 // Valid returns nil if the identifier is considered valid.
-func (id ID) Valid() error {
-	if !validIdentifier(string(id)) {
+func valid(id string) error {
+	if !validIdentifier(id) {
 		return fmt.Errorf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", id)
 	}
 
 	return nil
 }
 
-func (id ID) String() string { return string(id) }
+func (id *ID) String() string { return id.value }
+
+func (id *ID) Parts() []string {
+	return split(id.value)
+}
 
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
 // Rules:
@@ -76,9 +80,9 @@ func isValidRune(c rune) bool {
 // - "*" matches a single component
 // - "**" matches zero or more components
 // - "/" is the separator
-func (id ID) Match(pattern Pattern) bool {
-	pathParts := split(string(id))
-	patternParts := split(string(pattern))
+func (id *ID) Match(pattern *Pattern) bool {
+	pathParts := split(string(id.value))
+	patternParts := split(pattern.value)
 
 	return match(patternParts, pathParts)
 }
