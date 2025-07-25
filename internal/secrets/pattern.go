@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"errors"
-	"fmt"
 )
 
 var ErrInvalidPattern = errors.New("invalid pattern")
@@ -10,27 +9,20 @@ var ErrInvalidPattern = errors.New("invalid pattern")
 // Pattern can be used to match secret identifiers.
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
 // that '*' can be used to match a single component, and '**' can be used to match zero or more components.
-type Pattern string
-
-func ParsePattern(pattern string) (Pattern, error) {
-	p := Pattern(pattern)
-	if err := p.Valid(); err != nil {
-		return "", fmt.Errorf("parsing pattern: %w", err)
-	}
-	return p, nil
+type Pattern struct {
+	value string
 }
 
-// Valid returns nil if the pattern is considered valid.
-func (p Pattern) Valid() error {
-	if !validPattern(string(p)) {
-		return ErrInvalidPattern
+func ParsePattern(pattern string) (*Pattern, error) {
+	if !validPattern(pattern) {
+		return nil, ErrInvalidPattern
 	}
-	return nil
+	return &Pattern{pattern}, nil
 }
 
-func (p Pattern) Match(id ID) bool {
-	pathParts := split(string(id))
-	patternParts := split(string(p))
+func (p *Pattern) Match(id *ID) bool {
+	pathParts := split(id.value)
+	patternParts := split(p.value)
 
 	return match(patternParts, pathParts)
 }
