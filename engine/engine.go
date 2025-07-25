@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
@@ -131,6 +133,39 @@ func newLauncher(cfg config, pluginFile string) (string, Launcher) {
 }
 
 type Launcher func() (runtime, error)
+
+func RetryLoop(ctx context.Context, cfg config, reg registry, name string, launch Launcher) error {
+	cfg.logger.Printf("registering plugin '%s'...", name)
+
+	exponentialBackOff := backoff.NewExponentialBackOff()
+	exponentialBackOff.InitialInterval = 2 * time.Second
+	opts := []backoff.RetryOption{
+		backoff.WithNotify(func(err error, duration time.Duration) {
+			cfg.logger.Printf("retry registering plugin '%s' (timeout: %s): %s", name, duration, err)
+		}),
+		backoff.WithMaxTries(cfg.maxTries),
+		backoff.WithMaxElapsedTime(2 * time.Minute),
+		backoff.WithBackOff(exponentialBackOff),
+	}
+
+	_, err := backoff.Retry(ctx, func() (any, error) {
+		errClosed, err := register(cfg.logger, reg, launch)
+		if err != nil {
+			cfg.logger.Errorf("registering plugin '%s': %v", name, err)
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errClosed:
+			if err != nil {
+				cfg.logger.Errorf("plugin '%s' terminated: %v", name, err)
+			}
+			return nil, err
+		}
+	}, opts...)
+	return err
+}
 
 func register(logger logging.Logger, reg registry, launch Launcher) (<-chan error, error) {
 	run, err := launch()

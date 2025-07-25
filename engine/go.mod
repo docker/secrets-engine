@@ -10,6 +10,7 @@ replace github.com/docker/secrets-engine/plugin => ../plugin
 
 require (
 	connectrpc.com/connect v1.18.1
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/docker/secrets-engine v0.0.0-00010101000000-000000000000
 	github.com/docker/secrets-engine/client v0.0.0-00010101000000-000000000000
 	github.com/docker/secrets-engine/plugin v0.0.0-00010101000000-000000000000

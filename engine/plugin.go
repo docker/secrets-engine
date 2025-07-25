@@ -142,6 +142,11 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 
 	go func() {
 		<-cmdWrapper.Closed()
+
+		// TODO(#140):
+		// If cmdWrapper.Close() returns nil but finalCloseEverything hasn't been called
+		// it means the plugin just stopped. -> this needs to be turned into an error
+
 		// The error is stored in the sync.OnceValue and will be fetched later
 		// when runtime.Close() is called.
 		_ = finalCloseEverything()
