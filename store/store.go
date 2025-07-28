@@ -59,7 +59,7 @@ type Store interface {
 	// underlying store does not get queried for each secret's sensitive data.
 	// This could be very taxing on the underlying store and cause a poor User
 	// Experience.
-	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
+	GetAllMetadata(ctx context.Context) (map[string]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
 }

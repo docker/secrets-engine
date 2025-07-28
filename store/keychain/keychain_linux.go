@@ -203,7 +203,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -242,7 +242,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		return nil, store.ErrCredentialNotFound
 	}
 
-	credentials := make(map[store.ID]store.Secret, len(itemPaths))
+	credentials := make(map[string]store.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(itemPath)
 		if err != nil {
@@ -265,7 +265,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 			return nil, err
 		}
 
-		credentials[secretID] = secret
+		credentials[secretID.String()] = secret
 	}
 
 	return credentials, nil

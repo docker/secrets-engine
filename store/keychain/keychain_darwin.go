@@ -118,7 +118,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -131,7 +131,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[store.ID]store.Secret, len(results))
+	creds := make(map[string]store.Secret, len(results))
 	for _, result := range results {
 		id, err := store.ParseID(result.Account)
 		if err != nil {
@@ -147,7 +147,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		creds[id] = secret
+		creds[id.String()] = secret
 	}
 	return creds, nil
 }

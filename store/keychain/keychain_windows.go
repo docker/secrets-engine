@@ -142,7 +142,7 @@ func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string
 	return attributes
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -150,7 +150,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 
 	onlyLabelPrefix := k.itemLabel(store.ID(""))
 
-	secrets := make(map[store.ID]store.Secret)
+	secrets := make(map[string]store.Secret)
 	for cred := range findServiceCredentials(k, credentials) {
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
@@ -164,7 +164,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		secrets[id] = secret
+		secrets[id.String()] = secret
 	}
 
 	return secrets, nil
