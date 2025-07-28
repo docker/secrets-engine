@@ -40,7 +40,15 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 			}
 			closeOnce()
 		}()
-		runErr.StoreFirst(p.Run(ctxWithCancel))
+		err := p.Run(ctxWithCancel)
+		select {
+		case <-ctxWithCancel.Done():
+		default:
+			if err == nil {
+				err = fmt.Errorf("builtin plugin '%s' stopped unexpectedly", name)
+			}
+		}
+		runErr.StoreFirst(err)
 	}()
 	return &internalRuntime{
 		name:   name,
