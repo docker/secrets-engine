@@ -7,9 +7,6 @@ connectrpc.com/connect/internal/gen/connectext/grpc/status/v1
 ## explicit; go 1.24
 github.com/Benehiko/go-keychain/v2
 github.com/Benehiko/go-keychain/v2/secretservice
-# github.com/alecthomas/kong v1.11.0
-## explicit; go 1.20
-github.com/alecthomas/kong
 # github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5
