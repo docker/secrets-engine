@@ -26,6 +26,7 @@ type mockInternalPlugin struct {
 	runPanics       bool
 	getSecretPanics bool
 	secrets         map[secrets.ID]string
+	runExitCh       chan struct{}
 }
 
 func (m *mockInternalPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -57,7 +58,14 @@ func (m *mockInternalPlugin) Run(ctx context.Context) error {
 	if m.blockRunForever != nil {
 		<-m.blockRunForever
 	}
-	<-ctx.Done()
+	if m.runExitCh != nil {
+		select {
+		case <-m.runExitCh:
+		case <-ctx.Done():
+		}
+	} else {
+		<-ctx.Done()
+	}
 	return nil
 }
 
@@ -114,6 +122,15 @@ func Test_internalRuntime(t *testing.T) {
 		assert.ErrorContains(t, r.Close(), "panic in foo:")
 		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 		assert.ErrorContains(t, err, "panic in foo:")
+	})
+	t.Run("Run() terminating too early without error creates 'stopped unexpectedly' error", func(t *testing.T) {
+		runCh := make(chan struct{})
+		m := &mockInternalPlugin{pattern: "*", runExitCh: runCh}
+		r, err := newInternalRuntime(t.Context(), "foo", m)
+		assert.NoError(t, err)
+		close(runCh)
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
+		assert.ErrorContains(t, r.Close(), "stopped unexpectedly")
 	})
 	t.Run("panic in GetSecret is handled", func(t *testing.T) {
 		m := &mockInternalPlugin{pattern: "*", getSecretPanics: true}
