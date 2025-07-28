@@ -38,6 +38,7 @@ type config struct {
 	dynamicPluginsDisabled bool
 	enginePluginsDisabled  bool
 	logger                 logging.Logger
+	maxTries               uint
 }
 
 type adaptation struct {
@@ -93,6 +94,15 @@ func WithEngineLaunchedPluginsDisabled() Option {
 func WithLogger(logger logging.Logger) Option {
 	return func(r *config) error {
 		r.logger = logger
+		return nil
+	}
+}
+
+// WithMaxTries limits the number of all attempts.
+// Unlimited by default (maxTries == 0).
+func WithMaxTries(maxTries uint) Option {
+	return func(r *config) error {
+		r.maxTries = maxTries
 		return nil
 	}
 }

@@ -126,7 +126,7 @@ func startBuiltins(ctx context.Context, reg registry, plugins map[string]Plugin)
 	for name, p := range plugins {
 		launcher := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
 		logger.Printf("starting builtin plugin '%s'...", name)
-		if err := register(logger, reg, launcher); err != nil {
+		if _, err := register(logger, reg, launcher); err != nil {
 			logger.Warnf("failed to initialize builtin plugin '%s': %v", name, err)
 		}
 	}

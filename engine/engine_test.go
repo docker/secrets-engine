@@ -15,6 +15,7 @@ import (
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 type mockSlowRuntime struct {
@@ -120,7 +121,9 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return nil, launchErr
 		}
-		assert.ErrorIs(t, register(testLogger(t), reg, l), launchErr)
+		errCh, err := register(testLogger(t), reg, l)
+		assert.ErrorIs(t, err, launchErr)
+		assert.Nil(t, errCh)
 	})
 	t.Run("when Register() returns an error, Close() is called", func(t *testing.T) {
 		errRegister := errors.New("register error")
@@ -129,7 +132,9 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.ErrorIs(t, register(testLogger(t), reg, l), errRegister)
+		errCh, err := register(testLogger(t), reg, l)
+		assert.ErrorIs(t, err, errRegister)
+		assert.Nil(t, errCh)
 		assert.Equal(t, 1, r.closeCalled)
 	})
 	t.Run("runtime gets unregistered when channel is closed", func(t *testing.T) {
@@ -138,23 +143,25 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.NoError(t, register(testLogger(t), reg, l))
+		errCh, err := register(testLogger(t), reg, l)
+		assert.NoError(t, err)
 		assert.Equal(t, 0, reg.removeCalled)
 		close(r.closed)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
-		assert.Equal(t, 0, r.closeCalled)
+		assert.NoError(t, testhelper.WaitForErrorWithTimeout(errCh))
 	})
-	t.Run("runtime gets unregistered when channel is nil", func(t *testing.T) {
+	t.Run("runtime gets unregistered when runtime closed channel is nil", func(t *testing.T) {
 		reg := &mockRegistry{removed: make(chan struct{})}
 		r := &mockRuntime{}
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		assert.NoError(t, register(testLogger(t), reg, l))
+		errCh, err := register(testLogger(t), reg, l)
+		assert.NoError(t, err)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
-		assert.Equal(t, 0, r.closeCalled)
+		assert.NoError(t, testhelper.WaitForErrorWithTimeout(errCh))
 	})
 }
 
