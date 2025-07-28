@@ -15,7 +15,9 @@ type launchPlan struct {
 	name string
 }
 
-func startRetryHypervisor(ctx context.Context, cfg config, reg registry, plan []launchPlan) func() {
+// Parallelizes the launch of all managed plugins but then still waits for synchronization until
+// all launch functions are at least executed once.
+func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []launchPlan) func() {
 	initialProcesses := map[string]runnable{}
 	upGroup := &sync.WaitGroup{}
 	for _, p := range plan {
@@ -41,11 +43,11 @@ func startRetryHypervisor(ctx context.Context, cfg config, reg registry, plan []
 		downGroup.Add(1)
 
 		go func() {
+			defer downGroup.Done()
 			err := run(ctxChild)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				cfg.logger.Errorf("plugin '%s' stopped: %s", name, err)
 			}
-			downGroup.Done()
 		}()
 	}
 	upGroup.Wait()

@@ -85,6 +85,9 @@ func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets
 	}.Build())
 	resp, err := c.resolverClient.GetSecret(ctx, req)
 	if err != nil {
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			err = secrets.ErrNotFound
+		}
 		return secrets.EnvelopeErr(request, err), err
 	}
 	id, err := secrets.ParseID(resp.Msg.GetId())

@@ -194,23 +194,162 @@ func Test_discoverPlugins(t *testing.T) {
 }
 
 func Test_newEngine(t *testing.T) {
-	plugins := []dummy.PluginBehaviour{{Value: "foo"}}
-	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
-	socketPath := testhelper.RandomShortSocketName()
-	cfg := config{
-		name:       "test-engine",
-		version:    "test-version",
-		pluginPath: dir,
-		socketPath: socketPath,
-		logger:     logging.NewDefaultLogger(""),
-	}
-	e, err := newEngine(testLoggerCtx(t), cfg)
-	require.NoError(t, err)
-	t.Cleanup(func() { assert.NoError(t, e.Close()) })
-	c, err := client.New(client.WithSocketPath(socketPath))
-	require.NoError(t, err)
-	foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
-	assert.NoError(t, err)
-	assert.Equal(t, secrets.ID("foo"), foo.ID)
-	assert.Equal(t, "foo-value", string(foo.Value))
+	t.Parallel()
+	t.Run("can retrieve secret from external plugin (no crashes)", func(t *testing.T) {
+		plugins := []dummy.PluginBehaviour{{Value: "foo"}}
+		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		socketPath := testhelper.RandomShortSocketName()
+		cfg := config{
+			name:       "test-engine",
+			version:    "test-version",
+			pluginPath: dir,
+			socketPath: socketPath,
+			logger:     testLogger(t),
+			maxTries:   1,
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		c, err := client.New(client.WithSocketPath(socketPath))
+		require.NoError(t, err)
+		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+		require.NoError(t, err)
+		assert.Equal(t, secrets.ID("foo"), foo.ID)
+		assert.Equal(t, "foo-value", string(foo.Value))
+	})
+	t.Run("external plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
+		plugins := []dummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &dummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		socketPath := testhelper.RandomShortSocketName()
+		cfg := config{
+			name:       "test-engine",
+			version:    "test-version",
+			pluginPath: dir,
+			socketPath: socketPath,
+			logger:     testLogger(t),
+			maxTries:   1,
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.ElementsMatch(collect, e.Plugins(), []string{"plugin-bar-2-1"})
+		}, 2*time.Second, 100*time.Millisecond)
+		c, err := client.New(client.WithSocketPath(socketPath))
+		require.NoError(t, err)
+		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		require.NoError(t, err)
+		assert.Equal(t, secrets.ID("bar"), bar.ID)
+		assert.Equal(t, "bar-value", string(bar.Value))
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Empty(collect, e.Plugins())
+		}, 2*time.Second, 100*time.Millisecond)
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
+	})
+	t.Run("internal plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
+		socketPath := testhelper.RandomShortSocketName()
+		internalPluginRunExitCh := make(chan struct{})
+		cfg := config{
+			name:                  "test-engine",
+			version:               "test-version",
+			enginePluginsDisabled: true,
+			socketPath:            socketPath,
+			logger:                testLogger(t),
+			maxTries:              1,
+			plugins:               map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
+		}, 2*time.Second, 100*time.Millisecond)
+		c, err := client.New(client.WithSocketPath(socketPath))
+		require.NoError(t, err)
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		require.NoError(t, err)
+		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, "some-value", string(mySecret.Value))
+		close(internalPluginRunExitCh)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Empty(collect, e.Plugins())
+		}, 2*time.Second, 100*time.Millisecond)
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
+	})
+	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
+		plugins := []dummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &dummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		socketPath := testhelper.RandomShortSocketName()
+		cfg := config{
+			name:       "test-engine",
+			version:    "test-version",
+			pluginPath: dir,
+			socketPath: socketPath,
+			logger:     testLogger(t),
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		c, err := client.New(client.WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		require.NoError(t, err)
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+			require.NoError(collect, err)
+			assert.Equal(collect, secrets.ID("bar"), bar.ID)
+			assert.Equal(collect, "bar-value", string(bar.Value))
+		}, 5*time.Second, 100*time.Millisecond)
+	})
+	t.Run("internal plugin crashes (recovery)", func(t *testing.T) {
+		socketPath := testhelper.RandomShortSocketName()
+		blockRunCh := make(chan struct{}, 1)
+		blockRunCh <- struct{}{}
+		runExitCh := make(chan struct{}, 1)
+		cfg := config{
+			name:                  "test-engine",
+			version:               "test-version",
+			enginePluginsDisabled: true,
+			socketPath:            socketPath,
+			logger:                testLogger(t),
+			plugins: map[string]Plugin{"my-builtin": &mockInternalPlugin{
+				pattern:         "*",
+				blockRunForever: blockRunCh,
+				runExitCh:       runExitCh,
+				secrets:         map[secrets.ID]string{"my-secret": "some-value"},
+			}},
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		c, err := client.New(client.WithSocketPath(socketPath))
+		require.NoError(t, err)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
+		}, 2*time.Second, 100*time.Millisecond)
+
+		runExitCh <- struct{}{}
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Empty(collect, e.Plugins())
+		}, 2*time.Second, 100*time.Millisecond)
+
+		select {
+		case blockRunCh <- struct{}{}:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for block run")
+		}
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
+		}, 5*time.Second, 100*time.Millisecond) // Timeout needs to be larger than the initial retry interval
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		require.NoError(t, err)
+		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, "some-value", string(mySecret.Value))
+	})
 }

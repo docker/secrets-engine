@@ -24,11 +24,17 @@ const (
 	engineShutdownTimeout = 2 * time.Second
 )
 
-type engine struct {
+type engine interface {
+	io.Closer
+	Plugins() []string
+}
+
+type engineImpl struct {
+	reg   registry
 	close func() error
 }
 
-func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
+func newEngine(ctx context.Context, cfg config) (engine, error) {
 	l, err := createListener(cfg.socketPath)
 	if err != nil {
 		return nil, err
@@ -43,7 +49,7 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 		plan = append(plan, morePlugins...)
 	}
 	reg := &manager{}
-	h := startRetryHypervisor(ctx, cfg, reg, plan)
+	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
 	server := newServer(cfg, reg)
 	done := make(chan struct{})
@@ -55,7 +61,8 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 		serverErr = errors.Join(serverErr, shutdownManagedPlugins())
 		close(done)
 	}()
-	return &engine{
+	return &engineImpl{
+		reg: reg,
 		close: sync.OnceValue(func() error {
 			defer l.Close()
 			select {
@@ -72,13 +79,21 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 	}, nil
 }
 
-func (e *engine) Close() error {
+func (e *engineImpl) Close() error {
 	return e.close()
 }
 
-func shutdownManagedPluginsOnce(stopHypervisor func(), reg registry) func() error {
+func (e *engineImpl) Plugins() []string {
+	var plugins []string
+	for _, p := range e.reg.GetAll() {
+		plugins = append(plugins, p.Data().name)
+	}
+	return plugins
+}
+
+func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry) func() error {
 	return sync.OnceValue(func() error {
-		stopHypervisor()
+		stopSupervisor()
 		return parallelStop(reg.GetAll())
 	})
 }
@@ -137,7 +152,7 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 	exponentialBackOff.InitialInterval = 2 * time.Second
 	opts := []backoff.RetryOption{
 		backoff.WithNotify(func(err error, duration time.Duration) {
-			cfg.logger.Printf("retry registering plugin '%s'... (timeout: %s)", name, duration)
+			cfg.logger.Printf("retry registering plugin '%s' (timeout: %s): %s", name, duration, err)
 		}),
 		backoff.WithMaxTries(cfg.maxTries),
 		backoff.WithMaxElapsedTime(2 * time.Minute),
