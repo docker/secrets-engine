@@ -16,6 +16,7 @@ import (
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 )
 
 type mockSlowRuntime struct {
@@ -193,8 +194,7 @@ func Test_discoverPlugins(t *testing.T) {
 }
 
 func Test_startPlugins(t *testing.T) {
-	okPlugin := "plugin-ok"
-	dir := createDummyPlugins(t, dummyPlugins{failPlugin: true, okPlugins: []string{okPlugin}})
+	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{FailPlugin: true, Plugins: []dummy.PluginBehaviour{{Value: "foo"}}})
 	reg := &manager{}
 	require.NoError(t, startPlugins(config{
 		name:       "test-engine",
@@ -204,7 +204,7 @@ func Test_startPlugins(t *testing.T) {
 	}, reg))
 	plugins := reg.GetAll()
 	assert.Len(t, plugins, 1)
-	assert.Equal(t, okPlugin, plugins[0].Data().name)
+	assert.Equal(t, "plugin-foo", plugins[0].Data().name)
 	for _, plugin := range plugins {
 		assert.NoError(t, plugin.Close())
 	}
@@ -212,9 +212,9 @@ func Test_startPlugins(t *testing.T) {
 }
 
 func Test_newEngine(t *testing.T) {
-	okPlugins := []string{"plugin-foo"}
-	dir := createDummyPlugins(t, dummyPlugins{okPlugins: okPlugins})
-	socketPath := filepath.Join(t.TempDir(), "test.sock")
+	plugins := []dummy.PluginBehaviour{{Value: "foo"}}
+	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+	socketPath := testhelper.RandomShortSocketName()
 	cfg := config{
 		name:       "test-engine",
 		version:    "test-version",

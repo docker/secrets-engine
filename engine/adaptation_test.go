@@ -13,13 +13,13 @@ import (
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 	p "github.com/docker/secrets-engine/plugin"
 )
 
 func Test_SecretsEngine(t *testing.T) {
 	t.Parallel()
-	okPlugins := []string{"plugin-foo", "plugin-bar"}
-	dir := createDummyPlugins(t, dummyPlugins{okPlugins: okPlugins})
+	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: []dummy.PluginBehaviour{{Value: "foo"}, {Value: "bar"}}})
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(socketPath),
@@ -96,15 +96,15 @@ func Test_SecretsEngine(t *testing.T) {
 		assert.Contains(t, secret.Error, "secret not found")
 	})
 	t.Run("non-unique secrets", func(t *testing.T) {
-		mockFromFoo, err := c.GetSecret(t.Context(), secrets.Request{ID: mockSecretID, Provider: "plugin-foo"})
+		mockFromFoo, err := c.GetSecret(t.Context(), secrets.Request{ID: dummy.MockSecretID, Provider: "plugin-foo"})
 		assert.NoError(t, err)
-		assert.Equal(t, mockSecretID, mockFromFoo.ID)
-		assert.Equal(t, mockSecretValue, string(mockFromFoo.Value))
+		assert.Equal(t, dummy.MockSecretID, mockFromFoo.ID)
+		assert.Equal(t, dummy.MockSecretValue, string(mockFromFoo.Value))
 		assert.Equal(t, "plugin-foo", mockFromFoo.Provider)
-		mockFromBar, err := c.GetSecret(t.Context(), secrets.Request{ID: mockSecretID, Provider: "plugin-bar"})
+		mockFromBar, err := c.GetSecret(t.Context(), secrets.Request{ID: dummy.MockSecretID, Provider: "plugin-bar"})
 		assert.NoError(t, err)
-		assert.Equal(t, mockSecretID, mockFromBar.ID)
-		assert.Equal(t, mockSecretValue, string(mockFromBar.Value))
+		assert.Equal(t, dummy.MockSecretID, mockFromBar.ID)
+		assert.Equal(t, dummy.MockSecretValue, string(mockFromBar.Value))
 		assert.Equal(t, "plugin-bar", mockFromBar.Provider)
 	})
 	t.Run("existing secrets but wrong provider", func(t *testing.T) {
@@ -147,7 +147,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dir := createDummyPlugins(t, dummyPlugins{okPlugins: []string{"plugin-foo"}})
+			dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: []dummy.PluginBehaviour{{Value: "foo"}}})
 			socketPath := testhelper.RandomShortSocketName()
 			options := []Option{
 				WithSocketPath(socketPath),
