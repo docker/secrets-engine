@@ -4,7 +4,6 @@ go 1.24.3
 
 require (
 	connectrpc.com/connect v1.18.1
-	github.com/alecthomas/kong v1.11.0
 	github.com/containerd/nri v0.9.0
 	github.com/hashicorp/yamux v0.1.2
 	github.com/sirupsen/logrus v1.9.3
