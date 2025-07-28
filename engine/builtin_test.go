@@ -13,6 +13,12 @@ import (
 	"github.com/docker/secrets-engine/plugin"
 )
 
+const (
+	mockVersion     = "mockVersion"
+	mockSecretValue = "mockSecretValue"
+	mockSecretID    = secrets.ID("mockSecretID")
+)
+
 type mockInternalPlugin struct {
 	pattern         secrets.Pattern
 	errGetSecretErr error
