@@ -203,6 +203,35 @@ func Test_newPlugin(t *testing.T) {
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
 		},
+		{
+			name: "plugin process exists unexpectedly",
+			test: func(t *testing.T) {
+				pattern := secrets.Pattern("foo-bar")
+				version := "my-version"
+				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
+					Config: p.Config{
+						Version: version,
+						Pattern: pattern,
+					},
+					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					CrashBehaviour: &dummy.CrashBehaviour{
+						OnNthSecretRequest: 1,
+						ExitCode:           0,
+					},
+				})
+				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+					name: pluginNameFromTestName(t),
+					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
+				})
+				assert.NoError(t, err)
+				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
+				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
+				_, err = parseOutput()
+				assert.ErrorContains(t, err, "failed to unmarshal ''")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)

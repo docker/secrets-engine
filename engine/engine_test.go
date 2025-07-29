@@ -122,7 +122,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return nil, launchErr
 		}
-		errCh, err := register(testLogger(t), reg, l)
+		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.ErrorIs(t, err, launchErr)
 		assert.Nil(t, errCh)
 	})
@@ -133,7 +133,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLogger(t), reg, l)
+		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.ErrorIs(t, err, errRegister)
 		assert.Nil(t, errCh)
 		assert.Equal(t, 1, r.closeCalled)
@@ -144,7 +144,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLogger(t), reg, l)
+		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, reg.removeCalled)
 		close(r.closed)
@@ -158,7 +158,7 @@ func Test_Register(t *testing.T) {
 		l := func() (runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLogger(t), reg, l)
+		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.NoError(t, err)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)

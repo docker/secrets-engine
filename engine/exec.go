@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/docker/secrets-engine/internal/logging"
@@ -128,4 +129,37 @@ func (w *cmdWatchWrapper) shutdownCMD() {
 		w.logger.Warnf("plugin '%s' did not shut down after timeout", w.name)
 	}
 	w.kill()
+}
+
+type shutdownHelperImpl struct {
+	m                sync.Mutex
+	alreadyTriggered bool
+	close            func() error
+	lastErr          error
+	done             chan struct{}
+}
+
+type shutdownHelper interface {
+	shutdown(err error) error
+	closed() <-chan struct{}
+}
+
+func newShutdownHelper(c func() error) shutdownHelper {
+	return &shutdownHelperImpl{close: c, done: make(chan struct{})}
+}
+
+func (r *shutdownHelperImpl) shutdown(err error) error {
+	r.m.Lock()
+	defer r.m.Unlock()
+	if r.alreadyTriggered {
+		return r.lastErr
+	}
+	defer close(r.done)
+	r.alreadyTriggered = true
+	r.lastErr = errors.Join(err, r.close())
+	return r.lastErr
+}
+
+func (r *shutdownHelperImpl) closed() <-chan struct{} {
+	return r.done
 }

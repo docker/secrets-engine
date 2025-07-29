@@ -127,9 +127,8 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 
 	cmdWrapper := launchCmdWatched(logger, v.name, fromCmd(cmd), getPluginShutdownTimeout())
 
-	closed := make(chan struct{})
-	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(logger, rwc, ipc.NewServerIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	ipcClosed, setIpcClosed := closeOnce()
+	r, err := setup(logger, rwc, ipc.NewServerIPC, setIpcClosed, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		cmdWrapper.Close()
@@ -137,20 +136,13 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	}
 
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
-	finalCloseEverything := sync.OnceValue(func() error {
-		return errors.Join(callPluginShutdown(c, closed), r.close(), cmdWrapper.Close())
+	helper := newShutdownHelper(func() error {
+		return errors.Join(callPluginShutdown(c, ipcClosed), r.close(), cmdWrapper.Close())
 	})
 
 	go func() {
 		<-cmdWrapper.Closed()
-
-		// TODO(#140):
-		// If cmdWrapper.Close() returns nil but finalCloseEverything hasn't been called
-		// it means the plugin just stopped. -> this needs to be turned into an error
-
-		// The error is stored in the sync.OnceValue and will be fetched later
-		// when runtime.Close() is called.
-		_ = finalCloseEverything()
+		_ = helper.shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", v.name))
 	}()
 
 	return &runtimeImpl{
@@ -162,9 +154,16 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 		},
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
-		close:          finalCloseEverything,
-		closed:         closed,
+		close: func() error {
+			return helper.shutdown(nil)
+		},
+		closed: helper.closed(),
 	}, nil
+}
+
+func closeOnce() (<-chan struct{}, func()) {
+	ch := make(chan struct{})
+	return ch, sync.OnceFunc(func() { close(ch) })
 }
 
 func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan struct{}) error {
