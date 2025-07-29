@@ -57,14 +57,14 @@ type stub struct {
 // ManualLaunchOption only apply when the plugin is launched manually.
 // If launched by the secrets engine, they are ignored.
 func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
-	cfg, err := newCfg(p, opts...)
+	cfg, ipcSetup, err := newCfg(p, opts...)
 	if err != nil {
 		return nil, err
 	}
 	stub := &stub{
 		name: cfg.name,
 		factory: func(ctx context.Context, onClose func(error)) (io.Closer, error) {
-			return setup(ctx, *cfg, onClose)
+			return setup(ctx, ipcSetup, *cfg, onClose)
 		},
 	}
 	logrus.Infof("Created plugin %s", cfg.name)
