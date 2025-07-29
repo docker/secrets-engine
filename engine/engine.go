@@ -24,31 +24,33 @@ const (
 	engineShutdownTimeout = 2 * time.Second
 )
 
-type engine struct {
+type engine interface {
+	io.Closer
+	Plugins() []string
+}
+
+type engineImpl struct {
+	reg   registry
 	close func() error
 }
 
-func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
+func newEngine(ctx context.Context, cfg config) (engine, error) {
 	l, err := createListener(cfg.socketPath)
 	if err != nil {
 		return nil, err
 	}
 
-	reg := &manager{}
-	if err := startBuiltins(ctx, reg, cfg.plugins); err != nil {
-		return nil, err
-	}
+	plan := wrapBuiltins(ctx, cfg.logger, cfg.plugins)
 	if !cfg.enginePluginsDisabled {
-		if err := startPlugins(cfg, reg); err != nil {
+		morePlugins, err := wrapExternalPlugins(cfg)
+		if err != nil {
 			return nil, err
 		}
+		plan = append(plan, morePlugins...)
 	}
-	m := sync.Mutex{}
-	stopPlugins := func() error {
-		m.Lock()
-		defer m.Unlock()
-		return parallelStop(reg.GetAll())
-	}
+	reg := &manager{}
+	h := syncedParallelLaunch(ctx, cfg, reg, plan)
+	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
 	server := newServer(cfg, reg)
 	done := make(chan struct{})
 	var serverErr error
@@ -56,10 +58,11 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 		if err := server.Serve(l); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
 			serverErr = errors.Join(serverErr, err)
 		}
-		serverErr = errors.Join(serverErr, stopPlugins())
+		serverErr = errors.Join(serverErr, shutdownManagedPlugins())
 		close(done)
 	}()
-	return &engine{
+	return &engineImpl{
+		reg: reg,
 		close: sync.OnceValue(func() error {
 			defer l.Close()
 			select {
@@ -67,7 +70,7 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 				return serverErr
 			default:
 			}
-			stopErr := stopPlugins()
+			stopErr := shutdownManagedPlugins()
 			// Close() has its own context that's derived from the initial context passed to the engine
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), engineShutdownTimeout)
 			defer cancel()
@@ -76,8 +79,23 @@ func newEngine(ctx context.Context, cfg config) (io.Closer, error) {
 	}, nil
 }
 
-func (e *engine) Close() error {
+func (e *engineImpl) Close() error {
 	return e.close()
+}
+
+func (e *engineImpl) Plugins() []string {
+	var plugins []string
+	for _, p := range e.reg.GetAll() {
+		plugins = append(plugins, p.Data().name)
+	}
+	return plugins
+}
+
+func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry) func() error {
+	return sync.OnceValue(func() error {
+		stopSupervisor()
+		return parallelStop(reg.GetAll())
+	})
 }
 
 // Runs all io.Close() calls in parallel so shutdown time is T(1) and not T(n) for n plugins.
@@ -100,29 +118,22 @@ func parallelStop(plugins []runtime) error {
 	return errs
 }
 
-func startPlugins(cfg config, reg registry) error {
-	cfg.logger.Printf("starting plugins...")
-	discoveredPlugins, err := discoverPlugins(cfg.logger, cfg.pluginPath)
+func wrapExternalPlugins(cfg config) ([]launchPlan, error) {
+	cfg.logger.Printf("scanning plugin dir...")
+	discoveredPlugins, err := scanPluginDir(cfg.logger, cfg.pluginPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	g := sync.WaitGroup{}
+	var result []launchPlan
 	for _, p := range discoveredPlugins {
 		name, l := newLauncher(cfg, p)
-		g.Add(1)
-		go func() {
-			cfg.logger.Printf("starting pre-installed plugin '%s'...", name)
-			if _, err := register(cfg.logger, reg, l); err != nil {
-				cfg.logger.Errorf("failed to initialize pre-installed plugin '%s': %v", name, err)
-			}
-			g.Done()
-		}()
+		result = append(result, launchPlan{l, internalPlugin, name})
+		cfg.logger.Printf("discovered plugin: %s", name)
 	}
-	g.Wait()
-	return nil
+	return result, nil
 }
 
-func newLauncher(cfg config, pluginFile string) (string, Launcher) {
+func newLauncher(cfg config, pluginFile string) (string, launcher) {
 	name := toDisplayName(pluginFile)
 	return name, func() (runtime, error) {
 		return newLaunchedPlugin(exec.Command(filepath.Join(cfg.pluginPath, pluginFile)), runtimeCfg{
@@ -132,9 +143,9 @@ func newLauncher(cfg config, pluginFile string) (string, Launcher) {
 	}
 }
 
-type Launcher func() (runtime, error)
+type launcher func() (runtime, error)
 
-func RetryLoop(ctx context.Context, cfg config, reg registry, name string, launch Launcher) error {
+func retryLoop(ctx context.Context, cfg config, reg registry, name string, l launcher) error {
 	cfg.logger.Printf("registering plugin '%s'...", name)
 
 	exponentialBackOff := backoff.NewExponentialBackOff()
@@ -149,7 +160,7 @@ func RetryLoop(ctx context.Context, cfg config, reg registry, name string, launc
 	}
 
 	_, err := backoff.Retry(ctx, func() (any, error) {
-		errClosed, err := register(cfg.logger, reg, launch)
+		errClosed, err := register(cfg.logger, reg, l)
 		if err != nil {
 			cfg.logger.Errorf("registering plugin '%s': %v", name, err)
 			return nil, err
@@ -167,7 +178,7 @@ func RetryLoop(ctx context.Context, cfg config, reg registry, name string, launc
 	return err
 }
 
-func register(logger logging.Logger, reg registry, launch Launcher) (<-chan error, error) {
+func register(logger logging.Logger, reg registry, launch launcher) (<-chan error, error) {
 	run, err := launch()
 	if err != nil {
 		return nil, err
@@ -191,7 +202,7 @@ func register(logger logging.Logger, reg registry, launch Launcher) (<-chan erro
 	return errClosed, nil
 }
 
-func discoverPlugins(logger logging.Logger, pluginPath string) ([]string, error) {
+func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
 	if pluginPath == "" {
 		return nil, nil
 	}
@@ -219,7 +230,6 @@ func discoverPlugins(logger logging.Logger, pluginPath string) ([]string, error)
 			continue
 		}
 
-		logger.Printf("discovered plugin %s", toDisplayName(e.Name()))
 		result = append(result, e.Name())
 	}
 
@@ -236,7 +246,7 @@ func newServer(cfg config, reg registry) *http.Server {
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
 	if !cfg.dynamicPluginsDisabled {
 		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(conn net.Conn) {
-			launcher := Launcher(func() (runtime, error) {
+			launcher := launcher(func() (runtime, error) {
 				return newExternalPlugin(conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
 			if _, err := register(cfg.logger, reg, launcher); err != nil {
