@@ -9,7 +9,7 @@ import (
 func TestManager_Register(t *testing.T) {
 	t.Parallel()
 	t.Run("add and remove", func(t *testing.T) {
-		m := &manager{}
+		m := &manager{logger: testLogger(t)}
 		p := &mockRuntime{name: "foo"}
 		rm, err := m.Register(p)
 		assert.NoError(t, err)
@@ -18,7 +18,7 @@ func TestManager_Register(t *testing.T) {
 		assert.Empty(t, m.GetAll())
 	})
 	t.Run("can register multiple plugins with different names and result of GetAll is sorted", func(t *testing.T) {
-		m := &manager{}
+		m := &manager{logger: testLogger(t)}
 		p1 := &mockRuntime{name: "foo"}
 		_, err := m.Register(p1)
 		assert.NoError(t, err)
@@ -30,7 +30,7 @@ func TestManager_Register(t *testing.T) {
 		assert.Equal(t, []runtime{p1}, m.GetAll())
 	})
 	t.Run("cannot register another plugin with same name", func(t *testing.T) {
-		m := &manager{}
+		m := &manager{logger: testLogger(t)}
 		p1 := &mockRuntime{name: "bar"}
 		_, err := m.Register(p1)
 		assert.NoError(t, err)
@@ -39,7 +39,7 @@ func TestManager_Register(t *testing.T) {
 		assert.ErrorContains(t, err, "already exists")
 	})
 	t.Run("cannot register plugin without a name", func(t *testing.T) {
-		m := &manager{}
+		m := &manager{logger: testLogger(t)}
 		p := &mockRuntime{}
 		_, err := m.Register(p)
 		assert.ErrorContains(t, err, "no plugin name")

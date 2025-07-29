@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
@@ -24,6 +22,10 @@ type internalRuntime struct {
 }
 
 func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, error) {
+	logger, err := logging.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	config := p.Config()
 	if err := config.Pattern.Valid(); err != nil {
 		return nil, err
@@ -35,7 +37,7 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logrus.Errorf("recovering from panic in %s: %s", name, debug.Stack())
+				logger.Errorf("recovering from panic in %s: %s", name, debug.Stack())
 				runErr.StoreFirst(fmt.Errorf("panic in %s: %v", name, r))
 			}
 			closeOnce()
