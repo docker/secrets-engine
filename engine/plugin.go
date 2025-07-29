@@ -128,7 +128,7 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(rwc, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(rwc, ipc.NewServerIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		cmdWrapper.Close()
@@ -182,7 +182,7 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 func newExternalPlugin(conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(conn, ipc.NewClientIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}
