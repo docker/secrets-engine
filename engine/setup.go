@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
-	"github.com/sirupsen/logrus"
 
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 type setupResult struct {
@@ -27,7 +27,7 @@ type runtimeCfg struct {
 	name string
 }
 
-func setup(conn io.ReadWriteCloser, setup ipc.Setup, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
+func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -35,11 +35,11 @@ func setup(conn io.ReadWriteCloser, setup ipc.Setup, cb func(), v runtimeCfg, op
 		_, _ = w.Write([]byte("ok"))
 	})
 	registrator := newRegistrationLogic(v, chRegistrationResult)
-	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{registrator}))
+	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{logger: logger, r: registrator}))
 	chIpcErr := make(chan error, 1)
 	i, c, err := setup(conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
-			logrus.Infof("Connection to plugin %v closed", v.name)
+			logger.Printf("Connection to plugin %v closed", v.name)
 		}
 		cb()
 		chIpcErr <- err
@@ -62,7 +62,7 @@ func setup(conn io.ReadWriteCloser, setup ipc.Setup, cb func(), v runtimeCfg, op
 		i.Close()
 		return nil, errors.New("plugin registration timed out")
 	}
-	logrus.Infof("Plugin %s@%s registered successfully with pattern %v", out.name, out.version, out.pattern)
+	logger.Printf("Plugin %s@%s registered successfully with pattern %v", out.name, out.version, out.pattern)
 	return &setupResult{
 		client: c,
 		cfg:    out,

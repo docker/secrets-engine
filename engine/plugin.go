@@ -16,6 +16,7 @@ import (
 	v1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
@@ -105,7 +106,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
+func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -124,11 +125,11 @@ func newLaunchedPlugin(cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
 	}
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
-	cmdWrapper := launchCmdWatched(v.name, fromCmd(cmd), getPluginShutdownTimeout())
+	cmdWrapper := launchCmdWatched(logger, v.name, fromCmd(cmd), getPluginShutdownTimeout())
 
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(rwc, ipc.NewServerIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(logger, rwc, ipc.NewServerIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		cmdWrapper.Close()
@@ -179,10 +180,10 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
+func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(conn, ipc.NewClientIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(logger, conn, ipc.NewClientIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}

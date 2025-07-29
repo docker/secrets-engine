@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 type removeFunc func()
@@ -20,6 +20,7 @@ type registry interface {
 type manager struct {
 	m       sync.RWMutex
 	plugins []runtime
+	logger  logging.Logger
 }
 
 var _ registry = &manager{}
@@ -47,9 +48,9 @@ func (m *manager) sort() {
 		return strings.Compare(a.Data().name, b.Data().name)
 	})
 	if len(m.plugins) > 0 {
-		logrus.Infof("plugin priority order")
+		m.logger.Printf("plugin priority order")
 		for i, p := range m.plugins {
-			logrus.Infof("  #%d: %s", i+1, p.Data().qualifiedName())
+			m.logger.Printf("  #%d: %s", i+1, p.Data().qualifiedName())
 		}
 	}
 }

@@ -54,7 +54,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			runReceived:    make(chan struct{}),
 			runDone:        make(chan error, 1),
 		}
-		wrapper := launchCmdWatched("foo", cmd, 5*time.Second)
+		wrapper := launchCmdWatched(testLogger(t), "foo", cmd, 5*time.Second)
 		assert.False(t, isClosed(wrapper.Closed()))
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.runReceived))
 		errClose := make(chan error)
@@ -77,7 +77,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			runReceived: make(chan struct{}),
 			runDone:     make(chan error, 1),
 		}
-		wrapper := launchCmdWatched("foo", cmd, 5*time.Second)
+		wrapper := launchCmdWatched(testLogger(t), "foo", cmd, 5*time.Second)
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.runReceived))
 		cmd.runDone <- runErr
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -94,7 +94,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
-		wrapper := launchCmdWatched("foo", cmd, 100*time.Millisecond)
+		wrapper := launchCmdWatched(testLogger(t), "foo", cmd, 100*time.Millisecond)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()
@@ -116,7 +116,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
-		wrapper := launchCmdWatched("foo", cmd, time.Second)
+		wrapper := launchCmdWatched(testLogger(t), "foo", cmd, time.Second)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()
@@ -137,7 +137,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			signalReceived: make(chan struct{}),
 			signalDone:     make(chan error, 1),
 		}
-		wrapper := launchCmdWatched("foo", cmd, time.Second)
+		wrapper := launchCmdWatched(testLogger(t), "foo", cmd, time.Second)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()

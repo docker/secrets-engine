@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 type proc interface {
@@ -62,16 +62,17 @@ type cmdWatchWrapper struct {
 	done            chan struct{}
 	name            string
 	shutdownTimeout time.Duration
+	logger          logging.Logger
 }
 
-func launchCmdWatched(name string, p proc, timeout time.Duration) procWrapper {
-	result := &cmdWatchWrapper{name: name, p: p, done: make(chan struct{}), shutdownTimeout: timeout}
+func launchCmdWatched(logger logging.Logger, name string, p proc, timeout time.Duration) procWrapper {
+	result := &cmdWatchWrapper{logger: logger, name: name, p: p, done: make(chan struct{}), shutdownTimeout: timeout}
 	go func() {
 		err := p.Run()
 		// On linux, if the process doesn't listen to SIGINT / explicitly handles it, cmd.Wait() returns an error.
 		// It's not an error for us, but logging it could help giving feedback to improve the plugin implementation.
 		if isSigint(err) {
-			logrus.Infof("Plugin %s returned sigint error. Is SIGINT signal being properly handled?", name)
+			logger.Printf("Plugin %s returned sigint error. Is SIGINT signal being properly handled?", name)
 			err = nil
 		}
 		if err != nil {
@@ -93,7 +94,7 @@ func (w *cmdWatchWrapper) Close() error {
 		return w.err
 	default:
 	}
-	shutdownCMD(w.name, w.p, w.done, w.shutdownTimeout)
+	w.shutdownCMD()
 	select {
 	case <-w.done:
 		return w.err
@@ -102,29 +103,29 @@ func (w *cmdWatchWrapper) Close() error {
 	}
 }
 
+func (w *cmdWatchWrapper) kill() {
+	if err := w.p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		w.logger.Errorf("sending SIGKILL to plugin: %v", err)
+	}
+}
+
 // Assures cmd gets shut down (gracefully). However, cmd.Run() could still
 // terminating on its own for any kind of reason.
 // -> filter out os.ErrProcessDone
-func shutdownCMD(name string, p proc, done <-chan struct{}, timeout time.Duration) {
-	if err := askProcessToStop(p); err != nil {
+func (w *cmdWatchWrapper) shutdownCMD() {
+	if err := askProcessToStop(w.p); err != nil {
 		if errors.Is(err, os.ErrProcessDone) {
 			return
 		}
-		logrus.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin '%s': %v", name, err)
-		kill(p)
+		w.logger.Errorf("sending SIGINT/CTRL_BREAK_EVENT to plugin '%s': %v", w.name, err)
+		w.kill()
 		return
 	}
 	select {
-	case <-done:
+	case <-w.done:
 		return
-	case <-time.After(timeout):
-		logrus.Warnf("plugin '%s' did not shut down after timeout", name)
+	case <-time.After(w.shutdownTimeout):
+		w.logger.Warnf("plugin '%s' did not shut down after timeout", w.name)
 	}
-	kill(p)
-}
-
-func kill(p proc) {
-	if err := p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-		logrus.Errorf("sending SIGKILL to plugin: %v", err)
-	}
+	w.kill()
 }

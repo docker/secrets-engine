@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
@@ -37,11 +37,12 @@ type pluginRegistrator interface {
 }
 
 type RegisterService struct {
-	r pluginRegistrator
+	logger logging.Logger
+	r      pluginRegistrator
 }
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
-	logrus.Infof("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
+	r.logger.Printf("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
 	in := pluginCfgIn{
 		name:    c.Msg.GetName(),
 		version: c.Msg.GetVersion(),

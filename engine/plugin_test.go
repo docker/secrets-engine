@@ -109,7 +109,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
 				})
-				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -145,7 +145,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					ErrGetSecret: errGetSecret,
 				})
-				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -171,7 +171,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -190,7 +190,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -346,6 +346,7 @@ type mockExternalRuntime struct {
 	server    *http.Server
 	chConn    chan net.Conn
 	serverErr chan error
+	logger    logging.Logger
 }
 
 func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternalRuntime {
@@ -357,7 +358,7 @@ func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternal
 	go func() {
 		serverErr <- server.Serve(l)
 	}()
-	return &mockExternalRuntime{server: server, chConn: chConn, serverErr: serverErr}
+	return &mockExternalRuntime{logger: logger, server: server, chConn: chConn, serverErr: serverErr}
 }
 
 func (m *mockExternalRuntime) shutdown() error {
@@ -370,7 +371,7 @@ func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newExternalPlugin(conn, runtimeCfg{
+	return newExternalPlugin(m.logger, conn, runtimeCfg{
 		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
 }
