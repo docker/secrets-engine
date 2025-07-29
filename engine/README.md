@@ -19,7 +19,8 @@ The two main tasks of the engine are:
   - [x] names must be unique
   - [ ] no conflicting patterns
 - [ ] configuration
-  - [ ] retry behaviour when plugins crash
+  - [x] retry behaviour when plugins crash
   - [ ] logging
   - [x] permanently disable engine launched plugins
   - [x] permanently disable externally launched plugins
+  - [ ] OTEL support

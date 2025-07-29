@@ -158,3 +158,33 @@ func isClosed[T any](ch <-chan T) bool {
 		return false
 	}
 }
+
+func Test_shutdownHelper(t *testing.T) {
+	t.Parallel()
+	t.Run("shutdown only executes once (with error)", func(t *testing.T) {
+		innerErr := errors.New("inner error")
+		firstOuterErr := errors.New("first error")
+		expectedErr := errors.Join(firstOuterErr, innerErr)
+		counter := 0
+		helper := newShutdownHelper(func() error {
+			counter++
+			return innerErr
+		})
+		assert.ErrorContains(t, helper.shutdown(firstOuterErr), expectedErr.Error())
+		assert.ErrorContains(t, helper.shutdown(errors.New("another error")), expectedErr.Error())
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.closed()))
+		assert.Equal(t, 1, counter)
+	})
+	t.Run("shutdown only executes once (no error)", func(t *testing.T) {
+		innerErr := errors.New("inner error")
+		counter := 0
+		helper := newShutdownHelper(func() error {
+			counter++
+			return innerErr
+		})
+		assert.ErrorIs(t, helper.shutdown(nil), innerErr)
+		assert.ErrorIs(t, helper.shutdown(errors.New("another error")), innerErr)
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.closed()))
+		assert.Equal(t, 1, counter)
+	})
+}
