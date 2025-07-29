@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,8 +89,7 @@ func TestMatch(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		t.Run(string(tc.pattern), func(t *testing.T) {
-			t.Logf("ids: %+v", tc.ids)
+		t.Run(tc.pattern, func(t *testing.T) {
 			for _, m := range tc.ids {
 				id, err := NewID(m)
 				assert.NoError(t, err)
@@ -99,4 +99,30 @@ func TestMatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIdentifierJSON(t *testing.T) {
+	t.Run("can marshal identifier", func(t *testing.T) {
+		id := MustNewID("com.test.test/something/something")
+		actual, err := id.MarshalJSON()
+		assert.NoError(t, err)
+		assert.Equal(t, "\"com.test.test/something/something\"", string(actual))
+	})
+	t.Run("can unmarshal identifier", func(t *testing.T) {
+		var s id
+		assert.NoError(t, json.Unmarshal([]byte("\"com.test.test/something/something\""), &s))
+		assert.Equal(t, "com.test.test/something/something", s.String())
+	})
+	t.Run("invalid identifier will error on unmarshal", func(t *testing.T) {
+		var s id
+		assert.ErrorContains(t, json.Unmarshal([]byte("\"/\""), &s), "invalid identifier")
+	})
+	t.Run("can marshal a type containing identifier", func(t *testing.T) {
+		type a struct {
+			ID ID
+		}
+		actual, err := json.Marshal(a{ID: MustNewID("com.test.test/something")})
+		assert.NoError(t, err)
+		assert.Equal(t, `{"ID":"com.test.test/something"}`, string(actual))
+	})
 }

@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -11,15 +12,58 @@ import (
 // For storage, we don't really differentiate much about the ID format but
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
-type ID struct {
+type ID interface {
+	// String formats the [ID] as a string
+	String() string
+	// Parts splits the [ID] by the forward-slash ("/") character into a slice
+	Parts() []string
+	// Match the [ID] against a [Pattern]
+	Match(pattern Pattern) bool
+
+	json.Unmarshaler
+	json.Marshaler
+}
+
+type id struct {
 	value string
 }
 
-func NewID(id string) (*ID, error) {
-	if err := valid(id); err != nil {
+func (id *id) MarshalJSON() ([]byte, error) {
+	return json.Marshal(id.value)
+}
+
+func (id *id) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if err := valid(s); err != nil {
+		return err
+	}
+	id.value = s
+	return nil
+}
+
+// NewID creates a new [ID] from a string
+// If a validation error occurs, it returns nil and the error.
+func NewID(s string) (ID, error) {
+	if err := valid(s); err != nil {
 		return nil, fmt.Errorf("parsing id: %w", err)
 	}
-	return &ID{id}, nil
+	return &id{
+		value: s,
+	}, nil
+}
+
+// MustNewID creates a new ID as [NewID] does, but panics when a validation
+// error occurs.
+func MustNewID(s string) ID {
+	if err := valid(s); err != nil {
+		panic(err)
+	}
+	return &id{
+		value: s,
+	}
 }
 
 // Valid returns nil if the identifier is considered valid.
@@ -31,9 +75,9 @@ func valid(id string) error {
 	return nil
 }
 
-func (id *ID) String() string { return id.value }
+func (id *id) String() string { return id.value }
 
-func (id *ID) Parts() []string {
+func (id *id) Parts() []string {
 	return split(id.value)
 }
 
@@ -80,9 +124,9 @@ func isValidRune(c rune) bool {
 // - "*" matches a single component
 // - "**" matches zero or more components
 // - "/" is the separator
-func (id *ID) Match(pattern *Pattern) bool {
-	pathParts := split(string(id.value))
-	patternParts := split(pattern.value)
+func (id *id) Match(pattern Pattern) bool {
+	pathParts := split(id.value)
+	patternParts := split(pattern.String())
 
 	return match(patternParts, pathParts)
 }

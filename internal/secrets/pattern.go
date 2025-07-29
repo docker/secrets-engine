@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"errors"
 )
 
@@ -9,22 +10,68 @@ var ErrInvalidPattern = errors.New("invalid pattern")
 // Pattern can be used to match secret identifiers.
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
 // that '*' can be used to match a single component, and '**' can be used to match zero or more components.
-type Pattern struct {
+type Pattern interface {
+	// Match the [Pattern] against an [ID]
+	Match(id ID) bool
+	// Get the [Pattern] as a string
+	String() string
+
+	json.Unmarshaler
+	json.Marshaler
+}
+
+type pattern struct {
 	value string
 }
 
-func ParsePattern(pattern string) (*Pattern, error) {
-	if !validPattern(pattern) {
+var _ Pattern = &pattern{}
+
+// ParsePattern parses a string into a [Pattern]
+func ParsePattern(s string) (Pattern, error) {
+	if !validPattern(s) {
 		return nil, ErrInvalidPattern
 	}
-	return &Pattern{pattern}, nil
+	return &pattern{
+		value: s,
+	}, nil
 }
 
-func (p *Pattern) Match(id *ID) bool {
-	pathParts := split(id.value)
+// MustParsePattern parses a string into a [Pattern] like with [ParsePattern],
+// however, it panics when a validation error occurs.
+func MustParsePattern(s string) Pattern {
+	if !validPattern(s) {
+		panic(ErrInvalidPattern)
+	}
+	return &pattern{
+		value: s,
+	}
+}
+
+func (p *pattern) Match(id ID) bool {
+	pathParts := split(id.String())
 	patternParts := split(p.value)
 
 	return match(patternParts, pathParts)
+}
+
+func (p *pattern) String() string {
+	return p.value
+}
+
+func (p *pattern) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.value)
+}
+
+func (p *pattern) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if !validPattern(s) {
+		return ErrInvalidPattern
+	}
+	p.value = s
+	return nil
 }
 
 // validPattern checks if a pattern is valid without using regexp or unicode.

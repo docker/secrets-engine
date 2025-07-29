@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,4 +41,31 @@ func TestParsePattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPatternJSON(t *testing.T) {
+	t.Run("can marshal to json", func(t *testing.T) {
+		pattern := MustParsePattern("*")
+		actual, err := pattern.MarshalJSON()
+		assert.NoError(t, err)
+		assert.Equal(t, "\"*\"", string(actual))
+	})
+	t.Run("can unmarshal from json", func(t *testing.T) {
+		var v pattern
+		assert.NoError(t, json.Unmarshal([]byte("\"*\""), &v))
+		assert.Equal(t, v.String(), "*")
+	})
+	t.Run("invalid pattern cannot be unmarshalled", func(t *testing.T) {
+		var v pattern
+		assert.ErrorIs(t, json.Unmarshal([]byte("\"/\""), &v), ErrInvalidPattern)
+	})
+	t.Run("can marshal as a field inside another type", func(t *testing.T) {
+		type a struct {
+			P Pattern
+		}
+		v := a{P: MustParsePattern("com.test.test/something/something")}
+		actual, err := json.Marshal(v)
+		assert.NoError(t, err)
+		assert.Equal(t, `{"P":"com.test.test/something/something"}`, string(actual))
+	})
 }
