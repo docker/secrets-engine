@@ -13,7 +13,7 @@ import (
 	"github.com/docker/secrets-engine/internal/ipc"
 )
 
-func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer, error) {
+func setup(ctx context.Context, setup ipc.Setup, config cfg, onClose func(err error)) (io.Closer, error) {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -26,7 +26,7 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 	}}))
 	setupCompleted := make(chan struct{})
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{config.plugin, setupCompleted, config.registrationTimeout}))
-	ipc, c, err := ipc.NewPluginIPC(config.conn, httpMux, func(err error) {
+	ipc, c, err := setup(config.conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", config.name)
 			err = nil // In the context of a plugin, the runtime shutting down IPC/plugin is not an error.

@@ -27,7 +27,7 @@ type runtimeCfg struct {
 	name string
 }
 
-func setup(conn io.ReadWriteCloser, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
+func setup(conn io.ReadWriteCloser, setup ipc.Setup, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
 	chRegistrationResult := make(chan registrationResult, 1)
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -37,7 +37,7 @@ func setup(conn io.ReadWriteCloser, cb func(), v runtimeCfg, option ...ipc.Optio
 	registrator := newRegistrationLogic(v, chRegistrationResult)
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{registrator}))
 	chIpcErr := make(chan error, 1)
-	i, c, err := ipc.NewRuntimeIPC(conn, httpMux, func(err error) {
+	i, c, err := setup(conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			logrus.Infof("Connection to plugin %v closed", v.name)
 		}
