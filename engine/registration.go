@@ -32,8 +32,14 @@ type pluginCfgIn struct {
 	pattern secrets.Pattern
 }
 
+type pluginCfgInUnvalidated struct {
+	name    string
+	version string
+	pattern string
+}
+
 type pluginRegistrator interface {
-	register(ctx context.Context, cfg pluginCfgIn) (*pluginCfgOut, error)
+	register(ctx context.Context, cfg pluginCfgInUnvalidated) (*pluginCfgOut, error)
 }
 
 type RegisterService struct {
@@ -43,10 +49,10 @@ type RegisterService struct {
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
 	r.logger.Printf("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
-	in := pluginCfgIn{
+	in := pluginCfgInUnvalidated{
 		name:    c.Msg.GetName(),
 		version: c.Msg.GetVersion(),
-		pattern: secrets.Pattern(c.Msg.GetPattern()),
+		pattern: c.Msg.GetPattern(),
 	}
 	out, err := r.r.register(ctx, in)
 	if errors.Is(err, secrets.ErrInvalidPattern) {
@@ -63,11 +69,11 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 }
 
 type pluginCfgInValidator interface {
-	Validate(pluginCfgIn) (*pluginCfgOut, error)
+	Validate(pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCfgOut, error)
 }
 
 type registrationResult struct {
-	cfg pluginCfgIn
+	cfg *pluginCfgIn
 	err error
 }
 
@@ -85,16 +91,16 @@ func newRegistrationLogic(validator pluginCfgInValidator, result chan registrati
 	}
 }
 
-func (l *registrationLogic) register(_ context.Context, cfg pluginCfgIn) (*pluginCfgOut, error) {
+func (l *registrationLogic) register(_ context.Context, cfg pluginCfgInUnvalidated) (*pluginCfgOut, error) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	if l.done {
 		return nil, errors.New("cannot rerun registration")
 	}
 	l.done = true
-	out, err := l.validator.Validate(cfg)
+	in, out, err := l.validator.Validate(cfg)
 	select {
-	case l.result <- registrationResult{cfg: cfg, err: err}:
+	case l.result <- registrationResult{cfg: in, err: err}:
 	default:
 		return nil, errors.New("registration rejected")
 	}
