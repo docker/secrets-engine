@@ -51,7 +51,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	reg := &manager{logger: cfg.logger}
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
-	server := newServer(cfg, reg)
+	server := newServer(ctx, cfg, reg)
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
@@ -160,7 +160,7 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 	}
 
 	_, err := backoff.Retry(ctx, func() (any, error) {
-		errClosed, err := register(cfg.logger, reg, l)
+		errClosed, err := register(ctx, reg, l)
 		if err != nil {
 			cfg.logger.Errorf("registering plugin '%s': %v", name, err)
 			return nil, err
@@ -178,7 +178,11 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 	return err
 }
 
-func register(logger logging.Logger, reg registry, launch launcher) (<-chan error, error) {
+func register(ctx context.Context, reg registry, launch launcher) (<-chan error, error) {
+	logger, err := logging.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	run, err := launch()
 	if err != nil {
 		return nil, err
@@ -193,9 +197,7 @@ func register(logger logging.Logger, reg registry, launch launcher) (<-chan erro
 	}
 	errClosed := make(chan error, 1)
 	go func() {
-		if run.Closed() != nil {
-			<-run.Closed()
-		}
+		run.Wait(ctx)
 		removeFunc()
 		errClosed <- run.Close() // close only pulls the error here but doesn't actually re-run close
 	}()
@@ -236,7 +238,7 @@ func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func newServer(cfg config, reg registry) *http.Server {
+func newServer(ctx context.Context, cfg config, reg registry) *http.Server {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -249,7 +251,7 @@ func newServer(cfg config, reg registry) *http.Server {
 			launcher := launcher(func() (runtime, error) {
 				return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
-			if _, err := register(cfg.logger, reg, launcher); err != nil {
+			if _, err := register(ctx, reg, launcher); err != nil {
 				cfg.logger.Errorf("registering dynamic plugin: %v", err)
 			}
 		}))

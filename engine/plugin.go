@@ -75,7 +75,7 @@ type runtime interface {
 
 	Data() pluginData
 
-	Closed() <-chan struct{}
+	Wait(context.Context)
 }
 
 type pluginType string
@@ -102,7 +102,7 @@ type runtimeImpl struct {
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
-	closed         <-chan struct{}
+	wait           func(ctx context.Context)
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -163,7 +163,16 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close:          finalCloseEverything,
-		closed:         closed,
+		wait: func(ctx context.Context) {
+			select {
+			case <-closed:
+			case <-ctx.Done():
+			}
+			select {
+			case <-cmdWrapper.Closed():
+			case <-ctx.Done():
+			}
+		},
 	}, nil
 }
 
@@ -200,7 +209,12 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 		close: sync.OnceValue(func() error {
 			return errors.Join(callPluginShutdown(c, closed), r.close())
 		}),
-		closed: closed,
+		wait: func(ctx context.Context) {
+			select {
+			case <-closed:
+			case <-ctx.Done():
+			}
+		},
 	}, nil
 }
 
@@ -208,8 +222,8 @@ func (r *runtimeImpl) Close() error {
 	return r.close()
 }
 
-func (r *runtimeImpl) Closed() <-chan struct{} {
-	return r.closed
+func (r *runtimeImpl) Wait(ctx context.Context) {
+	r.wait(ctx)
 }
 
 func (r *runtimeImpl) Data() pluginData {

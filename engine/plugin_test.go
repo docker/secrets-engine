@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -124,7 +125,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, dummy.MockSecretValue, string(s.Value))
 				assert.NoError(t, p.Close())
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
+				assert.NoError(t, waitWithTimeout(t, p.Wait))
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
@@ -177,7 +178,7 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				assert.NoError(t, p.Close())
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
+				assert.NoError(t, waitWithTimeout(t, p.Wait))
 			},
 		},
 		{
@@ -198,7 +199,7 @@ func Test_newPlugin(t *testing.T) {
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
 				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
+				assert.NoError(t, waitWithTimeout(t, p.Wait))
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
@@ -243,7 +244,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
+				assert.NoError(t, waitWithTimeout(t, r.Wait))
 
 				assert.NoError(t, testhelper.WaitForErrorWithTimeout(runErr))
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
@@ -264,7 +265,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
+				assert.NoError(t, waitWithTimeout(t, r.Wait))
 
 				err = <-runErr
 				assert.NoError(t, err)
@@ -294,7 +295,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				cancel()
 				<-done
-				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
+				assert.NoError(t, waitWithTimeout(t, r.Wait))
 				assert.NoError(t, r.Close())
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
@@ -374,4 +375,15 @@ func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
 	return newExternalPlugin(m.logger, conn, runtimeCfg{
 		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
+}
+
+func waitWithTimeout(t *testing.T, fn func(ctx context.Context)) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	fn(ctx)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return errors.New("timeout")
+	}
+	return nil
 }

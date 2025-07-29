@@ -124,8 +124,11 @@ func (i *internalRuntime) Data() pluginData {
 	}
 }
 
-func (i *internalRuntime) Closed() <-chan struct{} {
-	return i.closed
+func (i *internalRuntime) Wait(ctx context.Context) {
+	select {
+	case <-i.closed:
+	case <-ctx.Done():
+	}
 }
 
 func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[string]Plugin) []launchPlan {
