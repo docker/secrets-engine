@@ -12,6 +12,7 @@ import (
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type setupResult struct {
@@ -50,11 +51,11 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 	var out pluginCfgIn
 	select {
 	case r := <-chRegistrationResult:
-		if r.err != nil {
+		if r.err != nil || r.cfg == nil {
 			i.Close()
 			return nil, fmt.Errorf("failed to register plugin: %w", r.err)
 		}
-		out = r.cfg
+		out = *r.cfg
 	case err := <-chIpcErr:
 		i.Close()
 		return nil, fmt.Errorf("failed to register plugin, ipc error: %w", err)
@@ -79,15 +80,16 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 	}, nil
 }
 
-func (p runtimeCfg) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
-	if err := in.pattern.Valid(); err != nil {
-		return nil, err
+func (p runtimeCfg) Validate(in pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCfgOut, error) {
+	pattern, err := secrets.ParsePattern(in.pattern)
+	if err != nil {
+		return nil, nil, err
 	}
 	if p.name != "" && in.name != p.name {
-		return nil, errors.New("plugin name cannot be changed when launched by engine")
+		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
 	}
 	if p.name == "" && in.name == "" {
-		return nil, errors.New("plugin name is required when not launched by engine")
+		return nil, nil, errors.New("plugin name is required when not launched by engine")
 	}
-	return &p.out, nil
+	return &pluginCfgIn{in.name, in.version, pattern}, &p.out, nil
 }

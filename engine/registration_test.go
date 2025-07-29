@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
@@ -22,6 +23,11 @@ var (
 		engineVersion:  "1.0.0",
 		requestTimeout: 30 * time.Second,
 	}
+	mockPluginCfgInUnvalidated = pluginCfgInUnvalidated{
+		name:    "mockPlugin",
+		pattern: "*",
+		version: "1.0.0",
+	}
 	mockPluginCfgIn = pluginCfgIn{
 		name:    "mockPlugin",
 		pattern: "*",
@@ -35,9 +41,9 @@ type mockValidator struct {
 	err error
 }
 
-func (m mockValidator) Validate(in pluginCfgIn) (*pluginCfgOut, error) {
-	assert.Equal(m.t, mockPluginCfgIn, in)
-	return m.out, m.err
+func (m mockValidator) Validate(in pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCfgOut, error) {
+	assert.Equal(m.t, mockPluginCfgInUnvalidated, in)
+	return &mockPluginCfgIn, m.out, m.err
 }
 
 func mockValidatorOK(t *testing.T) pluginCfgInValidator {
@@ -65,15 +71,15 @@ func Test_registration(t *testing.T) {
 			name: "can only register once",
 			v:    mockValidatorOK(t),
 			test: func(t *testing.T, r *registrationLogic, chResult chan registrationResult) {
-				out, err := r.register(t.Context(), mockPluginCfgIn)
+				out, err := r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.Nil(t, err)
 				assert.Equal(t, mockPluginCfgOut, *out)
 
 				rr := <-chResult
-				assert.NoError(t, rr.err)
-				assert.Equal(t, mockPluginCfgIn, rr.cfg)
+				require.NoError(t, rr.err)
+				assert.Equal(t, mockPluginCfgIn, *rr.cfg)
 
-				_, err = r.register(t.Context(), mockPluginCfgIn)
+				_, err = r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.ErrorContains(t, err, "cannot rerun registration")
 			},
 		},
@@ -81,13 +87,13 @@ func Test_registration(t *testing.T) {
 			name: "registration gets rejected if validation fails and can't be retried",
 			v:    mockValidatorErr(t),
 			test: func(t *testing.T, r *registrationLogic, chResult chan registrationResult) {
-				_, err := r.register(t.Context(), mockPluginCfgIn)
+				_, err := r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.ErrorIs(t, err, errMockValidator)
 
 				rr := <-chResult
 				assert.ErrorIs(t, rr.err, errMockValidator)
 
-				_, err = r.register(t.Context(), mockPluginCfgIn)
+				_, err = r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.ErrorContains(t, err, "cannot rerun registration")
 			},
 		},
@@ -97,10 +103,10 @@ func Test_registration(t *testing.T) {
 			test: func(t *testing.T, r *registrationLogic, chResult chan registrationResult) {
 				chResult <- registrationResult{}
 
-				_, err := r.register(t.Context(), mockPluginCfgIn)
+				_, err := r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.ErrorContains(t, err, "registration rejected")
 
-				_, err = r.register(t.Context(), mockPluginCfgIn)
+				_, err = r.register(t.Context(), mockPluginCfgInUnvalidated)
 				assert.ErrorContains(t, err, "cannot rerun registration")
 			},
 		},
@@ -120,8 +126,8 @@ type mockPluginRegistrator struct {
 	err error
 }
 
-func (m mockPluginRegistrator) register(_ context.Context, cfg pluginCfgIn) (*pluginCfgOut, error) {
-	assert.Equal(m.t, mockPluginCfgIn, cfg)
+func (m mockPluginRegistrator) register(_ context.Context, cfg pluginCfgInUnvalidated) (*pluginCfgOut, error) {
+	assert.Equal(m.t, mockPluginCfgInUnvalidated, cfg)
 	return m.out, m.err
 }
 
@@ -144,13 +150,13 @@ func Test_RegisterPlugin(t *testing.T) {
 	tests := []struct {
 		name string
 		r    pluginRegistrator
-		in   pluginCfgIn
+		in   pluginCfgInUnvalidated
 		test func(t *testing.T, resp *connect.Response[resolverv1.RegisterPluginResponse], err error)
 	}{
 		{
 			name: "registration fails",
 			r:    mockPluginRegistratorErr(t),
-			in:   mockPluginCfgIn,
+			in:   mockPluginCfgInUnvalidated,
 			test: func(t *testing.T, _ *connect.Response[resolverv1.RegisterPluginResponse], err error) {
 				assert.ErrorIs(t, err, errMockRegistrator)
 			},
@@ -158,7 +164,7 @@ func Test_RegisterPlugin(t *testing.T) {
 		{
 			name: "registration succeeds",
 			r:    mockPluginRegistratorOK(t),
-			in:   mockPluginCfgIn,
+			in:   mockPluginCfgInUnvalidated,
 			test: func(t *testing.T, resp *connect.Response[resolverv1.RegisterPluginResponse], err error) {
 				assert.NoError(t, err)
 				assert.Equal(t, mockPluginCfgOut.engineName, resp.Msg.GetEngineName())
@@ -173,7 +179,7 @@ func Test_RegisterPlugin(t *testing.T) {
 			req := resolverv1.RegisterPluginRequest_builder{
 				Name:    proto.String(tt.in.name),
 				Version: proto.String(tt.in.version),
-				Pattern: proto.String(string(tt.in.pattern)),
+				Pattern: proto.String(tt.in.pattern),
 			}.Build()
 			resp, err := s.RegisterPlugin(t.Context(), connect.NewRequest(req))
 			tt.test(t, resp, err)
