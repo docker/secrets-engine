@@ -40,14 +40,14 @@ func Test_setup(t *testing.T) {
 		mRegister := &mockRegistrationHandler{}
 		httpMux.Handle(resolverv1connect.NewEngineServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
-		_, client, err := ipc.NewRuntimeIPC(a, httpMux, func(err error) {
+		_, client, err := ipc.NewServerIPC(a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)
 			close(runtimeClosed)
 		})
 		require.NoError(t, err)
 		mPlugin := &mockPlugin{}
 		pluginClosed := make(chan struct{})
-		closer, err := setup(t.Context(), cfg{mPlugin, "foo", b, 5 * time.Second}, func(err error) {
+		closer, err := setup(t.Context(), ipc.NewClientIPC, cfg{mPlugin, "foo", b, 5 * time.Second}, func(err error) {
 			assert.NoError(t, err)
 			close(pluginClosed)
 		})
