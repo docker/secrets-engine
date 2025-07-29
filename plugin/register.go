@@ -38,7 +38,7 @@ func (c *registerClient) register(ctx context.Context) (*runtimeConfig, error) {
 	req := connect.NewRequest(resolverv1.RegisterPluginRequest_builder{
 		Name:    proto.String(c.pluginName),
 		Version: proto.String(config.Version),
-		Pattern: proto.String(string(config.Pattern)),
+		Pattern: proto.String(config.Pattern.String()),
 	}.Build())
 	resp, err := c.engineClient.RegisterPlugin(ctx, req)
 	if err != nil {

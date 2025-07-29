@@ -23,7 +23,7 @@ type resolverService struct {
 
 func (r resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
 	msgID := c.Msg.GetId()
-	id, err := secrets.ParseID(msgID)
+	id, err := secrets.NewID(msgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret ID %q: %w", msgID, err))
 	}
@@ -35,7 +35,7 @@ func (r resolverService) GetSecret(ctx context.Context, c *connect.Request[resol
 		}
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get secret %q: %w", msgID, err))
 	}
-	if envelope.ID != id {
+	if envelope.ID.String() != id.String() {
 		return nil, connect.NewError(connect.CodeInternal, secrets.ErrIDMismatch)
 	}
 	return connect.NewResponse(resolverv1.GetSecretResponse_builder{
@@ -58,10 +58,6 @@ type resolver struct {
 
 func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.Envelope, error) {
 	var errs []error
-
-	if err := req.ID.Valid(); err != nil {
-		return secrets.EnvelopeErr(req, err), err
-	}
 
 	for _, plugin := range r.reg.GetAll() {
 		d := plugin.Data()
@@ -89,7 +85,7 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 
 	var err error
 	if len(errs) == 0 {
-		err = fmt.Errorf("secret %q: %w", req.ID, secrets.ErrNotFound)
+		err = fmt.Errorf("secret %q: %w", req.ID.String(), secrets.ErrNotFound)
 	} else {
 		err = errors.Join(errs...)
 	}

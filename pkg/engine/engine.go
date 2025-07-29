@@ -23,10 +23,6 @@ func NewEngine() *Engine {
 func (e *Engine) GetSecret(ctx context.Context, req secrets.Request) (secrets.Envelope, error) {
 	var errs []error
 
-	if err := req.ID.Valid(); err != nil {
-		return envelopeErr(req, err), err
-	}
-
 	for _, plugin := range e.plugins {
 		if req.Provider != "" && req.Provider != plugin.name {
 			continue
@@ -52,7 +48,7 @@ func (e *Engine) GetSecret(ctx context.Context, req secrets.Request) (secrets.En
 
 	var err error
 	if len(errs) == 0 {
-		err = fmt.Errorf("secret %q: %w", req.ID, secrets.ErrNotFound)
+		err = fmt.Errorf("secret %q: %w", req.ID.String(), secrets.ErrNotFound)
 	} else {
 		err = errors.Join(errs...)
 	}

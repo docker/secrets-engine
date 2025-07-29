@@ -80,10 +80,6 @@ func convertAttributes(attributes map[string]any) (map[string]string, error) {
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	item := newKeychainItem(id.String(), k)
 	err := kc.DeleteItem(item)
 	if err != nil && !errors.Is(err, kc.ErrorItemNotFound) {
@@ -93,10 +89,6 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
-	if err := id.Valid(); err != nil {
-		return nil, err
-	}
-
 	result, err := getItemWithData(id.String(), k)
 	if err != nil {
 		return nil, err
@@ -133,7 +125,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 
 	creds := make(map[string]store.Secret, len(results))
 	for _, result := range results {
-		id, err := store.ParseID(result.Account)
+		id, err := store.NewID(result.Account)
 		if err != nil {
 			return nil, err
 		}
@@ -153,10 +145,6 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	data, err := secret.Marshal()
 	if err != nil {
 		return err

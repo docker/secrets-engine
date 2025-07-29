@@ -29,7 +29,7 @@ type pluginCfgOut struct {
 type pluginCfgIn struct {
 	name    string
 	version string
-	pattern secrets.Pattern
+	pattern string
 }
 
 type pluginCfgInUnvalidated struct {

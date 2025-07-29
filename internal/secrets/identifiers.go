@@ -15,8 +15,6 @@ import (
 type ID interface {
 	// String formats the [ID] as a string
 	String() string
-	// Parts splits the [ID] by the forward-slash ("/") character into a slice
-	Parts() []string
 	// Match the [ID] against a [Pattern]
 	Match(pattern Pattern) bool
 
@@ -76,10 +74,6 @@ func valid(id string) error {
 }
 
 func (id *id) String() string { return id.value }
-
-func (id *id) Parts() []string {
-	return split(id.value)
-}
 
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
 // Rules:

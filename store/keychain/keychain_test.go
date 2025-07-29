@@ -66,8 +66,7 @@ func setupKeychain(t *testing.T, secretFactory func() store.Secret) store.Store 
 func TestKeychain(t *testing.T) {
 	t.Run("save credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.ID("com.test.test/test/bob")
-		require.NoError(t, id.Valid())
+		id := store.MustNewID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -80,7 +79,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("get credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.ID("com.test.test/test/bob")
+		id := store.MustNewID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -89,7 +88,6 @@ func TestKeychain(t *testing.T) {
 			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 		require.NoError(t, ks.Save(t.Context(), id, creds))
-		require.NoError(t, id.Valid())
 		secret, err := ks.Get(t.Context(), id)
 		require.NoError(t, err)
 
@@ -107,7 +105,7 @@ func TestKeychain(t *testing.T) {
 	t.Run("list all credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
 
-		moreCreds := map[store.ID]*mocks.MockCredential{
+		moreCreds := map[string]*mocks.MockCredential{
 			"com.test.test/test/bob": {
 				Username: "bob",
 				Password: "bob-password",
@@ -127,18 +125,18 @@ func TestKeychain(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				require.NoError(t, ks.Delete(context.Background(), id))
+				require.NoError(t, ks.Delete(context.Background(), store.MustNewID(id)))
 			}
 		})
 
 		for id, anotherCred := range moreCreds {
-			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
+			require.NoError(t, ks.Save(t.Context(), store.MustNewID(id), anotherCred))
 		}
 		secrets, err := ks.GetAllMetadata(t.Context())
 		require.NoError(t, err)
 		assert.Len(t, secrets, 3)
 
-		actual := make(map[store.ID]*mocks.MockCredential)
+		actual := make(map[string]*mocks.MockCredential)
 		for k, v := range secrets {
 			actual[k] = v.(*mocks.MockCredential)
 		}
@@ -159,8 +157,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("delete credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.ID("com.test.test/test/bob")
-		require.NoError(t, id.Valid())
+		id := store.MustNewID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -173,37 +170,13 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("delete non-existent credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.ID("com.test.test/test/does-not-exist")
-		require.NoError(t, id.Valid())
+		id := store.MustNewID("com.test.test/test/does-not-exist")
 		require.NoError(t, ks.Delete(t.Context(), id))
-	})
-
-	t.Run("invalid ID", func(t *testing.T) {
-		id := store.ID("completely*&@#$@invalid")
-		kc := setupKeychain(t, nil)
-
-		operations := []string{"save", "get", "delete"}
-
-		for _, op := range operations {
-			t.Run(op, func(t *testing.T) {
-				var err error
-				switch op {
-				case "save":
-					err = kc.Save(t.Context(), id, nil)
-				case "delete":
-					err = kc.Delete(t.Context(), id)
-				case "get":
-					_, err = kc.Get(t.Context(), id)
-				}
-				require.ErrorContains(t, err, "invalid identifier")
-			})
-		}
 	})
 
 	t.Run("marshal error on save", func(t *testing.T) {
 		kc := setupKeychain(t, nil)
-		id, err := store.ParseID("something/will/fail")
-		require.NoError(t, err)
+		id := store.MustNewID("something/will/fail")
 		require.ErrorContains(t, kc.Save(t.Context(), id, &mustMarshalError{}), "i am failing on purpose")
 	})
 
@@ -211,13 +184,12 @@ func TestKeychain(t *testing.T) {
 		kc := setupKeychain(t, func() store.Secret {
 			return &mustUnmarshalError{}
 		})
-		id, err := store.ParseID("something/will/fail")
-		require.NoError(t, err)
+		id := store.MustNewID("something/will/fail")
 		t.Cleanup(func() {
 			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
-		_, err = kc.Get(t.Context(), id)
+		_, err := kc.Get(t.Context(), id)
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 
@@ -225,13 +197,12 @@ func TestKeychain(t *testing.T) {
 		kc := setupKeychain(t, func() store.Secret {
 			return &mustUnmarshalError{}
 		})
-		id, err := store.ParseID("something/will/fail")
-		require.NoError(t, err)
+		id := store.MustNewID("something/will/fail")
 		t.Cleanup(func() {
 			require.NoError(t, kc.Delete(context.Background(), id))
 		})
 		require.NoError(t, kc.Save(t.Context(), id, &mustUnmarshalError{}))
-		_, err = kc.GetAllMetadata(t.Context())
+		_, err := kc.GetAllMetadata(t.Context())
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 }

@@ -94,10 +94,6 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service *kc.SecretServ
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	service, err := kc.NewService()
 	if err != nil {
 		return err
@@ -140,10 +136,6 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
-	if err := id.Valid(); err != nil {
-		return nil, err
-	}
-
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -254,7 +246,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 			return nil, errors.New("secret attributes does not contain `id` field")
 		}
 
-		secretID, err := store.ParseID(attrID)
+		secretID, err := store.NewID(attrID)
 		if err != nil {
 			return nil, err
 		}
@@ -272,10 +264,6 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	service, err := kc.NewService()
 	if err != nil {
 		return err

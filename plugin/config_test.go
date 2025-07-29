@@ -23,7 +23,9 @@ import (
 type mockPlugin struct{}
 
 func (m *mockPlugin) Config() Config {
-	return Config{}
+	return Config{
+		Pattern: secrets.MustParsePattern("*"),
+	}
 }
 
 func (m *mockPlugin) Configure(context.Context, runtimeConfig) error {

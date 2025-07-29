@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -16,8 +17,9 @@ import (
 
 const (
 	mockSecretValue = "mockSecretValue"
-	mockSecretID    = secrets.ID("mockSecretID")
 )
+
+var mockSecretID = secrets.MustNewID("mockSecretID")
 
 type mockResolver struct {
 	t     *testing.T
@@ -54,8 +56,8 @@ func withMockResolverError(err error) mockResolverOption {
 	}
 }
 
-func (m mockResolver) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
-	if request.ID != mockSecretID {
+func (m *mockResolver) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
+	if request.ID.String() != mockSecretID.String() {
 		return secrets.Envelope{}, errors.New("unexpected secret ID")
 	}
 	if m.err != nil {
@@ -66,6 +68,32 @@ func (m mockResolver) GetSecret(_ context.Context, request secrets.Request) (sec
 		Value: []byte(m.value),
 	}, nil
 }
+
+type mockID struct {
+	Value string `json:"id"`
+}
+
+func (m *mockID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m)
+}
+
+func (m *mockID) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &m.Value)
+}
+
+func (m *mockID) Match(_ secrets.Pattern) bool {
+	panic("unimplemented")
+}
+
+func (m *mockID) Parts() []string {
+	panic("unimplemented")
+}
+
+func (m *mockID) String() string {
+	return m.Value
+}
+
+var _ secrets.ID = &mockID{}
 
 func TestResolverService_GetSecret(t *testing.T) {
 	t.Parallel()
@@ -87,7 +115,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest("/"))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(&mockID{Value: "/"}))
 				assert.ErrorContains(t, err, "invalid secret ID")
 			},
 		},
@@ -116,7 +144,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 			test: func(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
-				s := &resolverService{resolver: newMockResolver(t, withMockResolverID("wrongID")), setupCompleted: done, registrationTimeout: 10 * time.Second}
+				s := &resolverService{resolver: newMockResolver(t, withMockResolverID(secrets.MustNewID("wrongID"))), setupCompleted: done, registrationTimeout: 10 * time.Second}
 				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
 				assert.ErrorIs(t, err, secrets.ErrIDMismatch)
 			},
@@ -143,6 +171,6 @@ func TestResolverService_GetSecret(t *testing.T) {
 
 func newGetSecretRequest(secretID secrets.ID) *connect.Request[resolverv1.GetSecretRequest] {
 	return connect.NewRequest(resolverv1.GetSecretRequest_builder{
-		Id: proto.String(string(secretID)),
+		Id: proto.String(secretID.String()),
 	}.Build())
 }

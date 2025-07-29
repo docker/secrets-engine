@@ -27,8 +27,8 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 		return nil, err
 	}
 	config := p.Config()
-	if err := config.Pattern.Valid(); err != nil {
-		return nil, err
+	if config.Pattern == nil {
+		return nil, secrets.ErrInvalidPattern
 	}
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	runErr := &atomicErr{}
@@ -52,6 +52,7 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 		}
 		runErr.StoreFirst(err)
 	}()
+
 	return &internalRuntime{
 		name:   name,
 		p:      p,

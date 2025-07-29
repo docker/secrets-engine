@@ -90,7 +90,7 @@ func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets
 		}
 		return secrets.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetId())
+	id, err := secrets.NewID(resp.Msg.GetId())
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}

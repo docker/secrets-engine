@@ -13,7 +13,7 @@ var ErrInvalidPattern = errors.New("invalid pattern")
 type Pattern interface {
 	// Match the [Pattern] against an [ID]
 	Match(id ID) bool
-	// Get the [Pattern] as a string
+	// String formats the [Pattern] as a string
 	String() string
 
 	json.Unmarshaler
@@ -23,8 +23,6 @@ type Pattern interface {
 type pattern struct {
 	value string
 }
-
-var _ Pattern = &pattern{}
 
 // ParsePattern parses a string into a [Pattern]
 func ParsePattern(s string) (Pattern, error) {

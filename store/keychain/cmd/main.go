@@ -56,7 +56,7 @@ func newCommand() (*cobra.Command, error) {
 		Use:     "store",
 		Aliases: []string{"set", "save"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, err := store.ParseID(path.Join("keystore-cli", username))
+			id, err := store.NewID(path.Join("keystore-cli", username))
 			if err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ func newCommand() (*cobra.Command, error) {
 		Use:  "get",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := store.ParseID(path.Join("keystore-cli", args[0]))
+			id, err := store.NewID(path.Join("keystore-cli", args[0]))
 			if err != nil {
 				return err
 			}
@@ -97,7 +97,7 @@ func newCommand() (*cobra.Command, error) {
 		Args:    cobra.ExactArgs(1),
 		Aliases: []string{"rm", "remove"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := store.ParseID(path.Join("keystore-cli", args[0]))
+			id, err := store.NewID(path.Join("keystore-cli", args[0]))
 			if err != nil {
 				return err
 			}

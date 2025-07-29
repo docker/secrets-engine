@@ -91,5 +91,5 @@ func (p runtimeCfg) Validate(in pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCf
 	if p.name == "" && in.name == "" {
 		return nil, nil, errors.New("plugin name is required when not launched by engine")
 	}
-	return &pluginCfgIn{in.name, in.version, pattern}, &p.out, nil
+	return &pluginCfgIn{name: in.name, version: in.version, pattern: pattern.String()}, &p.out, nil
 }

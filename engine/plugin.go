@@ -94,7 +94,7 @@ type pluginData struct {
 }
 
 func (d pluginData) qualifiedName() string {
-	return fmt.Sprintf("%s:%s@%s (%s)", d.pluginType, d.name, d.version, d.pattern)
+	return fmt.Sprintf("%s:%s@%s (%s)", d.pluginType, d.name, d.version, d.pattern.String())
 }
 
 type runtimeImpl struct {
@@ -148,7 +148,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	return &runtimeImpl{
 		pluginData: pluginData{
 			name:       v.name,
-			pattern:    r.cfg.pattern,
+			pattern:    secrets.MustParsePattern(r.cfg.pattern),
 			version:    r.cfg.version,
 			pluginType: internalPlugin,
 		},
@@ -190,7 +190,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 	return &runtimeImpl{
 		pluginData: pluginData{
 			name:       r.cfg.name,
-			pattern:    r.cfg.pattern,
+			pattern:    secrets.MustParsePattern(r.cfg.pattern),
 			version:    r.cfg.version,
 			pluginType: externalPlugin,
 		},
@@ -224,11 +224,11 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetId())
+	id, err := secrets.NewID(resp.Msg.GetId())
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}
-	if id != request.ID {
+	if id.String() != request.ID.String() {
 		return secrets.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{

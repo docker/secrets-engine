@@ -66,7 +66,7 @@ func (m *manager) remove(plugin runtime) {
 	defer m.m.Unlock()
 	for i, p := range m.plugins {
 		if p == plugin {
-			m.plugins = append(m.plugins[:i], m.plugins[i+1:]...)
+			m.plugins = slices.Delete(m.plugins, i, i+1)
 		}
 	}
 }

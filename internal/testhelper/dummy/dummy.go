@@ -31,7 +31,11 @@ const (
 	dummyPluginFail   = "plugin-fail"
 	mockVersion       = "mockVersion"
 	MockSecretValue   = "MockSecretValue"
-	MockSecretID      = secrets.ID("MockSecretID")
+)
+
+var (
+	MockSecretID = secrets.MustNewID("mockSecretID")
+	anyPattern   = secrets.MustParsePattern("*")
 )
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
@@ -44,13 +48,14 @@ func PluginProcessFromBinaryName(name string) {
 		if err != nil {
 			panic(err)
 		}
+		pluginID := secrets.MustNewID(behaviour.Value)
 		PluginProcess(&PluginCfg{
 			Config: plugin.Config{
 				Version: mockVersion,
-				Pattern: "*",
+				Pattern: anyPattern,
 			},
 			E: []secrets.Envelope{
-				{ID: secrets.ID(behaviour.Value), Value: []byte(behaviour.Value + "-value")},
+				{ID: pluginID, Value: []byte(behaviour.Value + "-value")},
 				{ID: MockSecretID, Value: []byte(MockSecretValue)},
 			},
 			CrashBehaviour: behaviour.CrashBehaviour,
@@ -167,7 +172,7 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
 	}
 	for _, s := range d.cfg.E {
-		if request.ID == s.ID {
+		if request.ID.String() == s.ID.String() {
 			s.CreatedAt = time.Now().Add(-time.Hour)
 			s.ExpiresAt = time.Now().Add(time.Hour)
 			return s, nil

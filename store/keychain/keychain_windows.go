@@ -52,10 +52,6 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	g := wincred.NewGenericCredential(k.itemLabel(id))
 	err := g.Delete()
 	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
@@ -65,10 +61,6 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
-	if err := id.Valid(); err != nil {
-		return nil, err
-	}
-
 	gc, err := wincred.GetGenericCredential(k.itemLabel(id))
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -148,11 +140,11 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		return nil, mapWindowsCredentialError(err)
 	}
 
-	onlyLabelPrefix := k.itemLabel(store.ID(""))
+	onlyLabelPrefix := k.itemLabel(nil)
 
 	secrets := make(map[string]store.Secret)
 	for cred := range findServiceCredentials(k, credentials) {
-		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
+		id, err := store.NewID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			return nil, err
 		}
@@ -171,10 +163,6 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	blob, err := encodeSecret(secret)
 	if err != nil {
 		return err

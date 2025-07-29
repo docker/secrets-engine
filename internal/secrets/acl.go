@@ -10,7 +10,7 @@ import (
 // By default, it allows access to no secrets but
 // can be modified safely from other threads.
 type Restricted struct {
-	allowed map[ID]struct{}
+	allowed map[string]struct{}
 	mu      sync.Mutex
 	next    Resolver
 }
@@ -27,7 +27,7 @@ func (r *Restricted) Allow(allowed ...ID) {
 	defer r.mu.Unlock()
 
 	for _, id := range allowed {
-		r.allowed[id] = struct{}{}
+		r.allowed[id.String()] = struct{}{}
 	}
 }
 
@@ -35,17 +35,17 @@ func (r *Restricted) GetSecret(ctx context.Context, request Request) (Envelope, 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, ok := r.allowed[request.ID]; !ok {
+	if _, ok := r.allowed[request.ID.String()]; !ok {
 		return Envelope{ID: request.ID, Error: ErrAccessDenied.Error()}, ErrAccessDenied
 	}
 
 	return r.next.GetSecret(ctx, request)
 }
 
-func allowList[K comparable](allowed ...K) map[K]struct{} {
-	m := make(map[K]struct{}, len(allowed))
+func allowList(allowed ...ID) map[string]struct{} {
+	m := make(map[string]struct{}, len(allowed))
 	for _, v := range allowed {
-		m[v] = struct{}{}
+		m[v.String()] = struct{}{}
 	}
 
 	return m

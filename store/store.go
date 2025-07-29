@@ -8,7 +8,10 @@ import (
 
 type ID = secrets.ID
 
-var ParseID = secrets.ParseID
+var (
+	NewID     = secrets.NewID
+	MustNewID = secrets.MustNewID
+)
 
 // Secret is a generic type that represents the actual secret values
 //

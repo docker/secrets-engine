@@ -27,8 +27,9 @@ import (
 const (
 	mockEngineName    = "mockEngineName"
 	mockEngineVersion = "mockEngineVersion"
-	mockPattern       = "mockPattern"
 )
+
+var mockPattern = secrets.MustParsePattern("mockPattern")
 
 type mockedPlugin struct {
 	pattern secrets.Pattern
@@ -102,7 +103,7 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
-				pattern := secrets.Pattern("foo-bar")
+				pattern := secrets.MustParsePattern("foo-bar")
 				version := "my-version"
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Config: p.Config{
@@ -115,7 +116,7 @@ func Test_newPlugin(t *testing.T) {
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, p.Data(), pluginData{
 					name:       pluginNameFromTestName(t),
 					pattern:    pattern,
@@ -130,7 +131,7 @@ func Test_newPlugin(t *testing.T) {
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
-				assert.Equal(t, dummy.MockSecretID, r.GetSecret[0].ID)
+				assert.Equal(t, dummy.MockSecretID.String(), r.GetSecret[0].ID.String())
 				assert.Equal(t, 1, r.ConfigRequests)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
@@ -143,7 +144,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Config: p.Config{
 						Version: "my-version",
-						Pattern: "foo-bar",
+						Pattern: secrets.MustParsePattern("foo-bar"),
 					},
 					ErrGetSecret: errGetSecret,
 				})
@@ -151,8 +152,9 @@ func Test_newPlugin(t *testing.T) {
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				require.Error(t, err)
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
 				r, err := parseOutput()
@@ -169,7 +171,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, _ := dummy.PluginCommand(t, dummy.PluginCfg{
 					Config: p.Config{
 						Version: "my-version",
-						Pattern: "foo-bar",
+						Pattern: secrets.MustParsePattern("foo-bar"),
 					},
 					IgnoreSigint: true,
 				})
@@ -177,7 +179,7 @@ func Test_newPlugin(t *testing.T) {
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NoError(t, p.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 			},
@@ -188,7 +190,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Config: p.Config{
 						Version: "my-version",
-						Pattern: "foo-bar",
+						Pattern: secrets.MustParsePattern("foo-bar"),
 					},
 					IgnoreSigint: true,
 				})
@@ -196,7 +198,7 @@ func Test_newPlugin(t *testing.T) {
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				_ = cmd.Process.Kill()
 				_ = cmd.Process.Release()
 				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
@@ -208,7 +210,7 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "plugin process exists unexpectedly",
 			test: func(t *testing.T) {
-				pattern := secrets.Pattern("foo-bar")
+				pattern := secrets.MustParsePattern("foo-bar")
 				version := "my-version"
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Config: p.Config{
@@ -227,6 +229,7 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				assert.Error(t, err)
 				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
@@ -286,7 +289,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				t.Helper()
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
-				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(WithID(secrets.MustNewID("rewrite-id"))), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
@@ -320,33 +323,13 @@ func Test_newExternalPlugin(t *testing.T) {
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 
 				cancel()
 				<-done
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
 				assert.NoError(t, r.Close())
-				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
-			},
-		},
-		{
-			name: "plugins with invalid patterns are rejected",
-			test: func(t *testing.T, l net.Listener, conn net.Conn) {
-				t.Helper()
-				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
-
-				doneRuntime := make(chan struct{})
-				go func() {
-					_, err := m.waitForNextRuntimeWithTimeout()
-					assert.ErrorContains(t, err, "invalid pattern")
-					close(doneRuntime)
-				}()
-
-				s, err := p.New(newMockedPlugin(WithPattern("a*a")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
-				require.NoError(t, err)
-				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
-				<-doneRuntime
 				assert.ErrorIs(t, m.shutdown(), http.ErrServerClosed)
 			},
 		},

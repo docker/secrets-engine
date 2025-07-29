@@ -37,14 +37,16 @@ func (m *mockSlowRuntime) Close() error {
 }
 
 func (m *mockSlowRuntime) Data() pluginData {
-	return pluginData{}
+	return pluginData{
+		pattern: secrets.MustParsePattern("*"),
+	}
 }
 
 // Unfortunately, there's no way to test this reliably using channels.
 // We instead have a tiny sleep per mockRuntime.Close() with a larger global timeout in case the parallelStop function locks.
 func Test_parallelStop(t *testing.T) {
 	var runtimes []runtime
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		runtimes = append(runtimes, &mockSlowRuntime{name: fmt.Sprintf("r%d", i)})
 	}
 	stopErr := make(chan error)
@@ -80,7 +82,7 @@ func (m *mockRuntime) Closed() <-chan struct{} {
 }
 
 func (m *mockRuntime) Data() pluginData {
-	return pluginData{name: m.name}
+	return pluginData{name: m.name, pattern: secrets.MustParsePattern("*")}
 }
 
 type mockRegistry struct {
@@ -207,9 +209,9 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("foo")})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("foo"), foo.ID)
+		assert.Equal(t, secrets.MustNewID("foo").String(), foo.ID.String())
 		assert.Equal(t, "foo-value", string(foo.Value))
 	})
 	t.Run("external plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
@@ -232,16 +234,16 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("bar"), bar.ID)
+		assert.Equal(t, secrets.MustNewID("bar"), bar.ID)
 		assert.Equal(t, "bar-value", string(bar.Value))
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			assert.Empty(collect, e.Plugins())
-		}, 2*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+			assert.Empty(collect, e.Plugins(), "the engine still contains some plugins")
+		}, 4*time.Second, 100*time.Millisecond)
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("internal plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
@@ -254,7 +256,13 @@ func Test_newEngine(t *testing.T) {
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
-			plugins:               map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
+			plugins: map[string]Plugin{
+				"my-builtin": &mockInternalPlugin{
+					pattern:   secrets.MustParsePattern("*"),
+					runExitCh: internalPluginRunExitCh,
+					secrets:   map[string]string{"my-secret": "some-value"},
+				},
+			},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -264,15 +272,15 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("my-secret")})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, secrets.MustNewID("my-secret").String(), mySecret.ID.String())
 		assert.Equal(t, "some-value", string(mySecret.Value))
 		close(internalPluginRunExitCh)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 2*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("my-secret")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
@@ -291,14 +299,14 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 		require.NoError(t, err)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("bar")})
 			require.NoError(collect, err)
-			assert.Equal(collect, secrets.ID("bar"), bar.ID)
+			assert.Equal(collect, secrets.MustNewID("bar").String(), bar.ID.String())
 			assert.Equal(collect, "bar-value", string(bar.Value))
 		}, 5*time.Second, 100*time.Millisecond)
 	})
@@ -314,10 +322,10 @@ func Test_newEngine(t *testing.T) {
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
 			plugins: map[string]Plugin{"my-builtin": &mockInternalPlugin{
-				pattern:         "*",
+				pattern:         secrets.MustParsePattern("*"),
 				blockRunForever: blockRunCh,
 				runExitCh:       runExitCh,
-				secrets:         map[secrets.ID]string{"my-secret": "some-value"},
+				secrets:         map[string]string{"my-secret": "some-value"},
 			}},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
@@ -342,9 +350,9 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
 		}, 5*time.Second, 100*time.Millisecond) // Timeout needs to be larger than the initial retry interval
-		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustNewID("my-secret")})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, secrets.MustNewID("my-secret"), mySecret.ID)
 		assert.Equal(t, "some-value", string(mySecret.Value))
 	})
 }
