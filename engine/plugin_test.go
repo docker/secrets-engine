@@ -3,11 +3,13 @@ package engine
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -373,21 +375,30 @@ func runAsync(ctx context.Context, run func(ctx context.Context) error) chan err
 
 type mockExternalRuntime struct {
 	server    *http.Server
-	chConn    chan net.Conn
+	ch        chan nextConn
 	serverErr chan error
 	logger    logging.Logger
 }
 
+type nextConn struct {
+	conn io.ReadWriteCloser
+	done func()
+}
+
 func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternalRuntime {
 	httpMux := http.NewServeMux()
-	chConn := make(chan net.Conn)
-	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(conn net.Conn) { chConn <- conn }))
+	ch := make(chan nextConn)
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(_ context.Context, conn io.ReadWriteCloser) {
+		wait := make(chan struct{})
+		ch <- nextConn{conn: conn, done: sync.OnceFunc(func() { close(wait) })}
+		<-wait
+	}))
 	serverErr := make(chan error, 1)
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		serverErr <- server.Serve(l)
 	}()
-	return &mockExternalRuntime{logger: logger, server: server, chConn: chConn, serverErr: serverErr}
+	return &mockExternalRuntime{logger: logger, server: server, ch: ch, serverErr: serverErr}
 }
 
 func (m *mockExternalRuntime) shutdown() error {
@@ -396,11 +407,20 @@ func (m *mockExternalRuntime) shutdown() error {
 }
 
 func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
-	conn, err := testhelper.WaitForWithTimeoutV(m.chConn)
+	item, err := testhelper.WaitForWithTimeoutV(m.ch)
 	if err != nil {
 		return nil, err
 	}
-	return newExternalPlugin(m.logger, conn, runtimeCfg{
+	r, err := newExternalPlugin(m.logger, item.conn, runtimeCfg{
 		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
 	})
+	if err != nil {
+		item.done()
+		return nil, err
+	}
+	go func() {
+		<-r.Closed()
+		item.done()
+	}()
+	return r, nil
 }

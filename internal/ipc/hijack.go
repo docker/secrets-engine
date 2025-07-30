@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -59,10 +60,10 @@ func hijackRequest(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 		return nil, fmt.Errorf("making hijack request: %s", err)
 	}
 
-	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, fmt.Errorf("clearing deadline: %w", err)
 	}
-	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+	defer func() { _ = conn.SetDeadline(time.Time{}) }()
 	br := bufio.NewReader(conn)
 	resp, err := http.ReadResponse(br, req)
 	if err != nil {
@@ -104,33 +105,60 @@ type CloseWriter interface {
 }
 
 type hijackHandler struct {
-	cb         func(net.Conn)
+	cb         func(ctx context.Context, closer io.ReadWriteCloser)
 	ackTimeout time.Duration
 	logger     logging.Logger
 }
 
-func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "hijacking connection", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Connection", "upgrade")
-	w.Header().Set("Upgrade", "tcp")
-	w.WriteHeader(http.StatusSwitchingProtocols) // 1xx headers are sent immediately -> no flush needed
-
-	conn, _, err := hj.Hijack()
-	if err != nil {
-		h.logger.Errorf("hijack error: %v", err)
+	conn, brw, hijackErr := hj.Hijack()
+	if errors.Is(hijackErr, http.ErrNotSupported) {
+		h.logger.Errorf("can't switch protocols using non-Hijacker ResponseWriter")
 		return
 	}
 
-	// Note: Be careful when trying to pass r.Context() in here.
-	// r.Context() gets cancelled when this function returns, but conn will live much longer which is misleading.
-	h.cb(conn)
+	if hijackErr != nil {
+		h.logger.Errorf("Hijack failed on protocol switch: %v", hijackErr)
+		return
+	}
+
+	defer conn.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		resp := &http.Response{
+			StatusCode: http.StatusSwitchingProtocols,
+			Proto:      r.Proto,
+			Header:     w.Header(),
+		}
+		resp.Header.Set("Connection", "upgrade")
+		resp.Header.Set("Upgrade", "tcp")
+		if err := resp.Write(brw); err != nil {
+			h.logger.Errorf("writing response: %v", err)
+			return
+		}
+		if err := brw.Flush(); err != nil {
+			h.logger.Errorf("flushing response: %v", err)
+			return
+		}
+
+		h.cb(r.Context(), conn)
+	}()
+
+	select {
+	case <-done:
+	case <-r.Context().Done():
+	}
 }
 
-func NewHijackAcceptor(logger logging.Logger, cb func(conn net.Conn)) (string, http.Handler) {
+func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
 	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }
