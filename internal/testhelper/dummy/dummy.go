@@ -193,12 +193,67 @@ func (d *dummyPlugin) Config() plugin.Config {
 }
 
 type PluginCfg struct {
-	plugin.Config  `json:",inline"`
-	E              []secrets.Envelope `json:"envelope,omitempty"`
+	E              []secrets.Envelope `json:"envelopes,omitempty"`
 	ErrGetSecret   string             `json:"errGetSecret,omitempty"`
 	IgnoreSigint   bool               `json:"ignoreSigint,omitempty"`
 	ErrConfigPanic string             `json:"errConfigPanic,omitempty"`
 	*CrashBehaviour
+	plugin.Config
+}
+
+var _ json.Unmarshaler = &PluginCfg{}
+
+func (c *PluginCfg) UnmarshalJSON(b []byte) error {
+	if c.Pattern == nil {
+		c.Pattern = secrets.MustParsePattern("*")
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+
+	// raw is an intermediary struct to flat map all the fields
+	// there were some issues with `DisallowUnknownFields` and embedded
+	// structs
+	type raw struct {
+		ExitCode           int                `json:"exitCode"`
+		OnNthSecretRequest int                `json:"onNthSecretRequest"`
+		Envelopes          []secrets.Envelope `json:"envelopes"`
+		Version            string             `json:"version"`
+		Pattern            json.RawMessage    `json:"pattern"`
+		ErrGetSecret       string             `json:"errGetSecret"`
+		ErrConfigPanic     string             `json:"errConfigPanic"`
+		IgnoreSigint       bool               `json:"ignoreSigint"`
+	}
+
+	var cc raw
+	if err := dec.Decode(&cc); err != nil {
+		return fmt.Errorf("got an error decoding JSON into dummy.PluginCfg: %w", err)
+	}
+
+	if dec.More() {
+		return errors.New("dummy.PluginCfg does not support more than one JSON object")
+	}
+
+	pattern := secrets.MustParsePattern("*")
+	if err := pattern.UnmarshalJSON(cc.Pattern); err != nil {
+		return fmt.Errorf("got an error decoding JSON pattern into dummy.PluginCfg: %w", err)
+	}
+
+	*c = PluginCfg{
+		CrashBehaviour: &CrashBehaviour{
+			ExitCode:           cc.ExitCode,
+			OnNthSecretRequest: cc.OnNthSecretRequest,
+		},
+		Config: plugin.Config{
+			Version: cc.Version,
+			Pattern: pattern,
+		},
+		E:              cc.Envelopes,
+		ErrGetSecret:   cc.ErrGetSecret,
+		IgnoreSigint:   cc.IgnoreSigint,
+		ErrConfigPanic: cc.ErrConfigPanic,
+	}
+	return nil
 }
 
 func (c *PluginCfg) toString() (string, error) {
@@ -210,7 +265,11 @@ func (c *PluginCfg) toString() (string, error) {
 }
 
 func newDummyPluginCfg(in string) (*PluginCfg, error) {
-	var result PluginCfg
+	result := PluginCfg{
+		Config: plugin.Config{
+			Pattern: secrets.MustParsePattern("*"),
+		},
+	}
 	if err := json.Unmarshal([]byte(in), &result); err != nil {
 		return nil, fmt.Errorf("failed to decode dummy plugin cfg: %w", err)
 	}
@@ -274,8 +333,8 @@ type PluginBehaviour struct {
 }
 
 type CrashBehaviour struct {
-	OnNthSecretRequest int `json:"on_nth_secret_request"`
-	ExitCode           int `json:"exit_code"`
+	OnNthSecretRequest int `json:"onNthSecretRequest"`
+	ExitCode           int `json:"exitCode"`
 }
 
 func (p PluginBehaviour) ToString() (string, error) {

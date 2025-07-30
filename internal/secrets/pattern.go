@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 )
@@ -62,9 +63,17 @@ func (p *pattern) MarshalJSON() ([]byte, error) {
 
 func (p *pattern) UnmarshalJSON(b []byte) error {
 	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&s); err != nil {
 		return err
 	}
+
+	if dec.More() {
+		return errors.New("secrets.Pattern does not support more than one JSON object")
+	}
+
 	if !validPattern(s) {
 		return ErrInvalidPattern
 	}

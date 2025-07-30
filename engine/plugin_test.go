@@ -110,7 +110,15 @@ func Test_newPlugin(t *testing.T) {
 						Version: version,
 						Pattern: pattern,
 					},
-					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					E: []secrets.Envelope{
+						{
+							ID:         dummy.MockSecretID,
+							Value:      []byte(dummy.MockSecretValue),
+							CreatedAt:  time.Now(),
+							ResolvedAt: time.Now(),
+							ExpiresAt:  time.Time{},
+						},
+					},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
@@ -217,7 +225,7 @@ func Test_newPlugin(t *testing.T) {
 						Version: version,
 						Pattern: pattern,
 					},
-					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue), CreatedAt: time.Now()}},
 					CrashBehaviour: &dummy.CrashBehaviour{
 						OnNthSecretRequest: 1,
 						ExitCode:           0,
@@ -227,9 +235,9 @@ func Test_newPlugin(t *testing.T) {
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
@@ -274,7 +282,7 @@ func Test_newExternalPlugin(t *testing.T) {
 					pluginType: externalPlugin,
 				})
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
@@ -296,6 +304,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
 				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				require.Error(t, err)
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))

@@ -1,7 +1,9 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,10 +22,46 @@ type Plugin interface {
 }
 
 type Config struct {
-	Version string
+	Version string `json:"version"`
 
-	Pattern secrets.Pattern
+	Pattern secrets.Pattern `json:"pattern"`
 }
+
+// alias the type so we don't have recursive calls to UnmarshalJSON
+type config Config
+
+func (c *Config) UnmarshalJSON(b []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+
+	p, err := secrets.ParsePattern("*")
+	if err != nil {
+		return fmt.Errorf("plugin.Config: something terrible happened: %v", err)
+	}
+
+	type raw struct {
+		Pattern json.RawMessage `json:"pattern"`
+		config
+	}
+
+	var r raw
+	if err := dec.Decode(&r); err != nil {
+		return err
+	}
+	if dec.More() {
+		return errors.New("plugin.Config does not support more than one JSON object")
+	}
+
+	if err := p.UnmarshalJSON(r.Pattern); err != nil {
+		return err
+	}
+	r.config.Pattern = p
+
+	*c = Config(r.config)
+	return nil
+}
+
+var _ json.Unmarshaler = &Config{}
 
 // Stub is the interface the stub provides for the plugin implementation.
 type Stub interface {
