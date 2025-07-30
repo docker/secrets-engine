@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -28,12 +27,9 @@ var _ registry = &manager{}
 func (m *manager) Register(plugin runtime) (removeFunc, error) {
 	m.m.Lock()
 	defer m.m.Unlock()
-	if plugin.Data().name == "" {
-		return nil, errors.New("no plugin name")
-	}
 	for _, p := range m.plugins {
-		if p.Data().name == plugin.Data().name {
-			return nil, fmt.Errorf("plugin %s already exists", plugin.Data().name)
+		if p.Data().Name() == plugin.Data().Name() {
+			return nil, fmt.Errorf("plugin %s already exists", plugin.Data().Name())
 		}
 	}
 	m.plugins = append(m.plugins, plugin)
@@ -45,12 +41,12 @@ func (m *manager) Register(plugin runtime) (removeFunc, error) {
 
 func (m *manager) sort() {
 	slices.SortFunc(m.plugins, func(a, b runtime) int {
-		return strings.Compare(a.Data().name, b.Data().name)
+		return strings.Compare(a.Data().Name(), b.Data().Name())
 	})
 	if len(m.plugins) > 0 {
 		m.logger.Printf("plugin priority order")
 		for i, p := range m.plugins {
-			m.logger.Printf("  #%d: %s", i+1, p.Data().qualifiedName())
+			m.logger.Printf("  #%d: %s", i+1, p.Data().Name())
 		}
 	}
 }

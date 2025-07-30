@@ -40,10 +40,4 @@ func TestManager_Register(t *testing.T) {
 		_, err = m.Register(p2)
 		assert.ErrorContains(t, err, "already exists")
 	})
-	t.Run("cannot register plugin without a name", func(t *testing.T) {
-		m := &manager{logger: testhelper.TestLogger(t)}
-		p := &mockRuntime{}
-		_, err := m.Register(p)
-		assert.ErrorContains(t, err, "no plugin name")
-	})
 }

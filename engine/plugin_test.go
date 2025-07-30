@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/secrets-engine/internal/api"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -114,12 +116,9 @@ func Test_newPlugin(t *testing.T) {
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
-				assert.Equal(t, p.Data(), pluginData{
-					name:       pluginNameFromTestName(t),
-					pattern:    pattern,
-					version:    version,
-					pluginType: internalPlugin,
-				})
+				dataExpected, err := api.NewPluginData(api.PluginDataUnvalidated{Name: pluginNameFromTestName(t), Pattern: string(pattern), Version: version})
+				require.NoError(t, err)
+				assert.Equal(t, p.Data(), dataExpected)
 				s, err := p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, dummy.MockSecretValue, string(s.Value))
@@ -262,12 +261,9 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				assert.Equal(t, r.Data(), pluginData{
-					name:       "my-plugin",
-					pattern:    mockPattern,
-					version:    "v1",
-					pluginType: externalPlugin,
-				})
+				dataExpected, err := api.NewPluginData(api.PluginDataUnvalidated{Name: "my-plugin", Pattern: mockPattern, Version: "v1"})
+				require.NoError(t, err)
+				assert.Equal(t, r.Data(), dataExpected)
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))

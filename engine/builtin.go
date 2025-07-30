@@ -7,13 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
 
 type internalRuntime struct {
-	name   string
+	data   api.PluginData
 	p      Plugin
 	c      plugin.Config
 	closed chan struct{}
@@ -28,6 +29,10 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 	}
 	config := p.Config()
 	if err := config.Pattern.Valid(); err != nil {
+		return nil, err
+	}
+	data, err := api.NewPluginData(api.PluginDataUnvalidated{Name: name, Version: config.Version, Pattern: string(config.Pattern)})
+	if err != nil {
 		return nil, err
 	}
 	ctxWithCancel, cancel := context.WithCancel(ctx)
@@ -53,7 +58,7 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 		runErr.StoreFirst(err)
 	}()
 	return &internalRuntime{
-		name:   name,
+		data:   data,
 		p:      p,
 		c:      config,
 		closed: closed,
@@ -97,13 +102,13 @@ func (i *internalRuntime) GetSecret(ctx context.Context, request secrets.Request
 		if err := i.runErr(); err != nil {
 			return secrets.EnvelopeErr(request, err), err
 		}
-		err := fmt.Errorf("plugin %s has been shutdown", i.name)
+		err := fmt.Errorf("plugin %s has been shutdown", i.data.Name())
 		return secrets.EnvelopeErr(request, err), err
 	default:
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.name, debug.Stack())
+			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.data.Name(), debug.Stack())
 			resp = secrets.EnvelopeErr(request, panicErr)
 			err = panicErr
 		}
@@ -115,13 +120,8 @@ func (i *internalRuntime) Close() error {
 	return i.close()
 }
 
-func (i *internalRuntime) Data() pluginData {
-	return pluginData{
-		name:       i.name,
-		pattern:    i.c.Pattern,
-		version:    i.c.Version,
-		pluginType: builtinPlugin,
-	}
+func (i *internalRuntime) Data() api.PluginData {
+	return i.data
 }
 
 func (i *internalRuntime) Closed() <-chan struct{} {
