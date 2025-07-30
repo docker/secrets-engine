@@ -51,7 +51,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	reg := &manager{logger: cfg.logger}
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
-	server := newServer(ctx, cfg, reg)
+	server := newServer(cfg, reg)
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
@@ -243,7 +243,7 @@ func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func newServer(ctx context.Context, cfg config, reg registry) *http.Server {
+func newServer(cfg config, reg registry) *http.Server {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -252,12 +252,20 @@ func newServer(ctx context.Context, cfg config, reg registry) *http.Server {
 	r := &resolver{reg: reg}
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
 	if !cfg.dynamicPluginsDisabled {
-		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(conn net.Conn) {
+		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
 			launcher := launcher(func() (runtime, error) {
 				return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
-			if _, err := register(ctx, reg, launcher); err != nil {
+			errDone, err := register(logging.WithLogger(ctx, cfg.logger), reg, launcher)
+			if err != nil {
 				cfg.logger.Errorf("registering dynamic plugin: %v", err)
+			}
+			select {
+			case <-ctx.Done():
+			case err := <-errDone:
+				if err != nil && !errors.Is(err, context.Canceled) {
+					cfg.logger.Errorf("external plugin '%s' stopped: %v", cfg.name, err)
+				}
 			}
 		}))
 	}
