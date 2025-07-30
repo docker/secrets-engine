@@ -3,7 +3,10 @@ package testhelper
 import (
 	"errors"
 	"math/rand"
+	"testing"
 	"time"
+
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 func WaitForErrorWithTimeout(in <-chan error) error {
@@ -57,4 +60,9 @@ func randString(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func TestLogger(t *testing.T) logging.Logger {
+	t.Helper()
+	return logging.NewDefaultLogger(t.Name())
 }

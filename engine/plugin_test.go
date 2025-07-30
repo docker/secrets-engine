@@ -109,7 +109,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
 				})
-				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -145,7 +145,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					ErrGetSecret: errGetSecret,
 				})
-				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -171,7 +171,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -190,7 +190,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -219,7 +219,7 @@ func Test_newPlugin(t *testing.T) {
 						ExitCode:           0,
 					},
 				})
-				p, err := newLaunchedPlugin(testLogger(t), cmd, runtimeCfg{
+				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
@@ -253,7 +253,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testLogger(t), l)
+				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
 				plugin := newMockedPlugin()
 				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -282,7 +282,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugin returns error on GetSecret",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testLogger(t), l)
+				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -304,7 +304,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testLogger(t), l)
+				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
 				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -332,7 +332,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testLogger(t), l)
+				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
 				doneRuntime := make(chan struct{})
 				go func() {

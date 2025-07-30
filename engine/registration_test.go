@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 var (
@@ -169,7 +170,7 @@ func Test_RegisterPlugin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &RegisterService{logger: testLogger(t), r: tt.r}
+			s := &RegisterService{logger: testhelper.TestLogger(t), r: tt.r}
 			req := resolverv1.RegisterPluginRequest_builder{
 				Name:    proto.String(tt.in.name),
 				Version: proto.String(tt.in.version),
