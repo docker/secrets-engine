@@ -2,8 +2,8 @@ package ipc
 
 import (
 	"bufio"
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -117,28 +117,46 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Connection", "upgrade")
-	w.Header().Set("Upgrade", "tcp")
-	w.WriteHeader(http.StatusSwitchingProtocols) // 1xx headers are sent immediately -> no flush needed
-
-	conn, brw, err := hj.Hijack()
-	if err != nil {
-		h.logger.Errorf("hijack error: %v", err)
+	conn, brw, hijackErr := hj.Hijack()
+	if errors.Is(hijackErr, http.ErrNotSupported) {
+		h.logger.Errorf("can't switch protocols using non-Hijacker ResponseWriter")
 		return
 	}
 
-	if err := conn.SetDeadline(time.Time{}); err != nil {
-		h.logger.Errorf("removing deadline: %s", err)
-		conn.Close()
+	if hijackErr != nil {
+		h.logger.Errorf("Hijack failed on protocol switch: %v", hijackErr)
 		return
 	}
-
-	// https://github.com/golang/go/issues/32314
-	b, _ := brw.Reader.Peek(brw.Reader.Buffered())
-	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), conn))
 
 	defer conn.Close()
-	h.cb(r.Context(), conn)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		resp := &http.Response{
+			StatusCode: http.StatusSwitchingProtocols,
+			Proto:      r.Proto,
+			Header:     w.Header(),
+		}
+		resp.Header.Set("Connection", "upgrade")
+		resp.Header.Set("Upgrade", "tcp")
+		if err := resp.Write(brw); err != nil {
+			h.logger.Errorf("writing response: %v", err)
+			return
+		}
+		if err := brw.Flush(); err != nil {
+			h.logger.Errorf("flushing response: %v", err)
+			return
+		}
+
+		h.cb(r.Context(), conn)
+	}()
+
+	select {
+	case <-done:
+	case <-r.Context().Done():
+	}
 }
 
 func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
