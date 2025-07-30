@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -59,10 +60,10 @@ func hijackRequest(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 		return nil, fmt.Errorf("making hijack request: %s", err)
 	}
 
-	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, fmt.Errorf("clearing deadline: %w", err)
 	}
-	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+	defer func() { _ = conn.SetDeadline(time.Time{}) }()
 	br := bufio.NewReader(conn)
 	resp, err := http.ReadResponse(br, req)
 	if err != nil {
@@ -104,12 +105,12 @@ type CloseWriter interface {
 }
 
 type hijackHandler struct {
-	cb         func(net.Conn)
+	cb         func(ctx context.Context, closer io.ReadWriteCloser)
 	ackTimeout time.Duration
 	logger     logging.Logger
 }
 
-func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "hijacking connection", http.StatusInternalServerError)
@@ -120,17 +121,26 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Upgrade", "tcp")
 	w.WriteHeader(http.StatusSwitchingProtocols) // 1xx headers are sent immediately -> no flush needed
 
-	conn, _, err := hj.Hijack()
+	conn, brw, err := hj.Hijack()
 	if err != nil {
 		h.logger.Errorf("hijack error: %v", err)
 		return
 	}
 
-	// Note: Be careful when trying to pass r.Context() in here.
-	// r.Context() gets cancelled when this function returns, but conn will live much longer which is misleading.
-	h.cb(conn)
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		h.logger.Errorf("removing deadline: %s", err)
+		conn.Close()
+		return
+	}
+
+	// https://github.com/golang/go/issues/32314
+	b, _ := brw.Reader.Peek(brw.Reader.Buffered())
+	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), conn))
+
+	defer conn.Close()
+	h.cb(r.Context(), conn)
 }
 
-func NewHijackAcceptor(logger logging.Logger, cb func(conn net.Conn)) (string, http.Handler) {
+func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
 	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }

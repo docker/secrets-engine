@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -55,7 +56,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
-				go runUncheckedDummyAcceptor(testLogger(t), listener)
+				go runUncheckedDummyAcceptor(testhelper.TestLogger(t), listener)
 				t.Cleanup(func() {
 					listener.Close()
 					os.Remove(socketPath)
@@ -77,7 +78,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				l, err := net.Listen("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { l.Close() })
-				go runUncheckedDummyAcceptor(testLogger(t), l)
+				go runUncheckedDummyAcceptor(testhelper.TestLogger(t), l)
 				conn, err := net.Dial("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })
@@ -101,16 +102,11 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 	}
 }
 
-func testLogger(t *testing.T) logging.Logger {
-	t.Helper()
-	return logging.NewDefaultLogger(t.Name())
-}
-
 // We on purpose never actually deal with accepted hijacked connections or server errors
 // as in the context of where this function is used we don't care.
 func runUncheckedDummyAcceptor(logger logging.Logger, listener net.Listener) {
 	httpMux := http.NewServeMux()
-	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(net.Conn) {}))
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(context.Context, io.ReadWriteCloser) {}))
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		_ = server.Serve(listener)
