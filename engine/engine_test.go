@@ -109,11 +109,6 @@ func testLoggerCtx(t *testing.T) context.Context {
 	return logging.WithLogger(t.Context(), logging.NewDefaultLogger(t.Name()))
 }
 
-func testLogger(t *testing.T) logging.Logger {
-	t.Helper()
-	return logging.NewDefaultLogger(t.Name())
-}
-
 func Test_Register(t *testing.T) {
 	t.Parallel()
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
@@ -174,7 +169,7 @@ func Test_discoverPlugins(t *testing.T) {
 		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "binary-file")))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "my-plugin")))
-		plugins, err := scanPluginDir(testLogger(t), dir)
+		plugins, err := scanPluginDir(testhelper.TestLogger(t), dir)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
 		assert.Contains(t, plugins, "binary-file"+suffix)
@@ -182,12 +177,12 @@ func Test_discoverPlugins(t *testing.T) {
 	})
 	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
 		dir := t.TempDir()
-		plugins, err := scanPluginDir(testLogger(t), filepath.Join(dir, "does-not-exist"))
+		plugins, err := scanPluginDir(testhelper.TestLogger(t), filepath.Join(dir, "does-not-exist"))
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
 	t.Run("empty dir string", func(t *testing.T) {
-		plugins, err := scanPluginDir(testLogger(t), "")
+		plugins, err := scanPluginDir(testhelper.TestLogger(t), "")
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
@@ -204,7 +199,7 @@ func Test_newEngine(t *testing.T) {
 			version:    "test-version",
 			pluginPath: dir,
 			socketPath: socketPath,
-			logger:     testLogger(t),
+			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
@@ -226,7 +221,7 @@ func Test_newEngine(t *testing.T) {
 			version:    "test-version",
 			pluginPath: dir,
 			socketPath: socketPath,
-			logger:     testLogger(t),
+			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
@@ -257,7 +252,7 @@ func Test_newEngine(t *testing.T) {
 			version:               "test-version",
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
-			logger:                testLogger(t),
+			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
 			plugins:               map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
 		}
@@ -289,7 +284,7 @@ func Test_newEngine(t *testing.T) {
 			version:    "test-version",
 			pluginPath: dir,
 			socketPath: socketPath,
-			logger:     testLogger(t),
+			logger:     testhelper.TestLogger(t),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -317,7 +312,7 @@ func Test_newEngine(t *testing.T) {
 			version:               "test-version",
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
-			logger:                testLogger(t),
+			logger:                testhelper.TestLogger(t),
 			plugins: map[string]Plugin{"my-builtin": &mockInternalPlugin{
 				pattern:         "*",
 				blockRunForever: blockRunCh,
