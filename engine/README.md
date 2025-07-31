@@ -20,7 +20,7 @@ The two main tasks of the engine are:
   - [ ] no conflicting patterns
 - [ ] configuration
   - [x] retry behaviour when plugins crash
-  - [ ] logging
+  - [x] logging
   - [x] permanently disable engine launched plugins
   - [x] permanently disable externally launched plugins
   - [ ] OTEL support

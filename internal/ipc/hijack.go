@@ -110,7 +110,20 @@ type hijackHandler struct {
 	logger     logging.Logger
 }
 
+// ServeHTTP hijacks the underlying connection of a http request.
+// The underlying connection can then be reused to send any data, i.e., it gives a universal duplex connection to the client.
+// Important notes to keep this stable:
+//   - The hijacked `net.Conn` is only guaranteed to be valid while the request handler hasn't returned.
+//     I.e., we need to make it wait for the code using it to finish before returning the request handler.
+//     Ownership of net.Conn can't be transferred out of the request handler.
+//   - The response header needs to be written **after** the hijack.
+//
+// See https://github.com/golang/go/issues/27408 and https://github.com/golang/go/issues/32314 for more details.
+// For possible correct implementations, see:
+// https://github.com/moby/moby/blob/e2ead4526d9416bd90502c710751839e55d739f2/daemon/server/router/container/exec.go#L118
+// https://cs.opensource.google/go/go/+/master:src/net/http/httputil/reverseproxy.go;l=750;drc=4ab1aec00799f91e96182cbbffd1de405cd52e93
 func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Important: Do not write anything (e.g. headers) before the hijack!
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "hijacking connection", http.StatusInternalServerError)
@@ -150,6 +163,7 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Important: The server still owns net.Conn! When this handler returns, conn gets closed.
 		h.cb(r.Context(), conn)
 	}()
 
