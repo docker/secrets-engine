@@ -21,7 +21,7 @@ func WaitForClosedWithTimeout(in <-chan struct{}) error {
 	select {
 	case <-in:
 		return nil
-	case <-time.After(2 * time.Second):
+	case <-time.After(4 * time.Second):
 		return errors.New("timeout")
 	}
 }

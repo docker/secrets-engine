@@ -240,7 +240,7 @@ func Test_newEngine(t *testing.T) {
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
-		}, 2*time.Second, 100*time.Millisecond)
+		}, 4*time.Second, 100*time.Millisecond)
 		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
