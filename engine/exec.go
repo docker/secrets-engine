@@ -55,6 +55,7 @@ func fromCmd(cmd *exec.Cmd) proc {
 type procWrapper interface {
 	io.Closer
 	Closed() <-chan struct{}
+	Error() error
 }
 
 type cmdWatchWrapper struct {
@@ -79,6 +80,10 @@ func launchCmdWatched(logger logging.Logger, name string, p proc, timeout time.D
 		if err != nil {
 			err = fmt.Errorf("plugin %s crashed: %w", name, err)
 		}
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			logger.Errorf("launchCmdWatched: %s", string(exitErr.String()))
+		}
 		result.err = err
 		close(result.done)
 	}()
@@ -87,6 +92,10 @@ func launchCmdWatched(logger logging.Logger, name string, p proc, timeout time.D
 
 func (w *cmdWatchWrapper) Closed() <-chan struct{} {
 	return w.done
+}
+
+func (w *cmdWatchWrapper) Error() error {
+	return w.err
 }
 
 func (w *cmdWatchWrapper) Close() error {

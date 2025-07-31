@@ -142,7 +142,10 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 
 	go func() {
 		<-cmdWrapper.Closed()
-		_ = helper.shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", v.name))
+		err = helper.shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly with error: '%v'", v.name, cmdWrapper.Error()))
+		if err != nil {
+			logger.Errorf("plugin command closed unexpectedly with error: %v", err)
+		}
 	}()
 
 	return &runtimeImpl{
