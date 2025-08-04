@@ -54,6 +54,7 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 }
 
 type cfg struct {
+	Config
 	plugin              Plugin
 	name                string
 	conn                io.ReadWriteCloser

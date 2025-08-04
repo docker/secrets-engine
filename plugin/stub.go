@@ -8,21 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/docker/secrets-engine/internal/api"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type Plugin interface {
 	secrets.Resolver
-
-	Config() Config
-}
-
-type Config struct {
-	Version string
-
-	Pattern secrets.Pattern
 }
 
 // Stub is the interface the stub provides for the plugin implementation.
@@ -53,21 +45,48 @@ type stub struct {
 	requestTimeout      time.Duration
 }
 
+type Config struct {
+	// Version of the plugin in semver format.
+	Version api.Version
+	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
+	Pattern secrets.Pattern
+	// Logger to be used within plugin side SDK code. If nil, a default logger will be created and used.
+	Logger logging.Logger
+}
+
+func (c *Config) Valid() error {
+	if c.Version == nil {
+		return errors.New("version is required")
+	}
+	if c.Pattern == "" {
+		return errors.New("pattern is required")
+	}
+	return nil
+}
+
 // New creates a stub with the given plugin and options.
 // ManualLaunchOption only apply when the plugin is launched manually.
 // If launched by the secrets engine, they are ignored.
-func New(p Plugin, opts ...ManualLaunchOption) (Stub, error) {
+// If logger is nil, a default logger will be created and used.
+func New(p Plugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
+	if err := config.Valid(); err != nil {
+		return nil, err
+	}
+	if config.Logger == nil {
+		config.Logger = logging.NewDefaultLogger("plugin")
+	}
 	cfg, ipcSetup, err := newCfg(p, opts...)
 	if err != nil {
 		return nil, err
 	}
+	cfg.Config = config
 	stub := &stub{
 		name: cfg.name,
 		factory: func(ctx context.Context, onClose func(error)) (io.Closer, error) {
 			return setup(ctx, ipcSetup, *cfg, onClose)
 		},
 	}
-	logrus.Infof("Created plugin %s", cfg.name)
+	config.Logger.Printf("Created plugin %s", cfg.name)
 
 	return stub, nil
 }

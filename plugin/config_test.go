@@ -20,15 +20,9 @@ import (
 	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
+var _ Plugin = &mockPlugin{}
+
 type mockPlugin struct{}
-
-func (m *mockPlugin) Config() Config {
-	return Config{}
-}
-
-func (m *mockPlugin) Configure(context.Context, runtimeConfig) error {
-	return nil
-}
 
 func (m *mockPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{}, nil
