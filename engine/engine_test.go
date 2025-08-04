@@ -255,7 +255,12 @@ func Test_newEngine(t *testing.T) {
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
-			plugins:               map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
+			plugins: map[Config]Plugin{
+				{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{
+					runExitCh: internalPluginRunExitCh,
+					secrets:   map[string]string{"my-secret": "some-value"},
+				},
+			},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -317,7 +322,7 @@ func Test_newEngine(t *testing.T) {
 			plugins: map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{
 				blockRunForever: blockRunCh,
 				runExitCh:       runExitCh,
-				secrets:         map[secrets.ID]string{"my-secret": "some-value"},
+				secrets:         map[string]string{"my-secret": "some-value"},
 			}},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
