@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
@@ -29,9 +30,9 @@ import (
 const (
 	dummyPluginCfgEnv = "DUMMY_PLUGIN_CFG"
 	dummyPluginFail   = "plugin-fail"
-	mockVersion       = "mockVersion"
-	MockSecretValue   = "MockSecretValue"
-	MockSecretID      = secrets.ID("MockSecretID")
+
+	MockSecretValue = "MockSecretValue"
+	MockSecretID    = secrets.ID("MockSecretID")
 )
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
@@ -45,10 +46,8 @@ func PluginProcessFromBinaryName(name string) {
 			panic(err)
 		}
 		PluginProcess(&PluginCfg{
-			Config: plugin.Config{
-				Version: mockVersion,
-				Pattern: "*",
-			},
+			Version: "1",
+			Pattern: "*",
 			E: []secrets.Envelope{
 				{ID: secrets.ID(behaviour.Value), Value: []byte(behaviour.Value + "-value")},
 				{ID: MockSecretID, Value: []byte(MockSecretValue)},
@@ -150,10 +149,9 @@ type dummyPlugin struct {
 }
 
 type PluginResult struct {
-	GetSecret      []secrets.Request
-	ConfigRequests int
-	Log            string
-	ErrTestSetup   string
+	GetSecret    []secrets.Request
+	Log          string
+	ErrTestSetup string
 }
 
 func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -177,18 +175,9 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	return secrets.EnvelopeErr(request, err), err
 }
 
-func (d *dummyPlugin) Config() plugin.Config {
-	d.m.Lock()
-	defer d.m.Unlock()
-	if d.cfg.ErrConfigPanic != "" {
-		panic(errors.New(d.cfg.ErrConfigPanic))
-	}
-	d.result.ConfigRequests++
-	return d.cfg.Config
-}
-
 type PluginCfg struct {
-	plugin.Config  `json:",inline"`
+	Version        string             `json:"version"`
+	Pattern        string             `json:"pattern"`
 	E              []secrets.Envelope `json:"envelope,omitempty"`
 	ErrGetSecret   string             `json:"errGetSecret,omitempty"`
 	IgnoreSigint   bool               `json:"ignoreSigint,omitempty"`
@@ -221,6 +210,17 @@ func getCfgFromEnv() *PluginCfg {
 	return cfg
 }
 
+type discardLogger struct{}
+
+func (d discardLogger) Printf(string, ...interface{}) {
+}
+
+func (d discardLogger) Warnf(string, ...interface{}) {
+}
+
+func (d discardLogger) Errorf(string, ...interface{}) {
+}
+
 // PluginProcess is the equivalent of a main when normally implementing a plugin.
 // Here, it gets run by TestMain if PluginCommand is used to re-launch the test binary (the binary built by go test).
 func PluginProcess(cfg *PluginCfg) {
@@ -238,7 +238,15 @@ func PluginProcess(cfg *PluginCfg) {
 	}
 
 	d := &dummyPlugin{cfg: *cfg}
-	p, err := plugin.New(d)
+	version, err := api.NewVersion(cfg.Version)
+	if err != nil {
+		panic(err)
+	}
+	pattern, err := secrets.ParsePattern(cfg.Pattern)
+	if err != nil {
+		panic(err)
+	}
+	p, err := plugin.New(d, plugin.Config{Version: version, Pattern: pattern, Logger: &discardLogger{}})
 	if err != nil {
 		tryExitWithTestSetupErr(err)
 	}
