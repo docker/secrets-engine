@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/docker/secrets-engine/internal/api"
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/logging"
@@ -25,21 +26,8 @@ type pluginCfgOut struct {
 	requestTimeout time.Duration
 }
 
-// config received from the plugin
-type pluginCfgIn struct {
-	name    string
-	version string
-	pattern secrets.Pattern
-}
-
-type pluginCfgInUnvalidated struct {
-	name    string
-	version string
-	pattern string
-}
-
 type pluginRegistrator interface {
-	register(ctx context.Context, cfg pluginCfgInUnvalidated) (*pluginCfgOut, error)
+	register(ctx context.Context, cfg api.PluginDataUnvalidated) (*pluginCfgOut, error)
 }
 
 type RegisterService struct {
@@ -49,10 +37,10 @@ type RegisterService struct {
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
 	r.logger.Printf("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
-	in := pluginCfgInUnvalidated{
-		name:    c.Msg.GetName(),
-		version: c.Msg.GetVersion(),
-		pattern: c.Msg.GetPattern(),
+	in := api.PluginDataUnvalidated{
+		Name:    c.Msg.GetName(),
+		Version: c.Msg.GetVersion(),
+		Pattern: c.Msg.GetPattern(),
 	}
 	out, err := r.r.register(ctx, in)
 	if errors.Is(err, secrets.ErrInvalidPattern) {
@@ -69,11 +57,11 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 }
 
 type pluginCfgInValidator interface {
-	Validate(pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCfgOut, error)
+	Validate(api.PluginDataUnvalidated) (api.PluginData, *pluginCfgOut, error)
 }
 
 type registrationResult struct {
-	cfg *pluginCfgIn
+	cfg api.PluginData
 	err error
 }
 
@@ -91,7 +79,7 @@ func newRegistrationLogic(validator pluginCfgInValidator, result chan registrati
 	}
 }
 
-func (l *registrationLogic) register(_ context.Context, cfg pluginCfgInUnvalidated) (*pluginCfgOut, error) {
+func (l *registrationLogic) register(_ context.Context, cfg api.PluginDataUnvalidated) (*pluginCfgOut, error) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	if l.done {

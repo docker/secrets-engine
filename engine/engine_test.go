@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/secrets-engine/internal/api"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,8 +38,8 @@ func (m *mockSlowRuntime) Close() error {
 	return fmt.Errorf("%s closed", m.name)
 }
 
-func (m *mockSlowRuntime) Data() pluginData {
-	return pluginData{}
+func (m *mockSlowRuntime) Data() api.PluginData {
+	return api.MustNewPluginData(api.PluginDataUnvalidated{Name: m.name, Version: mockVersion, Pattern: "*"})
 }
 
 // Unfortunately, there's no way to test this reliably using channels.
@@ -79,8 +81,8 @@ func (m *mockRuntime) Closed() <-chan struct{} {
 	return m.closed
 }
 
-func (m *mockRuntime) Data() pluginData {
-	return pluginData{name: m.name}
+func (m *mockRuntime) Data() api.PluginData {
+	return api.MustNewPluginData(api.PluginDataUnvalidated{Name: m.name, Version: mockVersion, Pattern: "*"})
 }
 
 type mockRegistry struct {

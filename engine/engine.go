@@ -86,7 +86,7 @@ func (e *engineImpl) Close() error {
 func (e *engineImpl) Plugins() []string {
 	var plugins []string
 	for _, p := range e.reg.GetAll() {
-		plugins = append(plugins, p.Data().name)
+		plugins = append(plugins, p.Data().Name())
 	}
 	return plugins
 }

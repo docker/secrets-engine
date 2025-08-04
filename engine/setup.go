@@ -9,15 +9,15 @@ import (
 
 	"github.com/hashicorp/yamux"
 
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
-	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type setupResult struct {
 	client *http.Client
-	cfg    pluginCfgIn
+	cfg    api.PluginData
 	close  func() error
 }
 
@@ -48,14 +48,14 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 	if err != nil {
 		return nil, err
 	}
-	var out pluginCfgIn
+	var out api.PluginData
 	select {
 	case r := <-chRegistrationResult:
 		if r.err != nil || r.cfg == nil {
 			i.Close()
 			return nil, fmt.Errorf("failed to register plugin: %w", r.err)
 		}
-		out = *r.cfg
+		out = r.cfg
 	case err := <-chIpcErr:
 		i.Close()
 		return nil, fmt.Errorf("failed to register plugin, ipc error: %w", err)
@@ -63,7 +63,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 		i.Close()
 		return nil, errors.New("plugin registration timed out")
 	}
-	logger.Printf("Plugin %s@%s registered successfully with pattern %v", out.name, out.version, out.pattern)
+	logger.Printf("Plugin %s@%s registered successfully with pattern %v", out.Name(), out.Version(), out.Pattern())
 	return &setupResult{
 		client: c,
 		cfg:    out,
@@ -80,16 +80,16 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 	}, nil
 }
 
-func (p runtimeCfg) Validate(in pluginCfgInUnvalidated) (*pluginCfgIn, *pluginCfgOut, error) {
-	pattern, err := secrets.ParsePattern(in.pattern)
+func (p runtimeCfg) Validate(in api.PluginDataUnvalidated) (api.PluginData, *pluginCfgOut, error) {
+	if p.name != "" && in.Name != p.name {
+		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
+	}
+	if p.name == "" && in.Name == "" {
+		return nil, nil, errors.New("plugin name is required when not launched by engine")
+	}
+	data, err := api.NewPluginData(in)
 	if err != nil {
 		return nil, nil, err
 	}
-	if p.name != "" && in.name != p.name {
-		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
-	}
-	if p.name == "" && in.name == "" {
-		return nil, nil, errors.New("plugin name is required when not launched by engine")
-	}
-	return &pluginCfgIn{in.name, in.version, pattern}, &p.out, nil
+	return data, &p.out, nil
 }

@@ -65,10 +65,10 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 
 	for _, plugin := range r.reg.GetAll() {
 		d := plugin.Data()
-		if req.Provider != "" && req.Provider != d.name {
+		if req.Provider != "" && req.Provider != d.Name() {
 			continue
 		}
-		if !d.pattern.Match(req.ID) {
+		if !d.Pattern().Match(req.ID) {
 			continue
 		}
 
@@ -79,7 +79,7 @@ func (r resolver) GetSecret(ctx context.Context, req secrets.Request) (secrets.E
 		}
 
 		// we use the first matching, successful registration to resolve the secret.
-		envelope.Provider = d.name
+		envelope.Provider = d.Name()
 
 		if envelope.ResolvedAt.IsZero() {
 			envelope.ResolvedAt = time.Now().UTC()

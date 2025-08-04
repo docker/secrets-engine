@@ -1,9 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 const (
@@ -23,4 +26,60 @@ func DefaultSocketPath() string {
 		return filepath.Join(home, ".cache", "secrets-engine", "engine.sock")
 	}
 	return filepath.Join(os.TempDir(), "secrets-engine", "engine.sock")
+}
+
+type PluginDataUnvalidated struct {
+	Name    string
+	Version string
+	Pattern string
+}
+
+func MustNewPluginData(in PluginDataUnvalidated) PluginData {
+	data, err := NewPluginData(in)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+func NewPluginData(in PluginDataUnvalidated) (PluginData, error) {
+	if in.Name == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	if in.Version == "" {
+		return nil, fmt.Errorf("version is required")
+	}
+	pattern, err := secrets.ParsePattern(in.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &pluginData{
+		name:    in.Name,
+		version: in.Version,
+		pattern: pattern,
+	}, nil
+}
+
+type pluginData struct {
+	name    string
+	version string
+	pattern secrets.Pattern
+}
+
+func (p pluginData) Name() string {
+	return p.name
+}
+
+func (p pluginData) Pattern() secrets.Pattern {
+	return p.pattern
+}
+
+func (p pluginData) Version() string {
+	return p.version
+}
+
+type PluginData interface {
+	Name() string
+	Pattern() secrets.Pattern
+	Version() string
 }

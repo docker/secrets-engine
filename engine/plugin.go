@@ -73,7 +73,7 @@ type runtime interface {
 
 	io.Closer
 
-	Data() pluginData
+	Data() api.PluginData
 
 	Closed() <-chan struct{}
 }
@@ -86,19 +86,8 @@ const (
 	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
 )
 
-type pluginData struct {
-	name    string
-	pattern secrets.Pattern
-	version string
-	pluginType
-}
-
-func (d pluginData) qualifiedName() string {
-	return fmt.Sprintf("%s:%s@%s (%s)", d.pluginType, d.name, d.version, d.pattern)
-}
-
 type runtimeImpl struct {
-	pluginData
+	api.PluginData
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
@@ -146,12 +135,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	}()
 
 	return &runtimeImpl{
-		pluginData: pluginData{
-			name:       v.name,
-			pattern:    r.cfg.pattern,
-			version:    r.cfg.version,
-			pluginType: internalPlugin,
-		},
+		PluginData:     r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: func() error {
@@ -188,12 +172,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 	}
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	return &runtimeImpl{
-		pluginData: pluginData{
-			name:       r.cfg.name,
-			pattern:    r.cfg.pattern,
-			version:    r.cfg.version,
-			pluginType: externalPlugin,
-		},
+		PluginData:     r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
@@ -211,8 +190,8 @@ func (r *runtimeImpl) Closed() <-chan struct{} {
 	return r.closed
 }
 
-func (r *runtimeImpl) Data() pluginData {
-	return r.pluginData
+func (r *runtimeImpl) Data() api.PluginData {
+	return r.PluginData
 }
 
 func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -234,7 +213,7 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	return secrets.Envelope{
 		ID:         id,
 		Value:      resp.Msg.GetValue(),
-		Provider:   r.name,
+		Provider:   r.Name(),
 		Version:    resp.Msg.GetVersion(),
 		Error:      resp.Msg.GetError(),
 		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),

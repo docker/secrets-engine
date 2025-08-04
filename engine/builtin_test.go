@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/docker/secrets-engine/internal/api"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/docker/secrets-engine/internal/secrets"
@@ -82,12 +86,9 @@ func Test_internalRuntime(t *testing.T) {
 		m := &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{mockSecretID: mockSecretValue}}
 		r, err := newInternalRuntime(testLoggerCtx(t), name, m)
 		assert.NoError(t, err)
-		assert.Equal(t, pluginData{
-			name:       name,
-			pattern:    "*",
-			version:    mockVersion,
-			pluginType: builtinPlugin,
-		}, r.Data())
+		dataExpected, err := api.NewPluginData(api.PluginDataUnvalidated{Name: name, Pattern: "*", Version: mockVersion})
+		require.NoError(t, err)
+		assert.Equal(t, dataExpected, r.Data())
 		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 		assert.NoError(t, err)
 		assert.Equal(t, resp.Value, []byte(mockSecretValue))
