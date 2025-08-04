@@ -26,14 +26,24 @@ func Resolver(provider secrets.Resolver) (string, http.Handler) {
 
 		var candidates []secrets.Envelope
 		for _, idUnsafe := range ids {
-			id, err := secrets.ParseID(idUnsafe)
+			id, err := secrets.ParseIDNew(idUnsafe)
 			if err != nil {
-				candidates = append(candidates, secrets.Envelope{ID: secrets.ID(idUnsafe), Error: fmt.Sprintf("invalid identifier: %q", idUnsafe)})
+				candidates = append(candidates, secrets.Envelope{
+					// ID: secrets.ID(idUnsafe),
+					// TODO: we should check this, we can't store an unsafe id here
+					ID:    nil,
+					Error: fmt.Sprintf("invalid identifier: %q", idUnsafe),
+				})
 				continue
 			}
 			envelope, err := provider.GetSecret(context.TODO(), secrets.Request{ID: id})
 			if err != nil {
-				candidates = append(candidates, secrets.Envelope{ID: secrets.ID(idUnsafe), Error: fmt.Sprintf("secret %s not available: %v", id, err)})
+				candidates = append(candidates, secrets.Envelope{
+					// ID:    secrets.ID(idUnsafe),
+					// TODO: same here, we can't pass along an unsave id
+					ID:    id,
+					Error: fmt.Sprintf("secret %s not available: %v", id, err),
+				})
 				continue
 			}
 
