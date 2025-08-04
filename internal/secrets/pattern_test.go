@@ -1,9 +1,11 @@
 package secrets
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParsePattern(t *testing.T) {
@@ -72,4 +74,36 @@ func TestParsePatternNew(t *testing.T) {
 			assert.ErrorIs(t, err, tc.expected)
 		})
 	}
+}
+
+func TestPatternJSON(t *testing.T) {
+	t.Run("can marshal to json", func(t *testing.T) {
+		pattern := MustParsePatternNew("*")
+		actual, err := pattern.MarshalJSON()
+		assert.NoError(t, err)
+		assert.Equal(t, "\"*\"", string(actual))
+	})
+	t.Run("can unmarshal from json", func(t *testing.T) {
+		var v pattern
+		assert.NoError(t, json.Unmarshal([]byte("\"*\""), &v))
+		assert.Equal(t, v.String(), "*")
+	})
+	t.Run("invalid pattern cannot be unmarshalled", func(t *testing.T) {
+		var v pattern
+		assert.ErrorIs(t, json.Unmarshal([]byte("\"/\""), &v), ErrInvalidPattern)
+	})
+	t.Run("can marshal as a field inside another type", func(t *testing.T) {
+		type a struct {
+			P PatternNew
+		}
+		v := a{P: MustParsePatternNew("com.test.test/something/something")}
+		actual, err := json.Marshal(v)
+		assert.NoError(t, err)
+		assert.Equal(t, `{"P":"com.test.test/something/something"}`, string(actual))
+	})
+	t.Run("unmarshal won't accept an array of values", func(t *testing.T) {
+		vals := json.RawMessage(`["com.test.test","com.test"]`)
+		var s pattern
+		require.ErrorContains(t, json.Unmarshal(vals, &s), "json: cannot unmarshal array into Go value of type string")
+	})
 }

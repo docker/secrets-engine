@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -100,6 +101,9 @@ type PatternNew interface {
 	Match(id IDNew) bool
 	// String formats the [Pattern] as a string
 	String() string
+
+	json.Marshaler
+	json.Unmarshaler
 }
 
 type pattern struct {
@@ -115,6 +119,22 @@ func (p *pattern) Match(id IDNew) bool {
 
 func (p *pattern) String() string {
 	return p.value
+}
+
+func (p *pattern) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.value)
+}
+
+func (p *pattern) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if !validPattern(s) {
+		return ErrInvalidPattern
+	}
+	p.value = s
+	return nil
 }
 
 var _ PatternNew = &pattern{}
