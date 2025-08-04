@@ -37,6 +37,25 @@ flowchart TD
 
 ---
 
+### 2025-07-31 Doing Hijacking Logic (the right way)
+
+There was a bug in the engine's ipc handler which caused intermittent plugin registration failures. 
+The CI became extremely flaky which indicated that there was an underlying problem.
+The core issue is that hijacking in `net/http.Server` would intermittently drop the connection which the plugin establishes. 
+The cause was a mixture of undocumented lifecycle behavior of the underlying `net.Conn` that was hijacked from connection in `net/http.Server` and a missing first byte from the payload sent by the client (possibly).
+
+The main takeaways are:
+- The hijacked `net.Conn` is only guaranteed to be valid while the request handler hasn't returned. I.e., we need to make it wait for the code using it to finish before returning the request handler. Ownership of net.Conn can't be transferred out of the request handler as previously assumed.
+- The response header needs to be written **after** the hijack.
+
+Also studying [the standard lib reverseproxy](https://github.com/golang/go/blob/880ca333d708b957325b6ef4798699372d4c090e/src/net/http/httputil/reverseproxy.go#L768-L804) helped a lot to understand how to implement hijacking on the server correctly.
+
+Related issues:
+- [net/http: first byte of second request in hijack mode is lost golang/go#27408](https://github.com/golang/go/issues/27408)
+- [net/http: reading from hijacked bufio.Reader should not cause r.Context to be cancelled golang/go#32314](https://github.com/golang/go/issues/32314)
+
+---
+
 ### 2025-07-15 Windows IPC: Using a pair of uni-directional pipes
 
 On windows, there are at least 3 different ways to achieve IPC that's equivalent to a socket+2fd on unix:
