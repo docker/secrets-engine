@@ -16,7 +16,6 @@ import (
 
 const (
 	mockSecretValue = "mockSecretValue"
-	mockSecretID    = "mockSecretID"
 )
 
 var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
@@ -31,7 +30,7 @@ type mockResolver struct {
 func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver {
 	resolver := &mockResolver{
 		t:         t,
-		secretsID: mockSecretID,
+		secretsID: mockSecretIDNew.String(),
 		value:     mockSecretValue,
 	}
 	for _, opt := range options {
@@ -57,14 +56,14 @@ func withMockResolverError(err error) mockResolverOption {
 }
 
 func (m mockResolver) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
-	if request.ID.String() != mockSecretID {
+	if request.ID.String() != mockSecretIDNew.String() {
 		return secrets.Envelope{}, errors.New("unexpected secret ID")
 	}
 	if m.err != nil {
 		return secrets.Envelope{}, m.err
 	}
 	return secrets.Envelope{
-		ID:    secrets.ID(m.secretsID),
+		ID:    secrets.MustParseIDNew(m.secretsID),
 		Value: []byte(m.value),
 	}, nil
 }
@@ -131,7 +130,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
 				resp, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.NoError(t, err)
-				assert.Equal(t, mockSecretID, resp.Msg.GetId())
+				assert.Equal(t, mockSecretIDNew.String(), resp.Msg.GetId())
 				assert.Equal(t, mockSecretValue, string(resp.Msg.GetValue()))
 			},
 		},

@@ -55,7 +55,7 @@ func WithID(id secrets.IDNew) MockedPluginOption {
 }
 
 func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
-	return secrets.Envelope{ID: secrets.ID(m.id.String()), Value: []byte(mockSecretValue)}, nil
+	return secrets.Envelope{ID: m.id, Value: []byte(mockSecretValue)}, nil
 }
 
 func getTestBinaryName() string {
@@ -239,7 +239,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.Equal(t, "my-plugin", r.Name().String())
 				assert.Equal(t, config.Version.String(), r.Version().String())
 				assert.Equal(t, mockPattern.String(), r.Pattern().String())
-				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 				assert.NoError(t, r.Close())
@@ -260,7 +260,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 				assert.ErrorContains(t, err, "id mismatch")
 				assert.NoError(t, r.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
@@ -287,7 +287,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
 

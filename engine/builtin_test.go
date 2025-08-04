@@ -37,7 +37,7 @@ func (m *mockInternalPlugin) GetSecret(_ context.Context, request secrets.Reques
 	if m.errGetSecretErr != nil {
 		return secrets.EnvelopeErr(request, m.errGetSecretErr), m.errGetSecretErr
 	}
-	if v, ok := m.secrets[string(request.ID)]; ok {
+	if v, ok := m.secrets[request.ID.String()]; ok {
 		return secrets.Envelope{ID: request.ID, Value: []byte(v)}, nil
 	}
 	return secrets.EnvelopeErr(request, secrets.ErrNotFound), secrets.ErrNotFound
@@ -74,12 +74,12 @@ func Test_internalRuntime(t *testing.T) {
 		assert.Equal(t, "foo", r.Name().String())
 		assert.Equal(t, "5", r.Version().String())
 		assert.Equal(t, "*", r.Pattern().String())
-		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.NoError(t, err)
 		assert.Equal(t, resp.Value, []byte(mockSecretValue))
 		assert.NoError(t, r.Close())
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
-		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.ErrorContains(t, err, "plugin foo has been shutdown")
 	})
 	t.Run("get secret -> forward error", func(t *testing.T) {
@@ -87,7 +87,7 @@ func Test_internalRuntime(t *testing.T) {
 		m := &mockInternalPlugin{errGetSecretErr: errGetSecretErr}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		assert.NoError(t, err)
-		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.ErrorIs(t, err, errGetSecretErr)
 		assert.Equal(t, resp.Error, errGetSecretErr.Error())
 	})
@@ -103,10 +103,10 @@ func Test_internalRuntime(t *testing.T) {
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		assert.NoError(t, err)
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
-		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.ErrorContains(t, err, "panic in foo:")
 		assert.ErrorContains(t, r.Close(), "panic in foo:")
-		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.ErrorContains(t, err, "panic in foo:")
 	})
 	t.Run("Run() terminating too early without error creates 'stopped unexpectedly' error", func(t *testing.T) {
@@ -122,7 +122,7 @@ func Test_internalRuntime(t *testing.T) {
 		m := &mockInternalPlugin{getSecretPanics: true}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		assert.NoError(t, err)
-		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
+		_, err = r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.ErrorContains(t, err, "recovering from panic in plugin foo")
 	})
 }

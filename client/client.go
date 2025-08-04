@@ -95,7 +95,7 @@ func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets
 		return secrets.EnvelopeErr(request, err), err
 	}
 	e := secrets.Envelope{
-		ID:         secrets.ID(id.String()),
+		ID:         id,
 		Value:      resp.Msg.GetValue(),
 		Provider:   resp.Msg.GetProvider(),
 		Version:    resp.Msg.GetVersion(),
