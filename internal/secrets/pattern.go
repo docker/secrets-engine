@@ -2,40 +2,9 @@ package secrets
 
 import (
 	"errors"
-	"fmt"
 )
 
 var ErrInvalidPattern = errors.New("invalid pattern")
-
-// Pattern can be used to match secret identifiers.
-// Valid patterns must follow the same validation rules as secret identifiers, with the exception
-// that '*' can be used to match a single component, and '**' can be used to match zero or more components.
-//
-// Deprecated: Use [PatternNew] instead
-type Pattern string
-
-func ParsePattern(pattern string) (Pattern, error) {
-	p := Pattern(pattern)
-	if err := p.Valid(); err != nil {
-		return "", fmt.Errorf("parsing pattern: %w", err)
-	}
-	return p, nil
-}
-
-// Valid returns nil if the pattern is considered valid.
-func (p Pattern) Valid() error {
-	if !validPattern(string(p)) {
-		return ErrInvalidPattern
-	}
-	return nil
-}
-
-func (p Pattern) Match(id ID) bool {
-	pathParts := split(string(id))
-	patternParts := split(string(p))
-
-	return match(patternParts, pathParts)
-}
 
 // validPattern checks if a pattern is valid without using regexp or unicode.
 // Rules:
@@ -92,12 +61,12 @@ func isValidPatternRune(c rune) bool {
 	return isValidRune(c) || c == '*'
 }
 
-// PatternNew can be used to match secret identifiers.
+// Pattern can be used to match secret identifiers.
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
 // that '*' can be used to match a single component, and '**' can be used to match zero or more components.
-type PatternNew interface {
+type Pattern interface {
 	// Match the [PatternNew] against an [IDNew]
-	Match(id IDNew) bool
+	Match(id ID) bool
 	// String formats the [Pattern] as a string
 	String() string
 }
@@ -106,7 +75,7 @@ type pattern struct {
 	value string
 }
 
-func (p *pattern) Match(id IDNew) bool {
+func (p *pattern) Match(id ID) bool {
 	pathParts := split(id.String())
 	patternParts := split(p.value)
 
@@ -117,9 +86,9 @@ func (p *pattern) String() string {
 	return p.value
 }
 
-var _ PatternNew = &pattern{}
+var _ Pattern = &pattern{}
 
-// ParsePatternNew parses a string into a [PatternNew]
+// ParsePattern parses a string into a [Pattern]
 // Rules:
 // - Components separated by '/'
 // - Each component is non-empty
@@ -128,7 +97,7 @@ var _ PatternNew = &pattern{}
 // - Asterisks rules:
 //   - '*' cannot be mixed with other characters in the same component
 //   - there can be no more than two '*' per component
-func ParsePatternNew(s string) (PatternNew, error) {
+func ParsePattern(s string) (Pattern, error) {
 	if !validPattern(s) {
 		return nil, ErrInvalidPattern
 	}
@@ -137,9 +106,9 @@ func ParsePatternNew(s string) (PatternNew, error) {
 	}, nil
 }
 
-// MustParsePatternNew parses a string into a [PatternNew] like with [ParsePatternNew],
+// MustParsePattern parses a string into a [Pattern] like with [ParsePattern],
 // however, it panics when a validation error occurs.
-func MustParsePatternNew(s string) PatternNew {
+func MustParsePattern(s string) Pattern {
 	if !validPattern(s) {
 		panic(ErrInvalidPattern)
 	}
