@@ -23,14 +23,11 @@ func NewEngine() *Engine {
 func (e *Engine) GetSecret(ctx context.Context, req secrets.Request) (secrets.Envelope, error) {
 	var errs []error
 
-	if err := req.ID.Valid(); err != nil {
-		return envelopeErr(req, err), err
-	}
-
 	for _, plugin := range e.plugins {
 		if req.Provider != "" && req.Provider != plugin.name {
 			continue
 		}
+
 		if !req.ID.Match(plugin.pattern) {
 			continue
 		}
@@ -66,7 +63,7 @@ func envelopeErr(req secrets.Request, err error) secrets.Envelope {
 type pluginRegistration struct {
 	name string
 	// version  string
-	pattern  secrets.Pattern
+	pattern  secrets.PatternNew
 	provider secrets.Resolver
 }
 
@@ -76,7 +73,7 @@ func (e *Engine) Register(name, _, pattern string, provider secrets.Resolver) er
 	}) {
 		return fmt.Errorf("provider name %q already registered", name)
 	}
-	p, err := secrets.ParsePattern(pattern)
+	p, err := secrets.ParsePatternNew(pattern)
 	if err != nil {
 		return err
 	}

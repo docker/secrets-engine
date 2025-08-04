@@ -199,11 +199,11 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetId())
+	id, err := secrets.ParseIDNew(resp.Msg.GetId())
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}
-	if id != request.ID {
+	if id.String() != request.ID.String() {
 		return secrets.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
 	}
 	return secrets.Envelope{

@@ -40,7 +40,7 @@ func Test_SecretsEngine(t *testing.T) {
 	t.Run("unique existing secrets across all plugin types", func(t *testing.T) {
 		t.Parallel()
 		t.Run("engine launched plugins", func(t *testing.T) {
-			foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+			foo, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("foo")})
 			assert.NoError(t, err)
 			assert.Equal(t, "foo", foo.ID.String())
 			assert.Equal(t, "foo-value", string(foo.Value))
@@ -49,13 +49,13 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.NotEmpty(t, foo.ResolvedAt)
 			assert.NotEmpty(t, foo.CreatedAt)
 			assert.NotEmpty(t, foo.ExpiresAt)
-			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
+			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
 			assert.NoError(t, err)
 			assert.Equal(t, "bar", bar.ID.String())
 			assert.Equal(t, "bar-value", string(bar.Value))
 		})
 		t.Run("internal plugin", func(t *testing.T) {
-			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("my-secret")})
 			assert.NoError(t, err)
 			assert.Equal(t, "my-secret", mySecret.ID.String())
 			assert.Equal(t, "some-value", string(mySecret.Value))
@@ -69,7 +69,7 @@ func Test_SecretsEngine(t *testing.T) {
 				id:         secrets.MustParseIDNew("special/secret"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "special/secret"})
+				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("special/secret")})
 				assert.NoError(collect, err)
 				assert.Equal(collect, "special/secret", secret.ID.String())
 				assert.Equal(collect, mockSecretValue, string(secret.Value))
@@ -82,22 +82,22 @@ func Test_SecretsEngine(t *testing.T) {
 				id:         secrets.MustParseIDNew("3rd-party-vendor/foo"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "3rd-party-vendor/foo"})
+				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("3rd-party-vendor/foo")})
 				assert.NoError(collect, err)
 				assert.Equal(collect, "3rd-party-vendor/foo", secret.ID.String())
 				assert.Equal(collect, mockSecretValue, string(secret.Value))
 				assert.Equal(t, "3rd-party-plugin", secret.Provider)
 			}, 2*time.Second, 100*time.Millisecond)
 			shutdown1()
-			_, err = c.GetSecret(t.Context(), secrets.Request{ID: "special/secret"})
+			_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("special/secret")})
 			assert.Error(t, err)
 			shutdown2()
-			_, err = c.GetSecret(t.Context(), secrets.Request{ID: "3rd-party-vendor/foo"})
+			_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("3rd-party-vendor/foo")})
 			assert.Error(t, err)
 		})
 	})
 	t.Run("non existing secrets", func(t *testing.T) {
-		secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "fancy-secret"})
+		secret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("fancy-secret")})
 		assert.ErrorContains(t, err, "secret not found")
 		assert.Contains(t, secret.Error, "secret not found")
 	})
@@ -114,7 +114,7 @@ func Test_SecretsEngine(t *testing.T) {
 		assert.Equal(t, "plugin-bar", mockFromBar.Provider)
 	})
 	t.Run("existing secrets but wrong provider", func(t *testing.T) {
-		_, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo", Provider: "plugin-bar"})
+		_, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("foo"), Provider: "plugin-bar"})
 		assert.ErrorContains(t, err, "secret not found")
 	})
 }
@@ -169,13 +169,13 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			runEngineAsync(t, e)
 			c, err := client.New(client.WithSocketPath(socketPath))
 			require.NoError(t, err)
-			_, err = c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
+			_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("foo")})
 			if test.shouldGetSecretFromExternalPlugin {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
 			}
-			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("my-secret")})
 			assert.NoError(t, err)
 			assert.Equal(t, "my-secret", mySecret.ID.String())
 			assert.Equal(t, "some-value", string(mySecret.Value))
