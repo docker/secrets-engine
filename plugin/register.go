@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
@@ -31,7 +30,7 @@ func newRegisterClient(c *http.Client, pluginName string, config Config, timeout
 }
 
 func (c *registerClient) register(ctx context.Context) (*runtimeConfig, error) {
-	logrus.Infof("Registering plugin %s...", c.pluginName)
+	c.config.Logger.Printf("Registering plugin %s...", c.pluginName)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	req := connect.NewRequest(resolverv1.RegisterPluginRequest_builder{
@@ -60,6 +59,6 @@ func doRegister(ctx context.Context, c *http.Client, pluginName string, config C
 	if err != nil {
 		return nil, fmt.Errorf("failed to register plugin %s: %w", pluginName, err)
 	}
-	logrus.Infof("Plugin %s registered successfully", pluginName)
+	config.Logger.Printf("Plugin %s registered successfully", pluginName)
 	return resp, nil
 }
