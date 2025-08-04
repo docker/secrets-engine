@@ -45,7 +45,7 @@ func (m *mockSlowRuntime) Data() api.PluginData {
 // We instead have a tiny sleep per mockRuntime.Close() with a larger global timeout in case the parallelStop function locks.
 func Test_parallelStop(t *testing.T) {
 	var runtimes []runtime
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		runtimes = append(runtimes, &mockSlowRuntime{name: fmt.Sprintf("r%d", i)})
 	}
 	stopErr := make(chan error)
@@ -210,7 +210,7 @@ func Test_newEngine(t *testing.T) {
 		require.NoError(t, err)
 		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("foo"), foo.ID)
+		assert.Equal(t, "foo", foo.ID.String())
 		assert.Equal(t, "foo-value", string(foo.Value))
 	})
 	t.Run("external plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
@@ -235,7 +235,7 @@ func Test_newEngine(t *testing.T) {
 		require.NoError(t, err)
 		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("bar"), bar.ID)
+		assert.Equal(t, "bar", bar.ID.String())
 		assert.Equal(t, "bar-value", string(bar.Value))
 		_, err = c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
@@ -272,7 +272,7 @@ func Test_newEngine(t *testing.T) {
 		require.NoError(t, err)
 		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, "my-secret", mySecret.ID.String())
 		assert.Equal(t, "some-value", string(mySecret.Value))
 		close(internalPluginRunExitCh)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -304,7 +304,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
 			require.NoError(collect, err)
-			assert.Equal(collect, secrets.ID("bar"), bar.ID)
+			assert.Equal(collect, "bar", bar.ID.String())
 			assert.Equal(collect, "bar-value", string(bar.Value))
 		}, 5*time.Second, 100*time.Millisecond)
 	})
@@ -349,7 +349,7 @@ func Test_newEngine(t *testing.T) {
 		}, 5*time.Second, 100*time.Millisecond) // Timeout needs to be larger than the initial retry interval
 		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
 		require.NoError(t, err)
-		assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+		assert.Equal(t, "my-secret", mySecret.ID.String())
 		assert.Equal(t, "some-value", string(mySecret.Value))
 	})
 }
