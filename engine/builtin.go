@@ -22,7 +22,7 @@ type internalRuntime struct {
 
 type internalPluginData struct {
 	name    string
-	pattern secrets.Pattern
+	pattern secrets.PatternNew
 	version api.Version
 }
 
@@ -39,7 +39,7 @@ func (i internalPluginData) Name() string {
 }
 
 func (i internalPluginData) Pattern() secrets.Pattern {
-	return i.pattern
+	return secrets.Pattern(i.pattern.String())
 }
 
 func (i internalPluginData) Version() string {

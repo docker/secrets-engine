@@ -35,7 +35,7 @@ type Config struct {
 	// Version of the plugin in semver format.
 	Version api.Version
 	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
-	Pattern secrets.Pattern
+	Pattern secrets.PatternNew
 }
 
 func (c *Config) Valid() error {
@@ -45,7 +45,7 @@ func (c *Config) Valid() error {
 	if c.Version == nil {
 		return errors.New("version is required")
 	}
-	if c.Pattern == "" {
+	if c.Pattern == nil {
 		return errors.New("pattern is required")
 	}
 	return nil

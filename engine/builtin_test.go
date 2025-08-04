@@ -67,7 +67,7 @@ func (m *mockInternalPlugin) Run(ctx context.Context) error {
 func Test_internalRuntime(t *testing.T) {
 	// TODO: relying on a global variable for tests is bad -> fix this!
 	SetPluginShutdownTimeout(100 * time.Millisecond)
-	mockConfig := Config{Name: "foo", Pattern: "*", Version: api.MustNewVersion("5")}
+	mockConfig := Config{Name: "foo", Pattern: mockPatternAny, Version: api.MustNewVersion("5")}
 
 	t.Parallel()
 	t.Run("no runtime for plugins with invalid config", func(t *testing.T) {
