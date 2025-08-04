@@ -62,8 +62,8 @@ func Test_SecretsEngine(t *testing.T) {
 			shutdown1 := launchExternalPlugin(t, externalPluginTestConfig{
 				socketPath: socketPath,
 				name:       "my-plugin",
-				pattern:    "special/*",
-				id:         "special/secret",
+				pattern:    secrets.MustParsePatternNew("special/*"),
+				id:         secrets.MustParseIDNew("special/secret"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "special/secret"})
@@ -75,8 +75,8 @@ func Test_SecretsEngine(t *testing.T) {
 			shutdown2 := launchExternalPlugin(t, externalPluginTestConfig{
 				socketPath: socketPath,
 				name:       "3rd-party-plugin",
-				pattern:    "**",
-				id:         "3rd-party-vendor/foo",
+				pattern:    secrets.MustParsePatternNew("**"),
+				id:         secrets.MustParseIDNew("3rd-party-vendor/foo"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "3rd-party-vendor/foo"})
@@ -195,8 +195,8 @@ func runEngineAsync(t *testing.T, e Engine) {
 type externalPluginTestConfig struct {
 	socketPath string
 	name       string
-	pattern    secrets.Pattern
-	id         secrets.ID
+	pattern    secrets.PatternNew
+	id         secrets.IDNew
 }
 
 func launchExternalPlugin(t *testing.T, cfg externalPluginTestConfig) func() {
@@ -204,7 +204,7 @@ func launchExternalPlugin(t *testing.T, cfg externalPluginTestConfig) func() {
 	conn, err := net.Dial("unix", cfg.socketPath)
 	require.NoError(t, err)
 	plugin := newMockedPlugin(WithID(cfg.id))
-	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: cfg.pattern, Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
+	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: secrets.Pattern(cfg.pattern.String()), Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	runErr := make(chan error)
