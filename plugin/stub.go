@@ -75,7 +75,7 @@ func New(p Plugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	if config.Logger == nil {
 		config.Logger = logging.NewDefaultLogger("plugin")
 	}
-	cfg, ipcSetup, err := newCfg(p, opts...)
+	cfg, err := newCfg(p, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func New(p Plugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	stub := &stub{
 		name: cfg.name,
 		factory: func(ctx context.Context, onClose func(error)) (io.Closer, error) {
-			return setup(ctx, ipcSetup, *cfg, onClose)
+			return setup(ctx, *cfg, onClose)
 		},
 	}
 	config.Logger.Printf("Created plugin %s", cfg.name)
