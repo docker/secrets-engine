@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -25,7 +24,6 @@ type resolverService struct {
 }
 
 func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
-	logrus.Debugf("GetSecret request (ID %q)", c.Msg.GetId())
 	select {
 	case <-r.setupCompleted:
 	case <-ctx.Done():

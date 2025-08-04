@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/docker/secrets-engine/internal/testhelper"
 )
 
 const (
@@ -35,7 +37,7 @@ func Test_ipc(t *testing.T) {
 					require.NoError(t, err)
 					defer sock.Close()
 
-					i, c, err := NewServerIPC(sock, newPingPongHandler("runtime"), nil)
+					i, c, err := NewServerIPC(testhelper.TestLogger(t), sock, newPingPongHandler("runtime"), nil)
 					require.NoError(t, err)
 					defer i.Close()
 					assertCommunicationToServer(t, c, "pong-plugin")
@@ -49,7 +51,7 @@ func Test_ipc(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(func() { sock.Close() })
 
-				i, c, err := NewClientIPC(sock, newPingPongHandler("plugin"), nil)
+				i, c, err := NewClientIPC(testhelper.TestLogger(t), sock, newPingPongHandler("plugin"), nil)
 				require.NoError(t, err)
 				t.Cleanup(func() { i.Close() })
 
@@ -71,7 +73,7 @@ func Test_ipc(t *testing.T) {
 					conn, err := listener.Accept()
 					require.NoError(t, err)
 
-					i, _, err := NewServerIPC(conn, newPingPongHandler("runtime"), func(err error) {
+					i, _, err := NewServerIPC(testhelper.TestLogger(t), conn, newPingPongHandler("runtime"), func(err error) {
 						assert.ErrorIs(t, err, io.EOF)
 						close(donePlugin)
 					})
@@ -85,7 +87,7 @@ func Test_ipc(t *testing.T) {
 				sock, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socketPath, Net: "unix"})
 				require.NoError(t, err)
 
-				i, c, err := NewClientIPC(sock, newPingPongHandler("plugin"), func(err error) {
+				i, c, err := NewClientIPC(testhelper.TestLogger(t), sock, newPingPongHandler("plugin"), func(err error) {
 					assert.NoError(t, err)
 					assert.ErrorContains(t, sock.Close(), "use of closed network connection")
 				})
@@ -112,7 +114,7 @@ func Test_ipc(t *testing.T) {
 					require.NoError(t, err)
 
 					done := make(chan struct{})
-					i, c, err := NewClientIPC(sock, newPingPongHandler("plugin"), func(err error) {
+					i, c, err := NewClientIPC(testhelper.TestLogger(t), sock, newPingPongHandler("plugin"), func(err error) {
 						assert.ErrorIs(t, err, io.EOF)
 						assert.ErrorContains(t, sock.Close(), "use of closed network connection")
 						close(done)
@@ -128,7 +130,7 @@ func Test_ipc(t *testing.T) {
 				conn, err := listener.Accept()
 				require.NoError(t, err)
 
-				i, _, err := NewServerIPC(conn, newPingPongHandler("runtime"), func(err error) {
+				i, _, err := NewServerIPC(testhelper.TestLogger(t), conn, newPingPongHandler("runtime"), func(err error) {
 					assert.NoError(t, err)
 					assert.ErrorContains(t, conn.Close(), "use of closed network connection")
 					close(runtimeDown)

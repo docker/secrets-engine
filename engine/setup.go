@@ -38,7 +38,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, setup ipc.Setup, cb f
 	registrator := newRegistrationLogic(v, chRegistrationResult)
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{logger: logger, r: registrator}))
 	chIpcErr := make(chan error, 1)
-	i, c, err := setup(conn, httpMux, func(err error) {
+	i, c, err := setup(logger, conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			logger.Printf("Connection to plugin %v closed", v.name)
 		}
