@@ -21,7 +21,19 @@ import (
 )
 
 type mockSlowRuntime struct {
-	name string
+	name api.Name
+}
+
+func (m *mockSlowRuntime) Name() api.Name {
+	return m.name
+}
+
+func (m *mockSlowRuntime) Version() api.Version {
+	return mockValidVersion
+}
+
+func (m *mockSlowRuntime) Pattern() secrets.PatternNew {
+	return mockPattern
 }
 
 func (m *mockSlowRuntime) Closed() <-chan struct{} {
@@ -37,16 +49,12 @@ func (m *mockSlowRuntime) Close() error {
 	return fmt.Errorf("%s closed", m.name)
 }
 
-func (m *mockSlowRuntime) Data() api.PluginData {
-	return api.MustNewPluginData(api.PluginDataUnvalidated{Name: m.name, Version: mockVersion, Pattern: "*"})
-}
-
 // Unfortunately, there's no way to test this reliably using channels.
 // We instead have a tiny sleep per mockRuntime.Close() with a larger global timeout in case the parallelStop function locks.
 func Test_parallelStop(t *testing.T) {
 	var runtimes []runtime
 	for i := range 10000 {
-		runtimes = append(runtimes, &mockSlowRuntime{name: fmt.Sprintf("r%d", i)})
+		runtimes = append(runtimes, &mockSlowRuntime{name: api.MustNewName(fmt.Sprintf("r%d", i))})
 	}
 	stopErr := make(chan error)
 	go func() {
@@ -62,9 +70,21 @@ func Test_parallelStop(t *testing.T) {
 }
 
 type mockRuntime struct {
-	name        string
+	name        api.Name
 	closeCalled int
 	closed      chan struct{}
+}
+
+func (m *mockRuntime) Name() api.Name {
+	return m.name
+}
+
+func (m *mockRuntime) Version() api.Version {
+	return mockValidVersion
+}
+
+func (m *mockRuntime) Pattern() secrets.PatternNew {
+	return mockPatternAny
 }
 
 func (m *mockRuntime) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
@@ -78,10 +98,6 @@ func (m *mockRuntime) Close() error {
 
 func (m *mockRuntime) Closed() <-chan struct{} {
 	return m.closed
-}
-
-func (m *mockRuntime) Data() api.PluginData {
-	return api.MustNewPluginData(api.PluginDataUnvalidated{Name: m.name, Version: mockVersion, Pattern: "*"})
 }
 
 type mockRegistry struct {
@@ -255,8 +271,8 @@ func Test_newEngine(t *testing.T) {
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
-			plugins: map[Config]Plugin{
-				{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{
+			plugins: map[metadata]Plugin{
+				&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 					runExitCh: internalPluginRunExitCh,
 					secrets:   map[string]string{"my-secret": "some-value"},
 				},
@@ -319,7 +335,7 @@ func Test_newEngine(t *testing.T) {
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
-			plugins: map[Config]Plugin{{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{
+			plugins: map[metadata]Plugin{&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 				blockRunForever: blockRunCh,
 				runExitCh:       runExitCh,
 				secrets:         map[string]string{"my-secret": "some-value"},

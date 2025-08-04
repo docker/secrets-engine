@@ -13,11 +13,12 @@ import (
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type setupResult struct {
 	client *http.Client
-	cfg    api.PluginData
+	cfg    metadata
 	close  func() error
 }
 
@@ -48,7 +49,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 	if err != nil {
 		return nil, err
 	}
-	var out api.PluginData
+	var out metadata
 	select {
 	case r := <-chRegistrationResult:
 		if r.err != nil || r.cfg == nil {
@@ -80,16 +81,59 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 	}, nil
 }
 
-func (p runtimeCfg) Validate(in api.PluginDataUnvalidated) (api.PluginData, *pluginCfgOut, error) {
+type pluginDataUnvalidated struct {
+	Name    string
+	Version string
+	Pattern string
+}
+
+func (p runtimeCfg) Validate(in pluginDataUnvalidated) (metadata, *pluginCfgOut, error) {
 	if p.name != "" && in.Name != p.name {
 		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
 	}
-	if p.name == "" && in.Name == "" {
-		return nil, nil, errors.New("plugin name is required when not launched by engine")
-	}
-	data, err := api.NewPluginData(in)
+	data, err := newValidatedConfig(in)
 	if err != nil {
 		return nil, nil, err
 	}
 	return data, &p.out, nil
+}
+
+func newValidatedConfig(in pluginDataUnvalidated) (metadata, error) {
+	name, err := api.NewName(in.Name)
+	if err != nil {
+		return nil, err
+	}
+	version, err := api.NewVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
+	pattern, err := secrets.ParsePatternNew(in.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &configValidated{name: name, version: version, pattern: pattern}, nil
+}
+
+type configValidated struct {
+	name    api.Name
+	version api.Version
+	pattern secrets.PatternNew
+}
+
+func (c configValidated) Name() api.Name {
+	return c.name
+}
+
+func (c configValidated) Version() api.Version {
+	return c.version
+}
+
+func (c configValidated) Pattern() secrets.PatternNew {
+	return c.pattern
+}
+
+type metadata interface {
+	Name() api.Name
+	Version() api.Version
+	Pattern() secrets.PatternNew
 }

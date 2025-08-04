@@ -38,17 +38,18 @@ type Config struct {
 	Pattern secrets.PatternNew
 }
 
-func (c *Config) Valid() error {
-	if c.Name == "" {
-		return errors.New("name is required")
+func (c *Config) validated() (metadata, error) {
+	name, err := api.NewName(c.Name)
+	if err != nil {
+		return nil, err
 	}
 	if c.Version == nil {
-		return errors.New("version is required")
+		return nil, errors.New("version is required")
 	}
 	if c.Pattern == nil {
-		return errors.New("pattern is required")
+		return nil, errors.New("pattern is required")
 	}
-	return nil
+	return &configValidated{name, c.Version, c.Pattern}, nil
 }
 
 type config struct {
@@ -56,7 +57,7 @@ type config struct {
 	version                string
 	pluginPath             string
 	socketPath             string
-	plugins                map[Config]Plugin
+	plugins                map[metadata]Plugin
 	dynamicPluginsDisabled bool
 	enginePluginsDisabled  bool
 	logger                 logging.Logger
@@ -91,7 +92,15 @@ func WithSocketPath(path string) Option {
 // WithPlugins sets a list of plugins that get bundled with the engine (batteries included plugins)
 func WithPlugins(plugins map[Config]Plugin) Option {
 	return func(r *config) error {
-		r.plugins = plugins
+		pluginsValidated := map[metadata]Plugin{}
+		for unvalidated, p := range plugins {
+			c, err := unvalidated.validated()
+			if err != nil {
+				return err
+			}
+			pluginsValidated[c] = p
+		}
+		r.plugins = pluginsValidated
 		return nil
 	}
 }

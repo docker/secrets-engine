@@ -7,51 +7,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 type internalRuntime struct {
+	metadata
 	p      Plugin
-	data   api.PluginData
 	closed chan struct{}
 	runErr func() error
 	close  func() error
 }
 
-type internalPluginData struct {
-	name    string
-	pattern secrets.PatternNew
-	version api.Version
-}
-
-// TODO: This entire thing smells. Try to consolidate.
-func fromConfig(c Config) (api.PluginData, error) {
-	if err := c.Valid(); err != nil {
-		return nil, err
-	}
-	return &internalPluginData{name: c.Name, pattern: c.Pattern, version: c.Version}, nil
-}
-
-func (i internalPluginData) Name() string {
-	return i.name
-}
-
-func (i internalPluginData) Pattern() secrets.Pattern {
-	return secrets.Pattern(i.pattern.String())
-}
-
-func (i internalPluginData) Version() string {
-	return i.version.String()
-}
-
-func newInternalRuntime(ctx context.Context, p Plugin, c Config) (runtime, error) {
+func newInternalRuntime(ctx context.Context, p Plugin, c metadata) (runtime, error) {
 	logger, err := logging.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	data, err := fromConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +31,8 @@ func newInternalRuntime(ctx context.Context, p Plugin, c Config) (runtime, error
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Errorf("recovering from panic in %s: %s", c.Name, debug.Stack())
-				runErr.StoreFirst(fmt.Errorf("panic in %s: %v", c.Name, r))
+				logger.Errorf("recovering from panic in %s: %s", c.Name(), debug.Stack())
+				runErr.StoreFirst(fmt.Errorf("panic in %s: %v", c.Name(), r))
 			}
 			closeOnce()
 		}()
@@ -72,16 +41,16 @@ func newInternalRuntime(ctx context.Context, p Plugin, c Config) (runtime, error
 		case <-ctxWithCancel.Done():
 		default:
 			if err == nil {
-				err = fmt.Errorf("builtin plugin '%s' stopped unexpectedly", c.Name)
+				err = fmt.Errorf("builtin plugin '%s' stopped unexpectedly", c.Name())
 			}
 		}
 		runErr.StoreFirst(err)
 	}()
 	return &internalRuntime{
-		p:      p,
-		data:   data,
-		closed: closed,
-		runErr: runErr.Load,
+		metadata: c,
+		p:        p,
+		closed:   closed,
+		runErr:   runErr.Load,
 		close: sync.OnceValue(func() error {
 			cancel()
 			select {
@@ -89,7 +58,7 @@ func newInternalRuntime(ctx context.Context, p Plugin, c Config) (runtime, error
 				return runErr.Load()
 			case <-time.After(getPluginShutdownTimeout()):
 				closeOnce()
-				return fmt.Errorf("timeout waiting for plugin %s shutdown", c.Name)
+				return fmt.Errorf("timeout waiting for plugin %s shutdown", c.Name())
 			}
 		}),
 	}, nil
@@ -121,13 +90,13 @@ func (i *internalRuntime) GetSecret(ctx context.Context, request secrets.Request
 		if err := i.runErr(); err != nil {
 			return secrets.EnvelopeErr(request, err), err
 		}
-		err := fmt.Errorf("plugin %s has been shutdown", i.data.Name())
+		err := fmt.Errorf("plugin %s has been shutdown", i.Name())
 		return secrets.EnvelopeErr(request, err), err
 	default:
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.data.Name(), debug.Stack())
+			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.Name(), debug.Stack())
 			resp = secrets.EnvelopeErr(request, panicErr)
 			err = panicErr
 		}
@@ -139,20 +108,16 @@ func (i *internalRuntime) Close() error {
 	return i.close()
 }
 
-func (i *internalRuntime) Data() api.PluginData {
-	return i.data
-}
-
 func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[Config]Plugin) []launchPlan {
+func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[metadata]Plugin) []launchPlan {
 	var result []launchPlan
 	for c, p := range plugins {
 		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c) }
-		result = append(result, launchPlan{l, builtinPlugin, c.Name})
-		logger.Printf("discovered builtin plugin: %s", c.Name)
+		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
+		logger.Printf("discovered builtin plugin: %s", c.Name())
 	}
 	return result
 }
