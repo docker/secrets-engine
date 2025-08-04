@@ -80,10 +80,6 @@ func convertAttributes(attributes map[string]any) (map[string]string, error) {
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	item := newKeychainItem(id.String(), k)
 	err := kc.DeleteItem(item)
 	if err != nil && !errors.Is(err, kc.ErrorItemNotFound) {
@@ -93,10 +89,6 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
-	if err := id.Valid(); err != nil {
-		return nil, err
-	}
-
 	result, err := getItemWithData(id.String(), k)
 	if err != nil {
 		return nil, err
@@ -118,7 +110,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -131,7 +123,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[store.ID]store.Secret, len(results))
+	creds := make(map[string]store.Secret, len(results))
 	for _, result := range results {
 		id, err := store.ParseID(result.Account)
 		if err != nil {
@@ -147,16 +139,12 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		creds[id] = secret
+		creds[id.String()] = secret
 	}
 	return creds, nil
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	data, err := secret.Marshal()
 	if err != nil {
 		return err
@@ -166,7 +154,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	// only creation of a secret needs the label attribute.
 	// it is a user-friendly name for the item, which is displayed in the keychain UI.
 	// https://developer.apple.com/documentation/security/ksecattrlabel
-	item.SetLabel(k.itemLabel(id))
+	item.SetLabel(k.itemLabel(id.String()))
 
 	metadata := make(map[string]string)
 	maps.Copy(metadata, secret.Metadata())
