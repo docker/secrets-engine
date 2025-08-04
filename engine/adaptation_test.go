@@ -129,7 +129,7 @@ func TestWithDynamicPluginsDisabled(t *testing.T) {
 	conn, err := net.Dial("unix", path)
 	require.NoError(t, err)
 	plugin := newMockedPlugin()
-	_, err = p.New(plugin, p.Config{Version: mockValidVersion, Pattern: "*"}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+	_, err = p.New(plugin, p.Config{Version: mockValidVersion, Pattern: secrets.MustParsePatternNew("*")}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 	assert.ErrorContains(t, err, "external plugin rejected")
 }
 
@@ -204,7 +204,7 @@ func launchExternalPlugin(t *testing.T, cfg externalPluginTestConfig) func() {
 	conn, err := net.Dial("unix", cfg.socketPath)
 	require.NoError(t, err)
 	plugin := newMockedPlugin(WithID(cfg.id))
-	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: secrets.Pattern(cfg.pattern.String()), Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
+	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: cfg.pattern, Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	runErr := make(chan error)
