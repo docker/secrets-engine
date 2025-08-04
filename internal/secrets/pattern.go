@@ -10,6 +10,8 @@ var ErrInvalidPattern = errors.New("invalid pattern")
 // Pattern can be used to match secret identifiers.
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
 // that '*' can be used to match a single component, and '**' can be used to match zero or more components.
+//
+// Deprecated: Use [PatternNew] instead
 type Pattern string
 
 func ParsePattern(pattern string) (Pattern, error) {
@@ -88,4 +90,60 @@ func isValidComponentMatcher(componentLen, wildcardLen int) bool {
 
 func isValidPatternRune(c rune) bool {
 	return isValidRune(c) || c == '*'
+}
+
+// PatternNew can be used to match secret identifiers.
+// Valid patterns must follow the same validation rules as secret identifiers, with the exception
+// that '*' can be used to match a single component, and '**' can be used to match zero or more components.
+type PatternNew interface {
+	// Match the [PatternNew] against an [IDNew]
+	Match(id IDNew) bool
+	// String formats the [Pattern] as a string
+	String() string
+}
+
+type pattern struct {
+	value string
+}
+
+func (p *pattern) Match(id IDNew) bool {
+	pathParts := split(id.String())
+	patternParts := split(p.value)
+
+	return match(patternParts, pathParts)
+}
+
+func (p *pattern) String() string {
+	return p.value
+}
+
+var _ PatternNew = &pattern{}
+
+// ParsePatternNew parses a string into a [PatternNew]
+// Rules:
+// - Components separated by '/'
+// - Each component is non-empty
+// - Only characters A-Z, a-z, 0-9, '.', '-', '_' or '*'
+// - No leading, trailing, or double slashes
+// - Asterisks rules:
+//   - '*' cannot be mixed with other characters in the same component
+//   - there can be no more than two '*' per component
+func ParsePatternNew(s string) (PatternNew, error) {
+	if !validPattern(s) {
+		return nil, ErrInvalidPattern
+	}
+	return &pattern{
+		value: s,
+	}, nil
+}
+
+// MustParsePatternNew parses a string into a [PatternNew] like with [ParsePatternNew],
+// however, it panics when a validation error occurs.
+func MustParsePatternNew(s string) PatternNew {
+	if !validPattern(s) {
+		panic(ErrInvalidPattern)
+	}
+	return &pattern{
+		value: s,
+	}
 }
