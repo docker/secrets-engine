@@ -10,12 +10,12 @@ import (
 
 type MockStore struct {
 	lock  sync.RWMutex
-	store map[store.ID]store.Secret
+	store map[string]store.Secret
 }
 
 func (m *MockStore) init() {
 	if m.store == nil {
-		m.store = make(map[store.ID]store.Secret)
+		m.store = make(map[string]store.Secret)
 	}
 }
 
@@ -25,7 +25,7 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	defer m.lock.Unlock()
 	m.init()
 
-	delete(m.store, id)
+	delete(m.store, id.String())
 	return nil
 }
 
@@ -35,7 +35,7 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	defer m.lock.RUnlock()
 	m.init()
 
-	secret, exists := m.store[id]
+	secret, exists := m.store[id.String()]
 	if !exists {
 		return nil, store.ErrCredentialNotFound
 	}
@@ -43,7 +43,7 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 }
 
 // GetAll implements Store.
-func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[string]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
@@ -58,7 +58,7 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	defer m.lock.Unlock()
 	m.init()
 
-	m.store[id] = secret
+	m.store[id.String()] = secret
 	return nil
 }
 
