@@ -16,23 +16,23 @@ import (
 
 const (
 	mockSecretValue = "mockSecretValue"
-	mockSecretID    = secrets.ID("mockSecretID")
+	mockSecretID    = "mockSecretID"
 )
 
 var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
 
 type mockResolver struct {
-	t     *testing.T
-	id    secrets.ID
-	value string
-	err   error
+	t         *testing.T
+	secretsID string
+	value     string
+	err       error
 }
 
 func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver {
 	resolver := &mockResolver{
-		t:     t,
-		id:    mockSecretID,
-		value: mockSecretValue,
+		t:         t,
+		secretsID: mockSecretID,
+		value:     mockSecretValue,
 	}
 	for _, opt := range options {
 		resolver = opt(resolver)
@@ -42,9 +42,9 @@ func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver 
 
 type mockResolverOption func(*mockResolver) *mockResolver
 
-func withMockResolverID(id secrets.ID) mockResolverOption {
+func withMockResolverID(id string) mockResolverOption {
 	return func(m *mockResolver) *mockResolver {
-		m.id = id
+		m.secretsID = id
 		return m
 	}
 }
@@ -57,14 +57,14 @@ func withMockResolverError(err error) mockResolverOption {
 }
 
 func (m mockResolver) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
-	if request.ID != mockSecretID {
+	if request.ID.String() != mockSecretID {
 		return secrets.Envelope{}, errors.New("unexpected secret ID")
 	}
 	if m.err != nil {
 		return secrets.Envelope{}, m.err
 	}
 	return secrets.Envelope{
-		ID:    m.id,
+		ID:    secrets.ID(m.secretsID),
 		Value: []byte(m.value),
 	}, nil
 }
@@ -131,7 +131,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
 				resp, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.NoError(t, err)
-				assert.Equal(t, mockSecretID.String(), resp.Msg.GetId())
+				assert.Equal(t, mockSecretID, resp.Msg.GetId())
 				assert.Equal(t, mockSecretValue, string(resp.Msg.GetValue()))
 			},
 		},
