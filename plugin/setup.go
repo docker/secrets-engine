@@ -36,7 +36,7 @@ func setup(ctx context.Context, setup ipc.Setup, config cfg, onClose func(err er
 	if err != nil {
 		return nil, err
 	}
-	runtimeCfg, err := doRegister(ctx, c, config.name, config.plugin, config.registrationTimeout)
+	runtimeCfg, err := doRegister(ctx, c, config.name, config.Config, config.registrationTimeout)
 	if err != nil {
 		ipc.Close()
 		return nil, err

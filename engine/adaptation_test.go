@@ -11,11 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
 	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 	p "github.com/docker/secrets-engine/plugin"
 )
+
+var mockValidVersion = api.MustNewVersion("7")
 
 func Test_SecretsEngine(t *testing.T) {
 	t.Parallel()
@@ -24,7 +27,7 @@ func Test_SecretsEngine(t *testing.T) {
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
-		WithPlugins(map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{"my-secret": "some-value"}}}))
+		WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[secrets.ID]string{"my-secret": "some-value"}}}))
 	assert.NoError(t, err)
 	runEngineAsync(t, e)
 	assert.ErrorContains(t, e.Run(t.Context()), "already started")
@@ -126,7 +129,7 @@ func TestWithDynamicPluginsDisabled(t *testing.T) {
 	conn, err := net.Dial("unix", path)
 	require.NoError(t, err)
 	plugin := newMockedPlugin()
-	_, err = p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+	_, err = p.New(plugin, p.Config{Version: mockValidVersion, Pattern: "*"}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 	assert.ErrorContains(t, err, "external plugin rejected")
 }
 
@@ -153,7 +156,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
-				WithPlugins(map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", secrets: map[secrets.ID]string{"my-secret": "some-value"}}}),
+				WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[secrets.ID]string{"my-secret": "some-value"}}}),
 			}
 			if test.extraOption != nil {
 				options = append(options, test.extraOption)
@@ -200,8 +203,8 @@ func launchExternalPlugin(t *testing.T, cfg externalPluginTestConfig) func() {
 	t.Helper()
 	conn, err := net.Dial("unix", cfg.socketPath)
 	require.NoError(t, err)
-	plugin := newMockedPlugin(WithPattern(cfg.pattern), WithID(cfg.id))
-	s, err := p.New(plugin, p.WithPluginName(cfg.name), p.WithConnection(conn))
+	plugin := newMockedPlugin(WithID(cfg.id))
+	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: cfg.pattern, Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	runErr := make(chan error)
