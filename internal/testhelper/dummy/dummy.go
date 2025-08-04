@@ -250,7 +250,7 @@ func PluginProcess(cfg *PluginCfg) {
 	if err != nil {
 		panic(err)
 	}
-	pattern, err := secrets.ParsePattern(cfg.Pattern)
+	pattern, err := secrets.ParsePatternNew(cfg.Pattern)
 	if err != nil {
 		panic(err)
 	}
