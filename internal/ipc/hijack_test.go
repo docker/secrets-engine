@@ -75,7 +75,7 @@ func TestHijackify_hijackRequest_timeout(t *testing.T) {
 	conn, err := net.Dial("unix", socket)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
-	_, err = hijackRequest(conn, 100*time.Millisecond)
+	_, err = Hijackify(conn, 100*time.Millisecond)
 	assert.ErrorContains(t, err, "i/o timeout")
 }
 
