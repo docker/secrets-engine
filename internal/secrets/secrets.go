@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -13,24 +14,36 @@ var (
 )
 
 type Request struct {
-	ID ID `json:",omitzero"`
+	ID ID `json:"-"`
 
 	// Provider can be optionally specified to restrict the resolver
 	// to a particular provider stack.
-	Provider    string `json:",omitzero"`
-	ClientID    string `json:",omitzero"`
-	RequestedAt time.Time
+	Provider    string    `json:"-"`
+	ClientID    string    `json:"-"`
+	RequestedAt time.Time `json:"-"`
+}
+
+var _ json.Marshaler = Request{}
+
+func (r Request) MarshalJSON() ([]byte, error) {
+	panic("secrets.Request does not support json.Marshal")
 }
 
 type Envelope struct {
-	ID         ID
-	Value      []byte    `json:",omitzero"`
-	Provider   string    `json:",omitzero"`
-	Version    string    `json:",omitzero"`
-	Error      string    `json:",omitzero"`
-	CreatedAt  time.Time `json:",omitzero"`
-	ResolvedAt time.Time `json:",omitzero"`
-	ExpiresAt  time.Time `json:",omitzero"`
+	ID         ID        `json:"-"`
+	Value      []byte    `json:"-"`
+	Provider   string    `json:"-"`
+	Version    string    `json:"-"`
+	Error      string    `json:"-"`
+	CreatedAt  time.Time `json:"-"`
+	ResolvedAt time.Time `json:"-"`
+	ExpiresAt  time.Time `json:"-"`
+}
+
+var _ json.Marshaler = Envelope{}
+
+func (e Envelope) MarshalJSON() ([]byte, error) {
+	panic("secrets.Envelope does not support json.Marshal")
 }
 
 type Resolver interface {
