@@ -27,7 +27,7 @@ func Test_SecretsEngine(t *testing.T) {
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
-		WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[secrets.ID]string{"my-secret": "some-value"}}}))
+		WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[string]string{"my-secret": "some-value"}}}))
 	assert.NoError(t, err)
 	runEngineAsync(t, e)
 	assert.ErrorContains(t, e.Run(t.Context()), "already started")
@@ -156,7 +156,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
-				WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[secrets.ID]string{"my-secret": "some-value"}}}),
+				WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{secrets: map[string]string{"my-secret": "some-value"}}}),
 			}
 			if test.extraOption != nil {
 				options = append(options, test.extraOption)
