@@ -6,9 +6,12 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
-type ID = secrets.ID
+type ID = secrets.IDNew
 
-var ParseID = secrets.ParseID
+var (
+	ParseID     = secrets.ParseIDNew
+	MustParseID = secrets.MustParseIDNew
+)
 
 // Secret is a generic type that represents the actual secret values
 //
@@ -59,7 +62,7 @@ type Store interface {
 	// underlying store does not get queried for each secret's sensitive data.
 	// This could be very taxing on the underlying store and cause a poor User
 	// Experience.
-	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
+	GetAllMetadata(ctx context.Context) (map[string]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
 }
