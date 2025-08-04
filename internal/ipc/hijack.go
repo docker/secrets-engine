@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/secrets-engine/internal/logging"
 )
 
@@ -25,28 +23,6 @@ const (
 // will retrieve the underlying tcp connection and hand it over / no longer serves requests to it.
 // -> we can use it as a long-running server-client connection and re-purpose it to run our IPC/yamux stack on top.
 func Hijackify(conn net.Conn, timeout time.Duration) (net.Conn, error) {
-	// When we set up a TCP connection for hijack, there could be long periods
-	// of inactivity (a long running command with no output) that in certain
-	// network setups may cause ECONNTIMEOUT, leaving the client in an unknown
-	// state. Setting TCP KeepAlive on the socket connection will prohibit
-	// ECONNTIMEOUT unless the socket connection truly is broken
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		if err := tcpConn.SetKeepAlive(true); err != nil {
-			logrus.Errorf("failed to set keep alive flag: %s", err)
-		}
-		if err := tcpConn.SetKeepAlivePeriod(30 * time.Second); err != nil {
-			logrus.Errorf("failed to set keep alive period: %s", err)
-		}
-	}
-
-	hijackedConn, err := hijackRequest(conn, timeout)
-	if err != nil {
-		return nil, err
-	}
-	return hijackedConn, nil
-}
-
-func hijackRequest(conn net.Conn, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://secrets-engine.localhost"+hijackPath, nil)
