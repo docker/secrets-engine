@@ -52,11 +52,7 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
-	g := wincred.NewGenericCredential(k.itemLabel(id))
+	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	err := g.Delete()
 	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
 		return mapWindowsCredentialError(err)
@@ -65,11 +61,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
-	if err := id.Valid(); err != nil {
-		return nil, err
-	}
-
-	gc, err := wincred.GetGenericCredential(k.itemLabel(id))
+	gc, err := wincred.GetGenericCredential(k.itemLabel(id.String()))
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
 	}
@@ -142,15 +134,15 @@ func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string
 	return attributes
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
 	}
 
-	onlyLabelPrefix := k.itemLabel(store.ID(""))
+	onlyLabelPrefix := k.itemLabel("")
 
-	secrets := make(map[store.ID]store.Secret)
+	secrets := make(map[string]store.Secret)
 	for cred := range findServiceCredentials(k, credentials) {
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
@@ -164,17 +156,13 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		secrets[id] = secret
+		secrets[id.String()] = secret
 	}
 
 	return secrets, nil
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	if err := id.Valid(); err != nil {
-		return err
-	}
-
 	blob, err := encodeSecret(secret)
 	if err != nil {
 		return err
@@ -184,7 +172,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	maps.Copy(attributes, secret.Metadata())
 	k.safelySetMetadata(id.String(), attributes)
 
-	g := wincred.NewGenericCredential(k.itemLabel(id))
+	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	g.UserName = id.String()
 	g.CredentialBlob = blob
 	g.Persist = wincred.PersistLocalMachine

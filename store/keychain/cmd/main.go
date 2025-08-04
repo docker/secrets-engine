@@ -41,7 +41,7 @@ func newCommand() (*cobra.Command, error) {
 			}
 
 			for id, v := range secrets {
-				fmt.Printf("\nID: %s\n", id.String())
+				fmt.Printf("\nID: %s\n", id)
 				fmt.Printf("\nMetadata: %+v", v.Metadata())
 			}
 			return nil
