@@ -33,6 +33,11 @@ linters:
       line-length: 200
       tab-width: 1
   exclusions:
+    rules:
+      - linters: [staticcheck]
+        text: 'SA1019:.*secrets.ID'
+      - linters: [staticcheck]
+        text: 'SA1019:.*secrets.Pattern'
     generated: lax
     presets:
       - comments
