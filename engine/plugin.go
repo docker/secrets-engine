@@ -73,7 +73,7 @@ type runtime interface {
 
 	io.Closer
 
-	Data() api.PluginData
+	metadata
 
 	Closed() <-chan struct{}
 }
@@ -87,7 +87,7 @@ const (
 )
 
 type runtimeImpl struct {
-	api.PluginData
+	metadata
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
@@ -135,7 +135,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	}()
 
 	return &runtimeImpl{
-		PluginData:     r.cfg,
+		metadata:       r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: func() error {
@@ -172,7 +172,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 	}
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	return &runtimeImpl{
-		PluginData:     r.cfg,
+		metadata:       r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
@@ -188,10 +188,6 @@ func (r *runtimeImpl) Close() error {
 
 func (r *runtimeImpl) Closed() <-chan struct{} {
 	return r.closed
-}
-
-func (r *runtimeImpl) Data() api.PluginData {
-	return r.PluginData
 }
 
 func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
@@ -213,7 +209,7 @@ func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (s
 	return secrets.Envelope{
 		ID:         id,
 		Value:      resp.Msg.GetValue(),
-		Provider:   r.Name(),
+		Provider:   r.Name().String(),
 		Version:    resp.Msg.GetVersion(),
 		Error:      resp.Msg.GetError(),
 		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),

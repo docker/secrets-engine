@@ -19,10 +19,7 @@ const (
 	mockSecretID    = "mockSecretID"
 )
 
-var (
-	mockVersion     = "mockVersion"
-	mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
-)
+var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
 
 type mockInternalPlugin struct {
 	errGetSecretErr error
@@ -67,21 +64,16 @@ func (m *mockInternalPlugin) Run(ctx context.Context) error {
 func Test_internalRuntime(t *testing.T) {
 	// TODO: relying on a global variable for tests is bad -> fix this!
 	SetPluginShutdownTimeout(100 * time.Millisecond)
-	mockConfig := Config{Name: "foo", Pattern: "*", Version: api.MustNewVersion("5")}
+	mockConfig := &configValidated{api.MustNewName("foo"), api.MustNewVersion("5"), mockPatternAny}
 
 	t.Parallel()
-	t.Run("no runtime for plugins with invalid config", func(t *testing.T) {
-		m := &mockInternalPlugin{}
-		_, err := newInternalRuntime(testLoggerCtx(t), m, Config{})
-		assert.Error(t, err)
-	})
 	t.Run("start / get secret -> value / stop / get secret -> no value", func(t *testing.T) {
 		m := &mockInternalPlugin{secrets: map[string]string{mockSecretIDNew.String(): mockSecretValue}}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		require.NoError(t, err)
-		assert.Equal(t, "foo", r.Data().Name())
-		assert.Equal(t, "5", r.Data().Version())
-		assert.Equal(t, "*", string(r.Data().Pattern()))
+		assert.Equal(t, "foo", r.Name().String())
+		assert.Equal(t, "5", r.Version().String())
+		assert.Equal(t, "*", r.Pattern().String())
 		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 		assert.NoError(t, err)
 		assert.Equal(t, resp.Value, []byte(mockSecretValue))

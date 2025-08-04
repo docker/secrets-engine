@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/api"
-
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,13 +24,21 @@ var (
 		engineVersion:  "1.0.0",
 		requestTimeout: 30 * time.Second,
 	}
-	mockPluginCfgInUnvalidated = api.PluginDataUnvalidated{
+	mockPluginCfgInUnvalidated = pluginDataUnvalidated{
 		Name:    "mockPlugin",
 		Pattern: "*",
 		Version: "1.0.0",
 	}
-	mockPluginCfgIn = api.MustNewPluginData(mockPluginCfgInUnvalidated)
+	mockPluginCfgIn = mustNewValidatedConfig(mockPluginCfgInUnvalidated)
 )
+
+func mustNewValidatedConfig(in pluginDataUnvalidated) metadata {
+	r, err := newValidatedConfig(in)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
 
 type mockValidator struct {
 	t   *testing.T
@@ -40,7 +46,7 @@ type mockValidator struct {
 	err error
 }
 
-func (m mockValidator) Validate(in api.PluginDataUnvalidated) (api.PluginData, *pluginCfgOut, error) {
+func (m mockValidator) Validate(in pluginDataUnvalidated) (metadata, *pluginCfgOut, error) {
 	assert.Equal(m.t, mockPluginCfgInUnvalidated, in)
 	return mockPluginCfgIn, m.out, m.err
 }
@@ -125,7 +131,7 @@ type mockPluginRegistrator struct {
 	err error
 }
 
-func (m mockPluginRegistrator) register(_ context.Context, cfg api.PluginDataUnvalidated) (*pluginCfgOut, error) {
+func (m mockPluginRegistrator) register(_ context.Context, cfg pluginDataUnvalidated) (*pluginCfgOut, error) {
 	assert.Equal(m.t, mockPluginCfgInUnvalidated, cfg)
 	return m.out, m.err
 }
@@ -149,7 +155,7 @@ func Test_RegisterPlugin(t *testing.T) {
 	tests := []struct {
 		name string
 		r    pluginRegistrator
-		in   api.PluginDataUnvalidated
+		in   pluginDataUnvalidated
 		test func(t *testing.T, resp *connect.Response[resolverv1.RegisterPluginResponse], err error)
 	}{
 		{

@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/docker/secrets-engine/internal/api"
 	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/logging"
@@ -27,7 +26,7 @@ type pluginCfgOut struct {
 }
 
 type pluginRegistrator interface {
-	register(ctx context.Context, cfg api.PluginDataUnvalidated) (*pluginCfgOut, error)
+	register(ctx context.Context, cfg pluginDataUnvalidated) (*pluginCfgOut, error)
 }
 
 type RegisterService struct {
@@ -37,7 +36,7 @@ type RegisterService struct {
 
 func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
 	r.logger.Printf("Reveived plugin registration request: %s@%s (pattern: %v)", c.Msg.GetName(), c.Msg.GetVersion(), c.Msg.GetPattern())
-	in := api.PluginDataUnvalidated{
+	in := pluginDataUnvalidated{
 		Name:    c.Msg.GetName(),
 		Version: c.Msg.GetVersion(),
 		Pattern: c.Msg.GetPattern(),
@@ -57,11 +56,11 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 }
 
 type pluginCfgInValidator interface {
-	Validate(api.PluginDataUnvalidated) (api.PluginData, *pluginCfgOut, error)
+	Validate(pluginDataUnvalidated) (metadata, *pluginCfgOut, error)
 }
 
 type registrationResult struct {
-	cfg api.PluginData
+	cfg metadata
 	err error
 }
 
@@ -79,7 +78,7 @@ func newRegistrationLogic(validator pluginCfgInValidator, result chan registrati
 	}
 }
 
-func (l *registrationLogic) register(_ context.Context, cfg api.PluginDataUnvalidated) (*pluginCfgOut, error) {
+func (l *registrationLogic) register(_ context.Context, cfg pluginDataUnvalidated) (*pluginCfgOut, error) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	if l.done {

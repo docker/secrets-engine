@@ -28,8 +28,8 @@ func (m *manager) Register(plugin runtime) (removeFunc, error) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	for _, p := range m.plugins {
-		if p.Data().Name() == plugin.Data().Name() {
-			return nil, fmt.Errorf("plugin %s already exists", plugin.Data().Name())
+		if p.Name().String() == plugin.Name().String() {
+			return nil, fmt.Errorf("plugin %s already exists", plugin.Name())
 		}
 	}
 	m.plugins = append(m.plugins, plugin)
@@ -41,12 +41,12 @@ func (m *manager) Register(plugin runtime) (removeFunc, error) {
 
 func (m *manager) sort() {
 	slices.SortFunc(m.plugins, func(a, b runtime) int {
-		return strings.Compare(a.Data().Name(), b.Data().Name())
+		return strings.Compare(a.Name().String(), b.Name().String())
 	})
 	if len(m.plugins) > 0 {
 		m.logger.Printf("plugin priority order")
 		for i, p := range m.plugins {
-			m.logger.Printf("  #%d: %s", i+1, p.Data().Name())
+			m.logger.Printf("  #%d: %s", i+1, p.Name())
 		}
 	}
 }
