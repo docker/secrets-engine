@@ -13,32 +13,6 @@ func (e ErrInvalidID) Error() string {
 	return fmt.Sprintf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", e.id)
 }
 
-// ID contains a secret identifier.
-// Valid secret identifiers must match the format [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)+?.
-//
-// For storage, we don't really differentiate much about the ID format but
-// by convention we do simple, slash-separated management, providing a
-// groupable access control system for management across plugins.
-//
-// Deprecated: Use [IDNew] instead
-type ID string
-
-func ParseID(s string) (ID, error) {
-	id := ID(s)
-	if err := id.Valid(); err != nil {
-		return "", err
-	}
-
-	return id, nil
-}
-
-// Valid returns nil if the identifier is considered valid.
-func (id ID) Valid() error {
-	return valid(id.String())
-}
-
-func (id ID) String() string { return string(id) }
-
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
 // Rules:
 // - Components separated by '/'
@@ -76,17 +50,6 @@ func isValidRune(c rune) bool {
 		(c >= 'a' && c <= 'z') ||
 		(c >= '0' && c <= '9') ||
 		c == '.' || c == '-' || c == '_'
-}
-
-// Match checks if a given identifier matches the pattern.
-// - "*" matches a single component
-// - "**" matches zero or more components
-// - "/" is the separator
-func (id ID) Match(pattern Pattern) bool {
-	pathParts := split(string(id))
-	patternParts := split(string(pattern))
-
-	return match(patternParts, pathParts)
 }
 
 func split(s string) []string {
@@ -144,13 +107,13 @@ func valid(id string) error {
 	return nil
 }
 
-// IDNew contains a secret identifier.
+// ID contains a secret identifier.
 // Valid secret identifiers must match the format [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)+?.
 //
-// For storage, we don't really differentiate much about the IDNew format but
+// For storage, we don't really differentiate much about the ID format but
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
-type IDNew interface {
+type ID interface {
 	// String formats the [IDNew] as a string
 	String() string
 	// Match the [IDNew] against a [PatternNew]
@@ -158,14 +121,14 @@ type IDNew interface {
 	// - "*" matches a single component
 	// - "**" matches zero or more components
 	// - "/" is the separator
-	Match(pattern PatternNew) bool
+	Match(pattern Pattern) bool
 }
 
 type id struct {
 	value string
 }
 
-func (i *id) Match(pattern PatternNew) bool {
+func (i *id) Match(pattern Pattern) bool {
 	pathParts := split(i.value)
 	patternParts := split(pattern.String())
 
@@ -176,16 +139,16 @@ func (i *id) String() string {
 	return i.value
 }
 
-var _ IDNew = &id{}
+var _ ID = &id{}
 
-// ParseIDNew creates a new [IDNew] from a string
+// ParseID creates a new [ID] from a string
 // If a validation error occurs, it returns nil and the error.
 // Rules:
 // - Components separated by '/'
 // - Each component is non-empty
 // - Only characters A-Z, a-z, 0-9, '.', '_' or '-'
 // - No leading, trailing, or double slashes
-func ParseIDNew(s string) (IDNew, error) {
+func ParseID(s string) (ID, error) {
 	if err := valid(s); err != nil {
 		return nil, err
 	}
@@ -195,9 +158,9 @@ func ParseIDNew(s string) (IDNew, error) {
 	}, nil
 }
 
-// MustParseIDNew parses a string into a [IDNew] and behaves similar to
-// [ParseIDNew], however, it panics when the id is invalid
-func MustParseIDNew(s string) IDNew {
+// MustParseID parses a string into a [ID] and behaves similar to
+// [ParseID], however, it panics when the id is invalid
+func MustParseID(s string) ID {
 	if err := valid(s); err != nil {
 		panic(err)
 	}
