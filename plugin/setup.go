@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/internal/ipc"
 )
@@ -26,9 +24,9 @@ func setup(ctx context.Context, setup ipc.Setup, config cfg, onClose func(err er
 	}}))
 	setupCompleted := make(chan struct{})
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{config.plugin, setupCompleted, config.registrationTimeout}))
-	ipc, c, err := setup(config.conn, httpMux, func(err error) {
+	ipc, c, err := setup(config.Logger, config.conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
-			logrus.Infof("Plugin runtime stopped, plugin %s is shutting down...", config.name)
+			config.Logger.Printf("Plugin runtime stopped, plugin %s is shutting down...", config.name)
 			err = nil // In the context of a plugin, the runtime shutting down IPC/plugin is not an error.
 		}
 		onClose(err)
@@ -45,7 +43,7 @@ func setup(ctx context.Context, setup ipc.Setup, config cfg, onClose func(err er
 		<-closed
 		ipc.Close()
 	}()
-	logrus.Infof("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, config.name)
+	config.Logger.Printf("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, config.name)
 	close(setupCompleted)
 	return ipc, nil
 }

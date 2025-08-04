@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
-	"github.com/sirupsen/logrus"
+
+	"github.com/docker/secrets-engine/internal/logging"
 )
 
 const (
@@ -32,27 +33,45 @@ func WithShutdownTimeout(d time.Duration) Option {
 	}
 }
 
-type Setup func(sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error)
+type loggerWrapper struct {
+	logger logging.Logger
+}
 
-func NewClientIPC(sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
+func (l loggerWrapper) Print(v ...interface{}) {
+	l.logger.Printf(fmt.Sprint(v...))
+}
+
+func (l loggerWrapper) Printf(format string, v ...interface{}) {
+	l.logger.Printf(format, v...)
+}
+
+func (l loggerWrapper) Println(v ...interface{}) {
+	l.logger.Printf(fmt.Sprintln(v...))
+}
+
+type Setup func(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error)
+
+func NewClientIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	cfg := yamux.DefaultConfig()
-	cfg.LogOutput = logrus.StandardLogger().Out
+	cfg.Logger = &loggerWrapper{logger}
+	cfg.LogOutput = nil
 	session, err := yamux.Client(sockConn, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux client: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler, onServerClosed, option...)
+	i, c := newMuxedIPC(logger, session, handler, onServerClosed, option...)
 	return i, c, nil
 }
 
-func NewServerIPC(sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
+func NewServerIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	cfg := yamux.DefaultConfig()
-	cfg.LogOutput = logrus.StandardLogger().Out
+	cfg.Logger = &loggerWrapper{logger}
+	cfg.LogOutput = nil
 	session, err := yamux.Server(sockConn, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating yamux server: %w", err)
 	}
-	i, c := newMuxedIPC(session, handler, onServerClosed, option...)
+	i, c := newMuxedIPC(logger, session, handler, onServerClosed, option...)
 	return i, c, nil
 }
 
@@ -99,7 +118,7 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(error), option ...Option) (*ipcImpl, *http.Client) {
+func newMuxedIPC(logger logging.Logger, session *yamux.Session, handler http.Handler, onClose func(error), option ...Option) (*ipcImpl, *http.Client) {
 	// Note: Calling session.Close() needs to be done as the very last step as it shuts down all IPC!
 
 	cfg := &cfg{shutdownTimeout: defaultShutdownTimeout}
@@ -118,7 +137,7 @@ func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(erro
 		teardown: sync.OnceValue(func() error {
 			_ = session.GoAway()
 			c.CloseIdleConnections()
-			waitForClientToDisconnect(session, cfg.shutdownTimeout)
+			waitForClientToDisconnect(logger, session, cfg.shutdownTimeout)
 			err := server.server.Close()
 			<-server.done
 			return errors.Join(err, server.err)
@@ -126,13 +145,13 @@ func newMuxedIPC(session *yamux.Session, handler http.Handler, onClose func(erro
 	}, c
 }
 
-func waitForClientToDisconnect(s *yamux.Session, t time.Duration) {
+func waitForClientToDisconnect(logger logging.Logger, s *yamux.Session, t time.Duration) {
 	timeout := time.After(t)
 	for {
 		select {
 		case <-time.After(50 * time.Millisecond):
 		case <-timeout:
-			logrus.Debugf("Timeout expired but %d streams still open, shutting down server...", s.NumStreams())
+			logger.Printf("Timeout expired but %d streams still open, shutting down server...", s.NumStreams())
 			return
 		}
 		streams := s.NumStreams()

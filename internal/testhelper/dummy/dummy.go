@@ -18,11 +18,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/internal/api"
+	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
@@ -211,22 +211,29 @@ func getCfgFromEnv() *PluginCfg {
 	return cfg
 }
 
-type discardLogger struct{}
-
-func (d discardLogger) Printf(string, ...interface{}) {
+type bufferLogger struct {
+	buf *bytes.Buffer
 }
 
-func (d discardLogger) Warnf(string, ...interface{}) {
+func (b *bufferLogger) Printf(format string, v ...interface{}) {
+	_, _ = fmt.Fprintf(b.buf, format, v...)
 }
 
-func (d discardLogger) Errorf(string, ...interface{}) {
+func (b *bufferLogger) Warnf(format string, v ...interface{}) {
+	b.buf.WriteString("[WARN] " + fmt.Sprintf(format, v...))
 }
+
+func (b *bufferLogger) Errorf(format string, v ...interface{}) {
+	b.buf.WriteString("[ERR] " + fmt.Sprintf(format, v...))
+}
+
+var _ logging.Logger = &bufferLogger{}
 
 // PluginProcess is the equivalent of a main when normally implementing a plugin.
 // Here, it gets run by TestMain if PluginCommand is used to re-launch the test binary (the binary built by go test).
 func PluginProcess(cfg *PluginCfg) {
 	var logBuf bytes.Buffer
-	logrus.SetOutput(&logBuf)
+	logger := &bufferLogger{&logBuf}
 	if cfg == nil {
 		cfg = getCfgFromEnv()
 	}
@@ -247,7 +254,7 @@ func PluginProcess(cfg *PluginCfg) {
 	if err != nil {
 		panic(err)
 	}
-	p, err := plugin.New(d, plugin.Config{Version: version, Pattern: pattern, Logger: &discardLogger{}})
+	p, err := plugin.New(d, plugin.Config{Version: version, Pattern: pattern, Logger: logger})
 	if err != nil {
 		tryExitWithTestSetupErr(err)
 	}
