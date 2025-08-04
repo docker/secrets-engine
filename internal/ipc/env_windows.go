@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"syscall"
 	"unsafe"
-
-	"github.com/sirupsen/logrus"
 )
 
 type Custom struct {
@@ -59,12 +57,21 @@ func NewConnectionPair(cmd *exec.Cmd) (io.ReadWriteCloser, *FdWrapper, error) {
 		return nil, nil, err
 	}
 
+	closeAll := func() error {
+		return errors.Join(
+			syscall.CloseHandle(p2cW),
+			syscall.CloseHandle(p2cR),
+			syscall.CloseHandle(c2pW),
+			syscall.CloseHandle(c2pR),
+		)
+	}
+
 	// The handlers that remain in the parent process don't need to be inherited -> disable
 	if err := syscall.SetHandleInformation(p2cW, syscall.HANDLE_FLAG_INHERIT, 0); err != nil {
-		logrus.Warnf("disabling inheritance: %v", err)
+		return nil, nil, errors.Join(err, closeAll())
 	}
 	if err := syscall.SetHandleInformation(c2pR, syscall.HANDLE_FLAG_INHERIT, 0); err != nil {
-		logrus.Warnf("disabling inheritance: %v", err)
+		return nil, nil, errors.Join(err, closeAll())
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
