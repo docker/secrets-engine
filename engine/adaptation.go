@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/plugin"
 )
 
@@ -29,12 +30,33 @@ type Plugin interface {
 	Run(ctx context.Context) error
 }
 
+type Config struct {
+	Name string
+	// Version of the plugin in semver format.
+	Version api.Version
+	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
+	Pattern secrets.Pattern
+}
+
+func (c *Config) Valid() error {
+	if c.Name == "" {
+		return errors.New("name is required")
+	}
+	if c.Version == nil {
+		return errors.New("version is required")
+	}
+	if c.Pattern == "" {
+		return errors.New("pattern is required")
+	}
+	return nil
+}
+
 type config struct {
 	name                   string
 	version                string
 	pluginPath             string
 	socketPath             string
-	plugins                map[string]Plugin
+	plugins                map[Config]Plugin
 	dynamicPluginsDisabled bool
 	enginePluginsDisabled  bool
 	logger                 logging.Logger
@@ -67,7 +89,7 @@ func WithSocketPath(path string) Option {
 }
 
 // WithPlugins sets a list of plugins that get bundled with the engine (batteries included plugins)
-func WithPlugins(plugins map[string]Plugin) Option {
+func WithPlugins(plugins map[Config]Plugin) Option {
 	return func(r *config) error {
 		r.plugins = plugins
 		return nil

@@ -10,28 +10,48 @@ import (
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
-	"github.com/docker/secrets-engine/plugin"
 )
 
 type internalRuntime struct {
-	data   api.PluginData
 	p      Plugin
-	c      plugin.Config
+	data   api.PluginData
 	closed chan struct{}
 	runErr func() error
 	close  func() error
 }
 
-func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, error) {
+type internalPluginData struct {
+	name    string
+	pattern secrets.Pattern
+	version api.Version
+}
+
+// TODO: This entire thing smells. Try to consolidate.
+func fromConfig(c Config) (api.PluginData, error) {
+	if err := c.Valid(); err != nil {
+		return nil, err
+	}
+	return &internalPluginData{name: c.Name, pattern: c.Pattern, version: c.Version}, nil
+}
+
+func (i internalPluginData) Name() string {
+	return i.name
+}
+
+func (i internalPluginData) Pattern() secrets.Pattern {
+	return i.pattern
+}
+
+func (i internalPluginData) Version() string {
+	return i.version.String()
+}
+
+func newInternalRuntime(ctx context.Context, p Plugin, c Config) (runtime, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	config := p.Config()
-	if err := config.Pattern.Valid(); err != nil {
-		return nil, err
-	}
-	data, err := api.NewPluginData(api.PluginDataUnvalidated{Name: name, Version: config.Version, Pattern: string(config.Pattern)})
+	data, err := fromConfig(c)
 	if err != nil {
 		return nil, err
 	}
@@ -42,8 +62,8 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Errorf("recovering from panic in %s: %s", name, debug.Stack())
-				runErr.StoreFirst(fmt.Errorf("panic in %s: %v", name, r))
+				logger.Errorf("recovering from panic in %s: %s", c.Name, debug.Stack())
+				runErr.StoreFirst(fmt.Errorf("panic in %s: %v", c.Name, r))
 			}
 			closeOnce()
 		}()
@@ -52,15 +72,14 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 		case <-ctxWithCancel.Done():
 		default:
 			if err == nil {
-				err = fmt.Errorf("builtin plugin '%s' stopped unexpectedly", name)
+				err = fmt.Errorf("builtin plugin '%s' stopped unexpectedly", c.Name)
 			}
 		}
 		runErr.StoreFirst(err)
 	}()
 	return &internalRuntime{
-		data:   data,
 		p:      p,
-		c:      config,
+		data:   data,
 		closed: closed,
 		runErr: runErr.Load,
 		close: sync.OnceValue(func() error {
@@ -70,7 +89,7 @@ func newInternalRuntime(ctx context.Context, name string, p Plugin) (runtime, er
 				return runErr.Load()
 			case <-time.After(getPluginShutdownTimeout()):
 				closeOnce()
-				return fmt.Errorf("timeout waiting for plugin %s shutdown", name)
+				return fmt.Errorf("timeout waiting for plugin %s shutdown", c.Name)
 			}
 		}),
 	}, nil
@@ -128,12 +147,12 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[string]Plugin) []launchPlan {
+func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[Config]Plugin) []launchPlan {
 	var result []launchPlan
-	for name, p := range plugins {
-		l := func() (runtime, error) { return newInternalRuntime(ctx, name, p) }
-		result = append(result, launchPlan{l, builtinPlugin, name})
-		logger.Printf("discovered builtin plugin: %s", name)
+	for c, p := range plugins {
+		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c) }
+		result = append(result, launchPlan{l, builtinPlugin, c.Name})
+		logger.Printf("discovered builtin plugin: %s", c.Name)
 	}
 	return result
 }

@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/api"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
@@ -256,7 +255,7 @@ func Test_newEngine(t *testing.T) {
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
-			plugins:               map[string]Plugin{"my-builtin": &mockInternalPlugin{pattern: "*", runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
+			plugins:               map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{runExitCh: internalPluginRunExitCh, secrets: map[secrets.ID]string{"my-secret": "some-value"}}},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -315,8 +314,7 @@ func Test_newEngine(t *testing.T) {
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
-			plugins: map[string]Plugin{"my-builtin": &mockInternalPlugin{
-				pattern:         "*",
+			plugins: map[Config]Plugin{{"my-builtin", mockValidVersion, "*"}: &mockInternalPlugin{
 				blockRunForever: blockRunCh,
 				runExitCh:       runExitCh,
 				secrets:         map[secrets.ID]string{"my-secret": "some-value"},

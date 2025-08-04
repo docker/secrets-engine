@@ -13,11 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/api"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
@@ -29,31 +28,23 @@ import (
 const (
 	mockEngineName    = "mockEngineName"
 	mockEngineVersion = "mockEngineVersion"
-	mockPattern       = "mockPattern"
+	mockPattern       = secrets.Pattern("mockPattern")
 )
 
 type mockedPlugin struct {
-	pattern secrets.Pattern
-	id      secrets.ID
+	id secrets.ID
 }
 
 type MockedPluginOption func(*mockedPlugin)
 
 func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	m := &mockedPlugin{
-		pattern: mockPattern,
-		id:      mockSecretID,
+		id: mockSecretID,
 	}
 	for _, opt := range options {
 		opt(m)
 	}
 	return m
-}
-
-func WithPattern(pattern secrets.Pattern) MockedPluginOption {
-	return func(mp *mockedPlugin) {
-		mp.pattern = pattern
-	}
 }
 
 func WithID(id secrets.ID) MockedPluginOption {
@@ -64,13 +55,6 @@ func WithID(id secrets.ID) MockedPluginOption {
 
 func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
 	return secrets.Envelope{ID: m.id, Value: []byte(mockSecretValue)}, nil
-}
-
-func (m *mockedPlugin) Config() p.Config {
-	return p.Config{
-		Version: "v1",
-		Pattern: m.pattern,
-	}
 }
 
 func getTestBinaryName() string {
@@ -104,23 +88,21 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
-				pattern := secrets.Pattern("foo-bar")
-				version := "my-version"
+				pattern := "foo-bar"
+				version := api.MustNewVersion("2")
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Config: p.Config{
-						Version: version,
-						Pattern: pattern,
-					},
-					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					Version: "2",
+					Pattern: pattern,
+					E:       []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
-				assert.NoError(t, err)
-				dataExpected, err := api.NewPluginData(api.PluginDataUnvalidated{Name: pluginNameFromTestName(t), Pattern: string(pattern), Version: version})
 				require.NoError(t, err)
-				assert.Equal(t, p.Data(), dataExpected)
+				assert.Equal(t, p.Data().Name(), pluginNameFromTestName(t))
+				assert.Equal(t, p.Data().Version(), version.String())
+				assert.Equal(t, string(p.Data().Pattern()), pattern)
 				s, err := p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, dummy.MockSecretValue, string(s.Value))
@@ -130,7 +112,6 @@ func Test_newPlugin(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
 				assert.Equal(t, dummy.MockSecretID, r.GetSecret[0].ID)
-				assert.Equal(t, 1, r.ConfigRequests)
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
@@ -140,10 +121,8 @@ func Test_newPlugin(t *testing.T) {
 			test: func(t *testing.T) {
 				errGetSecret := "you do not get my secret"
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Config: p.Config{
-						Version: "my-version",
-						Pattern: "foo-bar",
-					},
+					Version:      "1",
+					Pattern:      "foo-bar",
 					ErrGetSecret: errGetSecret,
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
@@ -166,10 +145,8 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin ignoring SIGINT does not break the runtime",
 			test: func(t *testing.T) {
 				cmd, _ := dummy.PluginCommand(t, dummy.PluginCfg{
-					Config: p.Config{
-						Version: "my-version",
-						Pattern: "foo-bar",
-					},
+					Version:      "1",
+					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
@@ -185,10 +162,8 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin process crashes unexpectedly",
 			test: func(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Config: p.Config{
-						Version: "my-version",
-						Pattern: "foo-bar",
-					},
+					Version:      "1",
+					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
@@ -207,14 +182,10 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "plugin process exists unexpectedly",
 			test: func(t *testing.T) {
-				pattern := secrets.Pattern("foo-bar")
-				version := "my-version"
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Config: p.Config{
-						Version: version,
-						Pattern: pattern,
-					},
-					E: []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					Version: "2",
+					Pattern: "foo-bar",
+					E:       []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
 					CrashBehaviour: &dummy.CrashBehaviour{
 						OnNthSecretRequest: 1,
 						ExitCode:           0,
@@ -257,15 +228,16 @@ func Test_newExternalPlugin(t *testing.T) {
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
 				plugin := newMockedPlugin()
-				s, err := p.New(plugin, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				config := testExternalPluginConfig(t)
+				s, err := p.New(plugin, config, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				dataExpected, err := api.NewPluginData(api.PluginDataUnvalidated{Name: "my-plugin", Pattern: mockPattern, Version: "v1"})
-				require.NoError(t, err)
-				assert.Equal(t, r.Data(), dataExpected)
+				assert.Equal(t, r.Data().Name(), "my-plugin")
+				assert.Equal(t, r.Data().Version(), config.Version.String())
+				assert.Equal(t, r.Data().Pattern(), mockPattern)
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
@@ -281,8 +253,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
-
-				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
@@ -304,7 +275,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				t.Helper()
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
 
-				s, err := p.New(newMockedPlugin(), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				ctx, cancel := context.WithCancel(t.Context())
 				done := make(chan struct{})
@@ -339,7 +310,7 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(doneRuntime)
 				}()
 
-				s, err := p.New(newMockedPlugin(WithPattern("a*a")), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(), p.Config{Version: mockValidVersion, Pattern: "a*a", Logger: testhelper.TestLogger(t)}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
@@ -359,6 +330,11 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
+}
+
+func testExternalPluginConfig(t *testing.T) p.Config {
+	t.Helper()
+	return p.Config{Version: api.MustNewVersion("4"), Pattern: mockPattern, Logger: testhelper.TestLogger(t)}
 }
 
 func runAsync(ctx context.Context, run func(ctx context.Context) error) chan error {
