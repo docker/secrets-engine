@@ -23,7 +23,7 @@ func TestMacosKeychain(t *testing.T) {
 	var (
 		serviceName  = uuid.NewString()
 		serviceGroup = "test.testing." + uuid.NewString()
-		id           = store.ID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		id           = store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
 	)
 	store := keychainStore[*mocks.MockCredential]{
 		serviceGroup: "test.testing." + uuid.NewString(),

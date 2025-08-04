@@ -57,8 +57,8 @@ func New[T store.Secret](serviceGroup, serviceName string, factory Factory[T]) (
 
 // itemLabel prefixes a secret ID with the service group and service name
 // e.g. group:name:id
-func (k *keychainStore[T]) itemLabel(id store.ID) string {
-	return k.serviceGroup + ":" + k.serviceName + ":" + id.String()
+func (k *keychainStore[T]) itemLabel(id string) string {
+	return k.serviceGroup + ":" + k.serviceName + ":" + id
 }
 
 const (
