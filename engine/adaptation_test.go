@@ -39,7 +39,7 @@ func Test_SecretsEngine(t *testing.T) {
 		t.Run("engine launched plugins", func(t *testing.T) {
 			foo, err := c.GetSecret(t.Context(), secrets.Request{ID: "foo"})
 			assert.NoError(t, err)
-			assert.Equal(t, secrets.ID("foo"), foo.ID)
+			assert.Equal(t, "foo", foo.ID.String())
 			assert.Equal(t, "foo-value", string(foo.Value))
 			assert.Equal(t, "plugin-foo", foo.Provider)
 			assert.Empty(t, foo.Error)
@@ -48,13 +48,13 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.NotEmpty(t, foo.ExpiresAt)
 			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: "bar"})
 			assert.NoError(t, err)
-			assert.Equal(t, secrets.ID("bar"), bar.ID)
+			assert.Equal(t, "bar", bar.ID.String())
 			assert.Equal(t, "bar-value", string(bar.Value))
 		})
 		t.Run("internal plugin", func(t *testing.T) {
 			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
 			assert.NoError(t, err)
-			assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+			assert.Equal(t, "my-secret", mySecret.ID.String())
 			assert.Equal(t, "some-value", string(mySecret.Value))
 			assert.Equal(t, "my-builtin", mySecret.Provider)
 		})
@@ -68,7 +68,7 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "special/secret"})
 				assert.NoError(collect, err)
-				assert.Equal(collect, secrets.ID("special/secret"), secret.ID)
+				assert.Equal(collect, "special/secret", secret.ID.String())
 				assert.Equal(collect, mockSecretValue, string(secret.Value))
 				assert.Equal(t, "my-plugin", secret.Provider)
 			}, 2*time.Second, 100*time.Millisecond)
@@ -81,7 +81,7 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				secret, err := c.GetSecret(t.Context(), secrets.Request{ID: "3rd-party-vendor/foo"})
 				assert.NoError(collect, err)
-				assert.Equal(collect, secrets.ID("3rd-party-vendor/foo"), secret.ID)
+				assert.Equal(collect, "3rd-party-vendor/foo", secret.ID.String())
 				assert.Equal(collect, mockSecretValue, string(secret.Value))
 				assert.Equal(t, "3rd-party-plugin", secret.Provider)
 			}, 2*time.Second, 100*time.Millisecond)
@@ -174,7 +174,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			}
 			mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
 			assert.NoError(t, err)
-			assert.Equal(t, secrets.ID("my-secret"), mySecret.ID)
+			assert.Equal(t, "my-secret", mySecret.ID.String())
 			assert.Equal(t, "some-value", string(mySecret.Value))
 			assert.Equal(t, "my-builtin", mySecret.Provider)
 		})
