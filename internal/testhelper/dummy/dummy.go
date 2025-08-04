@@ -149,7 +149,7 @@ type dummyPlugin struct {
 }
 
 type PluginResult struct {
-	GetSecret    []secrets.Request
+	GetSecret    []string
 	Log          string
 	ErrTestSetup string
 }
@@ -160,7 +160,7 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	if d.cfg.CrashBehaviour != nil && len(d.result.GetSecret)+1 >= d.cfg.OnNthSecretRequest {
 		os.Exit(d.cfg.ExitCode)
 	}
-	d.result.GetSecret = append(d.result.GetSecret, request)
+	d.result.GetSecret = append(d.result.GetSecret, request.ID.String())
 	if d.cfg.ErrGetSecret != "" {
 		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
 	}
