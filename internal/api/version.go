@@ -1,8 +1,6 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -16,9 +14,6 @@ var (
 
 type Version interface {
 	String() string
-
-	json.Unmarshaler
-	json.Marshaler
 }
 
 type version struct {
@@ -27,27 +22,6 @@ type version struct {
 
 func (v *version) String() string {
 	return v.value
-}
-
-func (v *version) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.value)
-}
-
-func (v *version) UnmarshalJSON(b []byte) error {
-	var s string
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&s); err != nil {
-		return err
-	}
-	if dec.More() {
-		return errors.New("api.Version does not support more than one JSON object")
-	}
-	if err := valid(s); err != nil {
-		return err
-	}
-	v.value = s
-	return nil
 }
 
 // NewVersion creates a new [Version] from a string
