@@ -19,7 +19,10 @@ const (
 	mockSecretID    = "mockSecretID"
 )
 
-var mockVersion = "mockVersion"
+var (
+	mockVersion     = "mockVersion"
+	mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
+)
 
 type mockInternalPlugin struct {
 	errGetSecretErr error
@@ -37,10 +40,8 @@ func (m *mockInternalPlugin) GetSecret(_ context.Context, request secrets.Reques
 	if m.errGetSecretErr != nil {
 		return secrets.EnvelopeErr(request, m.errGetSecretErr), m.errGetSecretErr
 	}
-	for k, v := range m.secrets {
-		if k == request.ID.String() {
-			return secrets.Envelope{ID: secrets.ID(k), Value: []byte(v)}, nil
-		}
+	if v, ok := m.secrets[string(request.ID)]; ok {
+		return secrets.Envelope{ID: request.ID, Value: []byte(v)}, nil
 	}
 	return secrets.EnvelopeErr(request, secrets.ErrNotFound), secrets.ErrNotFound
 }
@@ -75,7 +76,7 @@ func Test_internalRuntime(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("start / get secret -> value / stop / get secret -> no value", func(t *testing.T) {
-		m := &mockInternalPlugin{secrets: map[string]string{mockSecretID: mockSecretValue}}
+		m := &mockInternalPlugin{secrets: map[string]string{mockSecretIDNew.String(): mockSecretValue}}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		require.NoError(t, err)
 		assert.Equal(t, "foo", r.Data().Name())

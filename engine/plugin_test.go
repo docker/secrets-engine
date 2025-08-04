@@ -32,14 +32,14 @@ const (
 )
 
 type mockedPlugin struct {
-	id secrets.ID
+	id secrets.IDNew
 }
 
 type MockedPluginOption func(*mockedPlugin)
 
 func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	m := &mockedPlugin{
-		id: mockSecretID,
+		id: mockSecretIDNew,
 	}
 	for _, opt := range options {
 		opt(m)
@@ -47,14 +47,14 @@ func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	return m
 }
 
-func WithID(id secrets.ID) MockedPluginOption {
+func WithID(id secrets.IDNew) MockedPluginOption {
 	return func(mp *mockedPlugin) {
 		mp.id = id
 	}
 }
 
 func (m *mockedPlugin) GetSecret(context.Context, secrets.Request) (secrets.Envelope, error) {
-	return secrets.Envelope{ID: m.id, Value: []byte(mockSecretValue)}, nil
+	return secrets.Envelope{ID: secrets.ID(m.id.String()), Value: []byte(mockSecretValue)}, nil
 }
 
 func getTestBinaryName() string {
@@ -93,7 +93,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Version: "2",
 					Pattern: pattern,
-					Secrets: map[string]string{string(dummy.MockSecretID): dummy.MockSecretValue},
+					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
@@ -111,7 +111,7 @@ func Test_newPlugin(t *testing.T) {
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
-				assert.Equal(t, dummy.MockSecretID, r.GetSecret[0].ID)
+				assert.Equal(t, dummy.MockSecretID.String(), r.GetSecret[0])
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
@@ -185,7 +185,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Version: "2",
 					Pattern: "foo-bar",
-					Secrets: map[string]string{string(dummy.MockSecretID): dummy.MockSecretValue},
+					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
 					CrashBehaviour: &dummy.CrashBehaviour{
 						OnNthSecretRequest: 1,
 						ExitCode:           0,
@@ -253,7 +253,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
-				s, err := p.New(newMockedPlugin(WithID("rewrite-id")), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(WithID(secrets.MustParseIDNew("rewrite-id"))), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
