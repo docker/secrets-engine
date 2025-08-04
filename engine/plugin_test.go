@@ -28,8 +28,9 @@ import (
 const (
 	mockEngineName    = "mockEngineName"
 	mockEngineVersion = "mockEngineVersion"
-	mockPattern       = secrets.Pattern("mockPattern")
 )
+
+var mockPattern = secrets.MustParsePatternNew("mockPattern")
 
 type mockedPlugin struct {
 	id secrets.IDNew
@@ -235,9 +236,9 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				assert.Equal(t, r.Data().Name(), "my-plugin")
-				assert.Equal(t, r.Data().Version(), config.Version.String())
-				assert.Equal(t, r.Data().Pattern(), mockPattern)
+				assert.Equal(t, "my-plugin", r.Data().Name())
+				assert.Equal(t, config.Version.String(), r.Data().Version())
+				assert.Equal(t, mockPattern.String(), string(r.Data().Pattern()))
 				e, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretID})
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretValue, string(e.Value))
@@ -310,7 +311,7 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(doneRuntime)
 				}()
 
-				s, err := p.New(newMockedPlugin(), p.Config{Version: mockValidVersion, Pattern: "a*a", Logger: testhelper.TestLogger(t)}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(), p.Config{Version: mockValidVersion, Pattern: &maliciousPattern{}, Logger: testhelper.TestLogger(t)}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
@@ -330,6 +331,16 @@ func Test_newExternalPlugin(t *testing.T) {
 			l.Close()
 		})
 	}
+}
+
+type maliciousPattern struct{}
+
+func (m maliciousPattern) Match(secrets.IDNew) bool {
+	panic("implement me")
+}
+
+func (m maliciousPattern) String() string {
+	return "a*a"
 }
 
 func testExternalPluginConfig(t *testing.T) p.Config {
