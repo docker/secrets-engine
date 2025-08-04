@@ -18,7 +18,7 @@ const (
 	mockSecretValue = "mockSecretValue"
 )
 
-var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
+var mockSecretIDNew = secrets.MustParseID("mockSecretID")
 
 type mockResolver struct {
 	t         *testing.T
@@ -63,7 +63,7 @@ func (m mockResolver) GetSecret(_ context.Context, request secrets.Request) (sec
 		return secrets.Envelope{}, m.err
 	}
 	return secrets.Envelope{
-		ID:    secrets.MustParseIDNew(m.secretsID),
+		ID:    secrets.MustParseID(m.secretsID),
 		Value: []byte(m.value),
 	}, nil
 }
@@ -148,11 +148,11 @@ func (m maliciousID) String() string {
 	return "/"
 }
 
-func (m maliciousID) Match(secrets.PatternNew) bool {
+func (m maliciousID) Match(secrets.Pattern) bool {
 	return false
 }
 
-func newGetSecretRequest(secretID secrets.IDNew) *connect.Request[resolverv1.GetSecretRequest] {
+func newGetSecretRequest(secretID secrets.ID) *connect.Request[resolverv1.GetSecretRequest] {
 	return connect.NewRequest(resolverv1.GetSecretRequest_builder{
 		Id: proto.String(secretID.String()),
 	}.Build())

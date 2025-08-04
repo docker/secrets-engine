@@ -32,7 +32,7 @@ func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[reso
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("registration incomplete (timeout after %s)", r.registrationTimeout))
 	}
 	msgID := c.Msg.GetId()
-	id, err := secrets.ParseIDNew(msgID)
+	id, err := secrets.ParseID(msgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret ID %q: %w", msgID, err))
 	}

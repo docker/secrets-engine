@@ -30,10 +30,10 @@ const (
 	mockEngineVersion = "mockEngineVersion"
 )
 
-var mockPattern = secrets.MustParsePatternNew("mockPattern")
+var mockPattern = secrets.MustParsePattern("mockPattern")
 
 type mockedPlugin struct {
-	id secrets.IDNew
+	id secrets.ID
 }
 
 type MockedPluginOption func(*mockedPlugin)
@@ -48,7 +48,7 @@ func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
 	return m
 }
 
-func WithID(id secrets.IDNew) MockedPluginOption {
+func WithID(id secrets.ID) MockedPluginOption {
 	return func(mp *mockedPlugin) {
 		mp.id = id
 	}
@@ -254,7 +254,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
-				s, err := p.New(newMockedPlugin(WithID(secrets.MustParseIDNew("rewrite-id"))), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(WithID(secrets.MustParseID("rewrite-id"))), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
@@ -335,7 +335,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 type maliciousPattern struct{}
 
-func (m maliciousPattern) Match(secrets.IDNew) bool {
+func (m maliciousPattern) Match(secrets.ID) bool {
 	panic("implement me")
 }
 

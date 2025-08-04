@@ -19,7 +19,7 @@ const (
 	mockSecretID    = "mockSecretID"
 )
 
-var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
+var mockSecretIDNew = secrets.MustParseID("mockSecretID")
 
 type mockInternalPlugin struct {
 	errGetSecretErr error
