@@ -19,7 +19,7 @@ import (
 type (
 	Request  = secrets.Request
 	Envelope = secrets.Envelope
-	ID       = secrets.IDNew
+	ID       = secrets.ID
 )
 
 var _ secrets.Resolver = &client{}
@@ -90,7 +90,7 @@ func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets
 		}
 		return secrets.EnvelopeErr(request, err), err
 	}
-	id, err := secrets.ParseIDNew(resp.Msg.GetId())
+	id, err := secrets.ParseID(resp.Msg.GetId())
 	if err != nil {
 		return secrets.EnvelopeErr(request, err), err
 	}

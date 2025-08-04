@@ -32,7 +32,7 @@ func (m *mockSlowRuntime) Version() api.Version {
 	return mockValidVersion
 }
 
-func (m *mockSlowRuntime) Pattern() secrets.PatternNew {
+func (m *mockSlowRuntime) Pattern() secrets.Pattern {
 	return mockPattern
 }
 
@@ -83,7 +83,7 @@ func (m *mockRuntime) Version() api.Version {
 	return mockValidVersion
 }
 
-func (m *mockRuntime) Pattern() secrets.PatternNew {
+func (m *mockRuntime) Pattern() secrets.Pattern {
 	return mockPatternAny
 }
 
@@ -224,7 +224,7 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("foo")})
+		foo, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("foo")})
 		require.NoError(t, err)
 		assert.Equal(t, "foo", foo.ID.String())
 		assert.Equal(t, "foo-value", string(foo.Value))
@@ -249,16 +249,16 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+		bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 		require.NoError(t, err)
 		assert.Equal(t, "bar", bar.ID.String())
 		assert.Equal(t, "bar-value", string(bar.Value))
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 4*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("internal plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
@@ -286,7 +286,7 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("my-secret")})
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("my-secret")})
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", mySecret.ID.String())
 		assert.Equal(t, "some-value", string(mySecret.Value))
@@ -294,7 +294,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 2*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("my-secret")})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("my-secret")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
@@ -313,12 +313,12 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 		require.NoError(t, err)
-		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+		_, err = c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("bar")})
+			bar, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("bar")})
 			require.NoError(collect, err)
 			assert.Equal(collect, "bar", bar.ID.String())
 			assert.Equal(collect, "bar-value", string(bar.Value))
@@ -363,7 +363,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
 		}, 5*time.Second, 100*time.Millisecond) // Timeout needs to be larger than the initial retry interval
-		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseIDNew("my-secret")})
+		mySecret, err := c.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("my-secret")})
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", mySecret.ID.String())
 		assert.Equal(t, "some-value", string(mySecret.Value))

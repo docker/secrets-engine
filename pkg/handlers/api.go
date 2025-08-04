@@ -26,7 +26,7 @@ func Resolver(provider secrets.Resolver) (string, http.Handler) {
 
 		var candidates []secrets.Envelope
 		for _, idUnsafe := range ids {
-			id, err := secrets.ParseIDNew(idUnsafe)
+			id, err := secrets.ParseID(idUnsafe)
 			if err != nil {
 				candidates = append(candidates, secrets.Envelope{
 					// ID: secrets.ID(idUnsafe),

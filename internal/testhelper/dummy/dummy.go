@@ -34,7 +34,7 @@ const (
 	MockSecretValue = "MockSecretValue"
 )
 
-var MockSecretID = secrets.MustParseIDNew("MockSecretID")
+var MockSecretID = secrets.MustParseID("MockSecretID")
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
 // To be used from TestMain.
@@ -251,7 +251,7 @@ func PluginProcess(cfg *PluginCfg) {
 	if err != nil {
 		panic(err)
 	}
-	pattern, err := secrets.ParsePatternNew(cfg.Pattern)
+	pattern, err := secrets.ParsePattern(cfg.Pattern)
 	if err != nil {
 		panic(err)
 	}

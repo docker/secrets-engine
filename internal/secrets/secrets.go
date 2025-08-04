@@ -14,7 +14,7 @@ var (
 )
 
 type Request struct {
-	ID IDNew `json:"-"`
+	ID ID `json:"-"`
 
 	// Provider can be optionally specified to restrict the resolver
 	// to a particular provider stack.
@@ -30,7 +30,7 @@ func (r Request) MarshalJSON() ([]byte, error) {
 }
 
 type Envelope struct {
-	ID         IDNew     `json:"-"`
+	ID         ID        `json:"-"`
 	Value      []byte    `json:"-"`
 	Provider   string    `json:"-"`
 	Version    string    `json:"-"`

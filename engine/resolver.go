@@ -23,7 +23,7 @@ type resolverService struct {
 
 func (r resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
 	msgID := c.Msg.GetId()
-	id, err := secrets.ParseIDNew(msgID)
+	id, err := secrets.ParseID(msgID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret ID %q: %w", msgID, err))
 	}

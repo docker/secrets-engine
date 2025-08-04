@@ -107,7 +107,7 @@ func newValidatedConfig(in pluginDataUnvalidated) (metadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	pattern, err := secrets.ParsePatternNew(in.Pattern)
+	pattern, err := secrets.ParsePattern(in.Pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func newValidatedConfig(in pluginDataUnvalidated) (metadata, error) {
 type configValidated struct {
 	name    api.Name
 	version api.Version
-	pattern secrets.PatternNew
+	pattern secrets.Pattern
 }
 
 func (c configValidated) Name() api.Name {
@@ -128,12 +128,12 @@ func (c configValidated) Version() api.Version {
 	return c.version
 }
 
-func (c configValidated) Pattern() secrets.PatternNew {
+func (c configValidated) Pattern() secrets.Pattern {
 	return c.pattern
 }
 
 type metadata interface {
 	Name() api.Name
 	Version() api.Version
-	Pattern() secrets.PatternNew
+	Pattern() secrets.Pattern
 }

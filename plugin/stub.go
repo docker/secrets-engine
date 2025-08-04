@@ -49,7 +49,7 @@ type Config struct {
 	// Version of the plugin in semver format.
 	Version api.Version
 	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
-	Pattern secrets.PatternNew
+	Pattern secrets.Pattern
 	// Logger to be used within plugin side SDK code. If nil, a default logger will be created and used.
 	Logger logging.Logger
 }
