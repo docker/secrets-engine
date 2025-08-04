@@ -93,7 +93,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Version: "2",
 					Pattern: pattern,
-					E:       []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					Secrets: map[string]string{string(dummy.MockSecretID): dummy.MockSecretValue},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
@@ -185,7 +185,7 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
 					Version: "2",
 					Pattern: "foo-bar",
-					E:       []secrets.Envelope{{ID: dummy.MockSecretID, Value: []byte(dummy.MockSecretValue)}},
+					Secrets: map[string]string{string(dummy.MockSecretID): dummy.MockSecretValue},
 					CrashBehaviour: &dummy.CrashBehaviour{
 						OnNthSecretRequest: 1,
 						ExitCode:           0,
