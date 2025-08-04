@@ -48,7 +48,7 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		mPlugin := &mockPlugin{}
 		pluginClosed := make(chan struct{})
-		closer, err := setup(t.Context(), ipc.NewClientIPC, cfg{Config{api.MustNewVersion("1"), "*", testhelper.TestLogger(t)}, mPlugin, "foo", b, 5 * time.Second}, func(err error) {
+		closer, err := setup(t.Context(), cfg{Config{api.MustNewVersion("1"), "*", testhelper.TestLogger(t)}, mPlugin, "foo", b, 5 * time.Second}, func(err error) {
 			assert.NoError(t, err)
 			close(pluginClosed)
 		})

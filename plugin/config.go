@@ -61,13 +61,13 @@ type cfg struct {
 	registrationTimeout time.Duration
 }
 
-func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, ipc.Setup, error) {
+func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	engineCfg, err := restoreConfig(p)
 	if errors.Is(err, errPluginNotLaunchedByEngine) {
 		cfg, err := newCfgForManualLaunch(p, opts...)
-		return cfg, ipc.NewServerIPC, err
+		return cfg, err
 	}
-	return engineCfg, ipc.NewClientIPC, err
+	return engineCfg, err
 }
 
 func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
