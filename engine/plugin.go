@@ -117,7 +117,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	cmdWrapper := launchCmdWatched(logger, v.name, fromCmd(cmd), getPluginShutdownTimeout())
 
 	ipcClosed, setIpcClosed := closeOnce()
-	r, err := setup(logger, rwc, ipc.NewServerIPC, setIpcClosed, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(logger, rwc, setIpcClosed, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		cmdWrapper.Close()
@@ -166,7 +166,7 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(logger, conn, ipc.NewClientIPC, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(logger, conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}
