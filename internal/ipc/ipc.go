@@ -49,8 +49,6 @@ func (l loggerWrapper) Println(v ...interface{}) {
 	l.logger.Printf(fmt.Sprintln(v...))
 }
 
-type Setup func(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error)
-
 func NewClientIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	cfg := yamux.DefaultConfig()
 	cfg.Logger = &loggerWrapper{logger}
