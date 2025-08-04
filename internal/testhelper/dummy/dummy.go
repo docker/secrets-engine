@@ -32,8 +32,9 @@ const (
 	dummyPluginFail   = "plugin-fail"
 
 	MockSecretValue = "MockSecretValue"
-	MockSecretID    = secrets.ID("MockSecretID")
 )
+
+var MockSecretID = secrets.MustParseIDNew("MockSecretID")
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
 // To be used from TestMain.
@@ -49,8 +50,8 @@ func PluginProcessFromBinaryName(name string) {
 			Version: "1",
 			Pattern: "*",
 			Secrets: map[string]string{
-				behaviour.Value:      behaviour.Value + "-value",
-				string(MockSecretID): MockSecretValue,
+				behaviour.Value:       behaviour.Value + "-value",
+				MockSecretID.String(): MockSecretValue,
 			},
 			CrashBehaviour: behaviour.CrashBehaviour,
 		})
@@ -164,7 +165,7 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	if d.cfg.ErrGetSecret != "" {
 		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
 	}
-	if v, ok := d.cfg.Secrets[string(request.ID)]; ok {
+	if v, ok := d.cfg.Secrets[request.ID.String()]; ok {
 		return secrets.Envelope{
 			ID:        request.ID,
 			Value:     []byte(v),
