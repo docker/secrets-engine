@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -159,6 +160,9 @@ type IDNew interface {
 	// - "**" matches zero or more components
 	// - "/" is the separator
 	Match(pattern PatternNew) bool
+
+	json.Marshaler
+	json.Unmarshaler
 }
 
 type id struct {
@@ -174,6 +178,22 @@ func (i *id) Match(pattern PatternNew) bool {
 
 func (i *id) String() string {
 	return i.value
+}
+
+func (i *id) MarshalJSON() ([]byte, error) {
+	return json.Marshal(i.value)
+}
+
+func (i *id) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if err := valid(s); err != nil {
+		return err
+	}
+	i.value = s
+	return nil
 }
 
 var _ IDNew = &id{}
