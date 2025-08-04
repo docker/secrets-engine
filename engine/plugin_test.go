@@ -111,7 +111,7 @@ func Test_newPlugin(t *testing.T) {
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
-				assert.Equal(t, dummy.MockSecretID, r.GetSecret[0].ID)
+				assert.Equal(t, dummy.MockSecretID.String(), r.GetSecret[0])
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
