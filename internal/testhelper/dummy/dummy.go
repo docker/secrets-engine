@@ -48,9 +48,9 @@ func PluginProcessFromBinaryName(name string) {
 		PluginProcess(&PluginCfg{
 			Version: "1",
 			Pattern: "*",
-			E: []secrets.Envelope{
-				{ID: secrets.ID(behaviour.Value), Value: []byte(behaviour.Value + "-value")},
-				{ID: MockSecretID, Value: []byte(MockSecretValue)},
+			Secrets: map[string]string{
+				behaviour.Value:      behaviour.Value + "-value",
+				string(MockSecretID): MockSecretValue,
 			},
 			CrashBehaviour: behaviour.CrashBehaviour,
 		})
@@ -164,24 +164,25 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	if d.cfg.ErrGetSecret != "" {
 		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
 	}
-	for _, s := range d.cfg.E {
-		if request.ID == s.ID {
-			s.CreatedAt = time.Now().Add(-time.Hour)
-			s.ExpiresAt = time.Now().Add(time.Hour)
-			return s, nil
-		}
+	if v, ok := d.cfg.Secrets[string(request.ID)]; ok {
+		return secrets.Envelope{
+			ID:        request.ID,
+			Value:     []byte(v),
+			CreatedAt: time.Now().Add(-time.Hour),
+			ExpiresAt: time.Now().Add(-time.Hour),
+		}, nil
 	}
 	err := errors.New("secret not found")
 	return secrets.EnvelopeErr(request, err), err
 }
 
 type PluginCfg struct {
-	Version        string             `json:"version"`
-	Pattern        string             `json:"pattern"`
-	E              []secrets.Envelope `json:"envelope,omitempty"`
-	ErrGetSecret   string             `json:"errGetSecret,omitempty"`
-	IgnoreSigint   bool               `json:"ignoreSigint,omitempty"`
-	ErrConfigPanic string             `json:"errConfigPanic,omitempty"`
+	Version        string            `json:"version"`
+	Pattern        string            `json:"pattern"`
+	Secrets        map[string]string `json:"secrets"`
+	ErrGetSecret   string            `json:"errGetSecret,omitempty"`
+	IgnoreSigint   bool              `json:"ignoreSigint,omitempty"`
+	ErrConfigPanic string            `json:"errConfigPanic,omitempty"`
 	*CrashBehaviour
 }
 
