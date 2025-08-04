@@ -19,6 +19,8 @@ const (
 	mockSecretID    = secrets.ID("mockSecretID")
 )
 
+var mockSecretIDNew = secrets.MustParseIDNew("mockSecretID")
+
 type mockResolver struct {
 	t     *testing.T
 	id    secrets.ID
@@ -77,7 +79,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 			name: "does not resolve secrets before setup completed",
 			test: func(t *testing.T) {
 				s := &resolverService{resolver: newMockResolver(t)}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.ErrorContains(t, err, "registration incomplete (timeout ")
 			},
 		},
@@ -87,7 +89,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest("/"))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(&maliciousID{}))
 				assert.ErrorContains(t, err, "invalid secret ID")
 			},
 		},
@@ -97,7 +99,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t, withMockResolverError(secrets.ErrNotFound)), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.ErrorIs(t, err, secrets.ErrNotFound)
 			},
 		},
@@ -107,7 +109,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t, withMockResolverError(errors.New("foo"))), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.ErrorContains(t, err, "foo")
 			},
 		},
@@ -117,7 +119,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t, withMockResolverID("wrongID")), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
+				_, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.ErrorIs(t, err, secrets.ErrIDMismatch)
 			},
 		},
@@ -127,7 +129,7 @@ func TestResolverService_GetSecret(t *testing.T) {
 				done := make(chan struct{})
 				close(done)
 				s := &resolverService{resolver: newMockResolver(t), setupCompleted: done, registrationTimeout: 10 * time.Second}
-				resp, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretID))
+				resp, err := s.GetSecret(t.Context(), newGetSecretRequest(mockSecretIDNew))
 				assert.NoError(t, err)
 				assert.Equal(t, mockSecretID.String(), resp.Msg.GetId())
 				assert.Equal(t, mockSecretValue, string(resp.Msg.GetValue()))
@@ -141,8 +143,18 @@ func TestResolverService_GetSecret(t *testing.T) {
 	}
 }
 
-func newGetSecretRequest(secretID secrets.ID) *connect.Request[resolverv1.GetSecretRequest] {
+type maliciousID struct{}
+
+func (m maliciousID) String() string {
+	return "/"
+}
+
+func (m maliciousID) Match(secrets.PatternNew) bool {
+	return false
+}
+
+func newGetSecretRequest(secretID secrets.IDNew) *connect.Request[resolverv1.GetSecretRequest] {
 	return connect.NewRequest(resolverv1.GetSecretRequest_builder{
-		Id: proto.String(string(secretID)),
+		Id: proto.String(secretID.String()),
 	}.Build())
 }
