@@ -9,6 +9,7 @@ import (
 )
 
 func TestParsePattern(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		input     string
@@ -45,6 +46,7 @@ func TestParsePattern(t *testing.T) {
 }
 
 func TestParsePatternNew(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -77,6 +79,7 @@ func TestParsePatternNew(t *testing.T) {
 }
 
 func TestPatternJSON(t *testing.T) {
+	t.Parallel()
 	t.Run("can marshal to json", func(t *testing.T) {
 		pattern := MustParsePatternNew("*")
 		actual, err := pattern.MarshalJSON()

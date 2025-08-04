@@ -9,6 +9,7 @@ import (
 )
 
 func TestParseID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		input     string
@@ -38,6 +39,7 @@ func TestParseID(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		pattern   Pattern
 		matches   []string
@@ -85,6 +87,7 @@ func TestMatch(t *testing.T) {
 }
 
 func TestParseIDNew(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -110,6 +113,7 @@ func TestParseIDNew(t *testing.T) {
 }
 
 func TestMatchNew(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		pattern  string
 		ids      []string
@@ -175,6 +179,7 @@ func TestMatchNew(t *testing.T) {
 }
 
 func TestIdentifierJSON(t *testing.T) {
+	t.Parallel()
 	t.Run("can marshal identifier", func(t *testing.T) {
 		id := MustParseIDNew("com.test.test/something/something")
 		actual, err := id.MarshalJSON()
