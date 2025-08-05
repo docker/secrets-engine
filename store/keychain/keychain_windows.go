@@ -67,7 +67,8 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	}
 
 	attributes := mapFromWindowsAttributes(gc.Attributes)
-	k.safelyCleanMetadata(attributes)
+	safelyCleanMetadata(attributes)
+	safelySetID(id, attributes)
 
 	secret := k.factory()
 	if err := secret.SetMetadata(attributes); err != nil {
@@ -103,13 +104,21 @@ func isServiceCredential[T store.Secret](k *keychainStore[T], attrs []wincred.Cr
 
 // findServiceCredentials is an iterator that yields credentials that match the
 // service group and service name.
-func findServiceCredentials[T store.Secret](k *keychainStore[T], credentials []*wincred.Credential) iter.Seq[*wincred.Credential] {
+func findServiceCredentials[T store.Secret](k *keychainStore[T], pattern store.Pattern, credentials []*wincred.Credential) iter.Seq[*wincred.Credential] {
 	return func(yield func(cred *wincred.Credential) bool) {
 		for _, c := range credentials {
-			if isServiceCredential(k, c.Attributes) {
-				if !yield(c) {
-					return
-				}
+			if !isServiceCredential(k, c.Attributes) {
+				continue
+			}
+			id, err := store.ParseID(c.UserName)
+			if err != nil {
+				continue
+			}
+			if !pattern.Match(id) {
+				continue
+			}
+			if !yield(c) {
+				return
 			}
 		}
 	}
@@ -142,15 +151,18 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 
 	onlyLabelPrefix := k.itemLabel("")
 
+	// this pattern matches any secret ID that conforms to the secrets engine
+	pattern := store.MustParsePattern("**")
+
 	secrets := make(map[string]store.Secret)
-	for cred := range findServiceCredentials(k, credentials) {
+	for cred := range findServiceCredentials(k, pattern, credentials) {
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			return nil, err
 		}
 
 		attributes := mapFromWindowsAttributes(cred.Attributes)
-		k.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 
 		secret := k.factory()
 		if err := secret.SetMetadata(attributes); err != nil {
@@ -170,7 +182,8 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 
 	attributes := make(map[string]string)
 	maps.Copy(attributes, secret.Metadata())
-	k.safelySetMetadata(id.String(), attributes)
+	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
+	safelySetID(id, attributes)
 
 	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	g.UserName = id.String()
@@ -178,6 +191,56 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	g.Persist = wincred.PersistLocalMachine
 	g.Attributes = mapToWindowsAttributes(attributes)
 	return mapWindowsCredentialError(g.Write())
+}
+
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+	// Note: there is no notion of a filter on Windows inside the wincred API.
+	// It has no way to even filter on known attributes.
+	// This means we need to retrieve the entire list of ALL secrets, that
+	// may or may not even be related to our serviceName, serviceGroup, or
+	// keychain instance.
+	// The performance of this shouldn't be too terrible as we don't fetch
+	// the encrypted secret from the keychain unless it matches our pattern.
+
+	credentials, err := wincred.List()
+	if err != nil {
+		return nil, mapWindowsCredentialError(err)
+	}
+
+	onlyLabelPrefix := k.itemLabel("")
+
+	secrets := make(map[string]store.Secret)
+	for cred := range findServiceCredentials(k, pattern, credentials) {
+		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
+		if err != nil {
+			continue
+		}
+
+		gc, err := wincred.GetGenericCredential(cred.TargetName)
+		if err != nil {
+			return nil, mapWindowsCredentialError(err)
+		}
+
+		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+		blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
+		if err != nil {
+			return nil, err
+		}
+
+		gcAttributes := mapFromWindowsAttributes(gc.Attributes)
+		safelyCleanMetadata(gcAttributes)
+
+		secret := k.factory()
+		if err := secret.SetMetadata(gcAttributes); err != nil {
+			return nil, err
+		}
+		if err := secret.Unmarshal(blob); err != nil {
+			return nil, err
+		}
+		secrets[id.String()] = secret
+	}
+
+	return secrets, nil
 }
 
 func mapWindowsCredentialError(err error) error {
