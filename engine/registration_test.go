@@ -21,13 +21,13 @@ var (
 
 	mockPluginCfgOut = pluginCfgOut{
 		engineName:     "mockEngine",
-		engineVersion:  "1.0.0",
+		engineVersion:  "v1.0.0",
 		requestTimeout: 30 * time.Second,
 	}
 	mockPluginCfgInUnvalidated = pluginDataUnvalidated{
 		Name:    "mockPlugin",
 		Pattern: "*",
-		Version: "1.0.0",
+		Version: "v1.0.0",
 	}
 	mockPluginCfgIn = mustNewValidatedConfig(mockPluginCfgInUnvalidated)
 )

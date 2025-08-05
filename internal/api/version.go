@@ -9,7 +9,7 @@ import (
 
 var (
 	ErrEmptyVersion = errors.New("empty version")
-	ErrVPrefix      = errors.New("redundant version prefix")
+	ErrVPrefix      = errors.New("missing version prefix")
 )
 
 type Version interface {
@@ -46,13 +46,13 @@ func MustNewVersion(s string) Version {
 }
 
 func valid(s string) error {
-	if len(s) > 0 && s[0] == 'v' {
+	if len(s) > 0 && s[0] != 'v' {
 		return ErrVPrefix
 	}
 	if s == "" {
 		return ErrEmptyVersion
 	}
-	if !semver.IsValid("v" + s) {
+	if !semver.IsValid(s) {
 		return fmt.Errorf("invalid version: %s", s)
 	}
 	return nil

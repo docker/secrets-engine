@@ -64,7 +64,7 @@ func (m *mockInternalPlugin) Run(ctx context.Context) error {
 func Test_internalRuntime(t *testing.T) {
 	// TODO: relying on a global variable for tests is bad -> fix this!
 	SetPluginShutdownTimeout(100 * time.Millisecond)
-	mockConfig := &configValidated{api.MustNewName("foo"), api.MustNewVersion("5"), mockPatternAny}
+	mockConfig := &configValidated{api.MustNewName("foo"), api.MustNewVersion("v5"), mockPatternAny}
 
 	t.Parallel()
 	t.Run("start / get secret -> value / stop / get secret -> no value", func(t *testing.T) {
@@ -72,7 +72,7 @@ func Test_internalRuntime(t *testing.T) {
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		require.NoError(t, err)
 		assert.Equal(t, "foo", r.Name().String())
-		assert.Equal(t, "5", r.Version().String())
+		assert.Equal(t, "v5", r.Version().String())
 		assert.Equal(t, "*", r.Pattern().String())
 		resp, err := r.GetSecret(t.Context(), secrets.Request{ID: mockSecretIDNew})
 		assert.NoError(t, err)

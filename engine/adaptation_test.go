@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	mockValidVersion = api.MustNewVersion("7")
+	mockValidVersion = api.MustNewVersion("v7")
 	mockPatternAny   = secrets.MustParsePattern("*")
 )
 
