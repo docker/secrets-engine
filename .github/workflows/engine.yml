@@ -1,4 +1,4 @@
-name: Engine
+name: Engine (cross platform)
 
 on:
   push:
