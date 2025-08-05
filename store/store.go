@@ -6,11 +6,16 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
-type ID = secrets.ID
+type (
+	ID      = secrets.ID
+	Pattern = secrets.Pattern
+)
 
 var (
-	ParseID     = secrets.ParseID
-	MustParseID = secrets.MustParseID
+	ParseID          = secrets.ParseID
+	MustParseID      = secrets.MustParseID
+	ParsePattern     = secrets.ParsePattern
+	MustParsePattern = secrets.MustParsePattern
 )
 
 // Secret is a generic type that represents the actual secret values
