@@ -4,7 +4,6 @@ package keychain
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,48 +15,123 @@ import (
 )
 
 func TestMacosKeychain(t *testing.T) {
-	secret := &mocks.MockCredential{
-		Username: uuid.NewString(),
-		Password: "bob2",
-	}
 	var (
 		serviceName  = uuid.NewString()
-		serviceGroup = "test.testing." + uuid.NewString()
-		id           = store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		serviceGroup = "com.test.testing"
 	)
-	store := keychainStore[*mocks.MockCredential]{
-		serviceGroup: "test.testing." + uuid.NewString(),
-		serviceName:  uuid.NewString(),
+	keychainStore := keychainStore[*mocks.MockCredential]{
+		serviceGroup: serviceGroup,
+		serviceName:  serviceName,
 		factory: func() *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	}
 
-	t.Run("secret can have no attributes", func(t *testing.T) {
-		t.Cleanup(func() {
-			assert.NoError(t, store.Delete(context.Background(), id))
-		})
-		require.NoError(t, store.Save(t.Context(), id, secret))
+	ids := []string{
+		serviceGroup + "/" + serviceName + "/" + uuid.NewString(),
+		serviceGroup + "/" + serviceName + "/" + uuid.NewString(),
+		serviceGroup + "/" + serviceName + "/" + uuid.NewString(),
+	}
+	t.Cleanup(func() {
+		for _, id := range ids {
+			assert.NoError(t, keychainStore.Delete(t.Context(), store.MustParseID(id)))
+		}
+	})
+	for _, id := range ids {
+		assert.NoError(t, keychainStore.Save(t.Context(), store.MustParseID(id), &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: uuid.NewString(),
+			Attributes: map[string]string{
+				"color": "purple",
+				"game":  "unknown",
+			},
+		}))
+	}
 
-		storeSecret, err := store.Get(t.Context(), id)
+	t.Run("can store secret that has no attribute", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: "bob2",
+		}
+		t.Cleanup(func() {
+			assert.NoError(t, keychainStore.Delete(t.Context(), id))
+		})
+		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
+		storeSecret, err := keychainStore.Get(t.Context(), id)
 		require.NoError(t, err)
-		assert.Empty(t, storeSecret.Metadata())
+		assert.EqualValues(t, map[string]string{}, storeSecret.Metadata())
 	})
 
-	t.Run("secret can store large attributes", func(t *testing.T) {
+	t.Run("can store large attributes", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
 		t.Cleanup(func() {
-			assert.NoError(t, store.Delete(context.Background(), id))
+			assert.NoError(t, keychainStore.Delete(t.Context(), id))
 		})
-		large := bytes.Repeat([]byte{'a'}, 1024*1024)
-		secret.Attributes = map[string]string{
-			"large": string(large),
-			"small": "eyy",
-		}
-		require.NoError(t, store.Save(t.Context(), id, secret))
 
-		storeSecret, err := store.Get(t.Context(), id)
+		large := bytes.Repeat([]byte{'a'}, 1024*1024)
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: "bob2",
+			Attributes: map[string]string{
+				"large": string(large),
+				"small": "eyy",
+			},
+		}
+
+		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
+		storeSecret, err := keychainStore.Get(t.Context(), id)
 		require.NoError(t, err)
 		assert.EqualValues(t, secret.Attributes, storeSecret.Metadata())
+	})
+
+	t.Run("filter populates both metadata and secret", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+
+		t.Cleanup(func() {
+			assert.NoError(t, keychainStore.Delete(t.Context(), id))
+		})
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: "bob2",
+			Attributes: map[string]string{
+				"game": "elden ring",
+			},
+		}
+
+		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
+		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern(id.String()))
+		require.NoError(t, err)
+		assert.Len(t, secrets, 1)
+		assert.Subset(t, secrets[id.String()].Metadata(), map[string]string{
+			"game": "elden ring",
+		})
+		assert.IsType(t, &mocks.MockCredential{}, secrets[id.String()], "secret from store must be of type *mocks.MockCredential")
+		mockSecret := secrets[id.String()].(*mocks.MockCredential)
+		assert.Equal(t, secret.Password, mockSecret.Password)
+	})
+
+	t.Run("can use pattern only matching service name", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+
+		t.Cleanup(func() {
+			assert.NoError(t, keychainStore.Delete(t.Context(), id))
+		})
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: "bob2",
+			Attributes: map[string]string{
+				"color": "blue",
+				"game":  "elden ring",
+			},
+		}
+		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
+		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern("*/"+serviceName+"/*"))
+		require.NoError(t, err)
+		assert.Len(t, secrets, 4)
+		_, ok := secrets[id.String()]
+		assert.Truef(t, ok, "returned secret must match original id")
 	})
 }
 
