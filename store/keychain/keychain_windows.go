@@ -68,7 +68,6 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 
 	attributes := mapFromWindowsAttributes(gc.Attributes)
 	safelyCleanMetadata(attributes)
-	safelySetID(id, attributes)
 
 	secret := k.factory()
 	if err := secret.SetMetadata(attributes); err != nil {
