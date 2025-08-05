@@ -90,9 +90,9 @@ func Test_newPlugin(t *testing.T) {
 			name: "engine launched plugin",
 			test: func(t *testing.T) {
 				pattern := "foo-bar"
-				version := api.MustNewVersion("2")
+				version := api.MustNewVersion("v2")
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Version: "2",
+					Version: version.String(),
 					Pattern: pattern,
 					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
 				})
@@ -122,7 +122,7 @@ func Test_newPlugin(t *testing.T) {
 			test: func(t *testing.T) {
 				errGetSecret := "you do not get my secret"
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Version:      "1",
+					Version:      "v1",
 					Pattern:      "foo-bar",
 					ErrGetSecret: errGetSecret,
 				})
@@ -146,7 +146,7 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin ignoring SIGINT does not break the runtime",
 			test: func(t *testing.T) {
 				cmd, _ := dummy.PluginCommand(t, dummy.PluginCfg{
-					Version:      "1",
+					Version:      "v1",
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
@@ -163,7 +163,7 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin process crashes unexpectedly",
 			test: func(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Version:      "1",
+					Version:      "v1",
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
@@ -184,7 +184,7 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin process exists unexpectedly",
 			test: func(t *testing.T) {
 				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
-					Version: "2",
+					Version: "v2",
 					Pattern: "foo-bar",
 					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
 					CrashBehaviour: &dummy.CrashBehaviour{
@@ -345,7 +345,7 @@ func (m maliciousPattern) String() string {
 
 func testExternalPluginConfig(t *testing.T) p.Config {
 	t.Helper()
-	return p.Config{Version: api.MustNewVersion("4"), Pattern: mockPattern, Logger: testhelper.TestLogger(t)}
+	return p.Config{Version: api.MustNewVersion("v4"), Pattern: mockPattern, Logger: testhelper.TestLogger(t)}
 }
 
 func runAsync(ctx context.Context, run func(ctx context.Context) error) chan error {
@@ -395,7 +395,7 @@ func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
 		return nil, err
 	}
 	r, err := newExternalPlugin(m.logger, item.conn, runtimeCfg{
-		out: pluginCfgOut{engineName: "test-engine", engineVersion: "1.0.0", requestTimeout: 30 * time.Second},
+		out: pluginCfgOut{engineName: "test-engine", engineVersion: "v1.0.0", requestTimeout: 30 * time.Second},
 	})
 	if err != nil {
 		item.done()

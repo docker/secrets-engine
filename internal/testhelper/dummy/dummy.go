@@ -47,7 +47,7 @@ func PluginProcessFromBinaryName(name string) {
 			panic(err)
 		}
 		PluginProcess(&PluginCfg{
-			Version: "1",
+			Version: "v1",
 			Pattern: "*",
 			Secrets: map[string]string{
 				behaviour.Value:       behaviour.Value + "-value",

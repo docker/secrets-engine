@@ -213,7 +213,7 @@ func Test_newEngine(t *testing.T) {
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
-			version:    "test-version",
+			version:    "v6",
 			pluginPath: dir,
 			socketPath: socketPath,
 			logger:     testhelper.TestLogger(t),
@@ -235,7 +235,7 @@ func Test_newEngine(t *testing.T) {
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
-			version:    "test-version",
+			version:    "v8",
 			pluginPath: dir,
 			socketPath: socketPath,
 			logger:     testhelper.TestLogger(t),
@@ -266,7 +266,7 @@ func Test_newEngine(t *testing.T) {
 		internalPluginRunExitCh := make(chan struct{})
 		cfg := config{
 			name:                  "test-engine",
-			version:               "test-version",
+			version:               "v9",
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),
@@ -303,7 +303,7 @@ func Test_newEngine(t *testing.T) {
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
-			version:    "test-version",
+			version:    "v99",
 			pluginPath: dir,
 			socketPath: socketPath,
 			logger:     testhelper.TestLogger(t),
@@ -331,7 +331,7 @@ func Test_newEngine(t *testing.T) {
 		runExitCh := make(chan struct{}, 1)
 		cfg := config{
 			name:                  "test-engine",
-			version:               "test-version",
+			version:               "v1",
 			enginePluginsDisabled: true,
 			socketPath:            socketPath,
 			logger:                testhelper.TestLogger(t),

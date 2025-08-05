@@ -21,13 +21,13 @@ func Test_newValidatedConfig(t *testing.T) {
 		assert.ErrorIs(t, err, api.ErrEmptyVersion)
 	})
 	t.Run("pattern must be valid", func(t *testing.T) {
-		_, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "1", Pattern: "*a*"})
+		_, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "v1", Pattern: "*a*"})
 		assert.ErrorIs(t, err, secrets.ErrInvalidPattern)
 	})
 	t.Run("valid data can be compared to be equal", func(t *testing.T) {
-		data1, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "1", Pattern: "*"})
+		data1, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "v1", Pattern: "*"})
 		require.NoError(t, err)
-		data2, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "1", Pattern: "*"})
+		data2, err := newValidatedConfig(pluginDataUnvalidated{Name: "foo", Version: "v1", Pattern: "*"})
 		require.NoError(t, err)
 		assert.Equal(t, data1, data2)
 	})
