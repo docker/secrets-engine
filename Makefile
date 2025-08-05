@@ -6,15 +6,18 @@ GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.mod")
 export BUF_VERSION := v1.54.0
 
 export NRI_PLUGIN_BINARY := nri-secrets-engine
+export MYSECRET_BINARY := docker-mysecret
 
 ifeq ($(OS),Windows_NT)
 	WINDOWS = $(OS)
 	EXTENSION = .exe
 	DOCKER_SOCKET = //var/run/docker.sock
+	DOCKER_MYSECRET_DST = $(USERPROFILE)\.docker\cli-plugins\$(MYSECRET_BINARY)$(EXTENSION)
 else
 	WINDOWS =
 	EXTENSION =
 	DOCKER_SOCKET = /var/run/docker.sock
+	DOCKER_MYSECRET_DST = $(HOME)/.docker/cli-plugins/$(MYSECRET_BINARY)$(EXTENSION)
 endif
 
 
@@ -27,6 +30,7 @@ BUILDER=buildx-multiarch
 DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg NRI_PLUGIN_BINARY \
+          			--build-arg MYSECRET_BINARY \
           			--build-arg BUF_VERSION \
           			--build-arg GIT_TAG
 
@@ -74,6 +78,15 @@ keychain-unit-tests:
 
 engine-unit-tests:
 	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
+
+mysecret:
+	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./cmd/mysecret
+	rm "$(DOCKER_MYSECRET_DST)" || true
+	cp "dist/$(MYSECRET_BINARY)$(EXTENSION)" "$(DOCKER_MYSECRET_DST)"
+
+mysecret-cross: multiarch-builder
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file cmd/mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
