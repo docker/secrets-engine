@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"net/http"
 	"os"
@@ -341,6 +342,10 @@ func (m maliciousPattern) Match(secrets.ID) bool {
 
 func (m maliciousPattern) String() string {
 	return "a*a"
+}
+
+func (m maliciousPattern) Parts() iter.Seq[secrets.PatternPart] {
+	panic("implement me")
 }
 
 func testExternalPluginConfig(t *testing.T) p.Config {
