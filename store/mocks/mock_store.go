@@ -5,6 +5,7 @@ import (
 	"maps"
 	"sync"
 
+	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/store"
 )
 
@@ -19,7 +20,6 @@ func (m *MockStore) init() {
 	}
 }
 
-// Delete implements Store.
 func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -29,7 +29,6 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-// Get implements Store.
 func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -42,17 +41,13 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	return secret, nil
 }
 
-// GetAll implements Store.
 func (m *MockStore) GetAllMetadata(_ context.Context) (map[string]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
-
-	// Return a copy of the store to avoid concurrent map read/write issues.
 	return maps.Clone(m.store), nil
 }
 
-// Save implements Store.
 func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -60,6 +55,24 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 
 	m.store[id.String()] = secret
 	return nil
+}
+
+func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.init()
+
+	filtered := make(map[string]store.Secret)
+	for id, f := range m.store {
+		p, err := secrets.ParseID(id)
+		if err != nil {
+			continue
+		}
+		if pattern.Match(p) {
+			filtered[p.String()] = f
+		}
+	}
+	return filtered, nil
 }
 
 var _ store.Store = &MockStore{}
