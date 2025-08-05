@@ -2,9 +2,38 @@ package secrets
 
 import (
 	"errors"
+	"iter"
 )
 
 var ErrInvalidPattern = errors.New("invalid pattern")
+
+type PatternPart interface {
+	// Value returns the part as a string
+	Value() string
+	// Type returns what type [PatternPartType] the part is
+	Type() PatternPartType
+}
+
+type patternPart struct {
+	value       string
+	patternType PatternPartType
+}
+
+func (part *patternPart) Value() string {
+	return part.value
+}
+
+func (part *patternPart) Type() PatternPartType {
+	return part.patternType
+}
+
+type PatternPartType int
+
+const (
+	ConcretePatternPartType PatternPartType = iota
+	AnyPatternPartType
+	AnyRecursivePatternPartType
+)
 
 // validPattern checks if a pattern is valid without using regexp or unicode.
 // Rules:
@@ -69,6 +98,8 @@ type Pattern interface {
 	Match(id ID) bool
 	// String formats the [Pattern] as a string
 	String() string
+	// Parts returns an iterator of type [PatternPart]
+	Parts() iter.Seq[PatternPart]
 }
 
 type pattern struct {
@@ -84,6 +115,33 @@ func (p *pattern) Match(id ID) bool {
 
 func (p *pattern) String() string {
 	return p.value
+}
+
+func getPartType(part string) PatternPartType {
+	switch part {
+	case "*":
+		return AnyPatternPartType
+	case "**":
+		return AnyRecursivePatternPartType
+	default:
+		return ConcretePatternPartType
+	}
+}
+
+func (p *pattern) Parts() iter.Seq[PatternPart] {
+	return func(yield func(PatternPart) bool) {
+		pattern := p.value
+		for _, part := range split(pattern) {
+			patternPart := &patternPart{
+				value:       part,
+				patternType: getPartType(part),
+			}
+
+			if !yield(patternPart) {
+				return
+			}
+		}
+	}
 }
 
 var _ Pattern = &pattern{}

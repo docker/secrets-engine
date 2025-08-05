@@ -37,3 +37,108 @@ func TestParsePatternNew(t *testing.T) {
 		})
 	}
 }
+
+func TestPatternParts(t *testing.T) {
+	tests := []struct {
+		desc     string
+		pattern  string
+		expected []patternPart
+	}{
+		{
+			desc:    "singular part",
+			pattern: "foo",
+			expected: []patternPart{
+				{
+					value:       "foo",
+					patternType: ConcretePatternPartType,
+				},
+			},
+		},
+		{
+			desc:    "multiple parts",
+			pattern: "foo/baz",
+			expected: []patternPart{
+				{
+					value:       "foo",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "baz",
+					patternType: ConcretePatternPartType,
+				},
+			},
+		},
+		{
+			desc:    "multiple parts with recursive any",
+			pattern: "foo/**/baz",
+			expected: []patternPart{
+				{
+					value:       "foo",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "**",
+					patternType: AnyRecursivePatternPartType,
+				},
+				{
+					value:       "baz",
+					patternType: ConcretePatternPartType,
+				},
+			},
+		},
+		{
+			desc:    "multiple parts with any",
+			pattern: "foo/*/baz/*",
+			expected: []patternPart{
+				{
+					value:       "foo",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "*",
+					patternType: AnyPatternPartType,
+				},
+				{
+					value:       "baz",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "*",
+					patternType: AnyPatternPartType,
+				},
+			},
+		},
+		{
+			desc:    "multiple parts with both recursive any and any",
+			pattern: "foo/**/baz/*",
+			expected: []patternPart{
+				{
+					value:       "foo",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "**",
+					patternType: AnyRecursivePatternPartType,
+				},
+				{
+					value:       "baz",
+					patternType: ConcretePatternPartType,
+				},
+				{
+					value:       "*",
+					patternType: AnyPatternPartType,
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			var parts []patternPart
+			for part := range (&pattern{tc.pattern}).Parts() {
+				parts = append(parts, *(part.(*patternPart)))
+			}
+			assert.Len(t, parts, len(tc.expected))
+			assert.EqualValues(t, tc.expected, parts)
+		})
+	}
+}
