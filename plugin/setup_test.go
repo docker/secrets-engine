@@ -30,7 +30,7 @@ func (m *mockRegistrationHandler) RegisterPlugin(context.Context, *connect.Reque
 	m.registerRequests++
 	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
 		EngineName:     proto.String("mock"),
-		EngineVersion:  proto.String("1.0.0"),
+		EngineVersion:  proto.String("v1.0.0"),
 		RequestTimeout: durationpb.New(10 * time.Second),
 	}.Build()), nil
 }
@@ -49,7 +49,7 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		mPlugin := &mockPlugin{}
 		pluginClosed := make(chan struct{})
-		closer, err := setup(t.Context(), cfg{Config{api.MustNewVersion("1"), secrets.MustParsePattern("*"), testhelper.TestLogger(t)}, mPlugin, "foo", b, 5 * time.Second}, func(err error) {
+		closer, err := setup(t.Context(), cfg{Config{api.MustNewVersion("v1"), secrets.MustParsePattern("*"), testhelper.TestLogger(t)}, mPlugin, "foo", b, 5 * time.Second}, func(err error) {
 			assert.NoError(t, err)
 			close(pluginClosed)
 		})
