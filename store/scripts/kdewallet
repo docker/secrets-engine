@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # 1. Check relevant binaries available
 # 2. Creates the necessary files for the keyring daemon
@@ -8,7 +8,7 @@
 # 6. Waits for the keyring to be active by polling dbus over `gdbus`
 # 7. Check if the registered `org.freedesktop.secrets` backend matches what we expect.
 
-set -eux pipefail
+set -euxo pipefail
 
 kwalletd=$(command -v kwalletd5 || command -v kwalletd6)
 
@@ -22,19 +22,33 @@ if test -z $(command -v dbus-daemon); then
     exit 1
 fi
 
-mkdir -p ~/.local/share/dbus-1/services
-touch ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
+if ! test -d ~/.local/share/dbus-1/services; then
+    mkdir -p ~/.local/share/dbus-1/services
+fi
 
-echo "[D-BUS Service]
+if ! test -e ~/.local/share/dbus-1/services/org.freedesktop.secrets.service; then
+    touch ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
+fi
+
+echo '[D-BUS Service]
 Name=org.freedesktop.secrets
-Exec=${kwalletd}" > ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
+Exec=${kwalletd}' > ~/.local/share/dbus-1/services/org.freedesktop.secrets.service
 
 
-mkdir -p ~/.local/share/kwalletd
-mkdir ~/.config
+if ! test -d ~/.local/share/kwalletd; then
+    mkdir -p ~/.local/share/kwalletd
+fi
 
-echo -e "[Wallet]\nFirst Use=false\nDefault Wallet=kwallet" > ~/.config/kwalletrc
-echo -e "[Wallet]\nVersion=1" > ~/.local/share/kwalletd/kwallet.kwl
+if ! test -d ~/.config; then
+    mkdir ~/.config
+fi
+
+echo '[Wallet]
+First Use=false
+Default Wallet=kwallet' > ~/.config/kwalletrc
+
+echo '[Wallet]
+Version=1' > ~/.local/share/kwalletd/kwallet.kwl
 
 export QT_QPA_PLATFORM=minimal
 
@@ -86,7 +100,13 @@ fi
 
 exe=$(readlink -f /proc/$pid/exe)
 
-if [[ "$exe" != "/usr/bin/ksecretd" ]]; then
-    echo "dbus org.freedesktop.secrets is not using ${kwalletd}"
-    exit 1
+# ksecretd which is part of kwalletd6
+# kwalletd5 is part of kwalletd5
+if [[ "$exe" == "/usr/bin/ksecretd" || "$exe" == "/usr/bin/kwalletd5" ]]; then
+    echo "dbus org.freedesktop.secrets is using ${exe}"
+    go test -v -count=1 ./store/keychain/...
+    exit 0
 fi
+
+echo "dbus org.freedesktop.secrets is not using kwalletd5 or kwalletd6. Using: ${exe}"
+exit 1
