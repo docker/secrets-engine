@@ -12,7 +12,7 @@ WORKDIR /app
 RUN --mount=type=bind,target=.
 
 FROM --platform=${BUILDPLATFORM} ubuntu:24.04 AS ubuntu24
-RUN apt update && apt install -y --no-install-recommends libglib2.0-bin dbus gnome-keyring kwalletmanager bash
+RUN apt update && apt install -y --no-install-recommends libglib2.0-bin dbus gnome-keyring kwalletmanager libqca-qt5-2-plugins bash
 COPY --from=go-base /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 RUN useradd -ms /bin/bash user
