@@ -1,8 +1,10 @@
 group "default" {
   targets = [
     "fedora_43_gnome_keyring",
-    "fedora_43_kdewallet",
-    "ubuntu_24_kdewallet",
+    # disabling kdewallet tests for now, it doesn't work in headless mode
+    # it just prompts anyway...
+    # "fedora_43_kdewallet",
+    # "ubuntu_24_kdewallet",
     "ubuntu_24_gnome_keyring"
   ]
 }
