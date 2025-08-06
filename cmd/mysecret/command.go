@@ -7,6 +7,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/secrets-engine/cmd/mysecret/internal/project"
 	"github.com/docker/secrets-engine/internal/config"
 )
 
@@ -37,7 +38,10 @@ func rootCommand(ctx context.Context) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
-			return plugin.PersistentPreRunE(cmd, args)
+			if plugin.PersistentPreRunE != nil {
+				return plugin.PersistentPreRunE(cmd, args)
+			}
+			return nil
 		},
 		Version: fmt.Sprintf("%s, commit %s", config.Version, config.Commit()),
 	}
@@ -49,8 +53,34 @@ func rootCommand(ctx context.Context) *cobra.Command {
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	cmd.AddCommand(dummyCommand())
+	return cmd
+}
 
+func mySecretCommands(ctx context.Context) *cobra.Command {
+	root := rootCommand(ctx)
+	root.AddCommand(WithProjectContextHandling(dummyCommand()))
+	return root
+}
+
+func WithProjectContextHandling(cmd *cobra.Command) *cobra.Command {
+	var global bool
+	origPersistentPreRun := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		if !global {
+			proj, err := project.CurrentGitProject()
+			if err != nil {
+				return err
+			}
+			ctx = project.WithProject(ctx, proj)
+		}
+		cmd.SetContext(ctx)
+		if origPersistentPreRun != nil {
+			return origPersistentPreRun(cmd, args)
+		}
+		return nil
+	}
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "global (no project realm)")
 	return cmd
 }
 
@@ -64,8 +94,15 @@ func dummyCommand() *cobra.Command {
 		Use:   "read",
 		Short: "Read the configuration",
 		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			if proj, err := project.FromContext(ctx); err == nil {
+				fmt.Printf("in project: %s\n", proj)
+			} else {
+				fmt.Println("no project (global)")
+			}
 			fmt.Println("hello")
+
 			return nil
 		},
 	})

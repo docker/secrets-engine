@@ -29,7 +29,7 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return rootCommand(ctx)
+		return mySecretCommands(ctx)
 	},
 		manager.Metadata{
 			SchemaVersion:    "0.1.0",
