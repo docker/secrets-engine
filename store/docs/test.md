@@ -12,8 +12,11 @@ enabled to support macOS.
 The cross distro linux tests can be run via:
 
 ` ` `console
-DOCKER_TARGET=ubuntu-24-gnome-keyring make keychain-linux-unit-tests
+make keychain-linux-unit-tests
 ` ` `
+
+This test uses the store/docker-bake.hcl file to parallelize the test across
+multiple environments.
 
 For Linux keychain we have four sub-tests:
 
@@ -29,6 +32,12 @@ flowchart TD
 - `ubuntu-24-kdewallet`
 - `fedora-43-gnome-keyring`
 - `fedora-43-kdewallet`
+
+To run a targeted test, re-use the CI make target:
+
+```console
+DOCKER_TARGET=ubuntu-24-gnome-keyring make keychain-linux-ci-unit-tests
+```
 
 This will use `buildkit` to target only the `ubuntu-24-gnome-keyring` label inside
 the `store/Dockerfile`.
