@@ -39,7 +39,7 @@ jobs:
           endpoint: "docker/secrets-engine"
           install: true
       - name: Test
-        run: DOCKER_TARGET=${{ matrix.subtest }} make keychain-linux-unit-tests
+        run: DOCKER_TARGET=${{ matrix.subtest }} make keychain-linux-ci-unit-tests
   tests-windows:
     permissions:
       id-token: write
