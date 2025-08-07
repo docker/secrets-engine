@@ -7,6 +7,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/secrets-engine/cmd/mysecret/commands"
 	"github.com/docker/secrets-engine/internal/config"
 )
 
@@ -49,26 +50,7 @@ func rootCommand(ctx context.Context) *cobra.Command {
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	cmd.AddCommand(dummyCommand())
-
-	return cmd
-}
-
-func dummyCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "dummy",
-		Short: "just a test",
-	}
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "read",
-		Short: "Read the configuration",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			fmt.Println("hello")
-			return nil
-		},
-	})
+	cmd.AddCommand(commands.SetCommand())
 
 	return cmd
 }

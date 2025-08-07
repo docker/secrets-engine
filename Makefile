@@ -83,7 +83,7 @@ engine-unit-tests:
 	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
 
 mysecret:
-	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./cmd/mysecret
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./cmd/mysecret
 	rm "$(DOCKER_MYSECRET_DST)" || true
 	cp "dist/$(MYSECRET_BINARY)$(EXTENSION)" "$(DOCKER_MYSECRET_DST)"
 
