@@ -305,6 +305,22 @@ func TestSafelyCleanMetadata(t *testing.T) {
 		kc.safelyCleanMetadata(attributes)
 		assert.Empty(t, attributes)
 	})
+
+	t.Run("underlying store attributes are always removed", func(t *testing.T) {
+		attributes := map[string]string{
+			secretIDKey:     "username",
+			serviceGroupKey: "com.test.test",
+			serviceNameKey:  "test",
+			"x_something":   "something",
+			// xdg:scheme is added by the underlying linux keychain after we
+			// have prefixed key's with 'x_'
+			"xdg:scheme": "org.freedesktop.Secret.Generic",
+		}
+		kc.safelyCleanMetadata(attributes)
+		assert.EqualValues(t, map[string]string{
+			"something": "something",
+		}, attributes)
+	})
 }
 
 func TestInternalMetadata(t *testing.T) {
