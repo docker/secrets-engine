@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # 1. Check relevant binaries available
 # 2. Creates the necessary files for the keyring daemon
@@ -8,7 +8,7 @@
 # 6. Waits for the keyring to be active by polling dbus over `gdbus`
 # 7. Check if the registered `org.freedesktop.secrets` backend matches what we expect.
 
-set -eux pipefail
+set -euxo pipefail
 
 if test -z $(command -v gnome-keyring-daemon); then
     echo "gnome-keyring-daemon is not installed"
@@ -20,8 +20,13 @@ if test -z $(command -v dbus-daemon); then
     exit 1
 fi
 
-mkdir -p ~/.local/share/keyrings
-touch ~/.local/share/keyrings/login.keyring
+if ! test -d ~/.local/share/keyrings; then 
+    mkdir -p ~/.local/share/keyrings
+fi
+
+if ! test -e ~/.local/share/keyrings/login.keyring; then
+    touch ~/.local/share/keyrings/login.keyring
+fi
 
 # create fake passwordless 'login' keyring
 echo '[keyring]
@@ -79,7 +84,11 @@ fi
 
 exe=$(readlink -f /proc/$pid/exe)
 
-if [[ "$exe" != *gnome-keyring-daemon* ]]; then
-    echo "dbus org.freedesktop.secrets is not using gnome-keyring-daemon"
-    exit 1
+if [[ "$exe" == *gnome-keyring-daemon* ]]; then
+    echo "dbus org.freedesktop.secrets is using gnome-keyring-daemon"
+    go test -v -count=1 ./store/keychain/...
+    exit 0
 fi
+
+echo "dbus org.freedesktop.secrets is not using gnome-keyring-daemon. Using ${exe}"
+exit 1

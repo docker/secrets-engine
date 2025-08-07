@@ -70,8 +70,11 @@ unit-tests:
 		exit $$err; \
 	fi
 
-keychain-linux-unit-tests:
+keychain-linux-ci-unit-tests:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=$(DOCKER_TARGET) --file store/Dockerfile .
+
+keychain-linux-unit-tests:
+	docker buildx bake --set '*.args.GO_VERSION=${GO_VERSION}' --file store/docker-bake.hcl
 
 keychain-unit-tests:
 	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
