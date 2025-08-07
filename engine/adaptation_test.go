@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
-	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 	p "github.com/docker/secrets-engine/plugin"
 )
 
@@ -25,7 +25,7 @@ var (
 
 func Test_SecretsEngine(t *testing.T) {
 	t.Parallel()
-	dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: []dummy.PluginBehaviour{{Value: "foo"}, {Value: "bar"}}})
+	dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: []testdummy.PluginBehaviour{{Value: "foo"}, {Value: "bar"}}})
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(socketPath),
@@ -102,15 +102,15 @@ func Test_SecretsEngine(t *testing.T) {
 		assert.Contains(t, secret.Error, "secret not found")
 	})
 	t.Run("non-unique secrets", func(t *testing.T) {
-		mockFromFoo, err := c.GetSecret(t.Context(), secrets.Request{ID: dummy.MockSecretID, Provider: "plugin-foo"})
+		mockFromFoo, err := c.GetSecret(t.Context(), secrets.Request{ID: testdummy.MockSecretID, Provider: "plugin-foo"})
 		assert.NoError(t, err)
-		assert.Equal(t, dummy.MockSecretID.String(), mockFromFoo.ID.String())
-		assert.Equal(t, dummy.MockSecretValue, string(mockFromFoo.Value))
+		assert.Equal(t, testdummy.MockSecretID.String(), mockFromFoo.ID.String())
+		assert.Equal(t, testdummy.MockSecretValue, string(mockFromFoo.Value))
 		assert.Equal(t, "plugin-foo", mockFromFoo.Provider)
-		mockFromBar, err := c.GetSecret(t.Context(), secrets.Request{ID: dummy.MockSecretID, Provider: "plugin-bar"})
+		mockFromBar, err := c.GetSecret(t.Context(), secrets.Request{ID: testdummy.MockSecretID, Provider: "plugin-bar"})
 		assert.NoError(t, err)
-		assert.Equal(t, dummy.MockSecretID.String(), mockFromBar.ID.String())
-		assert.Equal(t, dummy.MockSecretValue, string(mockFromBar.Value))
+		assert.Equal(t, testdummy.MockSecretID.String(), mockFromBar.ID.String())
+		assert.Equal(t, testdummy.MockSecretValue, string(mockFromBar.Value))
 		assert.Equal(t, "plugin-bar", mockFromBar.Provider)
 	})
 	t.Run("existing secrets but wrong provider", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: []dummy.PluginBehaviour{{Value: "foo"}}})
+			dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: []testdummy.PluginBehaviour{{Value: "foo"}}})
 			socketPath := testhelper.RandomShortSocketName()
 			options := []Option{
 				WithSocketPath(socketPath),

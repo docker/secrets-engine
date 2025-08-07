@@ -1,5 +1,5 @@
 //go:build !windows
 
-package dummy
+package testdummy
 
 const suffix = ""

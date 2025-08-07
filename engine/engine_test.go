@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
-	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 )
 
 type mockSlowRuntime struct {
@@ -208,8 +208,8 @@ func Test_discoverPlugins(t *testing.T) {
 func Test_newEngine(t *testing.T) {
 	t.Parallel()
 	t.Run("can retrieve secret from external plugin (no crashes)", func(t *testing.T) {
-		plugins := []dummy.PluginBehaviour{{Value: "foo"}}
-		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		plugins := []testdummy.PluginBehaviour{{Value: "foo"}}
+		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
@@ -230,8 +230,8 @@ func Test_newEngine(t *testing.T) {
 		assert.Equal(t, "foo-value", string(foo.Value))
 	})
 	t.Run("external plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
-		plugins := []dummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &dummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
-		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		plugins := []testdummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &testdummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
@@ -298,8 +298,8 @@ func Test_newEngine(t *testing.T) {
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
-		plugins := []dummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &dummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
-		dir := dummy.CreateDummyPlugins(t, dummy.Plugins{Plugins: plugins})
+		plugins := []testdummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &testdummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
 			name:       "test-engine",
