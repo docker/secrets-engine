@@ -94,9 +94,14 @@ func (k *keychainStore[T]) safelyCleanMetadata(attributes map[string]string) {
 	keys := slices.Collect(maps.Keys(attributes))
 	for _, key := range keys {
 		after, found := strings.CutPrefix(key, "x_")
+		// this preserves metadata set by the caller.
+		// we are restoring it by stripping the "x_" prefix.
 		if found {
 			attributes[after] = attributes[key]
-			delete(attributes, key)
 		}
+		// delete should always happen since we also want to remove attributes
+		// there were never prefixed. In this case we are just dropping them
+		// entirely. e.g. "xdg:scheme" set by the linux keychain internally.
+		delete(attributes, key)
 	}
 }
