@@ -4,6 +4,7 @@ use (
 	.
 	./client
 	./engine
+	./mysecret
 	./plugin
 	./store
 )

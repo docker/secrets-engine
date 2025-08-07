@@ -7,8 +7,8 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/cmd/mysecret/commands"
 	"github.com/docker/secrets-engine/internal/config"
+	"github.com/docker/secrets-engine/mysecret/commands"
 )
 
 // Note: We use a custom help template to make it more brief.

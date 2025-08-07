@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/secrets-engine/internal/mysecret"
 	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/mysecret/service"
 
 	"github.com/spf13/cobra"
 )
@@ -49,11 +49,11 @@ func SetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			service, err := mysecret.KCService()
+			kc, err := service.KCService()
 			if err != nil {
 				return err
 			}
-			return service.Save(cmd.Context(), id, &mysecret.MyValue{Value: []byte(s.val)})
+			return kc.Save(cmd.Context(), id, &service.MyValue{Value: []byte(s.val)})
 		},
 	}
 	return cmd
