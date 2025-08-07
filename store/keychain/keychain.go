@@ -67,30 +67,30 @@ const (
 	secretIDKey     = "id"
 )
 
-// safelySetMetadata prefixes each key with `x_` so that no collissions can ever
-// occur with internal fields.
-func (k *keychainStore[T]) safelySetMetadata(id string, attributes map[string]string) {
-	// prefix whatever is already in attributes
+// safelySetMetadata is a helper function to keychain providers
+// it adds internal metadata as well as prefixes externally defined attribute
+// keys with `x_` so that no collissions can ever occur.
+func safelySetMetadata(serviceGroup, serviceName string, attributes map[string]string) {
+	// we need to collect all keys first otherwise we might double set the prefix
 	keys := slices.Collect(maps.Keys(attributes))
+	// prefix whatever is already in attributes
 	for _, k := range keys {
 		attributes["x_"+k] = attributes[k]
 		delete(attributes, k)
 	}
 
-	attributes[serviceGroupKey] = k.serviceGroup
-	attributes[serviceNameKey] = k.serviceName
-	if id != "" {
-		attributes[secretIDKey] = id
-	}
+	attributes[serviceGroupKey] = serviceGroup
+	attributes[serviceNameKey] = serviceName
 }
 
 // safelyCleanMetadata removes internal metadata and removes the `x_` prefix
 // on all keys containing it.
-func (k *keychainStore[T]) safelyCleanMetadata(attributes map[string]string) {
+func safelyCleanMetadata(attributes map[string]string) {
 	delete(attributes, serviceGroupKey)
 	delete(attributes, serviceNameKey)
 	delete(attributes, secretIDKey)
 
+	// we need to collect all keys first otherwise we might double set the prefix
 	keys := slices.Collect(maps.Keys(attributes))
 	for _, key := range keys {
 		after, found := strings.CutPrefix(key, "x_")
@@ -104,4 +104,14 @@ func (k *keychainStore[T]) safelyCleanMetadata(attributes map[string]string) {
 		// entirely. e.g. "xdg:scheme" set by the linux keychain internally.
 		delete(attributes, key)
 	}
+}
+
+// safelySetID stores the id inside the attributes
+func safelySetID(id store.ID, attributes map[string]string) {
+	// first check if the "id" key already exists, it's possibly set by the
+	// caller, so we should avoid overwriting it.
+	if v, ok := attributes[secretIDKey]; ok {
+		attributes["x_"+secretIDKey] = v
+	}
+	attributes[secretIDKey] = id.String()
 }
