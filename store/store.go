@@ -6,11 +6,16 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
-type ID = secrets.ID
+type (
+	ID      = secrets.ID
+	Pattern = secrets.Pattern
+)
 
 var (
-	ParseID     = secrets.ParseID
-	MustParseID = secrets.MustParseID
+	ParseID          = secrets.ParseID
+	MustParseID      = secrets.MustParseID
+	ParsePattern     = secrets.ParsePattern
+	MustParsePattern = secrets.MustParsePattern
 )
 
 // Secret is a generic type that represents the actual secret values
@@ -65,4 +70,10 @@ type Store interface {
 	GetAllMetadata(ctx context.Context) (map[string]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
+	// Filter returns a map of secrets based on a [Pattern].
+	//
+	// Secrets returned will have both [Secret.SetMetadata] and [Secret.Unmarshal]
+	// called; in that order. Any error produced by any of them would result in
+	// an early return with a nil secrets map.
+	Filter(ctx context.Context, pattern Pattern) (map[string]Secret, error)
 }
