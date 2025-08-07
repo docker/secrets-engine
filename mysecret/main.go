@@ -11,9 +11,9 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/internal/config"
-	"github.com/docker/secrets-engine/internal/oshelper"
 	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/x/config"
+	"github.com/docker/secrets-engine/x/oshelper"
 )
 
 func main() {
