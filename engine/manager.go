@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 type removeFunc func()

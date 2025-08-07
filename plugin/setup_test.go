@@ -14,12 +14,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/docker/secrets-engine/internal/api"
-	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/internal/ipc"
-	"github.com/docker/secrets-engine/internal/secrets"
-	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/x/api"
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/x/ipc"
+	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 type mockRegistrationHandler struct {

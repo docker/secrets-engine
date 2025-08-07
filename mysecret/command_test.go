@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/mysecret/service"
 	"github.com/docker/secrets-engine/mysecret/teststore"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 func Test_rootCommand(t *testing.T) {

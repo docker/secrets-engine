@@ -9,11 +9,11 @@ import (
 
 	"github.com/hashicorp/yamux"
 
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/internal/ipc"
-	"github.com/docker/secrets-engine/internal/logging"
-	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/x/ipc"
+	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type setupResult struct {

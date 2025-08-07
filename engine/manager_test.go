@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 func TestManager_Register(t *testing.T) {

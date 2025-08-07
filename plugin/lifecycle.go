@@ -5,8 +5,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 )
 
 var _ resolverv1connect.PluginServiceHandler = &pluginService{}

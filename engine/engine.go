@@ -15,9 +15,9 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/internal/ipc"
-	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/x/ipc"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 const (

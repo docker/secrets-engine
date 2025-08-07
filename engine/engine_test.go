@@ -14,10 +14,10 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/logging"
-	"github.com/docker/secrets-engine/internal/secrets"
-	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 type mockSlowRuntime struct {
