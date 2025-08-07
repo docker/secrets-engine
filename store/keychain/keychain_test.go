@@ -155,6 +155,90 @@ func TestKeychain(t *testing.T) {
 		assert.EqualValues(t, expected, actual)
 	})
 
+	t.Run("filter credentials", func(t *testing.T) {
+		ks := setupKeychain(t, nil)
+		moreCreds := map[string]*mocks.MockCredential{
+			"com.test.test/test/bob": {
+				Username: "bob",
+				Password: "bob-password",
+				Attributes: map[string]string{
+					"role":     "admin",
+					"favcolor": "green",
+				},
+			},
+			"com.test.test/test/jeff": {
+				Username: "jeff",
+				Password: "jeff-password",
+			},
+			"com.test.test/test/pete": {
+				Username: "pete",
+				Password: "pete-password",
+				Attributes: map[string]string{
+					"role":     "maintainer",
+					"favcolor": "green",
+				},
+			},
+			"com.test.test2/test2/bob": {
+				Username: "bob",
+				Password: "bob-password",
+				Attributes: map[string]string{
+					"role":     "admin",
+					"favcolor": "green",
+				},
+			},
+		}
+		for id, anotherCred := range moreCreds {
+			require.NoError(t, ks.Save(t.Context(), store.MustParseID(id), anotherCred))
+		}
+
+		t.Cleanup(func() {
+			for id := range moreCreds {
+				assert.NoError(t, ks.Delete(t.Context(), store.MustParseID(id)))
+			}
+		})
+
+		t.Run("can use recursive pattern", func(t *testing.T) {
+			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/**"))
+			require.NoError(t, err)
+			assert.Len(t, actual, 3)
+		})
+
+		t.Run("can use subset pattern", func(t *testing.T) {
+			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/*"))
+			require.NoError(t, err)
+			assert.Len(t, actual, 3)
+		})
+
+		t.Run("can use serviceName only in pattern", func(t *testing.T) {
+			actual, err := ks.Filter(t.Context(), store.MustParsePattern("*/test/*"))
+			require.NoError(t, err)
+			assert.Len(t, actual, 3)
+		})
+
+		t.Run("can match on only username in pattern", func(t *testing.T) {
+			result, err := ks.Filter(t.Context(), store.MustParsePattern("**/bob"))
+			require.NoError(t, err)
+			assert.Len(t, result, 2)
+			actual := make(map[string]*mocks.MockCredential)
+			for k, v := range result {
+				actual[k] = v.(*mocks.MockCredential)
+			}
+			assert.Len(t, actual, 2)
+			expected := make(map[string]*mocks.MockCredential)
+			expected["com.test.test/test/bob"] = moreCreds["com.test.test/test/bob"]
+			expected["com.test.test2/test2/bob"] = moreCreds["com.test.test2/test2/bob"]
+			assert.EqualValues(t, expected, actual)
+		})
+
+		t.Run("exact id match should still return exactly one secret", func(t *testing.T) {
+			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/pete"))
+			require.NoError(t, err)
+			assert.Len(t, actual, 1)
+			_, ok := actual["com.test.test/test/pete"]
+			assert.True(t, ok)
+		})
+	})
+
 	t.Run("delete credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
 		id := store.MustParseID("com.test.test/test/bob")
@@ -210,11 +294,46 @@ func TestKeychain(t *testing.T) {
 	})
 }
 
+func TestSafelySetID(t *testing.T) {
+	t.Run("can set id in attributes", func(t *testing.T) {
+		attributes := map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"id":                 "avoid clash",
+			"x_already-prefixed": "prefixed",
+		}
+		safelySetID(store.MustParseID("username"), attributes)
+		assert.EqualValues(t, map[string]string{
+			"color":              "blue",
+			"game":               "elden ring",
+			"x_already-prefixed": "prefixed",
+			"x_id":               "avoid clash",
+			secretIDKey:          "username",
+		}, attributes)
+	})
+	t.Run("can clean id from attributes", func(t *testing.T) {
+		attributes := map[string]string{
+			"x_color":            "blue",
+			"x_game":             "elden ring",
+			"x_already-prefixed": "prefixed",
+			"x_id":               "avoid clash",
+			secretIDKey:          "username",
+		}
+		safelyCleanMetadata(attributes)
+		assert.EqualValues(t, map[string]string{
+			"color":            "blue",
+			"game":             "elden ring",
+			"already-prefixed": "prefixed",
+			"id":               "avoid clash",
+		}, attributes)
+	})
+}
+
 func TestSafelySetMetadata(t *testing.T) {
-	kc := &keychainStore[*mocks.MockCredential]{
-		serviceGroup: "com.test.test",
-		serviceName:  "test",
-	}
+	var (
+		serviceGroup = "com.test.test"
+		serviceName  = "test"
+	)
 
 	t.Run("avoid clashing by adding prefix", func(t *testing.T) {
 		attributes := map[string]string{
@@ -223,13 +342,12 @@ func TestSafelySetMetadata(t *testing.T) {
 			"id":                 "avoid clash",
 			"x_already-prefixed": "prefixed",
 		}
-		kc.safelySetMetadata("username", attributes)
+		safelySetMetadata(serviceGroup, serviceName, attributes)
 		assert.EqualValues(t, map[string]string{
 			"x_color":              "blue",
 			"x_game":               "elden ring",
 			"x_id":                 "avoid clash",
 			"x_x_already-prefixed": "prefixed",
-			secretIDKey:            "username",
 			serviceGroupKey:        "com.test.test",
 			serviceNameKey:         "test",
 		}, attributes)
@@ -239,7 +357,7 @@ func TestSafelySetMetadata(t *testing.T) {
 		attributes := map[string]string{
 			"": "something",
 		}
-		kc.safelySetMetadata("", attributes)
+		safelySetMetadata(serviceGroup, serviceName, attributes)
 		assert.EqualValues(t, map[string]string{
 			"x_":            "something",
 			serviceGroupKey: "com.test.test",
@@ -249,9 +367,8 @@ func TestSafelySetMetadata(t *testing.T) {
 
 	t.Run("empty map will get internal data added", func(t *testing.T) {
 		attributes := map[string]string{}
-		kc.safelySetMetadata("username", attributes)
+		safelySetMetadata(serviceGroup, serviceName, attributes)
 		assert.EqualValues(t, map[string]string{
-			secretIDKey:     "username",
 			serviceGroupKey: "com.test.test",
 			serviceNameKey:  "test",
 		}, attributes)
@@ -259,7 +376,7 @@ func TestSafelySetMetadata(t *testing.T) {
 
 	t.Run("empty id parameter won't add the id attribute", func(t *testing.T) {
 		attributes := map[string]string{}
-		kc.safelySetMetadata("", attributes)
+		safelySetMetadata(serviceGroup, serviceName, attributes)
 		assert.EqualValues(t, map[string]string{
 			serviceGroupKey: "com.test.test",
 			serviceNameKey:  "test",
@@ -268,10 +385,6 @@ func TestSafelySetMetadata(t *testing.T) {
 }
 
 func TestSafelyCleanMetadata(t *testing.T) {
-	kc := &keychainStore[*mocks.MockCredential]{
-		serviceGroup: "com.test.test",
-		serviceName:  "test",
-	}
 	t.Run("can remove prefix and internal metadata", func(t *testing.T) {
 		attributes := map[string]string{
 			"x_color":              "blue",
@@ -282,7 +395,7 @@ func TestSafelyCleanMetadata(t *testing.T) {
 			serviceGroupKey:        "com.test.test",
 			serviceNameKey:         "test",
 		}
-		kc.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 		assert.EqualValues(t, map[string]string{
 			"color":              "blue",
 			"game":               "elden ring",
@@ -290,9 +403,10 @@ func TestSafelyCleanMetadata(t *testing.T) {
 			"id":                 "avoid clash",
 		}, attributes)
 	})
+
 	t.Run("empty map won't cause any panics", func(t *testing.T) {
 		attributes := make(map[string]string)
-		kc.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 		assert.Empty(t, attributes)
 	})
 
@@ -302,7 +416,7 @@ func TestSafelyCleanMetadata(t *testing.T) {
 			serviceGroupKey: "com.test.test",
 			serviceNameKey:  "test",
 		}
-		kc.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 		assert.Empty(t, attributes)
 	})
 
@@ -316,43 +430,9 @@ func TestSafelyCleanMetadata(t *testing.T) {
 			// have prefixed key's with 'x_'
 			"xdg:scheme": "org.freedesktop.Secret.Generic",
 		}
-		kc.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 		assert.EqualValues(t, map[string]string{
 			"something": "something",
-		}, attributes)
-	})
-}
-
-func TestInternalMetadata(t *testing.T) {
-	kc := &keychainStore[*mocks.MockCredential]{
-		serviceGroup: "com.test.test",
-		serviceName:  "test",
-	}
-
-	t.Run("metadata can safely be set and cleaned afterwards", func(t *testing.T) {
-		attributes := map[string]string{
-			"color":              "blue",
-			"game":               "elden ring",
-			"id":                 "avoid clash",
-			"x_already-prefixed": "prefixed",
-		}
-		kc.safelySetMetadata("username", attributes)
-		assert.EqualValues(t, map[string]string{
-			"x_color":              "blue",
-			"x_game":               "elden ring",
-			"x_id":                 "avoid clash",
-			"x_x_already-prefixed": "prefixed",
-			secretIDKey:            "username",
-			serviceGroupKey:        "com.test.test",
-			serviceNameKey:         "test",
-		}, attributes)
-
-		kc.safelyCleanMetadata(attributes)
-		assert.EqualValues(t, map[string]string{
-			"color":              "blue",
-			"game":               "elden ring",
-			"x_already-prefixed": "prefixed",
-			"id":                 "avoid clash",
 		}, attributes)
 	})
 }

@@ -121,7 +121,8 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	}
 
 	attributes := make(map[string]string)
-	k.safelySetMetadata(id.String(), attributes)
+	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
+	safelySetID(id, attributes)
 
 	items, err := service.SearchCollection(objectPath, attributes)
 	if err != nil {
@@ -163,7 +164,8 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	}
 
 	searchMetadata := make(map[string]string)
-	k.safelySetMetadata(id.String(), searchMetadata)
+	safelySetMetadata(k.serviceGroup, k.serviceName, searchMetadata)
+	safelySetID(id, searchMetadata)
 
 	items, err := service.SearchCollection(objectPath, searchMetadata)
 	if err != nil {
@@ -178,7 +180,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	if err != nil {
 		return nil, err
 	}
-	k.safelyCleanMetadata(attributes)
+	safelyCleanMetadata(attributes)
 
 	value, err := service.GetSecret(items[0], *session)
 	if err != nil {
@@ -223,7 +225,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 	}
 
 	searchMetadata := make(map[string]string)
-	k.safelySetMetadata("", searchMetadata)
+	safelySetMetadata(k.serviceGroup, k.serviceName, searchMetadata)
 
 	itemPaths, err := service.SearchCollection(objectPath, searchMetadata)
 	if err != nil {
@@ -250,7 +252,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		if err != nil {
 			return nil, err
 		}
-		k.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 
 		secret := k.factory()
 		if err := secret.SetMetadata(attributes); err != nil {
@@ -302,7 +304,8 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 
 	attributes := make(map[string]string)
 	maps.Copy(attributes, secret.Metadata())
-	k.safelySetMetadata(id.String(), attributes)
+	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
+	safelySetID(id, attributes)
 
 	label := k.itemLabel(id.String())
 	properties := kc.NewSecretProperties(label, attributes)
@@ -313,4 +316,99 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	}
 
 	return nil
+}
+
+//gocyclo:ignore
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+	service, err := kc.NewService()
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	if err != nil {
+		return nil, err
+	}
+	defer service.CloseSession(session)
+
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return nil, err
+	}
+
+	err = isCollectionUnlocked(objectPath, service)
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return nil, err
+	}
+	if errors.Is(err, errCollectionLocked) {
+		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
+			return nil, err
+		}
+	}
+
+	attributes := make(map[string]string)
+	// add our pattern to the attributes so we can match against items that
+	// also contain these items
+	// only concrete types are used
+	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
+
+	itemPaths, err := service.SearchCollection(objectPath, attributes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search collection: %w", err)
+	}
+
+	if len(itemPaths) == 0 {
+		return nil, store.ErrCredentialNotFound
+	}
+
+	credentials := make(map[string]store.Secret)
+	for _, itemPath := range itemPaths {
+		attributes, err := service.GetAttributes(itemPath)
+		if err != nil {
+			return nil, err
+		}
+
+		// it is possible that someone else has stored secrets in the keychain
+		// directly without conforming to the store.ID format.
+		// We shouldn't error here when these values cannot be retrieved or
+		// parsed. Instead we just ignore them and proceed.
+		// I guess in future we could at least log them somewhere?
+		// but for now, let's just continue with the other items in the store.
+		attrID, ok := attributes["id"]
+		if !ok {
+			continue
+		}
+
+		secretID, err := store.ParseID(attrID)
+		if err != nil {
+			continue
+		}
+
+		// filter any secrets we couldn't filter through the keychain API
+		if !pattern.Match(secretID) {
+			continue
+		}
+
+		value, err := service.GetSecret(itemPath, *session)
+		if err != nil {
+			return nil, err
+		}
+		safelyCleanMetadata(attributes)
+
+		secret := k.factory()
+		if err := secret.SetMetadata(attributes); err != nil {
+			return nil, err
+		}
+		if err := secret.Unmarshal(value); err != nil {
+			return nil, err
+		}
+
+		credentials[secretID.String()] = secret
+	}
+
+	if len(credentials) == 0 {
+		return nil, store.ErrCredentialNotFound
+	}
+
+	return credentials, nil
 }

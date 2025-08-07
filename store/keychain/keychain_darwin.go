@@ -98,7 +98,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	if err != nil {
 		return nil, err
 	}
-	k.safelyCleanMetadata(attributes)
+	safelyCleanMetadata(attributes)
 
 	secret := k.factory()
 	if err := secret.SetMetadata(attributes); err != nil {
@@ -133,7 +133,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		if err != nil {
 			return nil, err
 		}
-		k.safelyCleanMetadata(attributes)
+		safelyCleanMetadata(attributes)
 
 		secret := k.factory()
 		if err := secret.SetMetadata(attributes); err != nil {
@@ -158,7 +158,8 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 
 	metadata := make(map[string]string)
 	maps.Copy(metadata, secret.Metadata())
-	k.safelySetMetadata(id.String(), metadata)
+	safelySetMetadata(k.serviceGroup, k.serviceName, metadata)
+	safelySetID(id, metadata)
 
 	metadataAny := make(map[string]any)
 	for k, v := range metadata {
@@ -167,6 +168,77 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	item.SetGenericMetadata(metadataAny)
 
 	return mapKeychainError(kc.AddItem(item))
+}
+
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+	// Note: Filter on macOS cannot filter by generic attributes and thus we
+	// cannot split the ID and store it in the keychain as parts for later
+	// pattern matching.
+	// We only have access to:
+	// - "Account" (secrets.ID)
+	// - "ServiceName" this keychain instances' serviceName
+	// - "ServiceGroup" this keychain instances' serviceGroup
+	//
+	// Filtering happens after we have retrieved the secrets from the store
+	// based on the above attributes.
+	// We then match the IDs against the pattern, 1 by 1.
+	// This shouldn't be too expensive since we don't actually retrieve the
+	// encrypted secret when fetching many secrets. Only after they match
+	// the pattern, do we fetch their data and possibly prompt the user.
+
+	item := newKeychainItem("", k)
+
+	// We use the MatchLimitAll attribute to query for multiple items from the
+	// store. It cannot be used with item.SetReturnData.
+	// https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)#Discussion
+	item.SetMatchLimit(kc.MatchLimitAll)
+
+	results, err := kc.QueryItem(item)
+	if err != nil {
+		return nil, mapKeychainError(err)
+	}
+
+	creds := make(map[string]store.Secret)
+	for _, result := range results {
+		// it is possible that someone else has stored secrets in the keychain
+		// directly without conforming to the store.ID format.
+		// We shouldn't error here when these values cannot be retrieved or
+		// parsed. Instead we just ignore them and proceed.
+		// I guess in future we could at least log them somewhere?
+		// but for now, let's just continue with the other items in the store.
+		id, err := store.ParseID(result.Account)
+		if err != nil {
+			continue
+		}
+
+		// filter out any secrets based on the pattern which we couldn't do
+		// with the keychain API
+		if !pattern.Match(id) {
+			continue
+		}
+
+		attr, err := convertAttributes(result.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		safelyCleanMetadata(attr)
+
+		i, err := getItemWithData(id.String(), k)
+		if err != nil {
+			return nil, err
+		}
+
+		secret := k.factory()
+		if err := secret.SetMetadata(attr); err != nil {
+			return nil, err
+		}
+		if err := secret.Unmarshal(i.Data); err != nil {
+			return nil, err
+		}
+		creds[id.String()] = secret
+	}
+
+	return creds, nil
 }
 
 func mapKeychainError(err error) error {
