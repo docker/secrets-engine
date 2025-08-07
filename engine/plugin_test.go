@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/ipc"
 	"github.com/docker/secrets-engine/internal/logging"
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/internal/testhelper"
-	"github.com/docker/secrets-engine/internal/testhelper/dummy"
 	p "github.com/docker/secrets-engine/plugin"
 )
 
@@ -72,9 +72,9 @@ func TestMain(m *testing.M) {
 	if strings.HasPrefix(binaryName, "plugin") {
 		// This allows tests to call the test binary as plugin by creating a symlink prefixed with "plugin-" to it.
 		// We then based on the suffix in dummyPluginProcessFromBinaryName() set the behavior of the plugin.
-		dummy.PluginProcessFromBinaryName(binaryName)
+		testdummy.PluginProcessFromBinaryName(binaryName)
 	} else if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
-		dummy.PluginProcess(nil)
+		testdummy.PluginProcess(nil)
 	} else {
 		os.Exit(m.Run())
 	}
@@ -91,10 +91,10 @@ func Test_newPlugin(t *testing.T) {
 			test: func(t *testing.T) {
 				pattern := "foo-bar"
 				version := api.MustNewVersion("v2")
-				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
+				cmd, parseOutput := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version: version.String(),
 					Pattern: pattern,
-					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
+					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
@@ -104,15 +104,15 @@ func Test_newPlugin(t *testing.T) {
 				assert.Equal(t, pluginNameFromTestName(t), p.Name().String())
 				assert.Equal(t, version.String(), p.Version().String())
 				assert.Equal(t, pattern, p.Pattern().String())
-				s, err := p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				s, err := p.GetSecret(context.Background(), secrets.Request{ID: testdummy.MockSecretID})
 				assert.NoError(t, err)
-				assert.Equal(t, dummy.MockSecretValue, string(s.Value))
+				assert.Equal(t, testdummy.MockSecretValue, string(s.Value))
 				assert.NoError(t, p.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				r, err := parseOutput()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(r.GetSecret))
-				assert.Equal(t, dummy.MockSecretID.String(), r.GetSecret[0])
+				assert.Equal(t, testdummy.MockSecretID.String(), r.GetSecret[0])
 
 				t.Logf("plugin binary output:\n%s", r.Log)
 			},
@@ -121,7 +121,7 @@ func Test_newPlugin(t *testing.T) {
 			name: "plugin returns no secret but an error",
 			test: func(t *testing.T) {
 				errGetSecret := "you do not get my secret"
-				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
+				cmd, parseOutput := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version:      "v1",
 					Pattern:      "foo-bar",
 					ErrGetSecret: errGetSecret,
@@ -131,7 +131,7 @@ func Test_newPlugin(t *testing.T) {
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
-				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				_, err = p.GetSecret(context.Background(), secrets.Request{ID: testdummy.MockSecretID})
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
 				r, err := parseOutput()
@@ -145,7 +145,7 @@ func Test_newPlugin(t *testing.T) {
 			// TODO(investigate): On windows cmd.Wait() returning STATUS_CONTROL_C_EXIT is very unreliable through this test.
 			name: "plugin ignoring SIGINT does not break the runtime",
 			test: func(t *testing.T) {
-				cmd, _ := dummy.PluginCommand(t, dummy.PluginCfg{
+				cmd, _ := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version:      "v1",
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
@@ -162,7 +162,7 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "plugin process crashes unexpectedly",
 			test: func(t *testing.T) {
-				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
+				cmd, parseOutput := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version:      "v1",
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
@@ -183,11 +183,11 @@ func Test_newPlugin(t *testing.T) {
 		{
 			name: "plugin process exists unexpectedly",
 			test: func(t *testing.T) {
-				cmd, parseOutput := dummy.PluginCommand(t, dummy.PluginCfg{
+				cmd, parseOutput := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version: "v2",
 					Pattern: "foo-bar",
-					Secrets: map[string]string{dummy.MockSecretID.String(): dummy.MockSecretValue},
-					CrashBehaviour: &dummy.CrashBehaviour{
+					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
+					CrashBehaviour: &testdummy.CrashBehaviour{
 						OnNthSecretRequest: 1,
 						ExitCode:           0,
 					},
@@ -197,7 +197,7 @@ func Test_newPlugin(t *testing.T) {
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
-				_, err = p.GetSecret(context.Background(), secrets.Request{ID: dummy.MockSecretID})
+				_, err = p.GetSecret(context.Background(), secrets.Request{ID: testdummy.MockSecretID})
 				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
