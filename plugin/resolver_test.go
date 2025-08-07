@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 
-	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
-	"github.com/docker/secrets-engine/internal/secrets"
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const (

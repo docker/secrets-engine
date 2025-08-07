@@ -63,7 +63,7 @@ unit-tests:
 	go test -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./...)       & pids="$$pids $$!"; \
+	go test -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
 	done; \
