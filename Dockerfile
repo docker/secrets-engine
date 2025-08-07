@@ -46,6 +46,7 @@ RUN --mount=type=bind,target=.,ro \
     go mod tidy --diff
     (cd client && go mod tidy --diff)
     (cd engine && go mod tidy --diff)
+    (cd mysecret && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
     (cd store && go mod tidy --diff)
 EOT

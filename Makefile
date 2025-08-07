@@ -60,6 +60,7 @@ unit-tests:
 	err=0; \
 	go test -v $(shell go list ./client/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
+	go test -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./...)       & pids="$$pids $$!"; \
 	for p in $$pids; do \
@@ -83,12 +84,12 @@ engine-unit-tests:
 	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
 
 mysecret:
-	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./cmd/mysecret
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./mysecret
 	rm "$(DOCKER_MYSECRET_DST)" || true
 	cp "dist/$(MYSECRET_BINARY)$(EXTENSION)" "$(DOCKER_MYSECRET_DST)"
 
 mysecret-cross: multiarch-builder
-	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file cmd/mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
 
 nri-plugin:
@@ -115,4 +116,4 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests
+.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests mysecret mysecret-cross

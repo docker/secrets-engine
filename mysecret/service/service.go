@@ -1,4 +1,4 @@
-package mysecret
+package service
 
 import (
 	"github.com/docker/secrets-engine/store"
