@@ -200,6 +200,12 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 
 	creds := make(map[string]store.Secret)
 	for _, result := range results {
+		// it is possible that someone else has stored secrets in the keychain
+		// directly without conforming to the store.ID format.
+		// We shouldn't error here when these values cannot be retrieved or
+		// parsed. Instead we just ignore them and proceed.
+		// I guess in future we could at least log them somewhere?
+		// but for now, let's just continue with the other items in the store.
 		id, err := store.ParseID(result.Account)
 		if err != nil {
 			continue
