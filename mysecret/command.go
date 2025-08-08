@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/secrets-engine/internal/config"
 	"github.com/docker/secrets-engine/mysecret/commands"
+	"github.com/docker/secrets-engine/store"
 )
 
 // Note: We use a custom help template to make it more brief.
@@ -28,7 +29,7 @@ Examples:
 `
 
 // rootCommand returns the root command for the init plugin
-func rootCommand(ctx context.Context) *cobra.Command {
+func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "mysecret [OPTIONS]",
 		TraverseChildren: true,
@@ -38,7 +39,10 @@ func rootCommand(ctx context.Context) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
-			return plugin.PersistentPreRunE(cmd, args)
+			if plugin.PersistentPreRunE != nil {
+				return plugin.PersistentPreRunE(cmd, args)
+			}
+			return nil
 		},
 		Version: fmt.Sprintf("%s, commit %s", config.Version, config.Commit()),
 	}
@@ -50,7 +54,7 @@ func rootCommand(ctx context.Context) *cobra.Command {
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	cmd.AddCommand(commands.SetCommand())
+	cmd.AddCommand(commands.SetCommand(s))
 
 	return cmd
 }
