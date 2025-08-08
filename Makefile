@@ -1,7 +1,5 @@
-MODULE := $(shell sh -c "awk '/^module/ { print \$$2 }' go.mod")
 GIT_TAG?=dev
-CLI_EXPERIMENTS_EXTENSION_IMAGE?=docker/secrets-engine-extension
-GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.mod")
+GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.work")
 
 export BUF_VERSION := v1.54.0
 
