@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -89,31 +89,21 @@ func parseArg(arg string) (*secret, error) {
 }
 
 func readAllWithContext(ctx context.Context, r io.Reader) ([]byte, error) {
-	lines := make(chan []byte)
-	errs := make(chan error)
+	var buf bytes.Buffer
+	done := make(chan error, 1)
 
 	go func() {
-		defer close(lines)
-		defer close(errs)
-
-		reader := bufio.NewReader(r)
-		line, err := reader.ReadBytes('\n')
-		switch {
-		case err == io.EOF:
-			lines <- line
-		case err != nil:
-			errs <- err
-		default:
-			lines <- line
-		}
+		_, err := io.Copy(&buf, r)
+		done <- err
 	}()
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case err := <-errs:
-		return nil, err
-	case line := <-lines:
-		return line, nil
+	case err := <-done:
+		if err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
 	}
 }
