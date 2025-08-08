@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/store"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,7 @@ echo my-secret-password > pwd.txt
 cat pwd.txt | docker mysecret set POSTGRES_PASSWORD
 `
 
-func SetCommand() *cobra.Command {
+func SetCommand(kc store.Store) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "set id[=value]",
 		Aliases: []string{"store", "save"},
@@ -46,10 +47,6 @@ func SetCommand() *cobra.Command {
 				s = *val
 			}
 			id, err := secrets.ParseID(s.id)
-			if err != nil {
-				return err
-			}
-			kc, err := service.KCService()
 			if err != nil {
 				return err
 			}
