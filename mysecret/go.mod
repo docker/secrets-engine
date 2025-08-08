@@ -8,8 +8,8 @@ replace github.com/docker/secrets-engine/store => ../store
 
 require (
 	github.com/docker/cli v28.3.3+incompatible
-	github.com/docker/secrets-engine v0.0.0-00010101000000-000000000000
-	github.com/docker/secrets-engine/store v0.0.0-00010101000000-000000000000
+	github.com/docker/secrets-engine v0.0.7
+	github.com/docker/secrets-engine/store v0.0.7
 	github.com/spf13/cobra v1.9.1
 )
 
