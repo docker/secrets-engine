@@ -23,6 +23,7 @@ type mockStore struct {
 	lock      sync.RWMutex
 	errSave   error
 	errGetAll error
+	errDelete error
 	store     map[string]store.Secret
 }
 
@@ -46,6 +47,12 @@ func withStoreGetAllErr(err error) mockStoreOption {
 	}
 }
 
+func withStoreDeleteErr(err error) mockStoreOption {
+	return func(m *mockStore) {
+		m.errDelete = err
+	}
+}
+
 func withStore(store map[string]store.Secret) mockStoreOption {
 	return func(m *mockStore) {
 		m.store = store
@@ -55,6 +62,10 @@ func withStore(store map[string]store.Secret) mockStoreOption {
 func (m *mockStore) Delete(_ context.Context, id store.ID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	if m.errDelete != nil {
+		return m.errDelete
+	}
 
 	delete(m.store, id.String())
 	return nil
@@ -156,6 +167,52 @@ func Test_rootCommand(t *testing.T) {
 			out, err := executeCommand(rootCommand(t.Context(), mock), "list")
 			assert.ErrorIs(t, errGetAll, err)
 			assert.Equal(t, "Error: "+errGetAll.Error()+"\n", out)
+		})
+	})
+	t.Run("rm", func(t *testing.T) {
+		t.Run("ok (two secrets)", func(t *testing.T) {
+			mock := newMockStore(withStore(map[string]store.Secret{
+				"foo": &service.MyValue{Value: []byte("bar")},
+				"baz": &service.MyValue{Value: []byte("0")},
+			}))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "foo", "baz")
+			assert.NoError(t, err)
+			assert.Equal(t, "RM: baz\nRM: foo\n", out)
+		})
+		t.Run("--all", func(t *testing.T) {
+			mock := newMockStore(withStore(map[string]store.Secret{
+				"foo": &service.MyValue{Value: []byte("bar")},
+				"baz": &service.MyValue{Value: []byte("0")},
+			}))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "--all")
+			assert.NoError(t, err)
+			assert.Equal(t, "RM: baz\nRM: foo\n", out)
+		})
+		t.Run("store error", func(t *testing.T) {
+			errRemove := errors.New("remove error")
+			mock := newMockStore(withStoreDeleteErr(errRemove))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "foo")
+			assert.ErrorIs(t, err, errRemove)
+			assert.Equal(t, "ERR: foo: remove error\nError: "+errRemove.Error()+"\n", out)
+		})
+		t.Run("invalid id", func(t *testing.T) {
+			mock := newMockStore()
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "/foo")
+			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
+			assert.ErrorIs(t, err, errInvalidID)
+			assert.Equal(t, "ERR: /foo: invalid ID\nError: "+errInvalidID.Error()+"\n", out)
+		})
+		t.Run("cannot mix --all with explicit list", func(t *testing.T) {
+			mock := newMockStore()
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "--all", "foo")
+			assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
+			assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
+		})
+		t.Run("no args or --all", func(t *testing.T) {
+			mock := newMockStore()
+			out, err := executeCommand(rootCommand(t.Context(), mock), "rm")
+			assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
+			assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
 		})
 	})
 }
