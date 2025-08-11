@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"github.com/spf13/cobra"
 	"maps"
 	"sync"
 	"testing"
@@ -109,9 +111,29 @@ func Test_rootCommand(t *testing.T) {
 		t.Run("store errors", func(t *testing.T) {
 			errSave := errors.New("save error")
 			mock := newMockStore(withStoreSaveErr(errSave))
-			cli := rootCommand(t.Context(), mock)
-			cli.SetArgs([]string{"set", "foo=bar"})
-			assert.ErrorIs(t, errSave, cli.Execute())
+			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "foo=bar")
+			assert.ErrorIs(t, errSave, err)
+			assert.Equal(t, "Error: "+errSave.Error()+"\n", out)
+		})
+		t.Run("invalid id", func(t *testing.T) {
+			errSave := errors.New("save error")
+			mock := newMockStore(withStoreSaveErr(errSave))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "/foo=bar")
+			// TODO: use ErrorIs
+			assert.ErrorContains(t, err, "invalid identifier")
+			// TODO: use secrets.ErrInvalidID.Error() directly
+			assert.Equal(t, `Error: invalid identifier: "/foo" must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?`+"\n", out)
 		})
 	})
+}
+
+func executeCommand(root *cobra.Command, args ...string) (output string, err error) {
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs(args)
+
+	err = root.Execute()
+
+	return buf.String(), err
 }
