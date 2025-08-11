@@ -82,7 +82,7 @@ keychain-unit-tests:
 	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
 
 engine-unit-tests:
-	CGO_ENABLED=0 go test -v $$(go list ./engine/...)
+	go test -v $$(go list ./engine/...)
 
 mysecret:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./mysecret
