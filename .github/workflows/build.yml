@@ -36,6 +36,35 @@ jobs:
       - name: Build docker-mysecret Plugin
         run: make BUILDER=${{ steps.buildx.outputs.name }} mysecret-cross
 
+  engine:
+    name: Build secrets engine daemon binary
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Hub login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERBUILDBOT_USERNAME }}
+          password: ${{ secrets.DOCKERBUILDBOT_WRITE_PAT }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: cloud
+          endpoint: "docker/secrets-engine"
+          install: true
+
+      - name: Build secrets engine daemon
+        run: make BUILDER=${{ steps.buildx.outputs.name }} engine-cross
+
   nri-plugin:
     name: Build NRI Plugin
     runs-on: ubuntu-latest
