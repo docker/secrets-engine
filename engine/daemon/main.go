@@ -20,10 +20,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	mysecretPlugin, err := mysecret.NewMySecretPlugin()
+	if err != nil {
+		panic(err)
+	}
 	// TODO: double check if the version actually points to the engine sub-module or the main module
 	e, err := engine.New("secrets-engine", bi.Main.Version,
 		engine.WithPlugins(map[engine.Config]engine.Plugin{
-			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}: mysecret.NewMySecretPlugin(),
+			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}: mysecretPlugin,
 		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
 		engine.WithExternallyLaunchedPluginsDisabled(),
