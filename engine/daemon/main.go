@@ -5,6 +5,7 @@ import (
 	"runtime/debug"
 
 	"github.com/docker/secrets-engine/engine"
+	"github.com/docker/secrets-engine/internal/oshelper"
 )
 
 func main() {
@@ -21,7 +22,10 @@ func main() {
 		panic(err)
 	}
 
-	if err := e.Run(context.Background()); err != nil {
+	ctx, cancel := oshelper.NotifyContext(context.Background())
+	defer cancel()
+
+	if err := e.Run(ctx); err != nil {
 		panic(err)
 	}
 }
