@@ -119,10 +119,9 @@ func Test_rootCommand(t *testing.T) {
 			errSave := errors.New("save error")
 			mock := newMockStore(withStoreSaveErr(errSave))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "/foo=bar")
-			// TODO: use ErrorIs
-			assert.ErrorContains(t, err, "invalid identifier")
-			// TODO: use secrets.ErrInvalidID.Error() directly
-			assert.Equal(t, `Error: invalid identifier: "/foo" must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?`+"\n", out)
+			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
+			assert.ErrorIs(t, err, errInvalidID)
+			assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
 		})
 	})
 }
