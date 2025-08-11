@@ -20,9 +20,10 @@ import (
 type mockStoreOption func(m *mockStore)
 
 type mockStore struct {
-	lock    sync.RWMutex
-	errSave error
-	store   map[string]store.Secret
+	lock      sync.RWMutex
+	errSave   error
+	errGetAll error
+	store     map[string]store.Secret
 }
 
 func newMockStore(options ...mockStoreOption) store.Store {
@@ -36,6 +37,18 @@ func newMockStore(options ...mockStoreOption) store.Store {
 func withStoreSaveErr(err error) mockStoreOption {
 	return func(m *mockStore) {
 		m.errSave = err
+	}
+}
+
+func withStoreGetAllErr(err error) mockStoreOption {
+	return func(m *mockStore) {
+		m.errGetAll = err
+	}
+}
+
+func withStore(store map[string]store.Secret) mockStoreOption {
+	return func(m *mockStore) {
+		m.store = store
 	}
 }
 
@@ -61,6 +74,9 @@ func (m *mockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 func (m *mockStore) GetAllMetadata(_ context.Context) (map[string]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
+	if m.errGetAll != nil {
+		return nil, m.errGetAll
+	}
 	return maps.Clone(m.store), nil
 }
 
@@ -108,7 +124,7 @@ func Test_rootCommand(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, "bar=bar=bar", string(impl.Value))
 		})
-		t.Run("store errors", func(t *testing.T) {
+		t.Run("store error", func(t *testing.T) {
 			errSave := errors.New("save error")
 			mock := newMockStore(withStoreSaveErr(errSave))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "foo=bar")
@@ -122,6 +138,24 @@ func Test_rootCommand(t *testing.T) {
 			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 			assert.ErrorIs(t, err, errInvalidID)
 			assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
+		})
+	})
+	t.Run("list", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			mock := newMockStore(withStore(map[string]store.Secret{
+				"foo": &service.MyValue{Value: []byte("bar")},
+				"baz": &service.MyValue{Value: []byte("0")},
+			}))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "list")
+			assert.NoError(t, err)
+			assert.Equal(t, "baz\nfoo\n", out)
+		})
+		t.Run("store error", func(t *testing.T) {
+			errGetAll := errors.New("get error")
+			mock := newMockStore(withStoreGetAllErr(errGetAll))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "list")
+			assert.ErrorIs(t, errGetAll, err)
+			assert.Equal(t, "Error: "+errGetAll.Error()+"\n", out)
 		})
 	})
 }
