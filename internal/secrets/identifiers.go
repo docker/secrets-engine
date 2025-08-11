@@ -6,11 +6,11 @@ import (
 )
 
 type ErrInvalidID struct {
-	id string
+	ID string
 }
 
 func (e ErrInvalidID) Error() string {
-	return fmt.Sprintf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", e.id)
+	return fmt.Sprintf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", e.ID)
 }
 
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
@@ -100,7 +100,7 @@ func match(pattern, path []string) bool {
 func valid(id string) error {
 	if !validIdentifier(id) {
 		return ErrInvalidID{
-			id: id,
+			ID: id,
 		}
 	}
 
