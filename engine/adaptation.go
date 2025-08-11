@@ -164,7 +164,7 @@ func (a *adaptation) Run(ctx context.Context, up ...func()) error {
 		return errors.New("already started")
 	}
 	defer a.m.Unlock()
-	a.logger.Printf("secrets engine starting up...")
+	a.logger.Printf("secrets engine starting up... (%s)", a.socketPath)
 	e, err := newEngine(logging.WithLogger(ctx, a.logger), a.config)
 	if err != nil {
 		return err

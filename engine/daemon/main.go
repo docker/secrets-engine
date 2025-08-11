@@ -5,7 +5,10 @@ import (
 	"runtime/debug"
 
 	"github.com/docker/secrets-engine/engine"
+	"github.com/docker/secrets-engine/engine/daemon/internal/mysecret"
+	"github.com/docker/secrets-engine/internal/api"
 	"github.com/docker/secrets-engine/internal/oshelper"
+	"github.com/docker/secrets-engine/internal/secrets"
 )
 
 func main() {
@@ -13,8 +16,15 @@ func main() {
 	if !ok {
 		panic("could not read build info")
 	}
+	version, err := api.NewVersion(bi.Main.Version)
+	if err != nil {
+		panic(err)
+	}
 	// TODO: double check if the version actually points to the engine sub-module or the main module
 	e, err := engine.New("secrets-engine", bi.Main.Version,
+		engine.WithPlugins(map[engine.Config]engine.Plugin{
+			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}: mysecret.NewMySecretPlugin(),
+		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
 		engine.WithExternallyLaunchedPluginsDisabled(),
 	)
