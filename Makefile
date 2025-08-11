@@ -6,6 +6,7 @@ export BUF_VERSION := v1.56.0
 
 export NRI_PLUGIN_BINARY := nri-secrets-engine
 export MYSECRET_BINARY := docker-mysecret
+export ENGINE_BINARY := secrets-engine
 
 ifeq ($(OS),Windows_NT)
 	WINDOWS = $(OS)
@@ -30,6 +31,7 @@ DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg NRI_PLUGIN_BINARY \
           			--build-arg MYSECRET_BINARY \
+          			--build-arg ENGINE_BINARY \
           			--build-arg BUF_VERSION \
           			--build-arg GIT_TAG
 
@@ -90,6 +92,11 @@ mysecret:
 mysecret-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
+engine:
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
+
+engine-cross: multiarch-builder
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-engine --file engine/daemon/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
@@ -115,4 +122,4 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests mysecret mysecret-cross
+.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests mysecret mysecret-cross engine engine-cross
