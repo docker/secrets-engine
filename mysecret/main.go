@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
@@ -12,19 +11,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/internal/config"
+	"github.com/docker/secrets-engine/internal/oshelper"
 	"github.com/docker/secrets-engine/mysecret/service"
 )
 
-type errCtxSignalTerminated struct {
-	signal os.Signal
-}
-
-func (errCtxSignalTerminated) Error() string {
-	return ""
-}
-
 func main() {
-	ctx, cancel := notifyContext(context.Background())
+	ctx, cancel := oshelper.NotifyContext(context.Background())
 	defer cancel()
 	if plugin.RunningStandalone() {
 		os.Args = append([]string{os.Args[0], "mysecret"}, os.Args[1:]...)
@@ -45,28 +37,4 @@ func main() {
 			ShortDescription: "Docker MySecret Plugin",
 		},
 	)
-}
-
-func notifyContext(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, signals...)
-
-	ctxCause, cancel := context.WithCancelCause(ctx)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			signal.Stop(ch)
-			return
-		case sig := <-ch:
-			cancel(errCtxSignalTerminated{signal: sig})
-			signal.Stop(ch)
-			return
-		}
-	}()
-
-	return ctxCause, func() {
-		signal.Stop(ch)
-		cancel(nil)
-	}
 }
