@@ -32,6 +32,7 @@ Examples:
 func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "mysecret [OPTIONS]",
+		SilenceUsage:     true,
 		TraverseChildren: true,
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: false,
