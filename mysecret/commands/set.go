@@ -78,11 +78,11 @@ type secret struct {
 }
 
 func parseArg(arg string) (*secret, error) {
-	parts := strings.Split(arg, "=")
-	if len(parts) != 2 {
+	key, value, found := strings.Cut(arg, "=")
+	if !found {
 		return nil, fmt.Errorf("no key=value pair: %s", arg)
 	}
-	return &secret{id: parts[0], val: parts[1]}, nil
+	return &secret{id: key, val: value}, nil
 }
 
 func readAllWithContext(ctx context.Context, r io.Reader) ([]byte, error) {
