@@ -56,6 +56,7 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	})
 
 	cmd.AddCommand(commands.SetCommand(s))
+	cmd.AddCommand(commands.ListCommand(s))
 
 	return cmd
 }
