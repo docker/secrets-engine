@@ -1,7 +1,8 @@
 GIT_TAG?=dev
 GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.work")
 
-export BUF_VERSION := v1.54.0
+# For latest version, see: https://github.com/bufbuild/buf/tags
+export BUF_VERSION := v1.56.0
 
 export NRI_PLUGIN_BINARY := nri-secrets-engine
 export MYSECRET_BINARY := docker-mysecret
