@@ -24,6 +24,7 @@ type mockStore struct {
 	errSave   error
 	errGetAll error
 	errDelete error
+	errGet    error
 	store     map[string]store.Secret
 }
 
@@ -38,6 +39,12 @@ func newMockStore(options ...mockStoreOption) store.Store {
 func withStoreSaveErr(err error) mockStoreOption {
 	return func(m *mockStore) {
 		m.errSave = err
+	}
+}
+
+func withStoreGetErr(err error) mockStoreOption {
+	return func(m *mockStore) {
+		m.errGet = err
 	}
 }
 
@@ -74,6 +81,10 @@ func (m *mockStore) Delete(_ context.Context, id store.ID) error {
 func (m *mockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
+
+	if m.errGet != nil {
+		return nil, m.errGet
+	}
 
 	secret, exists := m.store[id.String()]
 	if !exists {
@@ -178,6 +189,9 @@ func Test_rootCommand(t *testing.T) {
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "foo", "baz")
 			assert.NoError(t, err)
 			assert.Equal(t, "RM: baz\nRM: foo\n", out)
+			l, err := mock.GetAllMetadata(t.Context())
+			require.NoError(t, err)
+			assert.Empty(t, l)
 		})
 		t.Run("--all", func(t *testing.T) {
 			mock := newMockStore(withStore(map[string]store.Secret{
@@ -187,6 +201,9 @@ func Test_rootCommand(t *testing.T) {
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "--all")
 			assert.NoError(t, err)
 			assert.Equal(t, "RM: baz\nRM: foo\n", out)
+			l, err := mock.GetAllMetadata(t.Context())
+			require.NoError(t, err)
+			assert.Empty(t, l)
 		})
 		t.Run("store error", func(t *testing.T) {
 			errRemove := errors.New("remove error")
@@ -213,6 +230,23 @@ func Test_rootCommand(t *testing.T) {
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm")
 			assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
 			assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
+		})
+	})
+	t.Run("get", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			mock := newMockStore(withStore(map[string]store.Secret{
+				"foo": &service.MyValue{Value: []byte("bar")},
+			}))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "get", "foo")
+			assert.NoError(t, err)
+			assert.Equal(t, "ID: foo\nValue: bar\n", out)
+		})
+		t.Run("store error", func(t *testing.T) {
+			errGet := errors.New("get error")
+			mock := newMockStore(withStoreGetErr(errGet))
+			out, err := executeCommand(rootCommand(t.Context(), mock), "get", "foo")
+			assert.ErrorIs(t, err, errGet)
+			assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
 		})
 	})
 }
