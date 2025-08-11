@@ -65,6 +65,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag client/${TAG}
           git tag engine/${TAG}
+          git tag mysecret/${TAG}
           git tag plugin/${TAG}
           git tag store/${TAG}
 
