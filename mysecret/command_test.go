@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/spf13/cobra"
 	"maps"
 	"sync"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -99,14 +99,14 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("set secret from CLI", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := newMockStore()
-			cli := rootCommand(t.Context(), mock)
-			cli.SetArgs([]string{"set", "foo=bar"})
-			assert.NoError(t, cli.Execute())
+			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "foo=bar=bar=bar")
+			assert.NoError(t, err)
+			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
 			require.NoError(t, err)
 			impl, ok := s.(*service.MyValue)
 			require.True(t, ok)
-			assert.Equal(t, "bar", string(impl.Value))
+			assert.Equal(t, "bar=bar=bar", string(impl.Value))
 		})
 		t.Run("store errors", func(t *testing.T) {
 			errSave := errors.New("save error")
