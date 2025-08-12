@@ -12,7 +12,6 @@ on:
 permissions:
   id-token: write
   contents: write
-
 jobs:
   release:
     name: Release
@@ -22,9 +21,10 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
       BRANCH: ${{ github.event.inputs.branch }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: ./.github/actions/go
+        with:
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: "Release tag '${{ github.event.inputs.tag }}' should be semver prefixed with 'v'"
         shell: bash
         run: |
@@ -32,13 +32,11 @@ jobs:
             echo "::error::Invalid tag '${TAG}'. Tags must start with 'v' and follow semver (vMAJOR.MINOR.PATCH[-PRERELEASE])."
             exit 1
           fi
-
       - name: Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKERBUILDBOT_USERNAME }}
           password: ${{ secrets.DOCKERBUILDBOT_WRITE_PAT }}
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -46,10 +44,8 @@ jobs:
           driver: cloud
           endpoint: "docker/secrets-engine"
           install: true
-
       - name: Build NRI Plugin
         run: make BUILDER=${{ steps.buildx.outputs.name }} nri-plugin-package
-
       - name: Ship it
         uses: ncipollo/release-action@v1
         with:
@@ -58,7 +54,6 @@ jobs:
           tag: ${{ env.TAG }}
           commit: ${{ env.BRANCH }}
           generateReleaseNotes: true
-
       - name: Create module tags
         run: |
           git config user.name "github-actions[bot]"
@@ -68,6 +63,5 @@ jobs:
           git tag mysecret/${TAG}
           git tag plugin/${TAG}
           git tag store/${TAG}
-
       - name: Push tags
         run: git push origin --tags
