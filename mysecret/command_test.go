@@ -17,7 +17,7 @@ import (
 
 func Test_rootCommand(t *testing.T) {
 	t.Parallel()
-	t.Run("set secret from CLI", func(t *testing.T) {
+	t.Run("set", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore()
 			out, err := executeCommand(rootCommand(t.Context(), mock), "set", "foo=bar=bar=bar")
@@ -28,6 +28,17 @@ func Test_rootCommand(t *testing.T) {
 			impl, ok := s.(*service.MyValue)
 			require.True(t, ok)
 			assert.Equal(t, "bar=bar=bar", string(impl.Value))
+		})
+		t.Run("from STDIN", func(t *testing.T) {
+			mock := teststore.NewMockStore()
+			out, err := executeCommandWithStdin(rootCommand(t.Context(), mock), "my\nmultiline\nvalue", "set", "foo")
+			assert.NoError(t, err)
+			assert.Empty(t, out)
+			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
+			require.NoError(t, err)
+			impl, ok := s.(*service.MyValue)
+			require.True(t, ok)
+			assert.Equal(t, "my\nmultiline\nvalue", string(impl.Value))
 		})
 		t.Run("store error", func(t *testing.T) {
 			errSave := errors.New("save error")
@@ -132,6 +143,19 @@ func Test_rootCommand(t *testing.T) {
 			assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
 		})
 	})
+}
+
+func executeCommandWithStdin(root *cobra.Command, stdin string, args ...string) (output string, err error) {
+	inBuf := bytes.NewBufferString(stdin)
+	buf := &bytes.Buffer{}
+	root.SetIn(inBuf)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs(args)
+
+	err = root.Execute()
+
+	return buf.String(), err
 }
 
 func executeCommand(root *cobra.Command, args ...string) (output string, err error) {
