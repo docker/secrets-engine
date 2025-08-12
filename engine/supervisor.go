@@ -28,7 +28,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []
 				defer launchedOnce()
 				return p.launcher()
 			})
-			if err := retryLoop(ctx, cfg, reg, p.name, launcherWithOnce); err != nil {
+			if err := retryLoop(ctx, cfg, reg, p.name, launcherWithOnce); err != nil && !errors.Is(err, context.Canceled) {
 				cfg.logger.Errorf("plugin '%s' stopped: %s", p.name, err)
 				return err
 			}
