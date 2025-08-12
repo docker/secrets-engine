@@ -51,7 +51,9 @@ format: ## Format code
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=format .
 
 lint: multiarch-builder ## Lint code
-	@docker buildx build $(DOCKER_BUILD_ARGS) --secret id=GH_TOKEN --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
+	# https://github.com/docker/actions (which we use for cloud build in CI) names it GH_TOKEN but almost everywhere else at Docker it's named GITHUB_TOKEN
+	# so we stick that and don't force people to only for this project locally duplicate that variable.
+	@docker buildx build $(DOCKER_BUILD_ARGS) --secret id=GH_TOKEN,env=GITHUB_TOKEN --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
 
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
