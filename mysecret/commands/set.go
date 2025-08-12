@@ -1,11 +1,9 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/docker/secrets-engine/internal/secrets"
@@ -40,7 +38,7 @@ func SetCommand(kc store.Store) *cobra.Command {
 				}
 				s = *va
 			} else {
-				val, err := secretMappingFromSTDIN(cmd.Context(), args[0])
+				val, err := secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin(), args[0])
 				if err != nil {
 					return err
 				}
@@ -60,8 +58,8 @@ func isNotImplicitReadFromStdinSyntax(args []string) bool {
 	return strings.Contains(args[0], "=") || len(args) > 1
 }
 
-func secretMappingFromSTDIN(ctx context.Context, id string) (*secret, error) {
-	data, err := readAllWithContext(ctx, os.Stdin)
+func secretMappingFromSTDIN(ctx context.Context, reader io.Reader, id string) (*secret, error) {
+	data, err := readAllWithContext(ctx, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +84,12 @@ func parseArg(arg string) (*secret, error) {
 }
 
 func readAllWithContext(ctx context.Context, r io.Reader) ([]byte, error) {
-	var buf bytes.Buffer
+	var buf []byte
 	done := make(chan error, 1)
 
 	go func() {
-		_, err := io.Copy(&buf, r)
+		data, err := io.ReadAll(r)
+		buf = data
 		done <- err
 	}()
 
@@ -101,6 +100,6 @@ func readAllWithContext(ctx context.Context, r io.Reader) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return buf.Bytes(), nil
+		return buf, nil
 	}
 }
