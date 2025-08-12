@@ -1,11 +1,9 @@
 name: Go Work Check
-
 on:
   push:
     branches:
       - main
   pull_request:
-
 jobs:
   check:
     name: Check
@@ -14,19 +12,14 @@ jobs:
       id-token: write
       pull-requests: write
       contents: write
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
-          cache: true
-          check-latest: true
-
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Check if go work sync/vendor is clean
-        run: |
+        run: |-
           go work sync
           go work vendor
           if [[ -n "$(git status --porcelain)" ]]; then
