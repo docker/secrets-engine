@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/engine
 
-go 1.24.3
+go 1.24.4
 
 // This `replace` is only for CI to function.
 // The correct version will get resolved from below when this module is
@@ -18,6 +18,7 @@ replace github.com/docker/secrets-engine/store => ../store
 require (
 	connectrpc.com/connect v1.18.1
 	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/docker/docker-auth/auth v0.0.1-beta
 	github.com/docker/secrets-engine v0.0.7
 	github.com/docker/secrets-engine/client v0.0.7
 	github.com/docker/secrets-engine/mysecret v0.0.0-00010101000000-000000000000
