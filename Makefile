@@ -51,7 +51,7 @@ format: ## Format code
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=format .
 
 lint: multiarch-builder ## Lint code
-	@docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
+	@docker buildx build $(DOCKER_BUILD_ARGS) --secret id=GH_TOKEN --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
 
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
@@ -96,7 +96,10 @@ engine:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
 
 engine-cross: multiarch-builder
-	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-engine --file engine/daemon/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-engine \
+		--file engine/daemon/Dockerfile \
+		--platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 \
+		-o ./dist .
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin

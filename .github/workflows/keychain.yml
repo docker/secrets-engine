@@ -55,12 +55,11 @@ jobs:
           - windows-2022
           - windows-2025
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
         with:
-          go-version-file: ./store/go.mod
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Test keychain
         run: make keychain-unit-tests
   tests-macos:
@@ -77,11 +76,10 @@ jobs:
           - macOS-14
           - macOS-13
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
         with:
-          go-version-file: ./store/go.mod
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Test keychain
         run: make keychain-unit-tests
