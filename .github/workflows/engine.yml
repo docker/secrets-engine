@@ -16,12 +16,11 @@ jobs:
     name: WindowsEngineTests
     runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Test engine
         run: make engine-unit-tests
   tests-macos:
@@ -31,12 +30,10 @@ jobs:
     name: MacOSEngineTests
     runs-on: macos-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
         with:
-          go-version-file: go.mod
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Test engine
         run: CGO_ENABLED=1 make engine-unit-tests
-

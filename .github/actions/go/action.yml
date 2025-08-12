@@ -1,0 +1,25 @@
+name: Setup Go and GOPRIVATE
+inputs:
+  app_id:
+    description: Docker App ID
+    required: true
+  app_private_key:
+    description: Docker App Private Key
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Setup Git Credentials
+      id: setup-git-creds
+      uses: docker/actions/setup@setup/v1
+      with:
+        app_id: ${{ inputs.app_id }}
+        app_private_key: ${{ inputs.app_private_key }}
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+    - name: Set GOPRIVATE
+      shell: bash
+      run: |
+        echo "GOPRIVATE=github.com/docker" >> $GITHUB_ENV

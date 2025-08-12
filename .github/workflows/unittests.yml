@@ -1,18 +1,18 @@
 name: Unit Tests
-
 on:
   push:
     branches:
       - main
   pull_request:
-
 jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
+        with:
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
       - name: Unit Tests
         run: make unit-tests
