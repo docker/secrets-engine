@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -164,7 +165,7 @@ func (a *adaptation) Run(ctx context.Context, up ...func()) error {
 		return errors.New("already started")
 	}
 	defer a.m.Unlock()
-	a.logger.Printf("secrets engine starting up... (%s)", a.socketPath)
+	a.logger.Printf("secrets engine starting up... (%s)", tryMaskHomePath(a.socketPath))
 	e, err := newEngine(logging.WithLogger(ctx, a.logger), a.config)
 	if err != nil {
 		return err
@@ -180,4 +181,12 @@ func (a *adaptation) Run(ctx context.Context, up ...func()) error {
 
 func toDisplayName(filename string) string {
 	return strings.TrimSuffix(filename, ".exe")
+}
+
+func tryMaskHomePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return strings.Replace(path, home, "~", 1)
 }
