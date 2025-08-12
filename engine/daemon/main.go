@@ -32,8 +32,8 @@ func main() {
 	// TODO: double check if the version actually points to the engine sub-module or the main module
 	e, err := engine.New("secrets-engine", bi.Main.Version,
 		engine.WithPlugins(map[engine.Config]engine.Plugin{
-			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}:                                   mysecretPlugin,
-			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("io.Docker.Auth/docker-auth-cli/**")}: dockerAuthPlugin,
+			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}:    mysecretPlugin,
+			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("**")}: dockerAuthPlugin,
 		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
 		engine.WithExternallyLaunchedPluginsDisabled(),
