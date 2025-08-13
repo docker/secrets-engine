@@ -13,8 +13,16 @@ import (
 	"github.com/docker/secrets-engine/internal/secrets"
 )
 
+type (
+	Resolver = secrets.Resolver
+	Envelope = secrets.Envelope
+	Request  = secrets.Request
+)
+
+var EnvelopeErr = secrets.EnvelopeErr
+
 type Plugin interface {
-	secrets.Resolver
+	Resolver
 }
 
 // Stub is the interface the stub provides for the plugin implementation.
@@ -45,13 +53,25 @@ type stub struct {
 	requestTimeout      time.Duration
 }
 
+type (
+	Version = api.Version
+	Pattern = secrets.Pattern
+	Logger  = logging.Logger
+)
+
+var (
+	ParsePattern     = secrets.ParsePattern
+	MustParsePattern = secrets.MustParsePattern
+	NewVersion       = api.NewVersion
+)
+
 type Config struct {
 	// Version of the plugin in semver format.
-	Version api.Version
+	Version Version
 	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
-	Pattern secrets.Pattern
+	Pattern Pattern
 	// Logger to be used within plugin side SDK code. If nil, a default logger will be created and used.
-	Logger logging.Logger
+	Logger Logger
 }
 
 func (c *Config) Valid() error {
