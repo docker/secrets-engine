@@ -21,6 +21,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
       BRANCH: ${{ github.event.inputs.branch }}
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/go
         with:
           app_id: ${{ vars.DOCKER_READ_APP_ID }}
