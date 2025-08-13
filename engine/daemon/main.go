@@ -36,7 +36,7 @@ func main() {
 			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("**")}: dockerAuthPlugin,
 		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
-		engine.WithExternallyLaunchedPluginsDisabled(),
+		// engine.WithExternallyLaunchedPluginsDisabled(),
 	)
 	if err != nil {
 		panic(err)
