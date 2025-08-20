@@ -39,9 +39,10 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 	registrator := newRegistrationLogic(v, chRegistrationResult)
 	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{logger: logger, r: registrator}))
 	chIpcErr := make(chan error, 1)
+	name := make(chan string, 1)
 	i, c, err := ipc.NewServerIPC(logger, conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
-			logger.Printf("Connection to plugin %v closed", v.name)
+			logger.Printf("Connection to plugin %v closed", readWithTimeout(name, v.name))
 		}
 		cb()
 		chIpcErr <- err
@@ -56,6 +57,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 			i.Close()
 			return nil, fmt.Errorf("failed to register plugin: %w", r.err)
 		}
+		name <- r.cfg.Name().String()
 		out = r.cfg
 	case err := <-chIpcErr:
 		i.Close()
@@ -79,6 +81,15 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 			return err
 		},
 	}, nil
+}
+
+func readWithTimeout(ch <-chan string, fallback string) string {
+	select {
+	case s := <-ch:
+		return s
+	case <-time.After(getPluginRegistrationTimeout()):
+		return fallback
+	}
 }
 
 type pluginDataUnvalidated struct {
