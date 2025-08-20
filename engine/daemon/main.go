@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"runtime/debug"
+	"syscall"
 
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/daemon/internal/dockerauth"
@@ -42,7 +43,7 @@ func main() {
 		panic(err)
 	}
 
-	ctx, cancel := oshelper.NotifyContext(context.Background())
+	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
 	if err := e.Run(ctx); err != nil {
