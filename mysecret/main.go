@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
@@ -16,7 +17,7 @@ import (
 )
 
 func main() {
-	ctx, cancel := oshelper.NotifyContext(context.Background())
+	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	if plugin.RunningStandalone() {
 		os.Args = append([]string{os.Args[0], "mysecret"}, os.Args[1:]...)
