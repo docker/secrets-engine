@@ -51,7 +51,13 @@ format: ## Format code
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=format .
 
 lint: multiarch-builder ## Lint code
-	@docker buildx build $(DOCKER_BUILD_ARGS) --secret id=GH_TOKEN --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
+	@set -e; \
+	flags="--ssh default"; \
+	if [ -n "$$GH_TOKEN" ]; then \
+		flags="--secret id=GH_TOKEN,env=GH_TOKEN"; \
+	fi; \
+	echo "Using build flags: $$flags"; \
+	docker buildx build $(DOCKER_BUILD_ARGS) $(flags) --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
 
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
