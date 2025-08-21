@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	resolverv1 "github.com/docker/secrets-engine/internal/api/resolver/v1"
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 )
 
 type registerClient struct {

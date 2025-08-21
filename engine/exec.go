@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/logging"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 type proc interface {

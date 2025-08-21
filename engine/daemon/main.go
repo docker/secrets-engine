@@ -8,9 +8,9 @@ import (
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/daemon/internal/dockerauth"
 	"github.com/docker/secrets-engine/engine/daemon/internal/mysecret"
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/oshelper"
-	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/oshelper"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 type mockCmd struct {

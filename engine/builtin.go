@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/logging"
-	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type internalRuntime struct {

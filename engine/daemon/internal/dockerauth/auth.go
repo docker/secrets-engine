@@ -7,8 +7,8 @@ import (
 	"github.com/docker/docker-auth/auth/authstore"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const (
