@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/docker/secrets-engine/internal/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/x/ipc"
 )
 
 func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer, error) {

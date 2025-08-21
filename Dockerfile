@@ -53,12 +53,12 @@ RUN --mount=type=bind,target=.,ro \
     git config --global --add url."https://x-access-token:${GH_TOKEN}@github.com".insteadOf "ssh://git@github.com"
     git config --global --add url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
 
-    go mod tidy --diff
     (cd client && go mod tidy --diff)
     (cd engine && go mod tidy --diff)
     (cd mysecret && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
     (cd store && go mod tidy --diff)
+    (cd x && go mod tidy --diff)
 EOT
 RUN --mount=type=bind,target=.,ro \
     --mount=type=cache,target=/root/.cache <<EOT

@@ -5,7 +5,6 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/store"
 )
 
@@ -64,7 +63,7 @@ func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[string
 
 	filtered := make(map[string]store.Secret)
 	for id, f := range m.store {
-		p, err := secrets.ParseID(id)
+		p, err := store.ParseID(id)
 		if err != nil {
 			continue
 		}

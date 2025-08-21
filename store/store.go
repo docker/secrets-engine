@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/internal/secrets"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type (

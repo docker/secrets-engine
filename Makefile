@@ -63,7 +63,7 @@ unit-tests:
 	go test -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
 	go test -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./...)       & pids="$$pids $$!"; \
+	go test -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
 	done; \
@@ -120,6 +120,18 @@ proto-generate:
 
 proto-lint:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=proto-lint .
+
+mod: export GOPRIVATE=github.com/docker/*
+mod:
+	@echo "Tidying all Go modules..."
+	@for d in $$(find . -name "go.mod" -exec dirname {} \;); do \
+		echo ">>> Processing $$d"; \
+		rm -f $$d/go.sum; \
+		( cd $$d && go mod tidy ); \
+	done
+	@echo "Syncing and vendoring workspace..."
+	@go work sync
+	@go work vendor
 
 help: ## Show this help
 	@echo Please specify a build target. The choices are:

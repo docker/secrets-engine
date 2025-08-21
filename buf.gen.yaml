@@ -4,11 +4,11 @@ managed:
 plugins:
   # For latest version, see: https://github.com/protocolbuffers/protobuf-go/tags
   - remote: buf.build/protocolbuffers/go:v1.36.7
-    out: internal/api
+    out: x/api
     opt:
       - paths=source_relative
       - default_api_level=API_OPAQUE
   - remote: buf.build/connectrpc/go
-    out: internal/api
+    out: x/api
     opt:
       - paths=source_relative

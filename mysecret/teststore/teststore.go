@@ -5,8 +5,8 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/docker/secrets-engine/internal/secrets"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type Option func(m *MockStore)
