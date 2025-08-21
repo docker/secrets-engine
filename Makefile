@@ -121,6 +121,18 @@ proto-generate:
 proto-lint:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=proto-lint .
 
+mod: export GOPRIVATE=github.com/docker/*
+mod:
+	@echo "Tidying all Go modules..."
+	@for d in $$(find . -name "go.mod" -exec dirname {} \;); do \
+		echo ">>> Processing $$d"; \
+		rm -f $$d/go.sum; \
+		( cd $$d && go mod tidy ); \
+	done
+	@echo "Syncing and vendoring workspace..."
+	@go work sync
+	@go work vendor
+
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
