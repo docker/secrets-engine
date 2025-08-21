@@ -38,6 +38,11 @@ func TestMatchNew(t *testing.T) {
 		expected bool
 	}{
 		{
+			pattern:  "*/**/*",
+			ids:      []string{"foo/bar", "foo/bar/baz"},
+			expected: true,
+		},
+		{
 			pattern:  "**",
 			ids:      []string{"foo", "foo/bar", "foo/bar/baz"},
 			expected: true,

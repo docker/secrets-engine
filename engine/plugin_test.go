@@ -335,6 +335,10 @@ func Test_newExternalPlugin(t *testing.T) {
 
 type maliciousPattern struct{}
 
+func (m maliciousPattern) Includes(secrets.Pattern) bool {
+	panic("implement me")
+}
+
 func (m maliciousPattern) Match(secrets.ID) bool {
 	panic("implement me")
 }
