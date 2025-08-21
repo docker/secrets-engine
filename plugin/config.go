@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/ipc"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/ipc"
 )
 
 const hijackTimeout = 2 * time.Second

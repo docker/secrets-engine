@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/internal/api"
-	"github.com/docker/secrets-engine/internal/ipc"
-	"github.com/docker/secrets-engine/internal/logging"
-	"github.com/docker/secrets-engine/internal/secrets"
-	"github.com/docker/secrets-engine/internal/testhelper"
+	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/ipc"
+	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 var _ Plugin = &mockPlugin{}
