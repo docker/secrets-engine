@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
 )
@@ -23,7 +24,11 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 		once()
 	}}))
 	setupCompleted := make(chan struct{})
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{config.plugin, setupCompleted, config.registrationTimeout}))
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{
+		handler:             resolverv1.NewResolverHandler(config.plugin),
+		setupCompleted:      setupCompleted,
+		registrationTimeout: config.registrationTimeout,
+	}))
 	ipc, c, err := ipc.NewClientIPC(config.Logger, config.conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			config.Logger.Printf("Plugin runtime stopped, plugin %s is shutting down...", config.name)
