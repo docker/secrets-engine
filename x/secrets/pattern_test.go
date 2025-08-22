@@ -1,12 +1,14 @@
 package secrets
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestParsePatternNew(t *testing.T) {
+func TestParsePattern(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -34,6 +36,42 @@ func TestParsePatternNew(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParsePattern(tc.input)
 			assert.ErrorIs(t, err, tc.expected)
+		})
+	}
+}
+
+func TestPatternIncludes(t *testing.T) {
+	tests := []struct {
+		pattern         string
+		other           string
+		otherIsIncluded bool
+	}{
+		{"**", "**", true},
+		{"**/*", "*/**", true},
+		// **/* and ** are equivalent because IDs are required to always have at least one component
+		{"**/*", "**", true},
+		{"**", "**/*", true},
+		{"**/**", "**/**", true},
+		{"**/*/**", "**/**", true},
+		{"**/*/*", "*/*/**", true},
+		{"**/*/*", "**", false},
+		{"**", "**/foo", true},
+		{"**/foo", "**", false},
+		{"**/foo", "**/foo", true},
+		{"foo/**", "**/foo", false},
+		{"**", "bar/**/foo", true},
+		{"**", "*/bar/**/foo", true},
+		{"*", "*", true},
+		{"*/foo", "*", false},
+		{"*", "*/foo", false},
+	}
+	for idx, tc := range tests {
+		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
+			p, err := ParsePattern(tc.pattern)
+			require.NoError(t, err)
+			other, err := ParsePattern(tc.other)
+			require.NoError(t, err)
+			assert.Equal(t, tc.otherIsIncluded, p.Includes(other))
 		})
 	}
 }
