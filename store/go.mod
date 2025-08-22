@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	github.com/Benehiko/go-keychain/v2 v2.0.0
 	github.com/danieljoos/wincred v1.2.2
-	github.com/docker/secrets-engine/x v0.0.0-00010101000000-000000000000
+	github.com/docker/secrets-engine/x v0.0.1-do.not.use
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.9.1
