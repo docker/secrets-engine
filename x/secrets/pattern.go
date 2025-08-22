@@ -67,6 +67,8 @@ func isValidPatternRune(c rune) bool {
 type Pattern interface {
 	// Match the [PatternNew] against an [IDNew]
 	Match(id ID) bool
+	// Includes returns true if all matches of Pattern [other] are also matches of the current pattern.
+	Includes(other Pattern) bool
 	// String formats the [Pattern] as a string
 	String() string
 }
@@ -80,6 +82,13 @@ func (p *pattern) Match(id ID) bool {
 	patternParts := split(p.value)
 
 	return match(patternParts, pathParts)
+}
+
+func (p *pattern) Includes(other Pattern) bool {
+	otherParts := split(other.String())
+	patternParts := split(p.value)
+
+	return match(patternParts, otherParts)
 }
 
 func (p *pattern) String() string {
