@@ -10,8 +10,9 @@ import (
 	"maps"
 	"slices"
 
-	kc "github.com/Benehiko/go-keychain/v2/secretservice"
 	dbus "github.com/godbus/dbus/v5"
+
+	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain/secretservice"
 
 	"github.com/docker/secrets-engine/store"
 )

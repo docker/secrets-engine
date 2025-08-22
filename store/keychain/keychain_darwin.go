@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"maps"
 
-	kc "github.com/Benehiko/go-keychain/v2"
+	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 
 	"github.com/docker/secrets-engine/store"
 )
