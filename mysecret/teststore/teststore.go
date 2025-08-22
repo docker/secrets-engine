@@ -18,6 +18,7 @@ type MockStore struct {
 	errGetAll error
 	errDelete error
 	errGet    error
+	errFilter error
 	store     map[store.ID]store.Secret
 }
 
@@ -32,6 +33,12 @@ func NewMockStore(options ...Option) store.Store {
 func WithStoreSaveErr(err error) Option {
 	return func(m *MockStore) {
 		m.errSave = err
+	}
+}
+
+func WithStoreFilterErr(err error) Option {
+	return func(m *MockStore) {
+		m.errFilter = err
 	}
 }
 
@@ -109,6 +116,10 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	if m.errFilter != nil {
+		return nil, m.errFilter
+	}
 
 	filtered := make(map[store.ID]store.Secret)
 	for id, f := range m.store {
