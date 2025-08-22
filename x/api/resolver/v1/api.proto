@@ -41,31 +41,35 @@ message ShutdownResponse {}
 
 service ResolverService {
   // Resolve a secret by its ID.
-  rpc GetSecret(GetSecretRequest) returns (GetSecretResponse);
+  rpc GetSecrets(GetSecretRequest) returns (GetSecretResponse);
 }
 
 message GetSecretRequest {
   // ID of the secret to resolve.
-  string id = 1;
+  string pattern = 1;
 
   string provider = 2;
 }
 
 message GetSecretResponse {
-  // ID of the secret to resolve.
-  string id = 1;
-  // The resolved secret value.
-  bytes value = 2;
+  repeated Envelope envelopes = 1;
 
-  string provider = 3;
+  message Envelope {
+    // ID of the secret to resolve.
+    string id = 1;
+    // The resolved secret value.
+    bytes value = 2;
 
-  string version = 4;
+    string provider = 3;
 
-  string error = 5;
+    string version = 4;
 
-  google.protobuf.Timestamp created_at = 6;
+    string error = 5;
 
-  google.protobuf.Timestamp resolved_at = 7;
+    google.protobuf.Timestamp created_at = 6;
 
-  google.protobuf.Timestamp expires_at = 8;
+    google.protobuf.Timestamp resolved_at = 7;
+
+    google.protobuf.Timestamp expires_at = 8;
+  }
 }

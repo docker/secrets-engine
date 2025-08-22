@@ -42,9 +42,9 @@ const (
 	EngineServiceRegisterPluginProcedure = "/resolver.v1.EngineService/RegisterPlugin"
 	// PluginServiceShutdownProcedure is the fully-qualified name of the PluginService's Shutdown RPC.
 	PluginServiceShutdownProcedure = "/resolver.v1.PluginService/Shutdown"
-	// ResolverServiceGetSecretProcedure is the fully-qualified name of the ResolverService's GetSecret
-	// RPC.
-	ResolverServiceGetSecretProcedure = "/resolver.v1.ResolverService/GetSecret"
+	// ResolverServiceGetSecretsProcedure is the fully-qualified name of the ResolverService's
+	// GetSecrets RPC.
+	ResolverServiceGetSecretsProcedure = "/resolver.v1.ResolverService/GetSecrets"
 )
 
 // EngineServiceClient is a client for the resolver.v1.EngineService service.
@@ -194,7 +194,7 @@ func (UnimplementedPluginServiceHandler) Shutdown(context.Context, *connect.Requ
 // ResolverServiceClient is a client for the resolver.v1.ResolverService service.
 type ResolverServiceClient interface {
 	// Resolve a secret by its ID.
-	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
 }
 
 // NewResolverServiceClient constructs a client for the resolver.v1.ResolverService service. By
@@ -208,10 +208,10 @@ func NewResolverServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	resolverServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("ResolverService").Methods()
 	return &resolverServiceClient{
-		getSecret: connect.NewClient[v1.GetSecretRequest, v1.GetSecretResponse](
+		getSecrets: connect.NewClient[v1.GetSecretRequest, v1.GetSecretResponse](
 			httpClient,
-			baseURL+ResolverServiceGetSecretProcedure,
-			connect.WithSchema(resolverServiceMethods.ByName("GetSecret")),
+			baseURL+ResolverServiceGetSecretsProcedure,
+			connect.WithSchema(resolverServiceMethods.ByName("GetSecrets")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -219,18 +219,18 @@ func NewResolverServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // resolverServiceClient implements ResolverServiceClient.
 type resolverServiceClient struct {
-	getSecret *connect.Client[v1.GetSecretRequest, v1.GetSecretResponse]
+	getSecrets *connect.Client[v1.GetSecretRequest, v1.GetSecretResponse]
 }
 
-// GetSecret calls resolver.v1.ResolverService.GetSecret.
-func (c *resolverServiceClient) GetSecret(ctx context.Context, req *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
-	return c.getSecret.CallUnary(ctx, req)
+// GetSecrets calls resolver.v1.ResolverService.GetSecrets.
+func (c *resolverServiceClient) GetSecrets(ctx context.Context, req *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+	return c.getSecrets.CallUnary(ctx, req)
 }
 
 // ResolverServiceHandler is an implementation of the resolver.v1.ResolverService service.
 type ResolverServiceHandler interface {
 	// Resolve a secret by its ID.
-	GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
 }
 
 // NewResolverServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -240,16 +240,16 @@ type ResolverServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewResolverServiceHandler(svc ResolverServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	resolverServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("ResolverService").Methods()
-	resolverServiceGetSecretHandler := connect.NewUnaryHandler(
-		ResolverServiceGetSecretProcedure,
-		svc.GetSecret,
-		connect.WithSchema(resolverServiceMethods.ByName("GetSecret")),
+	resolverServiceGetSecretsHandler := connect.NewUnaryHandler(
+		ResolverServiceGetSecretsProcedure,
+		svc.GetSecrets,
+		connect.WithSchema(resolverServiceMethods.ByName("GetSecrets")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/resolver.v1.ResolverService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case ResolverServiceGetSecretProcedure:
-			resolverServiceGetSecretHandler.ServeHTTP(w, r)
+		case ResolverServiceGetSecretsProcedure:
+			resolverServiceGetSecretsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -259,6 +259,6 @@ func NewResolverServiceHandler(svc ResolverServiceHandler, opts ...connect.Handl
 // UnimplementedResolverServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedResolverServiceHandler struct{}
 
-func (UnimplementedResolverServiceHandler) GetSecret(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ResolverService.GetSecret is not implemented"))
+func (UnimplementedResolverServiceHandler) GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ResolverService.GetSecrets is not implemented"))
 }

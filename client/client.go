@@ -78,34 +78,37 @@ func New(options ...Option) (secrets.Resolver, error) {
 	}, nil
 }
 
-func (c client) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (c client) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretRequest_builder{
-		Id:       proto.String(request.ID.String()),
+		Pattern:  proto.String(request.Pattern.String()),
 		Provider: proto.String(request.Provider),
 	}.Build())
-	resp, err := c.resolverClient.GetSecret(ctx, req)
+	resp, err := c.resolverClient.GetSecrets(ctx, req)
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			err = secrets.ErrNotFound
 		}
-		return secrets.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErrs(err), err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetId())
-	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+	var errList []error
+	var envelopes []secrets.Envelope
+	for _, item := range resp.Msg.GetEnvelopes() {
+		id, err := secrets.ParseID(item.GetId())
+		if err != nil {
+			envelopes = append(envelopes, secrets.EnvelopeErr(err))
+			errList = append(errList, err)
+			continue
+		}
+		envelopes = append(envelopes, secrets.Envelope{
+			ID:         id,
+			Value:      item.GetValue(),
+			Provider:   item.GetProvider(),
+			Version:    item.GetVersion(),
+			Error:      item.GetError(),
+			CreatedAt:  item.GetCreatedAt().AsTime(),
+			ResolvedAt: item.GetResolvedAt().AsTime(),
+			ExpiresAt:  item.GetExpiresAt().AsTime(),
+		})
 	}
-	e := secrets.Envelope{
-		ID:         id,
-		Value:      resp.Msg.GetValue(),
-		Provider:   resp.Msg.GetProvider(),
-		Version:    resp.Msg.GetVersion(),
-		Error:      resp.Msg.GetError(),
-		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),
-		ResolvedAt: resp.Msg.GetResolvedAt().AsTime(),
-		ExpiresAt:  resp.Msg.GetExpiresAt().AsTime(),
-	}
-	if e.Error != "" {
-		return e, errors.New(e.Error)
-	}
-	return e, nil
+	return envelopes, errors.Join(errList...)
 }

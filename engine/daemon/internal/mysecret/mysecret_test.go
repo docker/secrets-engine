@@ -20,16 +20,18 @@ func Test_mysecretPlugin(t *testing.T) {
 			store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
 		}))
 		p := &mysecretPlugin{kc: mock}
-		e, err := p.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("foo")})
+		e, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
 		require.NoError(t, err)
-		assert.Equal(t, "bar", string(e.Value))
+		require.NotEmpty(t, e)
+		assert.Equal(t, "bar", string(e[0].Value))
 	})
 	t.Run("store error", func(t *testing.T) {
-		errGet := errors.New("get error")
-		mock := teststore.NewMockStore(teststore.WithStoreGetErr(errGet))
+		errFilter := errors.New("filter error")
+		mock := teststore.NewMockStore(teststore.WithStoreFilterErr(errFilter))
 		p := &mysecretPlugin{kc: mock}
-		e, err := p.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("foo")})
-		assert.ErrorIs(t, err, errGet)
-		assert.Equal(t, errGet.Error(), e.Error)
+		e, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		assert.ErrorIs(t, err, errFilter)
+		require.NotEmpty(t, e)
+		assert.Equal(t, errFilter.Error(), e[0].Error)
 	})
 }

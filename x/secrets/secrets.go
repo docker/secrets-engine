@@ -14,7 +14,7 @@ var (
 )
 
 type Request struct {
-	ID ID `json:"-"`
+	Pattern Pattern `json:"-"`
 
 	// Provider can be optionally specified to restrict the resolver
 	// to a particular provider stack.
@@ -47,9 +47,17 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 }
 
 type Resolver interface {
-	GetSecret(ctx context.Context, request Request) (Envelope, error)
+	GetSecrets(ctx context.Context, request Request) ([]Envelope, error)
 }
 
-func EnvelopeErr(req Request, err error) Envelope {
-	return Envelope{ID: req.ID, ResolvedAt: time.Now(), Error: err.Error()}
+func EnvelopeErr(err error) Envelope {
+	return Envelope{ResolvedAt: time.Now(), Error: err.Error()}
+}
+
+func EnvelopeErrs(err ...error) []Envelope {
+	var result []Envelope
+	for _, e := range err {
+		result = append(result, EnvelopeErr(e))
+	}
+	return result
 }

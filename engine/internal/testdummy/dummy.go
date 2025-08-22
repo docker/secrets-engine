@@ -34,7 +34,10 @@ const (
 	MockSecretValue = "MockSecretValue"
 )
 
-var MockSecretID = secrets.MustParseID("MockSecretID")
+var (
+	MockSecretID      = secrets.MustParseID("MockSecretID")
+	MockSecretPattern = secrets.MustParsePattern("MockSecretID")
+)
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
 // To be used from TestMain.
@@ -155,27 +158,32 @@ type PluginResult struct {
 	ErrTestSetup string
 }
 
-func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (d *dummyPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
 	d.m.Lock()
 	defer d.m.Unlock()
 	if d.cfg.CrashBehaviour != nil && len(d.result.GetSecret)+1 >= d.cfg.OnNthSecretRequest {
 		os.Exit(d.cfg.ExitCode)
 	}
-	d.result.GetSecret = append(d.result.GetSecret, request.ID.String())
+	d.result.GetSecret = append(d.result.GetSecret, request.Pattern.String())
 	if d.cfg.ErrGetSecret != "" {
 		err := errors.New(d.cfg.ErrGetSecret)
-		return secrets.EnvelopeErr(request, err), err
+		return secrets.EnvelopeErrs(err), err
 	}
-	if v, ok := d.cfg.secrets[request.ID]; ok {
-		return secrets.Envelope{
-			ID:        request.ID,
-			Value:     []byte(v),
-			CreatedAt: time.Now().Add(-time.Hour),
-			ExpiresAt: time.Now().Add(-time.Hour),
-		}, nil
+	var envelopes []secrets.Envelope
+	for id, value := range d.cfg.secrets {
+		if request.Pattern.Match(id) {
+			envelopes = append(envelopes, secrets.Envelope{
+				ID:        id,
+				Value:     []byte(value),
+				CreatedAt: time.Now().Add(-time.Hour),
+				ExpiresAt: time.Now().Add(-time.Hour),
+			})
+		}
 	}
-	err := errors.New("secret not found")
-	return secrets.EnvelopeErr(request, err), err
+	if len(envelopes) == 0 {
+		return secrets.EnvelopeErrs(secrets.ErrNotFound), secrets.ErrNotFound
+	}
+	return envelopes, nil
 }
 
 type PluginCfg struct {
