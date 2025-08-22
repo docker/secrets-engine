@@ -1,5 +1,3 @@
-github.com/Benehiko/go-keychain/v2 v2.0.0 h1:1savOWp6On9jC+QIBbk8qYZpaqFNF0HwL02aqgRSaro=
-github.com/Benehiko/go-keychain/v2 v2.0.0/go.mod h1:Qs/Ke0XjDSN07acDqQ89qXyE/mVGmIqB1qpsyu+Th0Q=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/danieljoos/wincred v1.2.2 h1:774zMFJrqaeYCK2W57BgAem/MLi6mtSE47MB6BOJ0i0=

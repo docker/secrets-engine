@@ -1,7 +1,5 @@
 connectrpc.com/connect v1.18.1 h1:PAg7CjSAGvscaf6YZKUefjoih5Z/qYkyaTrBW8xvYPw=
 connectrpc.com/connect v1.18.1/go.mod h1:0292hj1rnx8oFrStN7cB4jjVBeqs+Yx5yDIC2prWDO8=
-github.com/Benehiko/go-keychain/v2 v2.0.0 h1:1savOWp6On9jC+QIBbk8qYZpaqFNF0HwL02aqgRSaro=
-github.com/Benehiko/go-keychain/v2 v2.0.0/go.mod h1:Qs/Ke0XjDSN07acDqQ89qXyE/mVGmIqB1qpsyu+Th0Q=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
 github.com/cenkalti/backoff/v5 v5.0.3/go.mod h1:rkhZdG3JZukswDf7f0cwqPNk4K0sa+F97BxZthm/crw=
 github.com/containerd/nri v0.10.0 h1:bt2NzfvlY6OJE0i+fB5WVeGQEycxY7iFVQpEbh7J3Go=
