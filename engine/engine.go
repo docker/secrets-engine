@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 
+	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
@@ -249,8 +250,8 @@ func newServer(cfg config, reg registry) *http.Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	r := &resolver{reg: reg}
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{r}))
+	r := &regResolver{reg: reg}
+	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
 	if !cfg.dynamicPluginsDisabled {
 		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
 			launcher := launcher(func() (runtime, error) {

@@ -173,7 +173,6 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				_ = cmd.Process.Kill()
-				_ = cmd.Process.Release()
 				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				_, err = parseOutput()
