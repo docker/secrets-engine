@@ -21,7 +21,7 @@ func ListCommand(kc store.Store) *cobra.Command {
 			}
 			var idList []string
 			for id := range l {
-				idList = append(idList, id)
+				idList = append(idList, id.String())
 			}
 			slices.Sort(idList)
 			for _, id := range idList {
