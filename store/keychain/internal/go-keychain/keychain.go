@@ -79,6 +79,7 @@ func checkError(errCode C.OSStatus) error {
 	return Error(errCode)
 }
 
+//nolint:gocyclo
 func (k Error) Error() (msg string) {
 	// SecCopyErrorMessageString is only available on OSX, so derive manually.
 	// Messages derived from `$ security error $errcode`.
@@ -494,7 +495,7 @@ func QueryItemRef(item Item) (C.CFTypeRef, error) {
 	defer Release(C.CFTypeRef(cfDict))
 
 	var resultsRef C.CFTypeRef
-	errCode := C.SecItemCopyMatching(cfDict, &resultsRef) //nolint
+	errCode := C.SecItemCopyMatching(cfDict, &resultsRef)
 	if Error(errCode) == ErrorItemNotFound {
 		return 0, nil
 	}
@@ -547,7 +548,7 @@ func QueryItem(item Item) ([]QueryResult, error) {
 		item := QueryResult{Data: b}
 		results = append(results, item)
 	} else {
-		return nil, fmt.Errorf("Invalid result type: %s", CFTypeDescription(resultsRef))
+		return nil, fmt.Errorf("invalid result type: %s", CFTypeDescription(resultsRef))
 	}
 
 	return results, nil
@@ -557,6 +558,7 @@ func attrKey(ref C.CFTypeRef) string {
 	return CFStringToString(C.CFStringRef(ref))
 }
 
+//nolint:gocyclo
 func convertResult(d C.CFDictionaryRef) (*QueryResult, error) {
 	m := CFDictionaryToMap(d)
 	result := QueryResult{}
@@ -675,7 +677,7 @@ func GetGenericPassword(service, account, label, accessGroup string) ([]byte, er
 		return nil, err
 	}
 	if len(results) > 1 {
-		return nil, fmt.Errorf("Too many results")
+		return nil, fmt.Errorf("too many results")
 	}
 	if len(results) == 1 {
 		return results[0].Data, nil

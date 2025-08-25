@@ -34,6 +34,8 @@ func DeleteGenericPassword(service, account, accessGroup string) error {
 // GenericPasswordTest runs test code for generic password keychain item.
 // This is here so we can export using gomobile bind and run this method on iOS simulator and device.
 // Access groups aren't supported in iOS simulator.
+//
+//nolint:gocyclo // TODO: this function is complex but okay for now, will refactor later
 func GenericPasswordTest(t Test, service, accessGroup string) {
 	var err error
 
