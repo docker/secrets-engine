@@ -16,9 +16,9 @@ import (
 
 var (
 	mockSecretPattern = secrets.MustParsePattern("mockSecretID")
-	mockResponse      = connect.NewResponse(resolverv1.GetSecretResponse_builder{
-		Envelopes: []*resolverv1.GetSecretResponse_Envelope{
-			resolverv1.GetSecretResponse_Envelope_builder{Id: proto.String("mockSecretID")}.Build(),
+	mockResponse      = connect.NewResponse(resolverv1.GetSecretsResponse_builder{
+		Envelopes: []*resolverv1.GetSecretsResponse_Envelope{
+			resolverv1.GetSecretsResponse_Envelope_builder{Id: proto.String("mockSecretID")}.Build(),
 		},
 	}.Build())
 )
@@ -29,7 +29,7 @@ type mockHandler struct {
 	getSecretCalled int
 }
 
-func (m *mockHandler) GetSecrets(context.Context, *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
+func (m *mockHandler) GetSecrets(context.Context, *connect.Request[resolverv1.GetSecretsRequest]) (*connect.Response[resolverv1.GetSecretsResponse], error) {
 	m.getSecretCalled++
 	return mockResponse, nil
 }
@@ -71,8 +71,8 @@ func TestResolverService_GetSecret(t *testing.T) {
 	}
 }
 
-func newGetSecretRequest(pattern secrets.Pattern) *connect.Request[resolverv1.GetSecretRequest] {
-	return connect.NewRequest(resolverv1.GetSecretRequest_builder{
+func newGetSecretRequest(pattern secrets.Pattern) *connect.Request[resolverv1.GetSecretsRequest] {
+	return connect.NewRequest(resolverv1.GetSecretsRequest_builder{
 		Pattern: proto.String(pattern.String()),
 	}.Build())
 }

@@ -79,7 +79,7 @@ func New(options ...Option) (secrets.Resolver, error) {
 }
 
 func (c client) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
-	req := connect.NewRequest(v1.GetSecretRequest_builder{
+	req := connect.NewRequest(v1.GetSecretsRequest_builder{
 		Pattern:  proto.String(request.Pattern.String()),
 		Provider: proto.String(request.Provider),
 	}.Build())
@@ -88,15 +88,13 @@ func (c client) GetSecrets(ctx context.Context, request secrets.Request) ([]secr
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			err = secrets.ErrNotFound
 		}
-		return secrets.EnvelopeErrs(err), err
+		return nil, err
 	}
-	var errList []error
+
 	var envelopes []secrets.Envelope
 	for _, item := range resp.Msg.GetEnvelopes() {
 		id, err := secrets.ParseID(item.GetId())
 		if err != nil {
-			envelopes = append(envelopes, secrets.EnvelopeErr(err))
-			errList = append(errList, err)
 			continue
 		}
 		envelopes = append(envelopes, secrets.Envelope{
@@ -104,11 +102,10 @@ func (c client) GetSecrets(ctx context.Context, request secrets.Request) ([]secr
 			Value:      item.GetValue(),
 			Provider:   item.GetProvider(),
 			Version:    item.GetVersion(),
-			Error:      item.GetError(),
 			CreatedAt:  item.GetCreatedAt().AsTime(),
 			ResolvedAt: item.GetResolvedAt().AsTime(),
 			ExpiresAt:  item.GetExpiresAt().AsTime(),
 		})
 	}
-	return envelopes, errors.Join(errList...)
+	return envelopes, nil
 }

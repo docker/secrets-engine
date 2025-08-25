@@ -194,7 +194,7 @@ func (UnimplementedPluginServiceHandler) Shutdown(context.Context, *connect.Requ
 // ResolverServiceClient is a client for the resolver.v1.ResolverService service.
 type ResolverServiceClient interface {
 	// Resolve a secret by its ID.
-	GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	GetSecrets(context.Context, *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error)
 }
 
 // NewResolverServiceClient constructs a client for the resolver.v1.ResolverService service. By
@@ -208,7 +208,7 @@ func NewResolverServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	resolverServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("ResolverService").Methods()
 	return &resolverServiceClient{
-		getSecrets: connect.NewClient[v1.GetSecretRequest, v1.GetSecretResponse](
+		getSecrets: connect.NewClient[v1.GetSecretsRequest, v1.GetSecretsResponse](
 			httpClient,
 			baseURL+ResolverServiceGetSecretsProcedure,
 			connect.WithSchema(resolverServiceMethods.ByName("GetSecrets")),
@@ -219,18 +219,18 @@ func NewResolverServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // resolverServiceClient implements ResolverServiceClient.
 type resolverServiceClient struct {
-	getSecrets *connect.Client[v1.GetSecretRequest, v1.GetSecretResponse]
+	getSecrets *connect.Client[v1.GetSecretsRequest, v1.GetSecretsResponse]
 }
 
 // GetSecrets calls resolver.v1.ResolverService.GetSecrets.
-func (c *resolverServiceClient) GetSecrets(ctx context.Context, req *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+func (c *resolverServiceClient) GetSecrets(ctx context.Context, req *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error) {
 	return c.getSecrets.CallUnary(ctx, req)
 }
 
 // ResolverServiceHandler is an implementation of the resolver.v1.ResolverService service.
 type ResolverServiceHandler interface {
 	// Resolve a secret by its ID.
-	GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error)
+	GetSecrets(context.Context, *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error)
 }
 
 // NewResolverServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -259,6 +259,6 @@ func NewResolverServiceHandler(svc ResolverServiceHandler, opts ...connect.Handl
 // UnimplementedResolverServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedResolverServiceHandler struct{}
 
-func (UnimplementedResolverServiceHandler) GetSecrets(context.Context, *connect.Request[v1.GetSecretRequest]) (*connect.Response[v1.GetSecretResponse], error) {
+func (UnimplementedResolverServiceHandler) GetSecrets(context.Context, *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ResolverService.GetSecrets is not implemented"))
 }

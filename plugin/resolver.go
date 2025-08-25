@@ -20,7 +20,7 @@ type resolverService struct {
 	registrationTimeout time.Duration
 }
 
-func (r *resolverService) GetSecrets(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
+func (r *resolverService) GetSecrets(ctx context.Context, c *connect.Request[resolverv1.GetSecretsRequest]) (*connect.Response[resolverv1.GetSecretsResponse], error) {
 	select {
 	case <-r.setupCompleted:
 	case <-ctx.Done():
