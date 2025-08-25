@@ -31,6 +31,17 @@ func TestParseIDNew(t *testing.T) {
 	}
 }
 
+func TestIDComparable(t *testing.T) {
+	a := MustParseID("foo")
+	b := MustParseID("foo")
+	assert.Equal(t, a, b)
+	myMap := map[ID]string{}
+	bar := "bar"
+	myMap[MustParseID("foo")] = bar
+	assert.Equal(t, bar, myMap[a])
+	assert.Equal(t, bar, myMap[b])
+}
+
 func TestMatchNew(t *testing.T) {
 	tests := []struct {
 		pattern  string
