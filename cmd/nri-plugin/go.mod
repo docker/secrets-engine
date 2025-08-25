@@ -2,7 +2,7 @@ module github.com/docker/secrets-engine/nri-plugin
 
 go 1.24.3
 
-toolchain go1.24.4
+toolchain go1.25.0
 
 require (
 	github.com/containerd/nri v0.10.0
