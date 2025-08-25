@@ -67,7 +67,7 @@ type Store interface {
 	// underlying store does not get queried for each secret's sensitive data.
 	// This could be very taxing on the underlying store and cause a poor User
 	// Experience.
-	GetAllMetadata(ctx context.Context) (map[string]Secret, error)
+	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
@@ -75,5 +75,5 @@ type Store interface {
 	// Secrets returned will have both [Secret.SetMetadata] and [Secret.Unmarshal]
 	// called; in that order. Any error produced by any of them would result in
 	// an early return with a nil secrets map.
-	Filter(ctx context.Context, pattern Pattern) (map[string]Secret, error)
+	Filter(ctx context.Context, pattern Pattern) (map[ID]Secret, error)
 }
