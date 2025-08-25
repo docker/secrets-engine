@@ -73,29 +73,25 @@ type Pattern interface {
 	String() string
 }
 
-type pattern struct {
-	value string
-}
+type pattern string
 
-func (p *pattern) Match(id ID) bool {
+func (p pattern) Match(id ID) bool {
 	pathParts := split(id.String())
-	patternParts := split(p.value)
+	patternParts := split(string(p))
 
 	return match(patternParts, pathParts)
 }
 
-func (p *pattern) Includes(other Pattern) bool {
+func (p pattern) Includes(other Pattern) bool {
 	otherParts := split(other.String())
-	patternParts := split(p.value)
+	patternParts := split(string(p))
 
 	return match(patternParts, otherParts)
 }
 
-func (p *pattern) String() string {
-	return p.value
+func (p pattern) String() string {
+	return string(p)
 }
-
-var _ Pattern = &pattern{}
 
 // ParsePattern parses a string into a [Pattern]
 // Rules:
@@ -110,9 +106,7 @@ func ParsePattern(s string) (Pattern, error) {
 	if !validPattern(s) {
 		return nil, ErrInvalidPattern
 	}
-	return &pattern{
-		value: s,
-	}, nil
+	return pattern(s), nil
 }
 
 // MustParsePattern parses a string into a [Pattern] like with [ParsePattern],
@@ -121,7 +115,5 @@ func MustParsePattern(s string) Pattern {
 	if !validPattern(s) {
 		panic(ErrInvalidPattern)
 	}
-	return &pattern{
-		value: s,
-	}
+	return pattern(s)
 }
