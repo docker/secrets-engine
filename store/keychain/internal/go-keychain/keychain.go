@@ -79,6 +79,7 @@ func checkError(errCode C.OSStatus) error {
 	return Error(errCode)
 }
 
+//nolint:gocyclo
 func (k Error) Error() (msg string) {
 	// SecCopyErrorMessageString is only available on OSX, so derive manually.
 	// Messages derived from `$ security error $errcode`.
@@ -291,7 +292,7 @@ func (k *Item) SetInt32(key string, v int32) {
 }
 
 // SetString sets a string attibute for a string key
-func (k *Item) SetString(key string, s string) {
+func (k *Item) SetString(key, s string) {
 	if s != "" {
 		k.attr[key] = s
 	} else {
@@ -419,7 +420,7 @@ func NewItem() Item {
 }
 
 // NewGenericPassword creates a generic password item with the default keychain. This is a convenience method.
-func NewGenericPassword(service string, account string, label string, data []byte, accessGroup string) Item {
+func NewGenericPassword(service, account, label string, data []byte, accessGroup string) Item {
 	item := NewItem()
 	item.SetSecClass(SecClassGenericPassword)
 	item.SetService(service)
@@ -444,7 +445,7 @@ func AddItem(item Item) error {
 }
 
 // UpdateItem updates the queryItem with the parameters from updateItem
-func UpdateItem(queryItem Item, updateItem Item) error {
+func UpdateItem(queryItem, updateItem Item) error {
 	cfDict, err := ConvertMapToCFDictionary(queryItem.attr)
 	if err != nil {
 		return err
@@ -494,7 +495,7 @@ func QueryItemRef(item Item) (C.CFTypeRef, error) {
 	defer Release(C.CFTypeRef(cfDict))
 
 	var resultsRef C.CFTypeRef
-	errCode := C.SecItemCopyMatching(cfDict, &resultsRef) //nolint
+	errCode := C.SecItemCopyMatching(cfDict, &resultsRef)
 	if Error(errCode) == ErrorItemNotFound {
 		return 0, nil
 	}
@@ -547,7 +548,7 @@ func QueryItem(item Item) ([]QueryResult, error) {
 		item := QueryResult{Data: b}
 		results = append(results, item)
 	} else {
-		return nil, fmt.Errorf("Invalid result type: %s", CFTypeDescription(resultsRef))
+		return nil, fmt.Errorf("invalid result type: %s", CFTypeDescription(resultsRef))
 	}
 
 	return results, nil
@@ -557,6 +558,7 @@ func attrKey(ref C.CFTypeRef) string {
 	return CFStringToString(C.CFStringRef(ref))
 }
 
+//nolint:gocyclo
 func convertResult(d C.CFDictionaryRef) (*QueryResult, error) {
 	m := CFDictionaryToMap(d)
 	result := QueryResult{}
@@ -614,7 +616,7 @@ func convertResult(d C.CFDictionaryRef) (*QueryResult, error) {
 }
 
 // DeleteGenericPasswordItem removes a generic password item.
-func DeleteGenericPasswordItem(service string, account string) error {
+func DeleteGenericPasswordItem(service, account string) error {
 	item := NewItem()
 	item.SetSecClass(SecClassGenericPassword)
 	item.SetService(service)
@@ -661,7 +663,7 @@ func GetGenericPasswordAccounts(service string) ([]string, error) {
 
 // GetGenericPassword returns password data for service and account. This is a convenience method.
 // If item is not found returns nil, nil.
-func GetGenericPassword(service string, account string, label string, accessGroup string) ([]byte, error) {
+func GetGenericPassword(service, account, label, accessGroup string) ([]byte, error) {
 	query := NewItem()
 	query.SetSecClass(SecClassGenericPassword)
 	query.SetService(service)
@@ -675,7 +677,7 @@ func GetGenericPassword(service string, account string, label string, accessGrou
 		return nil, err
 	}
 	if len(results) > 1 {
-		return nil, fmt.Errorf("Too many results")
+		return nil, fmt.Errorf("too many results")
 	}
 	if len(results) == 1 {
 		return results[0].Data, nil
