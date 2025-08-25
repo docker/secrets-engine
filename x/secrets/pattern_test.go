@@ -40,6 +40,17 @@ func TestParsePattern(t *testing.T) {
 	}
 }
 
+func TestPatternComparable(t *testing.T) {
+	a := MustParsePattern("foo")
+	b := MustParsePattern("foo")
+	assert.Equal(t, a, b)
+	myMap := map[Pattern]string{}
+	bar := "bar"
+	myMap[MustParsePattern("foo")] = bar
+	assert.Equal(t, bar, myMap[a])
+	assert.Equal(t, bar, myMap[b])
+}
+
 func TestPatternIncludes(t *testing.T) {
 	tests := []struct {
 		pattern         string
