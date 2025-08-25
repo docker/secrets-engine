@@ -31,7 +31,7 @@ type dhGroup struct {
 
 var bigOne = big.NewInt(1)
 
-func (group *dhGroup) NewKeypair() (private *big.Int, public *big.Int, err error) {
+func (group *dhGroup) NewKeypair() (private, public *big.Int, err error) {
 	for {
 		if private, err = cryptorand.Int(cryptorand.Reader, group.pMinus1); err != nil {
 			return nil, nil, err
@@ -52,6 +52,7 @@ func (group *dhGroup) diffieHellman(theirPublic, myPrivate *big.Int) (*big.Int, 
 }
 
 func rfc2409SecondOakleyGroup() *dhGroup {
+	//nolint:lll
 	p, _ := new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
 	return &dhGroup{
 		g:       new(big.Int).SetInt64(2),
@@ -60,7 +61,7 @@ func rfc2409SecondOakleyGroup() *dhGroup {
 	}
 }
 
-func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic *big.Int, myPrivate *big.Int) ([]byte, error) {
+func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([]byte, error) {
 	sharedSecret, err := group.diffieHellman(theirPublic, myPrivate)
 	if err != nil {
 		return nil, err
@@ -78,7 +79,7 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic *big.Int, myPrivate *bi
 	return aesKey, nil
 }
 
-func unauthenticatedAESCBCEncrypt(unpaddedPlaintext []byte, key []byte) (iv []byte, ciphertext []byte, err error) {
+func unauthenticatedAESCBCEncrypt(unpaddedPlaintext, key []byte) (iv, ciphertext []byte, err error) {
 	paddedPlaintext := padPKCS7(unpaddedPlaintext, aes.BlockSize)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -95,7 +96,7 @@ func unauthenticatedAESCBCEncrypt(unpaddedPlaintext []byte, key []byte) (iv []by
 	return iv, ciphertext, nil
 }
 
-func unauthenticatedAESCBCDecrypt(iv []byte, ciphertext []byte, key []byte) ([]byte, error) {
+func unauthenticatedAESCBCDecrypt(iv, ciphertext, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

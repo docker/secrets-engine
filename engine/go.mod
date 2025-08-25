@@ -31,7 +31,6 @@ require (
 )
 
 require (
-	github.com/Benehiko/go-keychain/v2 v2.0.0 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

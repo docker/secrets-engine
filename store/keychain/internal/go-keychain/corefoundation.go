@@ -1,6 +1,8 @@
 //go:build darwin || ios
 // +build darwin ios
 
+//
+//nolint:gocyclo,lll
 package keychain
 
 /*
@@ -49,7 +51,7 @@ func Release(ref C.CFTypeRef) {
 // Release(ref).
 func BytesToCFData(b []byte) (C.CFDataRef, error) {
 	if uint64(len(b)) > math.MaxUint32 {
-		return 0, errors.New("Data is too large")
+		return 0, errors.New("data is too large")
 	}
 	var p *C.UInt8
 	if len(b) > 0 {
@@ -57,7 +59,7 @@ func BytesToCFData(b []byte) (C.CFDataRef, error) {
 	}
 	cfData := C.CFDataCreate(C.kCFAllocatorDefault, p, C.CFIndex(len(b)))
 	if cfData == 0 {
-		return 0, fmt.Errorf("CFDataCreate failed")
+		return 0, fmt.Errorf("failed on CFDataCreate")
 	}
 	return cfData, nil
 }
@@ -82,9 +84,9 @@ func MapToCFDictionary(m map[C.CFTypeRef]C.CFTypeRef) (C.CFDictionaryRef, error)
 		valuesPointer = &values[0]
 	}
 	cfDict := C.CFDictionaryCreateSafe2(C.kCFAllocatorDefault, keysPointer, valuesPointer, C.CFIndex(numValues),
-		&C.kCFTypeDictionaryKeyCallBacks, &C.kCFTypeDictionaryValueCallBacks) //nolint
+		&C.kCFTypeDictionaryKeyCallBacks, &C.kCFTypeDictionaryValueCallBacks)
 	if cfDict == 0 {
-		return 0, fmt.Errorf("CFDictionaryCreate failed")
+		return 0, fmt.Errorf("failed on CFDictionaryCreate")
 	}
 	return cfDict, nil
 }
@@ -115,10 +117,10 @@ func Int32ToCFNumber(u int32) C.CFNumberRef {
 // Release(ref).
 func StringToCFString(s string) (C.CFStringRef, error) {
 	if !utf8.ValidString(s) {
-		return 0, errors.New("Invalid UTF-8 string")
+		return 0, errors.New("invalid UTF-8 string")
 	}
 	if uint64(len(s)) > math.MaxUint32 {
-		return 0, errors.New("String is too large")
+		return 0, errors.New("string is too large")
 	}
 
 	bytes := []byte(s)
@@ -161,7 +163,7 @@ func ArrayToCFArray(a []C.CFTypeRef) C.CFArrayRef {
 	if numValues > 0 {
 		valuesPointer = &values[0]
 	}
-	return C.CFArrayCreateSafe2(C.kCFAllocatorDefault, valuesPointer, C.CFIndex(numValues), &C.kCFTypeArrayCallBacks) //nolint
+	return C.CFArrayCreateSafe2(C.kCFAllocatorDefault, valuesPointer, C.CFIndex(numValues), &C.kCFTypeArrayCallBacks)
 }
 
 // CFArrayToArray converts a CFArrayRef to an array of CFTypes.
@@ -187,7 +189,7 @@ func ConvertMapToCFDictionary(attr map[string]interface{}) (C.CFDictionaryRef, e
 		var valueRef C.CFTypeRef
 		switch val := i.(type) {
 		default:
-			return 0, fmt.Errorf("Unsupported value type: %v", reflect.TypeOf(i))
+			return 0, fmt.Errorf("unsupported value type: %v", reflect.TypeOf(i))
 		case C.CFTypeRef:
 			valueRef = val
 		case bool:
@@ -289,7 +291,7 @@ func Convert(ref C.CFTypeRef) (interface{}, error) {
 		return false, nil
 	}
 
-	return nil, fmt.Errorf("Invalid type: %s", CFTypeDescription(ref))
+	return nil, fmt.Errorf("invalid type: %s", CFTypeDescription(ref))
 }
 
 // ConvertCFDictionary converts a CFDictionary to map (deep).
@@ -319,66 +321,66 @@ func CFNumberToInterface(cfNumber C.CFNumberRef) interface{} {
 	switch typ {
 	case C.kCFNumberSInt8Type:
 		var sint C.SInt8
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint))
 		return int8(sint)
 	case C.kCFNumberSInt16Type:
 		var sint C.SInt16
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint))
 		return int16(sint)
 	case C.kCFNumberSInt32Type:
 		var sint C.SInt32
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint))
 		return int32(sint)
 	case C.kCFNumberSInt64Type:
 		var sint C.SInt64
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&sint))
 		return int64(sint)
 	case C.kCFNumberFloat32Type:
 		var float C.Float32
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float))
 		return float32(float)
 	case C.kCFNumberFloat64Type:
 		var float C.Float64
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float))
 		return float64(float)
 	case C.kCFNumberCharType:
 		var char C.char
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&char)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&char))
 		return byte(char)
 	case C.kCFNumberShortType:
 		var short C.short
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&short)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&short))
 		return int16(short)
 	case C.kCFNumberIntType:
 		var i C.int
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&i)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&i))
 		return int32(i)
 	case C.kCFNumberLongType:
 		var long C.long
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&long)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&long))
 		return int(long)
 	case C.kCFNumberLongLongType:
 		// This is the only type that may actually overflow us
 		var longlong C.longlong
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&longlong)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&longlong))
 		return int64(longlong)
 	case C.kCFNumberFloatType:
 		var float C.float
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&float))
 		return float32(float)
 	case C.kCFNumberDoubleType:
 		var double C.double
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&double)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&double))
 		return float64(double)
 	case C.kCFNumberCFIndexType:
 		// CFIndex is a long
 		var index C.CFIndex
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&index)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&index))
 		return int(index)
 	case C.kCFNumberNSIntegerType:
 		// We don't have a definition of NSInteger, but we know it's either an int or a long
 		var nsInt C.long
-		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&nsInt)) //nolint
+		C.CFNumberGetValue(cfNumber, typ, unsafe.Pointer(&nsInt))
 		return int(nsInt)
 	}
 	panic("Unknown CFNumber type")
