@@ -74,7 +74,7 @@ func TestMain(m *testing.M) {
 		// We then based on the suffix in dummyPluginProcessFromBinaryName() set the behavior of the plugin.
 		testdummy.PluginProcessFromBinaryName(binaryName)
 	} else if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
-		testdummy.PluginProcess(nil)
+		testdummy.PluginProcess()
 	} else {
 		os.Exit(m.Run())
 	}

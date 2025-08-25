@@ -46,17 +46,17 @@ func PluginProcessFromBinaryName(name string) {
 		if err != nil {
 			panic(err)
 		}
-		PluginProcess(&PluginCfg{
-			Version: "v1",
-			Pattern: "*",
-			Secrets: map[string]string{
-				behaviour.Value:       behaviour.Value + "-value",
-				MockSecretID.String(): MockSecretValue,
+		pluginProcess(&pluginCfgRestored{
+			version: api.MustNewVersion("v1"),
+			pattern: secrets.MustParsePattern("*"),
+			secrets: map[secrets.ID]string{
+				secrets.MustParseID(behaviour.Value): behaviour.Value + "-value",
+				MockSecretID:                         MockSecretValue,
 			},
 			CrashBehaviour: behaviour.CrashBehaviour,
 		})
 	} else {
-		PluginProcess(&PluginCfg{ErrConfigPanic: "fake crash"})
+		pluginProcess(&pluginCfgRestored{ErrConfigPanic: "fake crash"})
 	}
 }
 
@@ -145,7 +145,7 @@ var _ plugin.Plugin = &dummyPlugin{}
 
 type dummyPlugin struct {
 	m      sync.Mutex
-	cfg    PluginCfg
+	cfg    pluginCfgRestored
 	result PluginResult
 }
 
@@ -163,9 +163,10 @@ func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (sec
 	}
 	d.result.GetSecret = append(d.result.GetSecret, request.ID.String())
 	if d.cfg.ErrGetSecret != "" {
-		return secrets.Envelope{}, errors.New(d.cfg.ErrGetSecret)
+		err := errors.New(d.cfg.ErrGetSecret)
+		return secrets.EnvelopeErr(request, err), err
 	}
-	if v, ok := d.cfg.Secrets[request.ID.String()]; ok {
+	if v, ok := d.cfg.secrets[request.ID]; ok {
 		return secrets.Envelope{
 			ID:        request.ID,
 			Value:     []byte(v),
@@ -187,6 +188,16 @@ type PluginCfg struct {
 	*CrashBehaviour
 }
 
+type pluginCfgRestored struct {
+	version        api.Version
+	pattern        secrets.Pattern
+	secrets        map[secrets.ID]string
+	ErrGetSecret   string
+	IgnoreSigint   bool
+	ErrConfigPanic string
+	*CrashBehaviour
+}
+
 func (c *PluginCfg) toString() (string, error) {
 	result, err := json.Marshal(c)
 	if err != nil {
@@ -195,15 +206,39 @@ func (c *PluginCfg) toString() (string, error) {
 	return string(result), nil
 }
 
-func newDummyPluginCfg(in string) (*PluginCfg, error) {
-	var result PluginCfg
-	if err := json.Unmarshal([]byte(in), &result); err != nil {
+func newDummyPluginCfg(in string) (*pluginCfgRestored, error) {
+	var cfg PluginCfg
+	if err := json.Unmarshal([]byte(in), &cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode dummy plugin cfg: %w", err)
 	}
-	return &result, nil
+	store := map[secrets.ID]string{}
+	for idString, secret := range cfg.Secrets {
+		id, err := secrets.ParseID(idString)
+		if err != nil {
+			return nil, err
+		}
+		store[id] = secret
+	}
+	version, err := api.NewVersion(cfg.Version)
+	if err != nil {
+		return nil, err
+	}
+	pattern, err := secrets.ParsePattern(cfg.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &pluginCfgRestored{
+		version:        version,
+		pattern:        pattern,
+		secrets:        store,
+		ErrGetSecret:   cfg.ErrGetSecret,
+		IgnoreSigint:   cfg.IgnoreSigint,
+		ErrConfigPanic: cfg.ErrConfigPanic,
+		CrashBehaviour: cfg.CrashBehaviour,
+	}, nil
 }
 
-func getCfgFromEnv() *PluginCfg {
+func getCfgFromEnv() *pluginCfgRestored {
 	cfgStr := os.Getenv(dummyPluginCfgEnv)
 	cfg, err := newDummyPluginCfg(cfgStr)
 	if err != nil {
@@ -232,7 +267,11 @@ var _ logging.Logger = &bufferLogger{}
 
 // PluginProcess is the equivalent of a main when normally implementing a plugin.
 // Here, it gets run by TestMain if PluginCommand is used to re-launch the test binary (the binary built by go test).
-func PluginProcess(cfg *PluginCfg) {
+func PluginProcess() {
+	pluginProcess(nil)
+}
+
+func pluginProcess(cfg *pluginCfgRestored) {
 	var logBuf bytes.Buffer
 	logger := &bufferLogger{&logBuf}
 	if cfg == nil {
@@ -247,15 +286,7 @@ func PluginProcess(cfg *PluginCfg) {
 	}
 
 	d := &dummyPlugin{cfg: *cfg}
-	version, err := api.NewVersion(cfg.Version)
-	if err != nil {
-		panic(err)
-	}
-	pattern, err := secrets.ParsePattern(cfg.Pattern)
-	if err != nil {
-		panic(err)
-	}
-	p, err := plugin.New(d, plugin.Config{Version: version, Pattern: pattern, Logger: logger})
+	p, err := plugin.New(d, plugin.Config{Version: cfg.version, Pattern: cfg.pattern, Logger: logger})
 	if err != nil {
 		tryExitWithTestSetupErr(err)
 	}
