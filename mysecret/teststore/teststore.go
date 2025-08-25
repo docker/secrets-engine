@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/docker/secrets-engine/store"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type Option func(m *MockStore)
@@ -19,11 +18,11 @@ type MockStore struct {
 	errGetAll error
 	errDelete error
 	errGet    error
-	store     map[string]store.Secret
+	store     map[store.ID]store.Secret
 }
 
 func NewMockStore(options ...Option) store.Store {
-	s := &MockStore{store: map[string]store.Secret{}}
+	s := &MockStore{store: map[store.ID]store.Secret{}}
 	for _, option := range options {
 		option(s)
 	}
@@ -54,7 +53,7 @@ func WithStoreDeleteErr(err error) Option {
 	}
 }
 
-func WithStore(store map[string]store.Secret) Option {
+func WithStore(store map[store.ID]store.Secret) Option {
 	return func(m *MockStore) {
 		m.store = store
 	}
@@ -68,7 +67,7 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 		return m.errDelete
 	}
 
-	delete(m.store, id.String())
+	delete(m.store, id)
 	return nil
 }
 
@@ -80,14 +79,14 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 		return nil, m.errGet
 	}
 
-	secret, exists := m.store[id.String()]
+	secret, exists := m.store[id]
 	if !exists {
 		return nil, store.ErrCredentialNotFound
 	}
 	return secret, nil
 }
 
-func (m *MockStore) GetAllMetadata(_ context.Context) (map[string]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.errGetAll != nil {
@@ -103,22 +102,18 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 		return m.errSave
 	}
 
-	m.store[id.String()] = secret
+	m.store[id] = secret
 	return nil
 }
 
-func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	filtered := make(map[string]store.Secret)
+	filtered := make(map[store.ID]store.Secret)
 	for id, f := range m.store {
-		p, err := secrets.ParseID(id)
-		if err != nil {
-			continue
-		}
-		if pattern.Match(p) {
-			filtered[p.String()] = f
+		if pattern.Match(id) {
+			filtered[id] = f
 		}
 	}
 	return filtered, nil

@@ -104,11 +104,11 @@ func TestMacosKeychain(t *testing.T) {
 		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern(id.String()))
 		require.NoError(t, err)
 		assert.Len(t, secrets, 1)
-		assert.Subset(t, secrets[id.String()].Metadata(), map[string]string{
+		assert.Subset(t, secrets[id].Metadata(), map[string]string{
 			"game": "elden ring",
 		})
-		assert.IsType(t, &mocks.MockCredential{}, secrets[id.String()], "secret from store must be of type *mocks.MockCredential")
-		mockSecret := secrets[id.String()].(*mocks.MockCredential)
+		assert.IsType(t, &mocks.MockCredential{}, secrets[id], "secret from store must be of type *mocks.MockCredential")
+		mockSecret := secrets[id].(*mocks.MockCredential)
 		assert.Equal(t, secret.Password, mockSecret.Password)
 	})
 
@@ -130,7 +130,7 @@ func TestMacosKeychain(t *testing.T) {
 		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern("*/"+serviceName+"/*"))
 		require.NoError(t, err)
 		assert.Len(t, secrets, 4)
-		_, ok := secrets[id.String()]
+		_, ok := secrets[id]
 		assert.Truef(t, ok, "returned secret must match original id")
 	})
 }

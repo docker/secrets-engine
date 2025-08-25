@@ -10,12 +10,12 @@ import (
 
 type MockStore struct {
 	lock  sync.RWMutex
-	store map[string]store.Secret
+	store map[store.ID]store.Secret
 }
 
 func (m *MockStore) init() {
 	if m.store == nil {
-		m.store = make(map[string]store.Secret)
+		m.store = make(map[store.ID]store.Secret)
 	}
 }
 
@@ -24,7 +24,7 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	defer m.lock.Unlock()
 	m.init()
 
-	delete(m.store, id.String())
+	delete(m.store, id)
 	return nil
 }
 
@@ -33,14 +33,14 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 	defer m.lock.RUnlock()
 	m.init()
 
-	secret, exists := m.store[id.String()]
+	secret, exists := m.store[id]
 	if !exists {
 		return nil, store.ErrCredentialNotFound
 	}
 	return secret, nil
 }
 
-func (m *MockStore) GetAllMetadata(_ context.Context) (map[string]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
@@ -52,23 +52,19 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	defer m.lock.Unlock()
 	m.init()
 
-	m.store[id.String()] = secret
+	m.store[id] = secret
 	return nil
 }
 
-func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.init()
 
-	filtered := make(map[string]store.Secret)
+	filtered := make(map[store.ID]store.Secret)
 	for id, f := range m.store {
-		p, err := store.ParseID(id)
-		if err != nil {
-			continue
-		}
-		if pattern.Match(p) {
-			filtered[p.String()] = f
+		if pattern.Match(id) {
+			filtered[id] = f
 		}
 	}
 	return filtered, nil
