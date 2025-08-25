@@ -31,7 +31,7 @@ type dhGroup struct {
 
 var bigOne = big.NewInt(1)
 
-func (group *dhGroup) NewKeypair() (private *big.Int, public *big.Int, err error) {
+func (group *dhGroup) NewKeypair() (private, public *big.Int, err error) {
 	for {
 		if private, err = cryptorand.Int(cryptorand.Reader, group.pMinus1); err != nil {
 			return nil, nil, err
@@ -60,7 +60,7 @@ func rfc2409SecondOakleyGroup() *dhGroup {
 	}
 }
 
-func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic *big.Int, myPrivate *big.Int) ([]byte, error) {
+func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([]byte, error) {
 	sharedSecret, err := group.diffieHellman(theirPublic, myPrivate)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic *big.Int, myPrivate *bi
 	return aesKey, nil
 }
 
-func unauthenticatedAESCBCEncrypt(unpaddedPlaintext []byte, key []byte) (iv []byte, ciphertext []byte, err error) {
+func unauthenticatedAESCBCEncrypt(unpaddedPlaintext, key []byte) (iv, ciphertext []byte, err error) {
 	paddedPlaintext := padPKCS7(unpaddedPlaintext, aes.BlockSize)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -95,7 +95,7 @@ func unauthenticatedAESCBCEncrypt(unpaddedPlaintext []byte, key []byte) (iv []by
 	return iv, ciphertext, nil
 }
 
-func unauthenticatedAESCBCDecrypt(iv []byte, ciphertext []byte, key []byte) ([]byte, error) {
+func unauthenticatedAESCBCDecrypt(iv, ciphertext, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

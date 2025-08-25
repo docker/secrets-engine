@@ -9,6 +9,7 @@ package keychain
 #include <CoreFoundation/CoreFoundation.h>
 */
 import "C"
+
 import (
 	"math"
 	"time"
@@ -24,7 +25,7 @@ func absoluteTimeIntervalSince1970() int64 {
 	return int64(C.kCFAbsoluteTimeIntervalSince1970)
 }
 
-func unixToAbsoluteTime(s int64, ns int64) C.CFAbsoluteTime {
+func unixToAbsoluteTime(s, ns int64) C.CFAbsoluteTime {
 	// Subtract as int64s first before converting to floating
 	// point to minimize precision loss (assuming the given time
 	// isn't much earlier than the Core Foundation absolute

@@ -291,7 +291,7 @@ func (k *Item) SetInt32(key string, v int32) {
 }
 
 // SetString sets a string attibute for a string key
-func (k *Item) SetString(key string, s string) {
+func (k *Item) SetString(key, s string) {
 	if s != "" {
 		k.attr[key] = s
 	} else {
@@ -419,7 +419,7 @@ func NewItem() Item {
 }
 
 // NewGenericPassword creates a generic password item with the default keychain. This is a convenience method.
-func NewGenericPassword(service string, account string, label string, data []byte, accessGroup string) Item {
+func NewGenericPassword(service, account, label string, data []byte, accessGroup string) Item {
 	item := NewItem()
 	item.SetSecClass(SecClassGenericPassword)
 	item.SetService(service)
@@ -444,7 +444,7 @@ func AddItem(item Item) error {
 }
 
 // UpdateItem updates the queryItem with the parameters from updateItem
-func UpdateItem(queryItem Item, updateItem Item) error {
+func UpdateItem(queryItem, updateItem Item) error {
 	cfDict, err := ConvertMapToCFDictionary(queryItem.attr)
 	if err != nil {
 		return err
@@ -614,7 +614,7 @@ func convertResult(d C.CFDictionaryRef) (*QueryResult, error) {
 }
 
 // DeleteGenericPasswordItem removes a generic password item.
-func DeleteGenericPasswordItem(service string, account string) error {
+func DeleteGenericPasswordItem(service, account string) error {
 	item := NewItem()
 	item.SetSecClass(SecClassGenericPassword)
 	item.SetService(service)
@@ -661,7 +661,7 @@ func GetGenericPasswordAccounts(service string) ([]string, error) {
 
 // GetGenericPassword returns password data for service and account. This is a convenience method.
 // If item is not found returns nil, nil.
-func GetGenericPassword(service string, account string, label string, accessGroup string) ([]byte, error) {
+func GetGenericPassword(service, account, label, accessGroup string) ([]byte, error) {
 	query := NewItem()
 	query.SetSecClass(SecClassGenericPassword)
 	query.SetService(service)
