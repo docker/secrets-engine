@@ -197,7 +197,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		return nil, store.ErrCredentialNotFound
 	}
 
-	credentials := make(map[string]store.Secret, len(itemPaths))
+	credentials := make(map[store.ID]store.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(itemPath)
 		if err != nil {
@@ -259,7 +259,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 			return nil, err
 		}
 
-		credentials[secretID.String()] = secret
+		credentials[secretID] = secret
 	}
 
 	return credentials, nil
@@ -319,7 +319,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 }
 
 //gocyclo:ignore
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -361,7 +361,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		return nil, store.ErrCredentialNotFound
 	}
 
-	credentials := make(map[string]store.Secret)
+	credentials := make(map[store.ID]store.Secret)
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(itemPath)
 		if err != nil {
@@ -403,7 +403,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 			return nil, err
 		}
 
-		credentials[secretID.String()] = secret
+		credentials[secretID] = secret
 	}
 
 	if len(credentials) == 0 {

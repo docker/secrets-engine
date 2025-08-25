@@ -58,9 +58,9 @@ func Test_rootCommand(t *testing.T) {
 	})
 	t.Run("list", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
-			mock := teststore.NewMockStore(teststore.WithStore(map[string]store.Secret{
-				"foo": &service.MyValue{Value: []byte("bar")},
-				"baz": &service.MyValue{Value: []byte("0")},
+			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "list")
 			assert.NoError(t, err)
@@ -76,9 +76,9 @@ func Test_rootCommand(t *testing.T) {
 	})
 	t.Run("rm", func(t *testing.T) {
 		t.Run("ok (two secrets)", func(t *testing.T) {
-			mock := teststore.NewMockStore(teststore.WithStore(map[string]store.Secret{
-				"foo": &service.MyValue{Value: []byte("bar")},
-				"baz": &service.MyValue{Value: []byte("0")},
+			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "foo", "baz")
 			assert.NoError(t, err)
@@ -88,9 +88,9 @@ func Test_rootCommand(t *testing.T) {
 			assert.Empty(t, l)
 		})
 		t.Run("--all", func(t *testing.T) {
-			mock := teststore.NewMockStore(teststore.WithStore(map[string]store.Secret{
-				"foo": &service.MyValue{Value: []byte("bar")},
-				"baz": &service.MyValue{Value: []byte("0")},
+			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "--all")
 			assert.NoError(t, err)
@@ -111,7 +111,7 @@ func Test_rootCommand(t *testing.T) {
 			out, err := executeCommand(rootCommand(t.Context(), mock), "rm", "/foo")
 			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 			assert.ErrorIs(t, err, errInvalidID)
-			assert.Equal(t, "ERR: /foo: invalid ID\nError: "+errInvalidID.Error()+"\n", out)
+			assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
 		})
 		t.Run("cannot mix --all with explicit list", func(t *testing.T) {
 			mock := teststore.NewMockStore()
@@ -128,8 +128,8 @@ func Test_rootCommand(t *testing.T) {
 	})
 	t.Run("get", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
-			mock := teststore.NewMockStore(teststore.WithStore(map[string]store.Secret{
-				"foo": &service.MyValue{Value: []byte("bar")},
+			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
 			}))
 			out, err := executeCommand(rootCommand(t.Context(), mock), "get", "foo")
 			assert.NoError(t, err)

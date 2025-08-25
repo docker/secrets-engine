@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,10 +24,11 @@ func RmCommand(kc store.Store) *cobra.Command {
 		Aliases: []string{"delete", "erase", "remove"},
 		Short:   "Remove secrets from local keychain.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validateArgs(args, opts); err != nil {
+			idList, err := validateArgs(args, opts)
+			if err != nil {
 				return err
 			}
-			return runRm(cmd.Context(), cmd.OutOrStdout(), kc, args, opts)
+			return runRm(cmd.Context(), cmd.OutOrStdout(), kc, idList, opts)
 		},
 	}
 	flags := cmd.Flags()
@@ -34,38 +36,40 @@ func RmCommand(kc store.Store) *cobra.Command {
 	return cmd
 }
 
-func validateArgs(args []string, opts rmOpts) error {
+func validateArgs(args []string, opts rmOpts) ([]store.ID, error) {
 	if (len(args) == 0 && !opts.All) || (len(args) > 0 && opts.All) {
-		return fmt.Errorf("either provide a secret name or use --all to remove all secrets")
+		return nil, fmt.Errorf("either provide a secret name or use --all to remove all secrets")
 	}
-	return nil
+	var result []store.ID
+	for _, arg := range args {
+		id, err := store.ParseID(arg)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, id)
+	}
+	return result, nil
 }
 
-func runRm(ctx context.Context, out io.Writer, kc store.Store, names []string, opts rmOpts) error {
-	if opts.All && len(names) == 0 {
+func runRm(ctx context.Context, out io.Writer, kc store.Store, idList []store.ID, opts rmOpts) error {
+	if opts.All && len(idList) == 0 {
 		l, err := kc.GetAllMetadata(ctx)
 		if err != nil {
 			return err
 		}
 		for k := range l {
-			names = append(names, k)
+			idList = append(idList, k)
 		}
 	}
-	slices.Sort(names)
+	slices.SortFunc(idList, func(a, b store.ID) int { return strings.Compare(a.String(), b.String()) })
 	var errs []error
-	for _, name := range names {
-		id, err := store.ParseID(name)
-		if err != nil {
-			fmt.Fprintf(out, "ERR: %s: invalid ID\n", name)
-			errs = append(errs, err)
-			continue
-		}
+	for _, id := range idList {
 		if err := kc.Delete(ctx, id); err != nil {
 			errs = append(errs, err)
-			fmt.Fprintf(out, "ERR: %s: %s\n", name, err)
+			fmt.Fprintf(out, "ERR: %s: %s\n", id, err)
 			continue
 		}
-		fmt.Fprintf(out, "RM: %s\n", name)
+		fmt.Fprintf(out, "RM: %s\n", id)
 	}
 	return errors.Join(errs...)
 }
