@@ -105,8 +105,8 @@ func TestKeychain(t *testing.T) {
 	t.Run("list all credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
 
-		moreCreds := map[string]*mocks.MockCredential{
-			"com.test.test/test/bob": {
+		moreCreds := map[store.ID]*mocks.MockCredential{
+			store.MustParseID("com.test.test/test/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -114,29 +114,29 @@ func TestKeychain(t *testing.T) {
 					"game":  "elden ring",
 				},
 			},
-			"com.test.test/test/jeff": {
+			store.MustParseID("com.test.test/test/jeff"): {
 				Username: "jeff",
 				Password: "jeff-password",
 			},
-			"com.test.test/test/pete": {
+			store.MustParseID("com.test.test/test/pete"): {
 				Username: "pete",
 				Password: "pete-password",
 			},
 		}
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				require.NoError(t, ks.Delete(context.Background(), store.MustParseID(id)))
+				require.NoError(t, ks.Delete(context.Background(), id))
 			}
 		})
 
 		for id, anotherCred := range moreCreds {
-			require.NoError(t, ks.Save(t.Context(), store.MustParseID(id), anotherCred))
+			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
 		}
 		secrets, err := ks.GetAllMetadata(t.Context())
 		require.NoError(t, err)
 		assert.Len(t, secrets, 3)
 
-		actual := make(map[string]*mocks.MockCredential)
+		actual := make(map[store.ID]*mocks.MockCredential)
 		for k, v := range secrets {
 			actual[k] = v.(*mocks.MockCredential)
 		}
@@ -157,8 +157,8 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("filter credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		moreCreds := map[string]*mocks.MockCredential{
-			"com.test.test/test/bob": {
+		moreCreds := map[store.ID]*mocks.MockCredential{
+			store.MustParseID("com.test.test/test/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -166,11 +166,11 @@ func TestKeychain(t *testing.T) {
 					"favcolor": "green",
 				},
 			},
-			"com.test.test/test/jeff": {
+			store.MustParseID("com.test.test/test/jeff"): {
 				Username: "jeff",
 				Password: "jeff-password",
 			},
-			"com.test.test/test/pete": {
+			store.MustParseID("com.test.test/test/pete"): {
 				Username: "pete",
 				Password: "pete-password",
 				Attributes: map[string]string{
@@ -178,7 +178,7 @@ func TestKeychain(t *testing.T) {
 					"favcolor": "green",
 				},
 			},
-			"com.test.test2/test2/bob": {
+			store.MustParseID("com.test.test2/test2/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -188,12 +188,12 @@ func TestKeychain(t *testing.T) {
 			},
 		}
 		for id, anotherCred := range moreCreds {
-			require.NoError(t, ks.Save(t.Context(), store.MustParseID(id), anotherCred))
+			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
 		}
 
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				assert.NoError(t, ks.Delete(t.Context(), store.MustParseID(id)))
+				assert.NoError(t, ks.Delete(t.Context(), id))
 			}
 		})
 
@@ -219,14 +219,14 @@ func TestKeychain(t *testing.T) {
 			result, err := ks.Filter(t.Context(), store.MustParsePattern("**/bob"))
 			require.NoError(t, err)
 			assert.Len(t, result, 2)
-			actual := make(map[string]*mocks.MockCredential)
+			actual := make(map[store.ID]*mocks.MockCredential)
 			for k, v := range result {
 				actual[k] = v.(*mocks.MockCredential)
 			}
 			assert.Len(t, actual, 2)
-			expected := make(map[string]*mocks.MockCredential)
-			expected["com.test.test/test/bob"] = moreCreds["com.test.test/test/bob"]
-			expected["com.test.test2/test2/bob"] = moreCreds["com.test.test2/test2/bob"]
+			expected := make(map[store.ID]*mocks.MockCredential)
+			expected[store.MustParseID("com.test.test/test/bob")] = moreCreds[store.MustParseID("com.test.test/test/bob")]
+			expected[store.MustParseID("com.test.test2/test2/bob")] = moreCreds[store.MustParseID("com.test.test2/test2/bob")]
 			assert.EqualValues(t, expected, actual)
 		})
 
@@ -234,7 +234,7 @@ func TestKeychain(t *testing.T) {
 			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/pete"))
 			require.NoError(t, err)
 			assert.Len(t, actual, 1)
-			_, ok := actual["com.test.test/test/pete"]
+			_, ok := actual[store.MustParseID("com.test.test/test/pete")]
 			assert.True(t, ok)
 		})
 	})
