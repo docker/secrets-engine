@@ -165,9 +165,8 @@ func (d *dummyPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]
 		os.Exit(d.cfg.ExitCode)
 	}
 	d.result.GetSecret = append(d.result.GetSecret, request.Pattern.String())
-	if d.cfg.ErrGetSecret != "" {
-		err := errors.New(d.cfg.ErrGetSecret)
-		return secrets.EnvelopeErrs(err), err
+	if d.cfg.errGetSecret != nil {
+		return nil, d.cfg.errGetSecret
 	}
 	var envelopes []secrets.Envelope
 	for id, value := range d.cfg.secrets {
@@ -181,7 +180,7 @@ func (d *dummyPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]
 		}
 	}
 	if len(envelopes) == 0 {
-		return secrets.EnvelopeErrs(secrets.ErrNotFound), secrets.ErrNotFound
+		return nil, secrets.ErrNotFound
 	}
 	return envelopes, nil
 }
@@ -200,7 +199,7 @@ type pluginCfgRestored struct {
 	version        api.Version
 	pattern        secrets.Pattern
 	secrets        map[secrets.ID]string
-	ErrGetSecret   string
+	errGetSecret   error
 	IgnoreSigint   bool
 	ErrConfigPanic string
 	*CrashBehaviour
@@ -235,11 +234,15 @@ func newDummyPluginCfg(in string) (*pluginCfgRestored, error) {
 	if err != nil {
 		return nil, err
 	}
+	var errGetSecret error
+	if cfg.ErrGetSecret != "" {
+		errGetSecret = errors.New(cfg.ErrGetSecret)
+	}
 	return &pluginCfgRestored{
 		version:        version,
 		pattern:        pattern,
 		secrets:        store,
-		ErrGetSecret:   cfg.ErrGetSecret,
+		errGetSecret:   errGetSecret,
 		IgnoreSigint:   cfg.IgnoreSigint,
 		ErrConfigPanic: cfg.ErrConfigPanic,
 		CrashBehaviour: cfg.CrashBehaviour,

@@ -47,7 +47,7 @@ func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]sec
 	}
 
 	if len(results) == 0 && len(errs) == 0 {
-		return secrets.EnvelopeErrs(secrets.ErrNotFound), secrets.ErrNotFound
+		return nil, secrets.ErrNotFound
 	}
 
 	return results, errors.Join(errs...)

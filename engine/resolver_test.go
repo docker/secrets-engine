@@ -21,10 +21,9 @@ type mockResolverRuntime struct {
 
 func newMockResolverRuntime(name string, err ...error) runtime {
 	return &mockResolverRuntime{
-		name:      api.MustNewName(name),
-		version:   api.MustNewVersion("v1"),
-		err:       errors.Join(err...),
-		envelopes: secrets.EnvelopeErrs(err...),
+		name:    api.MustNewName(name),
+		version: api.MustNewVersion("v1"),
+		err:     errors.Join(err...),
 	}
 }
 

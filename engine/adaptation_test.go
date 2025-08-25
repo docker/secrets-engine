@@ -30,7 +30,9 @@ func Test_SecretsEngine(t *testing.T) {
 	e, err := New("test-engine", "test-version",
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
-		WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[string]string{"my-secret": "some-value"}}}))
+		WithPlugins(map[Config]Plugin{
+			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
+		}))
 	assert.NoError(t, err)
 	runEngineAsync(t, e)
 	assert.ErrorContains(t, e.Run(t.Context()), "already started")
@@ -46,7 +48,6 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.Equal(t, "foo", foo[0].ID.String())
 			assert.Equal(t, "foo-value", string(foo[0].Value))
 			assert.Equal(t, "plugin-foo", foo[0].Provider)
-			assert.Empty(t, foo[0].Error)
 			assert.NotEmpty(t, foo[0].ResolvedAt)
 			assert.NotEmpty(t, foo[0].CreatedAt)
 			assert.NotEmpty(t, foo[0].ExpiresAt)
@@ -102,10 +103,8 @@ func Test_SecretsEngine(t *testing.T) {
 		})
 	})
 	t.Run("non existing secrets", func(t *testing.T) {
-		secret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("fancy-secret")})
-		assert.ErrorContains(t, err, "secret not found")
-		require.NotEmpty(t, secret)
-		assert.Contains(t, secret[0].Error, "secret not found")
+		_, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("fancy-secret")})
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("non-unique secrets", func(t *testing.T) {
 		mockFromFoo, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: testdummy.MockSecretPattern, Provider: "plugin-foo"})
@@ -167,7 +166,9 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
-				WithPlugins(map[Config]Plugin{{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[string]string{"my-secret": "some-value"}}}),
+				WithPlugins(map[Config]Plugin{
+					{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
+				}),
 			}
 			if test.extraOption != nil {
 				options = append(options, test.extraOption)

@@ -29,9 +29,10 @@ func Test_mysecretPlugin(t *testing.T) {
 		errFilter := errors.New("filter error")
 		mock := teststore.NewMockStore(teststore.WithStoreFilterErr(errFilter))
 		p := &mysecretPlugin{kc: mock}
-		e, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		_, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
 		assert.ErrorIs(t, err, errFilter)
-		require.NotEmpty(t, e)
-		assert.Equal(t, errFilter.Error(), e[0].Error)
+	})
+	t.Run("unwrap error", func(*testing.T) {
+		// TODO
 	})
 }

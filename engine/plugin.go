@@ -191,7 +191,7 @@ func (r *runtimeImpl) Closed() <-chan struct{} {
 }
 
 func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
-	req := connect.NewRequest(v1.GetSecretRequest_builder{
+	req := connect.NewRequest(v1.GetSecretsRequest_builder{
 		Pattern:  proto.String(request.Pattern.String()),
 		Provider: proto.String(request.Provider),
 	}.Build())
@@ -200,16 +200,14 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) (
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			err = secrets.ErrNotFound
 		}
-		return secrets.EnvelopeErrs(err), err
+		return nil, err
 	}
-	var items []secrets.Envelope
-	var errList []error
 
+	var items []secrets.Envelope
 	for _, item := range resp.Msg.GetEnvelopes() {
 		id, err := secrets.ParseID(item.GetId())
 		if err != nil {
-			errList = append(errList, err)
-			items = append(items, secrets.EnvelopeErr(err))
+			// TODO: log error
 			continue
 		}
 		items = append(items, secrets.Envelope{
@@ -217,11 +215,10 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) (
 			Value:      item.GetValue(),
 			Provider:   r.Name().String(),
 			Version:    item.GetVersion(),
-			Error:      item.GetError(),
 			CreatedAt:  item.GetCreatedAt().AsTime(),
 			ResolvedAt: item.GetResolvedAt().AsTime(),
 			ExpiresAt:  item.GetExpiresAt().AsTime(),
 		})
 	}
-	return items, errors.Join(errList...)
+	return items, nil
 }

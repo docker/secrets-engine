@@ -34,7 +34,6 @@ type Envelope struct {
 	Value      []byte    `json:"-"`
 	Provider   string    `json:"-"`
 	Version    string    `json:"-"`
-	Error      string    `json:"-"`
 	CreatedAt  time.Time `json:"-"`
 	ResolvedAt time.Time `json:"-"`
 	ExpiresAt  time.Time `json:"-"`
@@ -48,16 +47,4 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 
 type Resolver interface {
 	GetSecrets(ctx context.Context, request Request) ([]Envelope, error)
-}
-
-func EnvelopeErr(err error) Envelope {
-	return Envelope{ResolvedAt: time.Now(), Error: err.Error()}
-}
-
-func EnvelopeErrs(err ...error) []Envelope {
-	var result []Envelope
-	for _, e := range err {
-		result = append(result, EnvelopeErr(e))
-	}
-	return result
 }

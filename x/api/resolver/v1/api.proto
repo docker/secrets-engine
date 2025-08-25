@@ -41,17 +41,17 @@ message ShutdownResponse {}
 
 service ResolverService {
   // Resolve a secret by its ID.
-  rpc GetSecrets(GetSecretRequest) returns (GetSecretResponse);
+  rpc GetSecrets(GetSecretsRequest) returns (GetSecretsResponse);
 }
 
-message GetSecretRequest {
+message GetSecretsRequest {
   // ID of the secret to resolve.
   string pattern = 1;
 
   string provider = 2;
 }
 
-message GetSecretResponse {
+message GetSecretsResponse {
   repeated Envelope envelopes = 1;
 
   message Envelope {
@@ -64,12 +64,10 @@ message GetSecretResponse {
 
     string version = 4;
 
-    string error = 5;
+    google.protobuf.Timestamp created_at = 5;
 
-    google.protobuf.Timestamp created_at = 6;
+    google.protobuf.Timestamp resolved_at = 6;
 
-    google.protobuf.Timestamp resolved_at = 7;
-
-    google.protobuf.Timestamp expires_at = 8;
+    google.protobuf.Timestamp expires_at = 7;
   }
 }

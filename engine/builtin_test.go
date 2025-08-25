@@ -29,7 +29,7 @@ type mockInternalPlugin struct {
 	blockRunForever chan struct{}
 	runPanics       bool
 	getSecretPanics bool
-	secrets         map[string]string
+	secrets         map[secrets.ID]string
 	runExitCh       chan struct{}
 }
 
@@ -38,17 +38,13 @@ func (m *mockInternalPlugin) GetSecrets(_ context.Context, request secrets.Reque
 		panic("panic")
 	}
 	if m.errGetSecretErr != nil {
-		return secrets.EnvelopeErrs(m.errGetSecretErr), m.errGetSecretErr
+		return nil, m.errGetSecretErr
 	}
 	var result []secrets.Envelope
-	for k, v := range m.secrets {
-		id := secrets.MustParseID(k)
+	for id, v := range m.secrets {
 		if request.Pattern.Match(id) {
 			result = append(result, secrets.Envelope{ID: id, Value: []byte(v)})
 		}
-	}
-	if len(result) == 0 {
-		return secrets.EnvelopeErrs(secrets.ErrNotFound), secrets.ErrNotFound
 	}
 	return result, nil
 }
@@ -78,7 +74,7 @@ func Test_internalRuntime(t *testing.T) {
 
 	t.Parallel()
 	t.Run("start / get secret -> value / stop / get secret -> no value", func(t *testing.T) {
-		m := &mockInternalPlugin{secrets: map[string]string{mockSecretIDNew.String(): mockSecretValue}}
+		m := &mockInternalPlugin{secrets: map[secrets.ID]string{mockSecretIDNew: mockSecretValue}}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		require.NoError(t, err)
 		assert.Equal(t, "foo", r.Name().String())
@@ -98,10 +94,8 @@ func Test_internalRuntime(t *testing.T) {
 		m := &mockInternalPlugin{errGetSecretErr: errGetSecretErr}
 		r, err := newInternalRuntime(testLoggerCtx(t), m, mockConfig)
 		assert.NoError(t, err)
-		resp, err := r.GetSecrets(t.Context(), secrets.Request{Pattern: mockSecretPattern})
+		_, err = r.GetSecrets(t.Context(), secrets.Request{Pattern: mockSecretPattern})
 		assert.ErrorIs(t, err, errGetSecretErr)
-		require.NotEmpty(t, resp)
-		assert.Equal(t, resp[0].Error, errGetSecretErr.Error())
 	})
 	t.Run("Blocking Run() on shutdown does not block but triggers an error", func(t *testing.T) {
 		m := &mockInternalPlugin{blockRunForever: make(chan struct{})}

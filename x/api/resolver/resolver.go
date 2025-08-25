@@ -25,7 +25,7 @@ func NewResolverHandler(r secrets.Resolver) resolverv1connect.ResolverServiceHan
 	return &resolverService{r}
 }
 
-func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
+func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[resolverv1.GetSecretsRequest]) (*connect.Response[resolverv1.GetSecretsResponse], error) {
 	msgPattern := c.Msg.GetPattern()
 	pattern, err := secrets.ParsePattern(msgPattern)
 	if err != nil {
@@ -39,20 +39,22 @@ func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[reso
 		}
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get secret %q: %w", msgPattern, err))
 	}
-	var items []*resolverv1.GetSecretResponse_Envelope
+	if len(envelopes) == 0 {
+		return nil, connect.NewError(connect.CodeNotFound, secrets.ErrNotFound)
+	}
+	var items []*resolverv1.GetSecretsResponse_Envelope
 	for _, envelope := range envelopes {
-		items = append(items, resolverv1.GetSecretResponse_Envelope_builder{
+		items = append(items, resolverv1.GetSecretsResponse_Envelope_builder{
 			Id:         proto.String(envelope.ID.String()),
 			Value:      envelope.Value,
 			Provider:   proto.String(envelope.Provider),
 			Version:    proto.String(envelope.Version),
-			Error:      proto.String(envelope.Error),
 			CreatedAt:  timestamppb.New(envelope.CreatedAt),
 			ResolvedAt: timestamppb.New(envelope.ResolvedAt),
 			ExpiresAt:  timestamppb.New(envelope.ExpiresAt),
 		}.Build())
 	}
-	return connect.NewResponse(resolverv1.GetSecretResponse_builder{
+	return connect.NewResponse(resolverv1.GetSecretsResponse_builder{
 		Envelopes: items,
 	}.Build()), nil
 }

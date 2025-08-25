@@ -276,7 +276,7 @@ func Test_newEngine(t *testing.T) {
 			plugins: map[metadata]Plugin{
 				&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 					runExitCh: internalPluginRunExitCh,
-					secrets:   map[string]string{"my-secret": "some-value"},
+					secrets:   map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 				},
 			},
 		}
@@ -342,7 +342,7 @@ func Test_newEngine(t *testing.T) {
 			plugins: map[metadata]Plugin{&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 				blockRunForever: blockRunCh,
 				runExitCh:       runExitCh,
-				secrets:         map[string]string{"my-secret": "some-value"},
+				secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 			}},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)

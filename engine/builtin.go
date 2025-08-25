@@ -88,16 +88,15 @@ func (i *internalRuntime) GetSecrets(ctx context.Context, request secrets.Reques
 	select {
 	case <-i.closed:
 		if err := i.runErr(); err != nil {
-			return secrets.EnvelopeErrs(err), err
+			return nil, err
 		}
-		err := fmt.Errorf("plugin %s has been shutdown", i.Name())
-		return secrets.EnvelopeErrs(err), err
+		return nil, fmt.Errorf("plugin %s has been shutdown", i.Name())
 	default:
 	}
 	defer func() {
 		if r := recover(); r != nil {
 			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.Name(), debug.Stack())
-			resp = secrets.EnvelopeErrs(panicErr)
+			resp = nil
 			err = panicErr
 		}
 	}()

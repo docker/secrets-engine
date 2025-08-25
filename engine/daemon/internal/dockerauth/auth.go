@@ -24,24 +24,32 @@ type dockerAuthPlugin struct {
 func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
 	list, err := d.store.Filter(ctx, request.Pattern)
 	if err != nil {
-		return secrets.EnvelopeErrs(err), err
+		return nil, err
 	}
 
 	var errList []error
 	var result []secrets.Envelope
 	for id, value := range list {
 		s, err := unpackValue(id, value)
-		errList = append(errList, err)
-		result = append(result, s)
+		if err != nil {
+			errList = append(errList, err)
+			// TODO: log error
+			continue
+		}
+		result = append(result, *s)
 	}
 
-	return result, errors.Join(errList...)
+	if len(result) == 0 && len(errList) > 0 {
+		return nil, errors.Join(errList...)
+	}
+
+	return result, nil
 }
 
-func unpackValue(id store.ID, secret store.Secret) (secrets.Envelope, error) {
+func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
 	val, err := secret.Marshal()
 	if err != nil {
-		return secrets.EnvelopeErr(err), err
+		return nil, err
 	}
 	m := secret.Metadata()
 
@@ -54,17 +62,17 @@ func unpackValue(id store.ID, secret store.Secret) (secrets.Envelope, error) {
 	if v, ok := m["createdAt"]; ok {
 		createdAt, err = time.Parse(time.RFC3339, v)
 		if err != nil {
-			return secrets.EnvelopeErr(err), err
+			return nil, err
 		}
 	}
 	if v, ok := m["expiresAt"]; ok {
 		expiresAt, err = time.Parse(time.RFC3339, v)
 		if err != nil {
-			return secrets.EnvelopeErr(err), err
+			return nil, err
 		}
 	}
 
-	return secrets.Envelope{
+	return &secrets.Envelope{
 		ID:         id,
 		Value:      val,
 		Provider:   serviceName,

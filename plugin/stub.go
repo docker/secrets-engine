@@ -19,8 +19,6 @@ type (
 	Request  = secrets.Request
 )
 
-var EnvelopeErr = secrets.EnvelopeErr
-
 type Plugin interface {
 	Resolver
 }
