@@ -124,22 +124,18 @@ type ID interface {
 	Match(pattern Pattern) bool
 }
 
-type id struct {
-	value string
-}
+type id string
 
-func (i *id) Match(pattern Pattern) bool {
-	pathParts := split(i.value)
+func (i id) Match(pattern Pattern) bool {
+	pathParts := split(string(i))
 	patternParts := split(pattern.String())
 
 	return match(patternParts, pathParts)
 }
 
-func (i *id) String() string {
-	return i.value
+func (i id) String() string {
+	return string(i)
 }
-
-var _ ID = &id{}
 
 // ParseID creates a new [ID] from a string
 // If a validation error occurs, it returns nil and the error.
@@ -153,9 +149,7 @@ func ParseID(s string) (ID, error) {
 		return nil, err
 	}
 
-	return &id{
-		value: s,
-	}, nil
+	return id(s), nil
 }
 
 // MustParseID parses a string into a [ID] and behaves similar to
@@ -164,7 +158,5 @@ func MustParseID(s string) ID {
 	if err := valid(s); err != nil {
 		panic(err)
 	}
-	return &id{
-		value: s,
-	}
+	return id(s)
 }
