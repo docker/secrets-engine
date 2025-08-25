@@ -2,8 +2,8 @@
 // keyring with a default collection created.
 // It should prompt you for your keyring password twice.
 
-//go:build !skipsecretserviceintegrationtests
-// +build !skipsecretserviceintegrationtests
+//go:build linux
+// +build linux
 
 package secretservice
 
@@ -57,7 +57,6 @@ func testKeyring(t *testing.T, mode AuthenticationMode) {
 
 	err = srv.LockItems([]dbus.ObjectPath{collection})
 	require.NoError(t, err)
-
 }
 
 func TestGetAll(t *testing.T) {
