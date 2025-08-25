@@ -142,7 +142,7 @@ func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string
 	return attributes
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -153,7 +153,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 	// this pattern matches any secret ID that conforms to the secrets engine
 	pattern := store.MustParsePattern("**")
 
-	secrets := make(map[string]store.Secret)
+	secrets := make(map[store.ID]store.Secret)
 	for cred := range findServiceCredentials(k, pattern, credentials) {
 		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
@@ -167,7 +167,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		secrets[id.String()] = secret
+		secrets[id] = secret
 	}
 
 	return secrets, nil
@@ -192,7 +192,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapWindowsCredentialError(g.Write())
 }
 
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	// Note: there is no notion of a filter on Windows inside the wincred API.
 	// It has no way to even filter on known attributes.
 	// This means we need to retrieve the entire list of ALL secrets, that
@@ -208,7 +208,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 
 	onlyLabelPrefix := k.itemLabel("")
 
-	secrets := make(map[string]store.Secret)
+	secrets := make(map[store.ID]store.Secret)
 	for cred := range findServiceCredentials(k, pattern, credentials) {
 		// it is possible that someone else has stored secrets in the keychain
 		// directly without conforming to the store.ID format.
@@ -242,7 +242,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		if err := secret.Unmarshal(blob); err != nil {
 			return nil, err
 		}
-		secrets[id.String()] = secret
+		secrets[id] = secret
 	}
 
 	return secrets, nil

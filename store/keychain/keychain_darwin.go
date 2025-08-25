@@ -110,7 +110,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -123,7 +123,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[string]store.Secret, len(results))
+	creds := make(map[store.ID]store.Secret, len(results))
 	for _, result := range results {
 		id, err := store.ParseID(result.Account)
 		if err != nil {
@@ -139,7 +139,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[string]store.Sec
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		creds[id.String()] = secret
+		creds[id] = secret
 	}
 	return creds, nil
 }
@@ -170,7 +170,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapKeychainError(kc.AddItem(item))
 }
 
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[string]store.Secret, error) {
+func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	// Note: Filter on macOS cannot filter by generic attributes and thus we
 	// cannot split the ID and store it in the keychain as parts for later
 	// pattern matching.
@@ -198,7 +198,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[string]store.Secret)
+	creds := make(map[store.ID]store.Secret)
 	for _, result := range results {
 		// it is possible that someone else has stored secrets in the keychain
 		// directly without conforming to the store.ID format.
@@ -235,7 +235,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		if err := secret.Unmarshal(i.Data); err != nil {
 			return nil, err
 		}
-		creds[id.String()] = secret
+		creds[id] = secret
 	}
 
 	return creds, nil

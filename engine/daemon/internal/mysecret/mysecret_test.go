@@ -16,8 +16,8 @@ import (
 func Test_mysecretPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[string]store.Secret{
-			"foo": &service.MyValue{Value: []byte("bar")},
+		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+			store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
 		}))
 		p := &mysecretPlugin{kc: mock}
 		e, err := p.GetSecret(t.Context(), secrets.Request{ID: secrets.MustParseID("foo")})
