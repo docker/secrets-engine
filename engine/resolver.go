@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/docker/secrets-engine/x/secrets"
@@ -15,7 +14,6 @@ type regResolver struct {
 }
 
 func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]secrets.Envelope, error) {
-	var errs []error
 	var results []secrets.Envelope
 
 	for _, plugin := range r.reg.GetAll() {
@@ -29,7 +27,6 @@ func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]sec
 		envelopes, err := plugin.GetSecrets(ctx, req)
 		if err != nil {
 			// TODO: log the error
-			errs = append(errs, err)
 			continue
 		}
 
@@ -46,9 +43,5 @@ func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]sec
 		return results, nil
 	}
 
-	if len(results) == 0 && len(errs) == 0 {
-		return nil, secrets.ErrNotFound
-	}
-
-	return results, errors.Join(errs...)
+	return results, secrets.ErrNotFound
 }

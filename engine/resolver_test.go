@@ -66,21 +66,13 @@ func (m mockResolverRegistry) GetAll() []runtime {
 func TestResolver(t *testing.T) {
 	t.Parallel()
 	t.Run("no match but errors", func(t *testing.T) {
-		errFoo1 := errors.New("foo")
-		errFoo2 := errors.New("foo")
-		errBar1 := errors.New("bar")
-		errBar2 := errors.New("bar")
 		reg := mockResolverRegistry{resolver: []runtime{
-			newMockResolverRuntime("foo", errFoo1, errFoo2),
-			newMockResolverRuntime("bar", errBar1, errBar2),
+			newMockResolverRuntime("foo", errors.New("foo")),
+			newMockResolverRuntime("bar", errors.New("bar")),
 		}}
 		resolver := &regResolver{reg: reg}
 		_, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, errFoo1)
-		assert.ErrorIs(t, err, errFoo2)
-		assert.ErrorIs(t, err, errBar1)
-		assert.ErrorIs(t, err, errBar2)
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("no match no errors", func(t *testing.T) {
 		reg := mockResolverRegistry{resolver: []runtime{}}

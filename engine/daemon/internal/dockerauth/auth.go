@@ -2,7 +2,6 @@ package dockerauth
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/docker/docker-auth/auth/authstore"
@@ -27,20 +26,18 @@ func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Reques
 		return nil, err
 	}
 
-	var errList []error
 	var result []secrets.Envelope
 	for id, value := range list {
 		s, err := unpackValue(id, value)
 		if err != nil {
-			errList = append(errList, err)
 			// TODO: log error
 			continue
 		}
 		result = append(result, *s)
 	}
 
-	if len(result) == 0 && len(errList) > 0 {
-		return nil, errors.Join(errList...)
+	if len(result) == 0 {
+		return nil, secrets.ErrNotFound
 	}
 
 	return result, nil

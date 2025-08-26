@@ -256,7 +256,7 @@ func Test_newEngine(t *testing.T) {
 		assert.Equal(t, "bar", bar[0].ID.String())
 		assert.Equal(t, "bar-value", string(bar[0].Value))
 		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
-		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 4*time.Second, 100*time.Millisecond)
@@ -319,7 +319,7 @@ func Test_newEngine(t *testing.T) {
 		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
 		require.NoError(t, err)
 		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
-		assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			bar, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
 			require.NoError(collect, err)
