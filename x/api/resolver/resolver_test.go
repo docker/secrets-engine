@@ -51,11 +51,11 @@ func withMockResolverError(err error) mockResolverOption {
 	}
 }
 
-func (m mockResolver) GetSecrets(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+func (m mockResolver) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	if m.err != nil {
 		return []secrets.Envelope{}, m.err
 	}
-	if request.Pattern.Match(m.secretsID) {
+	if pattern.Match(m.secretsID) {
 		return []secrets.Envelope{{ID: m.secretsID, Value: []byte(m.value)}}, nil
 	}
 	return []secrets.Envelope{}, nil

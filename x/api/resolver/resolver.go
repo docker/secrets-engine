@@ -32,7 +32,7 @@ func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[reso
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
 	}
 
-	envelopes, err := r.resolver.GetSecrets(ctx, secrets.Request{Pattern: pattern, Provider: c.Msg.GetProvider()})
+	envelopes, err := r.resolver.GetSecrets(ctx, pattern)
 	if err != nil {
 		if errors.Is(err, secrets.ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, secrets.ErrNotFound)
