@@ -13,6 +13,8 @@ import (
 
 var _ engine.Plugin = &mysecretPlugin{}
 
+var errUnknownSecretType = errors.New("unknown secret type")
+
 type mysecretPlugin struct {
 	kc     store.Store
 	logger logging.Logger
@@ -44,7 +46,7 @@ func (m *mysecretPlugin) GetSecrets(ctx context.Context, request secrets.Request
 func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
 	impl, ok := secret.(*service.MyValue)
 	if !ok {
-		return nil, errors.New("unknown secret type")
+		return nil, errUnknownSecretType
 	}
 	return &secrets.Envelope{
 		ID:    id,
