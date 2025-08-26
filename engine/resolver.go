@@ -4,13 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
 var _ secrets.Resolver = &regResolver{}
 
 type regResolver struct {
-	reg registry
+	reg    registry
+	logger logging.Logger
 }
 
 func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]secrets.Envelope, error) {
@@ -26,7 +28,7 @@ func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]sec
 
 		envelopes, err := plugin.GetSecrets(ctx, req)
 		if err != nil {
-			// TODO: log the error
+			r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
 			continue
 		}
 

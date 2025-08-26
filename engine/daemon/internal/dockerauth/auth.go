@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
@@ -17,7 +18,8 @@ const (
 )
 
 type dockerAuthPlugin struct {
-	store store.Store
+	store  store.Store
+	logger logging.Logger
 }
 
 func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
@@ -30,7 +32,7 @@ func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Reques
 	for id, value := range list {
 		s, err := unpackValue(id, value)
 		if err != nil {
-			// TODO: log error
+			d.logger.Errorf("unwrapping secret '%s': %s", id, err)
 			continue
 		}
 		result = append(result, *s)
@@ -85,12 +87,13 @@ func (d dockerAuthPlugin) Run(ctx context.Context) error {
 	return nil
 }
 
-func NewDockerAuthPlugin() (engine.Plugin, error) {
+func NewDockerAuthPlugin(logger logging.Logger) (engine.Plugin, error) {
 	s, err := authstore.NewStore(serviceGroup, serviceName)
 	if err != nil {
 		return nil, err
 	}
 	return &dockerAuthPlugin{
-		store: s,
+		store:  s,
+		logger: logger,
 	}, nil
 }
