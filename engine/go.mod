@@ -22,7 +22,7 @@ require (
 	github.com/docker/secrets-engine/client v0.0.7
 	github.com/docker/secrets-engine/mysecret v0.0.0-00010101000000-000000000000
 	github.com/docker/secrets-engine/plugin v0.0.7
-	github.com/docker/secrets-engine/store v0.0.7
+	github.com/docker/secrets-engine/store v0.0.9
 	github.com/docker/secrets-engine/x v0.0.2-do.not.use
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.10.0
