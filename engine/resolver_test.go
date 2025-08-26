@@ -28,7 +28,7 @@ func newMockResolverRuntime(name string, err ...error) runtime {
 	}
 }
 
-func (m mockResolverRuntime) GetSecrets(context.Context, secrets.Request) ([]secrets.Envelope, error) {
+func (m mockResolverRuntime) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return m.envelopes, m.err
 }
 
@@ -72,13 +72,13 @@ func TestResolver(t *testing.T) {
 			newMockResolverRuntime("bar", errors.New("bar")),
 		}}
 		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
-		_, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
+		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("no match no errors", func(t *testing.T) {
 		reg := mockResolverRegistry{resolver: []runtime{}}
 		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
-		_, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
+		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("multiple matches across multiple plugins", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestResolver(t *testing.T) {
 			},
 		}}
 		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
-		e, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
+		e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.NoError(t, err)
 		require.Len(t, e, 3)
 		assert.Equal(t, "foo", string(e[0].Value))

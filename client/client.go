@@ -17,9 +17,9 @@ import (
 )
 
 type (
-	Request  = secrets.Request
 	Envelope = secrets.Envelope
 	ID       = secrets.ID
+	Pattern  = secrets.Pattern
 )
 
 var _ secrets.Resolver = &client{}
@@ -78,10 +78,9 @@ func New(options ...Option) (secrets.Resolver, error) {
 	}, nil
 }
 
-func (c client) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretsRequest_builder{
-		Pattern:  proto.String(request.Pattern.String()),
-		Provider: proto.String(request.Provider),
+		Pattern: proto.String(pattern.String()),
 	}.Build())
 	resp, err := c.resolverClient.GetSecrets(ctx, req)
 	if err != nil {

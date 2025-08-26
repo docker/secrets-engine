@@ -23,7 +23,7 @@ func Test_mysecretPlugin(t *testing.T) {
 			store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
 		}))
 		p := &mysecretPlugin{kc: mock, logger: testhelper.TestLogger(t)}
-		e, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		require.NoError(t, err)
 		require.NotEmpty(t, e)
 		assert.Equal(t, "bar", string(e[0].Value))
@@ -31,14 +31,14 @@ func Test_mysecretPlugin(t *testing.T) {
 	t.Run("no secrets", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{}))
 		p := &mysecretPlugin{kc: mock}
-		_, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("store error", func(t *testing.T) {
 		errFilter := errors.New("filter error")
 		mock := teststore.NewMockStore(teststore.WithStoreFilterErr(errFilter))
 		p := &mysecretPlugin{kc: mock, logger: testhelper.TestLogger(t)}
-		_, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, errFilter)
 	})
 	t.Run("unwrap error", func(*testing.T) {
@@ -46,7 +46,7 @@ func Test_mysecretPlugin(t *testing.T) {
 			store.MustParseID("foo"): &MockMyOtherValue{Value: 7},
 		}))
 		p := &mysecretPlugin{kc: mock, logger: testhelper.TestLogger(t)}
-		_, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 }

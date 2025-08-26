@@ -20,8 +20,8 @@ type mysecretPlugin struct {
 	logger logging.Logger
 }
 
-func (m *mysecretPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
-	list, err := m.kc.Filter(ctx, request.Pattern)
+func (m *mysecretPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	list, err := m.kc.Filter(ctx, pattern)
 	if err != nil {
 		return nil, err
 	}

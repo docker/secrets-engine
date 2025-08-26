@@ -15,18 +15,15 @@ type regResolver struct {
 	logger logging.Logger
 }
 
-func (r regResolver) GetSecrets(ctx context.Context, req secrets.Request) ([]secrets.Envelope, error) {
+func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	var results []secrets.Envelope
 
 	for _, plugin := range r.reg.GetAll() {
-		if req.Provider != "" && req.Provider != plugin.Name().String() {
-			continue
-		}
-		if !plugin.Pattern().Includes(req.Pattern) {
+		if !plugin.Pattern().Includes(pattern) {
 			continue
 		}
 
-		envelopes, err := plugin.GetSecrets(ctx, req)
+		envelopes, err := plugin.GetSecrets(ctx, pattern)
 		if err != nil {
 			r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
 			continue

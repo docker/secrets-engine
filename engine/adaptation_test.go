@@ -42,7 +42,7 @@ func Test_SecretsEngine(t *testing.T) {
 	t.Run("unique existing secrets across all plugin types", func(t *testing.T) {
 		t.Parallel()
 		t.Run("engine launched plugins", func(t *testing.T) {
-			foo, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+			foo, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 			require.NoError(t, err)
 			require.NotEmpty(t, foo)
 			assert.Equal(t, "foo", foo[0].ID.String())
@@ -51,14 +51,14 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.NotEmpty(t, foo[0].ResolvedAt)
 			assert.NotEmpty(t, foo[0].CreatedAt)
 			assert.NotEmpty(t, foo[0].ExpiresAt)
-			bar, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+			bar, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 			require.NoError(t, err)
 			require.NotEmpty(t, bar)
 			assert.Equal(t, "bar", bar[0].ID.String())
 			assert.Equal(t, "bar-value", string(bar[0].Value))
 		})
 		t.Run("internal plugin", func(t *testing.T) {
-			mySecret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("my-secret")})
+			mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 			require.NoError(t, err)
 			require.NotEmpty(t, mySecret)
 			assert.Equal(t, "my-secret", mySecret[0].ID.String())
@@ -73,7 +73,7 @@ func Test_SecretsEngine(t *testing.T) {
 				id:         secrets.MustParseID("special/secret"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-				secret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("special/secret")})
+				secret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("special/secret"))
 				require.NoError(collect, err)
 				require.NotEmpty(t, secret)
 				assert.Equal(collect, "special/secret", secret[0].ID.String())
@@ -87,7 +87,7 @@ func Test_SecretsEngine(t *testing.T) {
 				id:         secrets.MustParseID("3rd-party-vendor/foo"),
 			})
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-				secret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("3rd-party-vendor/foo")})
+				secret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("3rd-party-vendor/foo"))
 				require.NoError(collect, err)
 				require.NotEmpty(t, secret)
 				assert.Equal(collect, "3rd-party-vendor/foo", secret[0].ID.String())
@@ -95,34 +95,27 @@ func Test_SecretsEngine(t *testing.T) {
 				assert.Equal(t, "3rd-party-plugin", secret[0].Provider)
 			}, 2*time.Second, 100*time.Millisecond)
 			shutdown1()
-			_, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("special/secret")})
+			_, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("special/secret"))
 			assert.Error(t, err)
 			shutdown2()
-			_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("3rd-party-vendor/foo")})
+			_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("3rd-party-vendor/foo"))
 			assert.Error(t, err)
 		})
 	})
 	t.Run("non existing secrets", func(t *testing.T) {
-		_, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("fancy-secret")})
+		_, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("fancy-secret"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("non-unique secrets", func(t *testing.T) {
-		mockFromFoo, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: testdummy.MockSecretPattern, Provider: "plugin-foo"})
+		envelopes, err := c.GetSecrets(t.Context(), testdummy.MockSecretPattern)
 		assert.NoError(t, err)
-		require.NotEmpty(t, mockFromFoo)
-		assert.Equal(t, testdummy.MockSecretID.String(), mockFromFoo[0].ID.String())
-		assert.Equal(t, testdummy.MockSecretValue, string(mockFromFoo[0].Value))
-		assert.Equal(t, "plugin-foo", mockFromFoo[0].Provider)
-		mockFromBar, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: testdummy.MockSecretPattern, Provider: "plugin-bar"})
-		assert.NoError(t, err)
-		require.NotEmpty(t, mockFromBar)
-		assert.Equal(t, testdummy.MockSecretID.String(), mockFromBar[0].ID.String())
-		assert.Equal(t, testdummy.MockSecretValue, string(mockFromBar[0].Value))
-		assert.Equal(t, "plugin-bar", mockFromBar[0].Provider)
-	})
-	t.Run("existing secrets but wrong provider", func(t *testing.T) {
-		_, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo"), Provider: "plugin-bar"})
-		assert.ErrorContains(t, err, "secret not found")
+		require.Len(t, envelopes, 2)
+		assert.Equal(t, testdummy.MockSecretID.String(), envelopes[0].ID.String())
+		assert.Equal(t, testdummy.MockSecretValue, string(envelopes[0].Value))
+		assert.Equal(t, "plugin-bar", envelopes[0].Provider)
+		assert.Equal(t, testdummy.MockSecretID.String(), envelopes[1].ID.String())
+		assert.Equal(t, testdummy.MockSecretValue, string(envelopes[1].Value))
+		assert.Equal(t, "plugin-foo", envelopes[1].Provider)
 	})
 }
 
@@ -178,13 +171,13 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			runEngineAsync(t, e)
 			c, err := client.New(client.WithSocketPath(socketPath))
 			require.NoError(t, err)
-			_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+			_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 			if test.shouldGetSecretFromExternalPlugin {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
 			}
-			mySecret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("my-secret")})
+			mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 			require.NoError(t, err)
 			require.NotEmpty(t, mySecret)
 			assert.Equal(t, "my-secret", mySecret[0].ID.String())

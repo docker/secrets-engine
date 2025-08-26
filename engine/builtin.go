@@ -84,7 +84,7 @@ func (e *atomicErr) StoreFirst(err error) {
 	e.err = err
 }
 
-func (i *internalRuntime) GetSecrets(ctx context.Context, request secrets.Request) (resp []secrets.Envelope, err error) {
+func (i *internalRuntime) GetSecrets(ctx context.Context, pattern secrets.Pattern) (resp []secrets.Envelope, err error) {
 	select {
 	case <-i.closed:
 		if err := i.runErr(); err != nil {
@@ -100,7 +100,7 @@ func (i *internalRuntime) GetSecrets(ctx context.Context, request secrets.Reques
 			err = panicErr
 		}
 	}()
-	return i.p.GetSecrets(ctx, request)
+	return i.p.GetSecrets(ctx, pattern)
 }
 
 func (i *internalRuntime) Close() error {

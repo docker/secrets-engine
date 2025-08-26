@@ -54,8 +54,8 @@ func WithID(id secrets.ID) MockedPluginOption {
 	}
 }
 
-func (m *mockedPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
-	if request.Pattern.Match(m.id) {
+func (m *mockedPlugin) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	if pattern.Match(m.id) {
 		return []secrets.Envelope{{ID: m.id, Value: []byte(mockSecretValue)}}, nil
 	}
 	return nil, secrets.ErrNotFound
@@ -107,7 +107,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.Equal(t, pluginNameFromTestName(t), p.Name().String())
 				assert.Equal(t, version.String(), p.Version().String())
 				assert.Equal(t, pattern, p.Pattern().String())
-				s, err := p.GetSecrets(context.Background(), secrets.Request{Pattern: testdummy.MockSecretPattern})
+				s, err := p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
 				require.NoError(t, err)
 				require.NotEmpty(t, s)
 				assert.Equal(t, testdummy.MockSecretValue, string(s[0].Value))
@@ -135,7 +135,7 @@ func Test_newPlugin(t *testing.T) {
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
-				_, err = p.GetSecrets(context.Background(), secrets.Request{Pattern: testdummy.MockSecretPattern})
+				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
 				r, err := parseOutput()
@@ -200,7 +200,7 @@ func Test_newPlugin(t *testing.T) {
 					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
 				})
 				assert.NoError(t, err)
-				_, err = p.GetSecrets(context.Background(), secrets.Request{Pattern: testdummy.MockSecretPattern})
+				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
 				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
@@ -241,7 +241,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				assert.Equal(t, "my-plugin", r.Name().String())
 				assert.Equal(t, config.Version.String(), r.Version().String())
 				assert.Equal(t, mockPattern.String(), r.Pattern().String())
-				e, err := r.GetSecrets(t.Context(), secrets.Request{Pattern: mockSecretPattern})
+				e, err := r.GetSecrets(t.Context(), mockSecretPattern)
 				require.NoError(t, err)
 				require.NotEmpty(t, e)
 				assert.Equal(t, mockSecretValue, string(e[0].Value))
@@ -263,7 +263,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				_, err = r.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+				_, err = r.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 				assert.ErrorIs(t, err, secrets.ErrNotFound)
 				assert.NoError(t, r.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(r.Closed()))
@@ -290,7 +290,7 @@ func Test_newExternalPlugin(t *testing.T) {
 
 				r, err := m.waitForNextRuntimeWithTimeout()
 				require.NoError(t, err)
-				e, err := r.GetSecrets(t.Context(), secrets.Request{Pattern: mockSecretPattern})
+				e, err := r.GetSecrets(t.Context(), mockSecretPattern)
 				require.NoError(t, err)
 				require.NotEmpty(t, e)
 				assert.Equal(t, mockSecretValue, string(e[0].Value))
