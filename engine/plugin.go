@@ -193,10 +193,9 @@ func (r *runtimeImpl) Closed() <-chan struct{} {
 	return r.closed
 }
 
-func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+func (r *runtimeImpl) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	req := connect.NewRequest(v1.GetSecretsRequest_builder{
-		Pattern:  proto.String(request.Pattern.String()),
-		Provider: proto.String(request.Provider),
+		Pattern: proto.String(pattern.String()),
 	}.Build())
 	resp, err := r.resolverClient.GetSecrets(ctx, req)
 	if err != nil {

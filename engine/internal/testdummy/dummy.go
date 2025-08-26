@@ -158,19 +158,19 @@ type PluginResult struct {
 	ErrTestSetup string
 }
 
-func (d *dummyPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+func (d *dummyPlugin) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	d.m.Lock()
 	defer d.m.Unlock()
 	if d.cfg.CrashBehaviour != nil && len(d.result.GetSecret)+1 >= d.cfg.OnNthSecretRequest {
 		os.Exit(d.cfg.ExitCode)
 	}
-	d.result.GetSecret = append(d.result.GetSecret, request.Pattern.String())
+	d.result.GetSecret = append(d.result.GetSecret, pattern.String())
 	if d.cfg.errGetSecret != nil {
 		return nil, d.cfg.errGetSecret
 	}
 	var envelopes []secrets.Envelope
 	for id, value := range d.cfg.secrets {
-		if request.Pattern.Match(id) {
+		if pattern.Match(id) {
 			envelopes = append(envelopes, secrets.Envelope{
 				ID:        id,
 				Value:     []byte(value),

@@ -22,8 +22,8 @@ type dockerAuthPlugin struct {
 	logger logging.Logger
 }
 
-func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
-	list, err := d.store.Filter(ctx, request.Pattern)
+func (d dockerAuthPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	list, err := d.store.Filter(ctx, pattern)
 	if err != nil {
 		return nil, err
 	}

@@ -40,7 +40,7 @@ func (m *mockSlowRuntime) Closed() <-chan struct{} {
 	return nil
 }
 
-func (m *mockSlowRuntime) GetSecrets(context.Context, secrets.Request) ([]secrets.Envelope, error) {
+func (m *mockSlowRuntime) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
 }
 
@@ -87,7 +87,7 @@ func (m *mockRuntime) Pattern() secrets.Pattern {
 	return mockPatternAny
 }
 
-func (m *mockRuntime) GetSecrets(context.Context, secrets.Request) ([]secrets.Envelope, error) {
+func (m *mockRuntime) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
 }
 
@@ -224,7 +224,7 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		foo, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
+		foo, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		require.NoError(t, err)
 		require.NotEmpty(t, foo)
 		assert.Equal(t, "foo", foo[0].ID.String())
@@ -250,17 +250,17 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		bar, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+		bar, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		require.NoError(t, err)
 		require.NotEmpty(t, bar)
 		assert.Equal(t, "bar", bar[0].ID.String())
 		assert.Equal(t, "bar-value", string(bar[0].Value))
-		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 4*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("internal plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
@@ -288,7 +288,7 @@ func Test_newEngine(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		mySecret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("my-secret")})
+		mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 		require.NoError(t, err)
 		require.NotEmpty(t, mySecret)
 		assert.Equal(t, "my-secret", mySecret[0].ID.String())
@@ -297,7 +297,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Empty(collect, e.Plugins())
 		}, 2*time.Second, 100*time.Millisecond)
-		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("my-secret")})
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
@@ -316,12 +316,12 @@ func Test_newEngine(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
-		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		require.NoError(t, err)
-		_, err = c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			bar, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("bar")})
+			bar, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 			require.NoError(collect, err)
 			require.NotEmpty(collect, bar)
 			assert.Equal(collect, "bar", bar[0].ID.String())
@@ -367,7 +367,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
 		}, 5*time.Second, 100*time.Millisecond) // Timeout needs to be larger than the initial retry interval
-		mySecret, err := c.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("my-secret")})
+		mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 		require.NoError(t, err)
 		require.NotEmpty(t, mySecret)
 		assert.Equal(t, "my-secret", mySecret[0].ID.String())
