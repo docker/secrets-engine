@@ -122,7 +122,7 @@ github.com/docker/go-connections/tlsconfig
 github.com/docker/go-units
 # github.com/docker/secrets-engine/client v0.0.7 => ./client
 ## explicit; go 1.24.3
-# github.com/docker/secrets-engine/mysecret v0.0.0-00010101000000-000000000000 => ./mysecret
+# github.com/docker/secrets-engine/mysecret v0.0.9 => ./mysecret
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.7 => ./plugin
 ## explicit; go 1.24.3
