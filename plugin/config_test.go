@@ -24,7 +24,7 @@ var _ Plugin = &mockPlugin{}
 
 type mockPlugin struct{}
 
-func (m *mockPlugin) GetSecrets(context.Context, secrets.Request) ([]secrets.Envelope, error) {
+func (m *mockPlugin) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
 }
 

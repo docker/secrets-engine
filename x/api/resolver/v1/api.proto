@@ -47,8 +47,6 @@ service ResolverService {
 message GetSecretsRequest {
   // ID of the secret to resolve.
   string pattern = 1;
-
-  string provider = 2;
 }
 
 message GetSecretsResponse {

@@ -397,7 +397,6 @@ func (b0 ShutdownResponse_builder) Build() *ShutdownResponse {
 type GetSecretsRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Pattern     *string                `protobuf:"bytes,1,opt,name=pattern"`
-	xxx_hidden_Provider    *string                `protobuf:"bytes,2,opt,name=provider"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -439,24 +438,9 @@ func (x *GetSecretsRequest) GetPattern() string {
 	return ""
 }
 
-func (x *GetSecretsRequest) GetProvider() string {
-	if x != nil {
-		if x.xxx_hidden_Provider != nil {
-			return *x.xxx_hidden_Provider
-		}
-		return ""
-	}
-	return ""
-}
-
 func (x *GetSecretsRequest) SetPattern(v string) {
 	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
-}
-
-func (x *GetSecretsRequest) SetProvider(v string) {
-	x.xxx_hidden_Provider = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
 }
 
 func (x *GetSecretsRequest) HasPattern() bool {
@@ -466,29 +450,16 @@ func (x *GetSecretsRequest) HasPattern() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *GetSecretsRequest) HasProvider() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
-}
-
 func (x *GetSecretsRequest) ClearPattern() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_Pattern = nil
-}
-
-func (x *GetSecretsRequest) ClearProvider() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_Provider = nil
 }
 
 type GetSecretsRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// ID of the secret to resolve.
-	Pattern  *string
-	Provider *string
+	Pattern *string
 }
 
 func (b0 GetSecretsRequest_builder) Build() *GetSecretsRequest {
@@ -496,12 +467,8 @@ func (b0 GetSecretsRequest_builder) Build() *GetSecretsRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
 		x.xxx_hidden_Pattern = b.Pattern
-	}
-	if b.Provider != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
-		x.xxx_hidden_Provider = b.Provider
 	}
 	return m0
 }
@@ -834,10 +801,9 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12B\n" +
 	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
-	"\x10ShutdownResponse\"I\n" +
+	"\x10ShutdownResponse\"-\n" +
 	"\x11GetSecretsRequest\x12\x18\n" +
-	"\apattern\x18\x01 \x01(\tR\apattern\x12\x1a\n" +
-	"\bprovider\x18\x02 \x01(\tR\bprovider\"\xf8\x02\n" +
+	"\apattern\x18\x01 \x01(\tR\apattern\"\xf8\x02\n" +
 	"\x12GetSecretsResponse\x12F\n" +
 	"\tenvelopes\x18\x01 \x03(\v2(.resolver.v1.GetSecretsResponse.EnvelopeR\tenvelopes\x1a\x99\x02\n" +
 	"\bEnvelope\x12\x0e\n" +

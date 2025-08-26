@@ -16,7 +16,10 @@ import (
 type (
 	Resolver = secrets.Resolver
 	Envelope = secrets.Envelope
-	Request  = secrets.Request
+
+	Version = api.Version
+	Pattern = secrets.Pattern
+	Logger  = logging.Logger
 )
 
 type Plugin interface {
@@ -50,12 +53,6 @@ type stub struct {
 	registrationTimeout time.Duration
 	requestTimeout      time.Duration
 }
-
-type (
-	Version = api.Version
-	Pattern = secrets.Pattern
-	Logger  = logging.Logger
-)
 
 var (
 	ParsePattern     = secrets.ParsePattern
