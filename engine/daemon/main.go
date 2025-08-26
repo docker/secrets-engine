@@ -6,8 +6,8 @@ import (
 	"syscall"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/engine/daemon/internal/dockerauth"
-	"github.com/docker/secrets-engine/engine/daemon/internal/mysecret"
+	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
+	"github.com/docker/secrets-engine/engine/builtins/mysecret"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"

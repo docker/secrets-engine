@@ -11,7 +11,21 @@ import (
 	"github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/oshelper"
 	"github.com/docker/secrets-engine/x/secrets"
+)
+
+type (
+	Version = api.Version
+	Logger  = logging.Logger
+)
+
+var (
+	NewVersion       = api.NewVersion
+	MustNewVersion   = api.MustNewVersion
+	NewDefaultLogger = logging.NewDefaultLogger
+
+	NotifyContext = oshelper.NotifyContext
 )
 
 const (
