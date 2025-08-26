@@ -190,30 +190,35 @@ func (r *runtimeImpl) Closed() <-chan struct{} {
 	return r.closed
 }
 
-func (r *runtimeImpl) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
-	req := connect.NewRequest(v1.GetSecretRequest_builder{
-		Id:       proto.String(request.ID.String()),
+func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+	req := connect.NewRequest(v1.GetSecretsRequest_builder{
+		Pattern:  proto.String(request.Pattern.String()),
 		Provider: proto.String(request.Provider),
 	}.Build())
-	resp, err := r.resolverClient.GetSecret(ctx, req)
+	resp, err := r.resolverClient.GetSecrets(ctx, req)
 	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			err = secrets.ErrNotFound
+		}
+		return nil, err
 	}
-	id, err := secrets.ParseID(resp.Msg.GetId())
-	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+
+	var items []secrets.Envelope
+	for _, item := range resp.Msg.GetEnvelopes() {
+		id, err := secrets.ParseID(item.GetId())
+		if err != nil {
+			// TODO: log error
+			continue
+		}
+		items = append(items, secrets.Envelope{
+			ID:         id,
+			Value:      item.GetValue(),
+			Provider:   r.Name().String(),
+			Version:    item.GetVersion(),
+			CreatedAt:  item.GetCreatedAt().AsTime(),
+			ResolvedAt: item.GetResolvedAt().AsTime(),
+			ExpiresAt:  item.GetExpiresAt().AsTime(),
+		})
 	}
-	if id.String() != request.ID.String() {
-		return secrets.EnvelopeErr(request, secrets.ErrIDMismatch), secrets.ErrIDMismatch
-	}
-	return secrets.Envelope{
-		ID:         id,
-		Value:      resp.Msg.GetValue(),
-		Provider:   r.Name().String(),
-		Version:    resp.Msg.GetVersion(),
-		Error:      resp.Msg.GetError(),
-		CreatedAt:  resp.Msg.GetCreatedAt().AsTime(),
-		ResolvedAt: resp.Msg.GetResolvedAt().AsTime(),
-		ExpiresAt:  resp.Msg.GetExpiresAt().AsTime(),
-	}, nil
+	return items, nil
 }

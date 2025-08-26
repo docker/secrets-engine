@@ -20,7 +20,7 @@ type resolverService struct {
 	registrationTimeout time.Duration
 }
 
-func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[resolverv1.GetSecretRequest]) (*connect.Response[resolverv1.GetSecretResponse], error) {
+func (r *resolverService) GetSecrets(ctx context.Context, c *connect.Request[resolverv1.GetSecretsRequest]) (*connect.Response[resolverv1.GetSecretsResponse], error) {
 	select {
 	case <-r.setupCompleted:
 	case <-ctx.Done():
@@ -28,5 +28,5 @@ func (r *resolverService) GetSecret(ctx context.Context, c *connect.Request[reso
 	case <-time.After(r.registrationTimeout):
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("registration incomplete (timeout after %s)", r.registrationTimeout))
 	}
-	return r.handler.GetSecret(ctx, c)
+	return r.handler.GetSecrets(ctx, c)
 }

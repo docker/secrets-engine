@@ -34,7 +34,10 @@ const (
 	MockSecretValue = "MockSecretValue"
 )
 
-var MockSecretID = secrets.MustParseID("MockSecretID")
+var (
+	MockSecretID      = secrets.MustParseID("MockSecretID")
+	MockSecretPattern = secrets.MustParsePattern("MockSecretID")
+)
 
 // PluginProcessFromBinaryName configures and runs a dummy plugin process.
 // To be used from TestMain.
@@ -155,27 +158,31 @@ type PluginResult struct {
 	ErrTestSetup string
 }
 
-func (d *dummyPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (d *dummyPlugin) GetSecrets(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
 	d.m.Lock()
 	defer d.m.Unlock()
 	if d.cfg.CrashBehaviour != nil && len(d.result.GetSecret)+1 >= d.cfg.OnNthSecretRequest {
 		os.Exit(d.cfg.ExitCode)
 	}
-	d.result.GetSecret = append(d.result.GetSecret, request.ID.String())
-	if d.cfg.ErrGetSecret != "" {
-		err := errors.New(d.cfg.ErrGetSecret)
-		return secrets.EnvelopeErr(request, err), err
+	d.result.GetSecret = append(d.result.GetSecret, request.Pattern.String())
+	if d.cfg.errGetSecret != nil {
+		return nil, d.cfg.errGetSecret
 	}
-	if v, ok := d.cfg.secrets[request.ID]; ok {
-		return secrets.Envelope{
-			ID:        request.ID,
-			Value:     []byte(v),
-			CreatedAt: time.Now().Add(-time.Hour),
-			ExpiresAt: time.Now().Add(-time.Hour),
-		}, nil
+	var envelopes []secrets.Envelope
+	for id, value := range d.cfg.secrets {
+		if request.Pattern.Match(id) {
+			envelopes = append(envelopes, secrets.Envelope{
+				ID:        id,
+				Value:     []byte(value),
+				CreatedAt: time.Now().Add(-time.Hour),
+				ExpiresAt: time.Now().Add(-time.Hour),
+			})
+		}
 	}
-	err := errors.New("secret not found")
-	return secrets.EnvelopeErr(request, err), err
+	if len(envelopes) == 0 {
+		return nil, secrets.ErrNotFound
+	}
+	return envelopes, nil
 }
 
 type PluginCfg struct {
@@ -192,7 +199,7 @@ type pluginCfgRestored struct {
 	version        api.Version
 	pattern        secrets.Pattern
 	secrets        map[secrets.ID]string
-	ErrGetSecret   string
+	errGetSecret   error
 	IgnoreSigint   bool
 	ErrConfigPanic string
 	*CrashBehaviour
@@ -227,11 +234,15 @@ func newDummyPluginCfg(in string) (*pluginCfgRestored, error) {
 	if err != nil {
 		return nil, err
 	}
+	var errGetSecret error
+	if cfg.ErrGetSecret != "" {
+		errGetSecret = errors.New(cfg.ErrGetSecret)
+	}
 	return &pluginCfgRestored{
 		version:        version,
 		pattern:        pattern,
 		secrets:        store,
-		ErrGetSecret:   cfg.ErrGetSecret,
+		errGetSecret:   errGetSecret,
 		IgnoreSigint:   cfg.IgnoreSigint,
 		ErrConfigPanic: cfg.ErrConfigPanic,
 		CrashBehaviour: cfg.CrashBehaviour,

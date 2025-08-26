@@ -16,22 +16,36 @@ type mysecretPlugin struct {
 	kc store.Store
 }
 
-func (m *mysecretPlugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
-	s, err := m.kc.Get(ctx, request.ID)
-	if errors.Is(err, store.ErrCredentialNotFound) {
-		errNotFound := secrets.ErrNotFound
-		return secrets.EnvelopeErr(request, errNotFound), errNotFound
-	}
+func (m *mysecretPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+	list, err := m.kc.Filter(ctx, request.Pattern)
 	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+		return nil, err
 	}
-	impl, ok := s.(*service.MyValue)
+
+	var result []secrets.Envelope
+	for id, value := range list {
+		s, err := unpackValue(id, value)
+		if err != nil {
+			// TODO: log error
+			continue
+		}
+		result = append(result, *s)
+	}
+
+	if len(result) == 0 {
+		return nil, secrets.ErrNotFound
+	}
+
+	return result, nil
+}
+
+func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
+	impl, ok := secret.(*service.MyValue)
 	if !ok {
-		err := errors.New("unknown secret type")
-		return secrets.EnvelopeErr(request, err), err
+		return nil, errors.New("unknown secret type")
 	}
-	return secrets.Envelope{
-		ID:    request.ID,
+	return &secrets.Envelope{
+		ID:    id,
 		Value: impl.Value,
 	}, nil
 }

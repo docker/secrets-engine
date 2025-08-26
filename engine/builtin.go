@@ -84,24 +84,23 @@ func (e *atomicErr) StoreFirst(err error) {
 	e.err = err
 }
 
-func (i *internalRuntime) GetSecret(ctx context.Context, request secrets.Request) (resp secrets.Envelope, err error) {
+func (i *internalRuntime) GetSecrets(ctx context.Context, request secrets.Request) (resp []secrets.Envelope, err error) {
 	select {
 	case <-i.closed:
 		if err := i.runErr(); err != nil {
-			return secrets.EnvelopeErr(request, err), err
+			return nil, err
 		}
-		err := fmt.Errorf("plugin %s has been shutdown", i.Name())
-		return secrets.EnvelopeErr(request, err), err
+		return nil, fmt.Errorf("plugin %s has been shutdown", i.Name())
 	default:
 	}
 	defer func() {
 		if r := recover(); r != nil {
 			panicErr := fmt.Errorf("recovering from panic in plugin %s: %s", i.Name(), debug.Stack())
-			resp = secrets.EnvelopeErr(request, panicErr)
+			resp = nil
 			err = panicErr
 		}
 	}()
-	return i.p.GetSecret(ctx, request)
+	return i.p.GetSecrets(ctx, request)
 }
 
 func (i *internalRuntime) Close() error {

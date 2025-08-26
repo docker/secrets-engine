@@ -20,19 +20,37 @@ type dockerAuthPlugin struct {
 	store store.Store
 }
 
-func (d dockerAuthPlugin) GetSecret(ctx context.Context, request secrets.Request) (secrets.Envelope, error) {
-	secret, err := d.store.Get(ctx, request.ID)
+func (d dockerAuthPlugin) GetSecrets(ctx context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+	list, err := d.store.Filter(ctx, request.Pattern)
 	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+		return nil, err
 	}
+
+	var result []secrets.Envelope
+	for id, value := range list {
+		s, err := unpackValue(id, value)
+		if err != nil {
+			// TODO: log error
+			continue
+		}
+		result = append(result, *s)
+	}
+
+	if len(result) == 0 {
+		return nil, secrets.ErrNotFound
+	}
+
+	return result, nil
+}
+
+func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
 	val, err := secret.Marshal()
 	if err != nil {
-		return secrets.EnvelopeErr(request, err), err
+		return nil, err
 	}
-
-	// TODO: make this a schema so we know which keys exist
 	m := secret.Metadata()
 
+	// TODO: make this a schema so we know which keys exist
 	var (
 		createdAt time.Time
 		expiresAt time.Time
@@ -41,18 +59,18 @@ func (d dockerAuthPlugin) GetSecret(ctx context.Context, request secrets.Request
 	if v, ok := m["createdAt"]; ok {
 		createdAt, err = time.Parse(time.RFC3339, v)
 		if err != nil {
-			return secrets.EnvelopeErr(request, err), err
+			return nil, err
 		}
 	}
 	if v, ok := m["expiresAt"]; ok {
 		expiresAt, err = time.Parse(time.RFC3339, v)
 		if err != nil {
-			return secrets.EnvelopeErr(request, err), err
+			return nil, err
 		}
 	}
 
-	return secrets.Envelope{
-		ID:         request.ID,
+	return &secrets.Envelope{
+		ID:         id,
 		Value:      val,
 		Provider:   serviceName,
 		Version:    "0.0.1",
