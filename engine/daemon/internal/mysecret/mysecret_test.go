@@ -11,6 +11,7 @@ import (
 	"github.com/docker/secrets-engine/mysecret/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 func Test_mysecretPlugin(t *testing.T) {
@@ -19,7 +20,7 @@ func Test_mysecretPlugin(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
 		}))
-		p := &mysecretPlugin{kc: mock}
+		p := &mysecretPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		e, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
 		require.NoError(t, err)
 		require.NotEmpty(t, e)
@@ -34,7 +35,7 @@ func Test_mysecretPlugin(t *testing.T) {
 	t.Run("store error", func(t *testing.T) {
 		errFilter := errors.New("filter error")
 		mock := teststore.NewMockStore(teststore.WithStoreFilterErr(errFilter))
-		p := &mysecretPlugin{kc: mock}
+		p := &mysecretPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		_, err := p.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("foo")})
 		assert.ErrorIs(t, err, errFilter)
 	})

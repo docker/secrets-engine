@@ -92,6 +92,7 @@ type runtimeImpl struct {
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
 	closed         <-chan struct{}
+	logger         logging.Logger
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -142,6 +143,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 			return helper.shutdown(nil)
 		},
 		closed: helper.closed(),
+		logger: logger,
 	}, nil
 }
 
@@ -179,6 +181,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 			return errors.Join(callPluginShutdown(c, closed), r.close())
 		}),
 		closed: closed,
+		logger: logger,
 	}, nil
 }
 
@@ -207,7 +210,7 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, request secrets.Request) (
 	for _, item := range resp.Msg.GetEnvelopes() {
 		id, err := secrets.ParseID(item.GetId())
 		if err != nil {
-			// TODO: log error
+			r.logger.Errorf("parsing ID: %s", err)
 			continue
 		}
 		items = append(items, secrets.Envelope{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 type mockResolverRuntime struct {
@@ -70,13 +71,13 @@ func TestResolver(t *testing.T) {
 			newMockResolverRuntime("foo", errors.New("foo")),
 			newMockResolverRuntime("bar", errors.New("bar")),
 		}}
-		resolver := &regResolver{reg: reg}
+		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
 		_, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("no match no errors", func(t *testing.T) {
 		reg := mockResolverRegistry{resolver: []runtime{}}
-		resolver := &regResolver{reg: reg}
+		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
 		_, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
@@ -99,7 +100,7 @@ func TestResolver(t *testing.T) {
 				},
 			},
 		}}
-		resolver := &regResolver{reg: reg}
+		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
 		e, err := resolver.GetSecrets(t.Context(), secrets.Request{Pattern: secrets.MustParsePattern("**")})
 		assert.NoError(t, err)
 		require.Len(t, e, 3)

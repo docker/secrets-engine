@@ -9,6 +9,7 @@ import (
 	"github.com/docker/secrets-engine/engine/daemon/internal/dockerauth"
 	"github.com/docker/secrets-engine/engine/daemon/internal/mysecret"
 	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -22,16 +23,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	mysecretPlugin, err := mysecret.NewMySecretPlugin()
+	logger := logging.NewDefaultLogger("engine")
+	mysecretPlugin, err := mysecret.NewMySecretPlugin(logger)
 	if err != nil {
 		panic(err)
 	}
-	dockerAuthPlugin, err := dockerauth.NewDockerAuthPlugin()
+	dockerAuthPlugin, err := dockerauth.NewDockerAuthPlugin(logger)
 	if err != nil {
 		panic(err)
 	}
 	// TODO: double check if the version actually points to the engine sub-module or the main module
 	e, err := engine.New("secrets-engine", bi.Main.Version,
+		engine.WithLogger(logger),
 		engine.WithPlugins(map[engine.Config]engine.Plugin{
 			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}:    mysecretPlugin,
 			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("**")}: dockerAuthPlugin,
