@@ -56,7 +56,7 @@ RUN --mount=type=bind,target=.,ro \
     git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
 
     # fallback for CI environments without ssh keys
-    if [ -s /run/secrets/GH_TOKEN ]; then
+    if [ -n "$GH_TOKEN" ]; then
         rm -f ~/.gitconfig
         git config --global user.email "106345742+cloud-platform-ci[bot]@users.noreply.github.com"
         git config --global user.name "cloud-platform-ci[bot]"

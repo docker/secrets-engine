@@ -57,7 +57,7 @@ lint: multiarch-builder ## Lint code
 		flags="--secret id=GH_TOKEN,env=GH_TOKEN"; \
 	fi; \
 	echo "Using build flags: $$flags"; \
-	docker buildx build $(DOCKER_BUILD_ARGS) $(flags) --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
+	docker buildx build $(DOCKER_BUILD_ARGS) $$flags --pull --builder=$(BUILDER) --target=lint --platform=$(LINT_PLATFORMS) .
 
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
