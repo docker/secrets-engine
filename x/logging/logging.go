@@ -3,8 +3,10 @@ package logging
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -27,15 +29,45 @@ func NewDefaultLogger(prefix string) Logger {
 }
 
 func (d defaultLogger) Printf(format string, v ...interface{}) {
-	d.logger.Printf(d.prefix+format, v...)
+	d.logger.Printf(suffix()+d.prefix+format, v...)
 }
 
 func (d defaultLogger) Warnf(format string, v ...interface{}) {
-	d.logger.Printf("[WARN] "+d.prefix+format, v...)
+	d.logger.Printf(suffix()+"[WARN] "+d.prefix+format, v...)
 }
 
 func (d defaultLogger) Errorf(format string, v ...interface{}) {
-	d.logger.Printf("[ERR] "+d.prefix+format, v...)
+	d.logger.Printf(suffix()+"[ERR] "+d.prefix+format+"\n"+stackTrace(), v...)
+}
+
+func suffix() string {
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("[%s:%d] ", file, line) // Note: Additionally set -trimpath when building to not leak anything from the file path
+}
+
+// Similar to debug.Stack() except it skips the top 3 frames which include the logger itself
+// to keep the logs focused on the actual relevant stack traces.
+func stackTrace() string {
+	const depth = 32
+	var pcs [depth]uintptr
+	n := runtime.Callers(3, pcs[:]) // skip runtime.Callers + stackTrace
+	if len(pcs) < n {
+		return ""
+	}
+	frames := runtime.CallersFrames(pcs[:n])
+	trace := ""
+	for {
+		frame, more := frames.Next()
+		// Note: Additionally set -trimpath when building to not leak anything from the file path
+		trace += fmt.Sprintf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+	}
+	return trace
 }
 
 type loggerKey struct{}

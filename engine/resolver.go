@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/docker/secrets-engine/x/logging"
@@ -25,7 +26,9 @@ func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 
 		envelopes, err := plugin.GetSecrets(ctx, pattern)
 		if err != nil {
-			r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
+			if !errors.Is(err, secrets.ErrNotFound) {
+				r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
+			}
 			continue
 		}
 
