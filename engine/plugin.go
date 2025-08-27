@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/hashicorp/yamux"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/docker/secrets-engine/x/api"
@@ -127,7 +128,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	helper := newShutdownHelper(func() error {
-		return errors.Join(callPluginShutdown(c, ipcClosed), r.close(), cmdWrapper.Close())
+		return errors.Join(callPluginShutdown(c, ipcClosed), filterClientAlreadyClosed(r.close()), cmdWrapper.Close())
 	})
 
 	go func() {
@@ -164,6 +165,13 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 	return err
 }
 
+func filterClientAlreadyClosed(err error) error {
+	if errors.Is(err, yamux.ErrRemoteGoAway) {
+		return nil
+	}
+	return err
+}
+
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
 func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
 	closed := make(chan struct{})
@@ -178,7 +186,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {
-			return errors.Join(callPluginShutdown(c, closed), r.close())
+			return errors.Join(callPluginShutdown(c, closed), filterClientAlreadyClosed(r.close()))
 		}),
 		closed: closed,
 		logger: logger,
