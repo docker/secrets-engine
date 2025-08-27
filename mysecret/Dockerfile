@@ -51,7 +51,7 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    go build -ldflags "-s -w" -o "/out/${MYSECRET_BINARY}${EXT}" ./mysecret
+    go build -trimpath -ldflags "-s -w" -o "/out/${MYSECRET_BINARY}${EXT}" ./mysecret
 EOT
 
 FROM scratch AS package-mysecret

@@ -65,11 +65,11 @@ clean: ## remove built binaries and packages
 unit-tests:
 	pids=""; \
 	err=0; \
-	go test -v $(shell go list ./client/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
-	go test -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
+	go test -trimpath -v $(shell go list ./client/...) & pids="$$pids $$!"; \
+	go test -trimpath -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
+	go test -trimpath -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
+	go test -trimpath -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
+	go test -trimpath -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
 	done; \
@@ -85,10 +85,10 @@ keychain-linux-unit-tests:
 	docker buildx bake --set '*.args.GO_VERSION=${GO_VERSION}' --file store/docker-bake.hcl
 
 keychain-unit-tests:
-	CGO_ENABLED=1 go test -v $$(go list ./store/keychain/...)
+	CGO_ENABLED=1 go test -trimpath -v $$(go list ./store/keychain/...)
 
 engine-unit-tests:
-	go test -v $$(go list ./engine/...)
+	go test -trimpath -v $$(go list ./engine/...)
 
 mysecret:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./mysecret
