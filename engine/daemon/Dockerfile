@@ -51,7 +51,7 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    go build -ldflags "-s -w" -o "/out/${ENGINE_BINARY}${EXT}" ./engine/daemon
+    go build -trimpath -ldflags "-s -w" -o "/out/${ENGINE_BINARY}${EXT}" ./engine/daemon
 EOT
 
 FROM scratch AS package-engine
