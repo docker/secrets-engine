@@ -151,7 +151,7 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-s -w" -o "/out/${NRI_PLUGIN_BINARY}${EXT}" ./cmd/nri-plugin
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o "/out/${NRI_PLUGIN_BINARY}${EXT}" ./cmd/nri-plugin
 EOT
 
 FROM scratch AS package-nri-plugin
