@@ -106,7 +106,7 @@ func TestMatchNew(t *testing.T) {
 				assert.NoError(t, err)
 				pattern, err := ParsePattern(tc.pattern)
 				assert.NoError(t, err)
-				assert.Equalf(t, tc.expected, id.Match(pattern), "unexpected match for id `%q` to and pattern `%q`", m, tc.pattern)
+				assert.Equalf(t, tc.expected, pattern.Match(id), "unexpected match for id `%q` to and pattern `%q`", m, tc.pattern)
 			}
 		})
 	}
