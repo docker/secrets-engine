@@ -22,6 +22,14 @@ type (
 	Pattern  = secrets.Pattern
 )
 
+var (
+	ParseID     = secrets.ParseID
+	MustParseID = secrets.MustParseID
+
+	ParsePattern     = secrets.ParsePattern
+	MustParsePattern = secrets.MustParsePattern
+)
+
 var _ secrets.Resolver = &client{}
 
 type Option func(c *config) error
