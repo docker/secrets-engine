@@ -17,11 +17,16 @@ import (
 
 var _ resolverv1connect.ResolverServiceHandler = &resolverService{}
 
-type resolverService struct {
-	resolver secrets.Resolver
+type resolver interface {
+	secrets.Resolver
+	secrets.Authenticator
 }
 
-func NewResolverHandler(r secrets.Resolver) resolverv1connect.ResolverServiceHandler {
+type resolverService struct {
+	resolver resolver
+}
+
+func NewResolverHandler(r resolver) resolverv1connect.ResolverServiceHandler {
 	return &resolverService{r}
 }
 
@@ -30,6 +35,10 @@ func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[reso
 	pattern, err := secrets.ParsePattern(msgPattern)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
+	}
+
+	if err := r.resolver.Authenticate(ctx, pattern, c.Header()); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("authentication failed: %w", err))
 	}
 
 	envelopes, err := r.resolver.GetSecrets(ctx, pattern)

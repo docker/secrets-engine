@@ -14,8 +14,9 @@ import (
 )
 
 type (
-	Resolver = secrets.Resolver
-	Envelope = secrets.Envelope
+	Resolver      = secrets.Resolver
+	Authenticator = secrets.Authenticator
+	Envelope      = secrets.Envelope
 
 	Version = api.Version
 	Pattern = secrets.Pattern

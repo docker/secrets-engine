@@ -1,16 +1,19 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/ipc"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const hijackTimeout = 2 * time.Second
@@ -55,11 +58,38 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 
 type cfg struct {
 	Config
-	plugin              Plugin
+	plugin              *resolver
 	name                string
 	conn                io.ReadWriteCloser
 	registrationTimeout time.Duration
 }
+
+type resolver struct {
+	p Plugin
+}
+
+// GetSecrets implements secrets.Resolver.
+func (r *resolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	v, ok := r.p.(Resolver)
+	if ok {
+		return v.GetSecrets(ctx, pattern)
+	}
+	return nil, errors.New("not supported")
+}
+
+// Authenticate implements secrets.Authenticator.
+func (r *resolver) Authenticate(ctx context.Context, pattern secrets.Pattern, header http.Header) error {
+	v, ok := r.p.(Authenticator)
+	if ok {
+		return v.Authenticate(ctx, pattern, header)
+	}
+	return nil
+}
+
+var (
+	_ secrets.Authenticator = &resolver{}
+	_ secrets.Resolver      = &resolver{}
+)
 
 func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	engineCfg, err := restoreConfig(p)
@@ -72,7 +102,7 @@ func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 
 func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	cfg := &cfg{
-		plugin:              p,
+		plugin:              &resolver{p},
 		registrationTimeout: api.DefaultPluginRegistrationTimeout,
 	}
 	for _, o := range opts {
@@ -118,7 +148,7 @@ func restoreConfig(p Plugin) (*cfg, error) {
 		return nil, err
 	}
 	return &cfg{
-		plugin:              p,
+		plugin:              &resolver{p},
 		name:                c.Name,
 		conn:                conn,
 		registrationTimeout: c.RegistrationTimeout,

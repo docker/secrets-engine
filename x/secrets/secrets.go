@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"time"
 )
 
@@ -30,4 +31,8 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 
 type Resolver interface {
 	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
+}
+
+type Authenticator interface {
+	Authenticate(ctx context.Context, pattern Pattern, header http.Header) error
 }

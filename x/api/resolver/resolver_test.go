@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -29,6 +30,13 @@ type mockResolver struct {
 	value     string
 	err       error
 }
+
+// Authenticate implements secrets.Authenticator.
+func (m *mockResolver) Authenticate(ctx context.Context, pattern secrets.Pattern, header http.Header) error {
+	panic("unimplemented")
+}
+
+var _ secrets.Authenticator = &mockResolver{}
 
 func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver {
 	resolver := &mockResolver{

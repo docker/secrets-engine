@@ -27,6 +27,11 @@ func (v *version) String() string {
 // NewVersion creates a new [Version] from a string
 // If a validation error occurs, it returns nil and the error.
 func NewVersion(s string) (Version, error) {
+	if s == "(devel)" {
+		return &version{
+			value: "v0.0.0-dev",
+		}, nil
+	}
 	if err := valid(s); err != nil {
 		return nil, fmt.Errorf("parsing version: %w", err)
 	}
