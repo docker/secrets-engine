@@ -1,19 +1,18 @@
-Docker Secrets Engine
-=====================
+# Docker Secrets Engine
 
 [![build](https://github.com/docker/secrets-engine/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/build.yml)
 [![unit tests](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml)
 [![lint](https://github.com/docker/secrets-engine/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
 
-
 ## Getting Started
 
 Run a local engine:
+
 ```console
 $ make engine
 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/secrets-engine ./engine/daemon
-$ ./dist/secrets-engine 
+$ ./dist/secrets-engine
 2025/08/12 10:20:45 engine: secrets engine starting up... (~/.cache/secrets-engine/engine.sock)
 2025/08/12 10:20:45 engine: discovered builtin plugin: mysecret
 2025/08/12 10:20:45 engine: registering plugin 'mysecret'...
@@ -23,6 +22,7 @@ $ ./dist/secrets-engine
 ```
 
 Create secrets in your keychain:
+
 ```console
 $ make mysecret
 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/docker-mysecret ./mysecret
@@ -34,13 +34,21 @@ foo
 ```
 
 Query secrets from the engine:
+
 ```console
-$ curl --unix-socket ~/.cache/secrets-engine/engine.sock -X POST http://localhost/resolver.v1.ResolverService/GetSecret  -H "Content-Type: application/json" -d '{"id": "foo"}'
+$ curl --unix-socket ~/.cache/secrets-engine/engine.sock \
+    -X POST http://localhost/resolver.v1.ResolverService/GetSecrets \
+    -H "Content-Type: application/json" -d '{"pattern": "foo"}'
 {"id":"foo","value":"bar","provider":"mysecret","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
 ```
 
+> [!NOTE]
+> On linux the socket might be on /run/user/1000/secrets-engine/engine.sock
+
 ## Integration
+
 There are three ways to integrate with the secrets engine:
+
 - Client integrator: Use the client to query secrets and to build business logic on top that makes use of the engine.
 - Plugin author: Create plugins for an engine.
 - Engine integrator: Build/run an engine yourself.
