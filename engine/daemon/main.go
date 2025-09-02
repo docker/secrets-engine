@@ -19,7 +19,12 @@ func main() {
 	if !ok {
 		panic("could not read build info")
 	}
-	version, err := api.NewVersion(bi.Main.Version)
+	buildVersion := bi.Main.Version
+	// on untagged branches, the version could be "(devel)"
+	if buildVersion == "(devel)" {
+		buildVersion = "v0.0.0-dev"
+	}
+	version, err := api.NewVersion(buildVersion)
 	if err != nil {
 		panic(err)
 	}
