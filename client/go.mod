@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/client
 
-go 1.24.3
+go 1.25
 
 // This `replace` is only for CI to function.
 // The correct version will get resolved from below when this module is
