@@ -121,15 +121,15 @@ github.com/docker/go-connections/tlsconfig
 ## explicit
 github.com/docker/go-units
 # github.com/docker/secrets-engine/client v0.0.9 => ./client
-## explicit; go 1.24.3
+## explicit; go 1.25
 # github.com/docker/secrets-engine/mysecret v0.0.9 => ./mysecret
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.9 => ./plugin
-## explicit; go 1.24.3
+## explicit; go 1.25
 # github.com/docker/secrets-engine/store v0.0.9 => ./store
-## explicit; go 1.24.3
+## explicit; go 1.25
 # github.com/docker/secrets-engine/x v0.0.2-do.not.use => ./x
-## explicit; go 1.24.3
+## explicit; go 1.25
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
