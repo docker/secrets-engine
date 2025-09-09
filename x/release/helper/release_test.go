@@ -1,11 +1,83 @@
 package helper
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_bumpIterative(t *testing.T) {
+	t.Parallel()
+	t.Run("bump module with cascading dependencies", func(t *testing.T) {
+		repo, err := newMockRepoData()
+		require.NoError(t, err)
+		m := &mockFS{}
+		assert.NoError(t, BumpIterative("x", Major, repo, m))
+		assert.ElementsMatch(t, m.tagsCreated, []string{
+			"x/v1.0.0-do.not.use",
+			"plugin/v0.1.1",
+			"client/v1.0.3",
+			"engine/v0.2.4",
+		})
+		pluginIdx := getIndex(t, "plugin", m.tagsCreated)
+		clientIdx := getIndex(t, "client", m.tagsCreated)
+		assert.ElementsMatch(t, m.bumps, []bump{
+			{"engine/go.mod", "x", "v1.0.0-do.not.use"},
+			{"engine/go.mod", "plugin", "v0.1.1"},
+			{"engine/go.mod", "client", "v1.0.3"},
+			{"client/go.mod", "x", "v1.0.0-do.not.use"},
+			{"plugin/go.mod", "x", "v1.0.0-do.not.use"},
+		})
+		require.Equal(t, 4, len(m.commits))
+		assert.Equal(t, "chore: bump x/v1.0.0-do.not.use", m.commits[0])
+		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[pluginIdx])
+		assert.Equal(t, "chore: bump client/v1.0.3", m.commits[clientIdx])
+		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[3])
+		assert.Equal(t, 4, m.makeModCalled)
+	})
+	t.Run("bump module with direct dependencies", func(t *testing.T) {
+		repo, err := newMockRepoData()
+		require.NoError(t, err)
+		m := &mockFS{}
+		assert.NoError(t, BumpIterative("plugin", Patch, repo, m))
+		assert.ElementsMatch(t, m.tagsCreated, []string{
+			"plugin/v0.1.1",
+			"engine/v0.2.4",
+		})
+		assert.ElementsMatch(t, m.bumps, []bump{
+			{"engine/go.mod", "plugin", "v0.1.1"},
+		})
+		require.Equal(t, 2, len(m.commits))
+		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[0])
+		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[1])
+		assert.Equal(t, 2, m.makeModCalled)
+	})
+	t.Run("bump module without dependencies", func(t *testing.T) {
+		repo, err := newMockRepoData()
+		require.NoError(t, err)
+		m := &mockFS{}
+		assert.NoError(t, BumpIterative("engine", Patch, repo, m))
+		assert.ElementsMatch(t, m.tagsCreated, []string{
+			"engine/v0.2.4",
+		})
+		assert.Empty(t, m.bumps)
+		require.Equal(t, 1, len(m.commits))
+		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[0])
+		assert.Equal(t, 1, m.makeModCalled)
+	})
+}
+
+func getIndex(t *testing.T, prefix string, items []string) int {
+	for i, item := range items {
+		if strings.HasPrefix(item, prefix) {
+			return i
+		}
+	}
+	t.Fatalf("no items found for prefix %s", prefix)
+	return -1
+}
 
 func Test_bumpModule(t *testing.T) {
 	t.Parallel()
