@@ -18,6 +18,51 @@ const (
 	Major
 )
 
+func BumpIterative(mod string, level ReleaseLevel, repo RepoData, i FS) error {
+	data, ok := repo[mod]
+	if !ok {
+		return fmt.Errorf("module %s not found", mod)
+	}
+	if err := BumpModule(mod, level, data, i); err != nil {
+		return err
+	}
+	queue := data.downstreams
+
+	// reduce the repo data to only the downstream modules of 'mod'
+	for k := range repo {
+		if _, ok := queue[k]; ok {
+			continue
+		}
+		repo.RmMod(k)
+	}
+
+	for len(queue) > 0 {
+		var nextMod string
+		for item := range queue {
+			if repo.GetDependencyCount(item) == 0 {
+				fmt.Printf("next candidate: %s\n", item)
+				nextMod = item
+				break
+			}
+		}
+		if nextMod == "" {
+			return fmt.Errorf("could not determine next module")
+		}
+		data, ok := repo[nextMod]
+		if !ok {
+			return fmt.Errorf("module %s not found", mod)
+		}
+		// We always propagate as patch release. The alternative is to not propagate at all and manually
+		// re-run the release automation with the desired type of version bump on the specific sub module.
+		if err := BumpModule(nextMod, Patch, data, i); err != nil {
+			return err
+		}
+		repo.RmMod(nextMod)
+		delete(queue, nextMod)
+	}
+	return nil
+}
+
 type FS interface {
 	GitTag(tag string) error
 	GitCommit(msg string) error
@@ -79,6 +124,21 @@ func (d *RepoData) getOrInit(mod string) ModData {
 		return ModData{downstreams: map[string]struct{}{}}
 	}
 	return result
+}
+
+func (d *RepoData) GetDependencyCount(mod string) int {
+	data, ok := (*d)[mod]
+	if !ok {
+		return 0
+	}
+	return len(data.dependencies)
+}
+
+func (d *RepoData) RmMod(mod string) {
+	delete(*d, mod)
+	for _, v := range *d {
+		delete(v.dependencies, mod)
+	}
 }
 
 type ModData struct {
