@@ -11,8 +11,7 @@ import (
 func Test_bumpIterative(t *testing.T) {
 	t.Parallel()
 	t.Run("bump module with cascading dependencies", func(t *testing.T) {
-		repo, err := newMockRepoData()
-		require.NoError(t, err)
+		repo := newMockRepoData()
 		m := &mockFS{}
 		assert.NoError(t, BumpIterative("x", Major, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
@@ -36,8 +35,7 @@ func Test_bumpIterative(t *testing.T) {
 		assert.Equal(t, "chore: bump client/v1.0.3", m.commits[clientIdx])
 	})
 	t.Run("bump module with direct dependencies", func(t *testing.T) {
-		repo, err := newMockRepoData()
-		require.NoError(t, err)
+		repo := newMockRepoData()
 		m := &mockFS{}
 		assert.NoError(t, BumpIterative("plugin", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
@@ -51,8 +49,7 @@ func Test_bumpIterative(t *testing.T) {
 		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[0])
 	})
 	t.Run("bump module without dependencies", func(t *testing.T) {
-		repo, err := newMockRepoData()
-		require.NoError(t, err)
+		repo := newMockRepoData()
 		m := &mockFS{}
 		assert.NoError(t, BumpIterative("engine", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
@@ -76,8 +73,7 @@ func getIndex(t *testing.T, prefix string, items []string) int {
 func Test_bumpModule(t *testing.T) {
 	t.Parallel()
 	t.Run("bump module with version metadata and dependencies", func(t *testing.T) {
-		repo, err := newMockRepoData()
-		require.NoError(t, err)
+		repo := newMockRepoData()
 		m := &mockFS{}
 		assert.NoError(t, BumpModule("x", Patch, repo["x"], m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{"x/v0.0.4-do.not.use"})
@@ -87,13 +83,11 @@ func Test_bumpModule(t *testing.T) {
 			{"plugin/go.mod", "x", "v0.0.4-do.not.use"},
 		})
 		assert.ElementsMatch(t, m.commits, []string{"chore: bump x/v0.0.4-do.not.use"})
-		original, err := newMockRepoData()
-		require.NoError(t, err)
+		original := newMockRepoData()
 		assert.Equal(t, original, repo, "no side effects in BumpModule")
 	})
 	t.Run("bump module without version metadata and no dependencies", func(t *testing.T) {
-		repo, err := newMockRepoData()
-		require.NoError(t, err)
+		repo := newMockRepoData()
 		m := &mockFS{}
 		assert.NoError(t, BumpModule("engine", Patch, repo["engine"], m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{"engine/v0.2.4"})
@@ -101,30 +95,13 @@ func Test_bumpModule(t *testing.T) {
 	})
 }
 
-func newMockRepoData() (RepoData, error) {
+func newMockRepoData() RepoData {
 	modules := RepoData{}
-	xVersion, extra := CutVersionExtra("v0.0.3-do.not.use")
-	x, err := NewFutureVersions(xVersion, WithExtra(extra))
-	if err != nil {
-		return nil, err
-	}
-	modules.AddMod("x", *x, []string{})
-	plugin, err := NewFutureVersions("v0.1.0")
-	if err != nil {
-		return nil, err
-	}
-	modules.AddMod("plugin", *plugin, []string{"x"})
-	client, err := NewFutureVersions("v1.0.2")
-	if err != nil {
-		return nil, err
-	}
-	modules.AddMod("client", *client, []string{"x"})
-	engine, err := NewFutureVersions("v0.2.3")
-	if err != nil {
-		return nil, err
-	}
-	modules.AddMod("engine", *engine, []string{"client", "plugin", "x"})
-	return modules, nil
+	modules.AddMod("x", Version{Current: "v0.0.3-do.not.use", KeepExtra: true}, []string{})
+	modules.AddMod("plugin", Version{Current: "v0.1.0"}, []string{"x"})
+	modules.AddMod("client", Version{Current: "v1.0.2"}, []string{"x"})
+	modules.AddMod("engine", Version{Current: "v0.2.3"}, []string{"client", "plugin", "x"})
+	return modules
 }
 
 type mockFS struct {
@@ -187,44 +164,22 @@ func Test_cutVersionExtra(t *testing.T) {
 
 func Test_futureVersion(t *testing.T) {
 	t.Parallel()
-	t.Run("non canonical version", func(t *testing.T) {
-		_, err := NewFutureVersions("v0.0.0.1")
-		assert.Error(t, err)
+	t.Run("patch/minor/major", func(t *testing.T) {
+		v := Version{Current: "v1.1.1-pre+meta"}
+		patch, err := v.GetNextVersion(Patch)
+		assert.NoError(t, err)
+		assert.Equal(t, "v1.1.2", patch)
+		minor, err := v.GetNextVersion(Minor)
+		assert.NoError(t, err)
+		assert.Equal(t, "v1.2.0", minor)
+		major, err := v.GetNextVersion(Major)
+		assert.NoError(t, err)
+		assert.Equal(t, "v2.0.0", major)
 	})
-	tests := []struct {
-		current string
-		result  *FutureVersions
-	}{
-		{
-			current: "v0.0.1",
-			result: &FutureVersions{
-				major: "v1.0.0",
-				minor: "v0.1.0",
-				patch: "v0.0.2",
-			},
-		},
-		{
-			current: "v0.1.1",
-			result: &FutureVersions{
-				major: "v1.0.0",
-				minor: "v0.2.0",
-				patch: "v0.1.2",
-			},
-		},
-		{
-			current: "v1.1.1",
-			result: &FutureVersions{
-				major: "v2.0.0",
-				minor: "v1.2.0",
-				patch: "v1.1.2",
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.current, func(t *testing.T) {
-			d, err := NewFutureVersions(test.current)
-			require.NoError(t, err)
-			assert.Equal(t, *test.result, *d)
-		})
-	}
+	t.Run("with metadata", func(t *testing.T) {
+		v := Version{Current: "v1.1.1-pre+meta", KeepExtra: true}
+		patch, err := v.GetNextVersion(Patch)
+		assert.NoError(t, err)
+		assert.Equal(t, "v1.1.2-pre+meta", patch)
+	})
 }
