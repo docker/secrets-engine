@@ -4,21 +4,52 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"golang.org/x/mod/semver"
 )
 
-type ReleaseLevel int
+type Level string
 
 const (
-	Patch ReleaseLevel = iota
-	Minor
-	Major
+	Patch Level = "patch"
+	Minor Level = "minor"
+	Major Level = "major"
 )
 
-func BumpIterative(mod string, level ReleaseLevel, repo RepoData, i FS) error {
+var Levels = []Level{Patch, Minor, Major}
+
+var _ pflag.Value = (*Level)(nil)
+
+func (e *Level) String() string {
+	return string(*e)
+}
+
+func (e *Level) Set(v string) error {
+	actual := Level(v)
+	if !slices.Contains(Levels, actual) {
+		return fmt.Errorf("must be one of %s", AllowedLevels())
+	}
+	*e = actual
+	return nil
+}
+
+func (e *Level) Type() string {
+	return "level"
+}
+
+func AllowedLevels() string {
+	var quoted []string
+	for _, v := range Levels {
+		quoted = append(quoted, "\""+string(v)+"\"")
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func BumpIterative(mod string, level Level, repo RepoData, i FS) error {
 	data, ok := repo[mod]
 	if !ok {
 		return fmt.Errorf("module %s not found", mod)
@@ -68,7 +99,7 @@ type FS interface {
 	BumpModInFile(path, module, version string) (bool, error)
 }
 
-func BumpModule(mod string, level ReleaseLevel, data ModData, i FS) error {
+func BumpModule(mod string, level Level, data ModData, i FS) error {
 	release := data.getByLevel(level)
 
 	tag := mod + "/" + release
@@ -156,7 +187,7 @@ type FutureVersions struct {
 	major string
 }
 
-func (f *FutureVersions) getByLevel(level ReleaseLevel) string {
+func (f *FutureVersions) getByLevel(level Level) string {
 	if level == Major {
 		return f.major
 	}
