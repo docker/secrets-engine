@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
@@ -32,12 +31,6 @@ const (
 	// DefaultPluginPath is the default path to search for secrets engine plugins.
 	DefaultPluginPath = "/opt/docker/secrets-engine/plugins"
 )
-
-type Engine interface {
-	// Run the engine. Calling Cancel() on the context will stop the engine.
-	// Optionally pass in callbacks that get called once the engine is ready to accept requests.
-	Run(ctx context.Context, up ...func()) error
-}
 
 type Plugin interface {
 	plugin.Plugin
@@ -77,12 +70,7 @@ type config struct {
 	enginePluginsDisabled  bool
 	logger                 logging.Logger
 	maxTries               uint
-}
-
-type adaptation struct {
-	config
-
-	m sync.Mutex
+	upCb                   func(ctx context.Context) error
 }
 
 // Option to apply to the secrets engine.
@@ -153,8 +141,15 @@ func WithMaxTries(maxTries uint) Option {
 	}
 }
 
-// New creates a new NRI Runtime.
-func New(name, version string, opts ...Option) (Engine, error) {
+// WithAfterHealthyHook set a callback that gets called once the engine is ready to accept requests.
+func WithAfterHealthyHook(cb func(ctx context.Context) error) Option {
+	return func(r *config) error {
+		r.upCb = cb
+		return nil
+	}
+}
+
+func Run(ctx context.Context, name, version string, opts ...Option) error {
 	cfg := &config{
 		name:       name,
 		version:    version,
@@ -164,32 +159,27 @@ func New(name, version string, opts ...Option) (Engine, error) {
 
 	for _, o := range opts {
 		if err := o(cfg); err != nil {
-			return nil, fmt.Errorf("failed to apply option: %w", err)
+			return fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 	if cfg.logger == nil {
 		cfg.logger = logging.NewDefaultLogger("engine")
 	}
 
-	return &adaptation{config: *cfg}, nil
-}
-
-func (a *adaptation) Run(ctx context.Context, up ...func()) error {
-	if !a.m.TryLock() {
-		return errors.New("already started")
-	}
-	defer a.m.Unlock()
-	a.logger.Printf("secrets engine starting up... (%s)", tryMaskHomePath(a.socketPath))
-	e, err := newEngine(logging.WithLogger(ctx, a.logger), a.config)
+	cfg.logger.Printf("secrets engine starting up... (%s)", tryMaskHomePath(cfg.socketPath))
+	e, err := newEngine(logging.WithLogger(ctx, cfg.logger), *cfg)
 	if err != nil {
 		return err
 	}
-	a.logger.Printf("secrets engine ready")
-	for _, cb := range up {
-		go cb()
+	cfg.logger.Printf("secrets engine ready")
+	if cfg.upCb != nil {
+		if err := cfg.upCb(ctx); err != nil {
+			e.Close()
+			return err
+		}
 	}
 	<-ctx.Done()
-	a.logger.Printf("secrets engine shutting down...")
+	cfg.logger.Printf("secrets engine shutting down...")
 	return e.Close()
 }
 
