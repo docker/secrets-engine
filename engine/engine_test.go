@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -205,6 +206,13 @@ func Test_discoverPlugins(t *testing.T) {
 	})
 }
 
+func newListener(t *testing.T, socketPath string) net.Listener {
+	t.Helper()
+	listener, err := createListener(socketPath)
+	require.NoError(t, err)
+	return listener
+}
+
 func Test_newEngine(t *testing.T) {
 	t.Parallel()
 	t.Run("can retrieve secret from external plugin (no crashes)", func(t *testing.T) {
@@ -215,7 +223,7 @@ func Test_newEngine(t *testing.T) {
 			name:       "test-engine",
 			version:    "v6",
 			pluginPath: dir,
-			socketPath: socketPath,
+			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
 		}
@@ -238,7 +246,7 @@ func Test_newEngine(t *testing.T) {
 			name:       "test-engine",
 			version:    "v8",
 			pluginPath: dir,
-			socketPath: socketPath,
+			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
 		}
@@ -270,7 +278,7 @@ func Test_newEngine(t *testing.T) {
 			name:                  "test-engine",
 			version:               "v9",
 			enginePluginsDisabled: true,
-			socketPath:            socketPath,
+			listener:              newListener(t, socketPath),
 			logger:                testhelper.TestLogger(t),
 			maxTries:              1,
 			plugins: map[metadata]Plugin{
@@ -308,7 +316,7 @@ func Test_newEngine(t *testing.T) {
 			name:       "test-engine",
 			version:    "v99",
 			pluginPath: dir,
-			socketPath: socketPath,
+			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
@@ -337,7 +345,7 @@ func Test_newEngine(t *testing.T) {
 			name:                  "test-engine",
 			version:               "v1",
 			enginePluginsDisabled: true,
-			socketPath:            socketPath,
+			listener:              newListener(t, socketPath),
 			logger:                testhelper.TestLogger(t),
 			plugins: map[metadata]Plugin{&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 				blockRunForever: blockRunCh,

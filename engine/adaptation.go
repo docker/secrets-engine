@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -64,7 +65,7 @@ type config struct {
 	name                   string
 	version                string
 	pluginPath             string
-	socketPath             string
+	listener               net.Listener
 	plugins                map[metadata]Plugin
 	dynamicPluginsDisabled bool
 	enginePluginsDisabled  bool
@@ -87,7 +88,25 @@ func WithPluginPath(path string) Option {
 // WithSocketPath returns an option to override the default socket path.
 func WithSocketPath(path string) Option {
 	return func(r *config) error {
-		r.socketPath = path
+		if r.listener != nil {
+			return errors.New("listener already set")
+		}
+		listener, err := createListener(path)
+		if err != nil {
+			return err
+		}
+		r.listener = listener
+		return nil
+	}
+}
+
+// WithListener sets the listener (and thereby overwrites using the default socket path)
+func WithListener(listener net.Listener) Option {
+	return func(r *config) error {
+		if r.listener != nil {
+			return errors.New("listener already set")
+		}
+		r.listener = listener
 		return nil
 	}
 }
@@ -154,7 +173,6 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 		name:       name,
 		version:    version,
 		pluginPath: DefaultPluginPath,
-		socketPath: api.DefaultSocketPath(),
 	}
 
 	for _, o := range opts {
@@ -165,8 +183,17 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	if cfg.logger == nil {
 		cfg.logger = logging.NewDefaultLogger("engine")
 	}
+	var socketInfo string
+	if cfg.listener == nil {
+		listener, err := createListener(api.DefaultSocketPath())
+		if err != nil {
+			return err
+		}
+		cfg.listener = listener
+		socketInfo = " (" + tryMaskHomePath(api.DefaultSocketPath()) + ")"
+	}
 
-	cfg.logger.Printf("secrets engine starting up... (%s)", tryMaskHomePath(cfg.socketPath))
+	cfg.logger.Printf("secrets engine starting up..." + socketInfo)
 	e, err := newEngine(logging.WithLogger(ctx, cfg.logger), *cfg)
 	if err != nil {
 		return err
