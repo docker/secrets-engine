@@ -30,12 +30,10 @@ func Test_bumpIterative(t *testing.T) {
 			{"client/go.mod", "x", "v1.0.0-do.not.use"},
 			{"plugin/go.mod", "x", "v1.0.0-do.not.use"},
 		})
-		require.Equal(t, 4, len(m.commits))
+		require.Equal(t, 3, len(m.commits))
 		assert.Equal(t, "chore: bump x/v1.0.0-do.not.use", m.commits[0])
 		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[pluginIdx])
 		assert.Equal(t, "chore: bump client/v1.0.3", m.commits[clientIdx])
-		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[3])
-		assert.Equal(t, 4, m.makeModCalled)
 	})
 	t.Run("bump module with direct dependencies", func(t *testing.T) {
 		repo, err := newMockRepoData()
@@ -49,10 +47,8 @@ func Test_bumpIterative(t *testing.T) {
 		assert.ElementsMatch(t, m.bumps, []bump{
 			{"engine/go.mod", "plugin", "v0.1.1"},
 		})
-		require.Equal(t, 2, len(m.commits))
+		require.Equal(t, 1, len(m.commits))
 		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[0])
-		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[1])
-		assert.Equal(t, 2, m.makeModCalled)
 	})
 	t.Run("bump module without dependencies", func(t *testing.T) {
 		repo, err := newMockRepoData()
@@ -63,9 +59,7 @@ func Test_bumpIterative(t *testing.T) {
 			"engine/v0.2.4",
 		})
 		assert.Empty(t, m.bumps)
-		require.Equal(t, 1, len(m.commits))
-		assert.Equal(t, "chore: bump engine/v0.2.4", m.commits[0])
-		assert.Equal(t, 1, m.makeModCalled)
+		assert.Empty(t, m.commits)
 	})
 }
 
@@ -93,7 +87,6 @@ func Test_bumpModule(t *testing.T) {
 			{"plugin/go.mod", "x", "v0.0.4-do.not.use"},
 		})
 		assert.ElementsMatch(t, m.commits, []string{"chore: bump x/v0.0.4-do.not.use"})
-		assert.Equal(t, 1, m.makeModCalled)
 		original, err := newMockRepoData()
 		require.NoError(t, err)
 		assert.Equal(t, original, repo, "no side effects in BumpModule")
@@ -135,15 +128,9 @@ func newMockRepoData() (RepoData, error) {
 }
 
 type mockFS struct {
-	tagsCreated   []string
-	bumps         []bump
-	commits       []string
-	makeModCalled int
-}
-
-func (m *mockFS) BeforeCommit() error {
-	m.makeModCalled++
-	return nil
+	tagsCreated []string
+	bumps       []bump
+	commits     []string
 }
 
 func (m *mockFS) GitCommit(commit string) error {
@@ -162,9 +149,9 @@ func (m *mockFS) GitTag(tag string) error {
 	return nil
 }
 
-func (m *mockFS) BumpModInFile(filename, dep, version string) error {
+func (m *mockFS) BumpModInFile(filename, dep, version string) (bool, error) {
 	m.bumps = append(m.bumps, bump{filename, dep, version})
-	return nil
+	return true, nil
 }
 
 func Test_cutVersionExtra(t *testing.T) {
