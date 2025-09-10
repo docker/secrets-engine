@@ -37,8 +37,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// TODO: double check if the version actually points to the engine sub-module or the main module
-	e, err := engine.New("secrets-engine", bi.Main.Version,
+
+	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+
+	opts := []engine.Option{
 		engine.WithLogger(logger),
 		engine.WithPlugins(map[engine.Config]engine.Plugin{
 			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}:    mysecretPlugin,
@@ -46,15 +49,10 @@ func main() {
 		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
 		// engine.WithExternallyLaunchedPluginsDisabled(),
-	)
-	if err != nil {
-		panic(err)
 	}
 
-	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
-
-	if err := e.Run(ctx); err != nil {
+	// TODO: double check if the version actually points to the engine sub-module or the main module
+	if err := engine.Run(ctx, "secrets-engine", bi.Main.Version, opts...); err != nil {
 		panic(err)
 	}
 }

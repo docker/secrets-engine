@@ -27,15 +27,12 @@ func Test_SecretsEngine(t *testing.T) {
 	t.Parallel()
 	dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: []testdummy.PluginBehaviour{{Value: "foo"}, {Value: "bar"}}})
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
-	e, err := New("test-engine", "test-version",
+	runEngineAsync(t, "test-engine", "test-version",
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
 		WithPlugins(map[Config]Plugin{
 			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 		}))
-	assert.NoError(t, err)
-	runEngineAsync(t, e)
-	assert.ErrorContains(t, e.Run(t.Context()), "already started")
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
 
@@ -121,13 +118,11 @@ func Test_SecretsEngine(t *testing.T) {
 
 func TestWithDynamicPluginsDisabled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "e.sock")
-	e, err := New("test-engine", "test-version",
+	runEngineAsync(t, "test-engine", "test-version",
 		WithSocketPath(path),
 		WithPluginPath(t.TempDir()),
 		WithExternallyLaunchedPluginsDisabled(),
 	)
-	assert.NoError(t, err)
-	runEngineAsync(t, e)
 
 	conn, err := net.Dial("unix", path)
 	require.NoError(t, err)
@@ -166,9 +161,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			if test.extraOption != nil {
 				options = append(options, test.extraOption)
 			}
-			e, err := New("test-engine", "test-version", options...)
-			assert.NoError(t, err)
-			runEngineAsync(t, e)
+			runEngineAsync(t, "test-engine", "test-version", options...)
 			c, err := client.New(client.WithSocketPath(socketPath))
 			require.NoError(t, err)
 			_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
@@ -187,12 +180,16 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 	}
 }
 
-func runEngineAsync(t *testing.T, e Engine) {
+func runEngineAsync(t *testing.T, name, version string, opts ...Option) {
 	t.Helper()
 	errEngine := make(chan error)
 	done := make(chan struct{})
+	opts = append(opts, WithAfterHealthyHook(func(context.Context) error {
+		close(done)
+		return nil
+	}))
 	go func() {
-		errEngine <- e.Run(t.Context(), func() { close(done) })
+		errEngine <- Run(t.Context(), name, version, opts...)
 	}()
 	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
 	t.Cleanup(func() { assert.NoError(t, testhelper.WaitForErrorWithTimeout(errEngine)) })
