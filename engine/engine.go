@@ -36,11 +36,6 @@ type engineImpl struct {
 }
 
 func newEngine(ctx context.Context, cfg config) (engine, error) {
-	l, err := createListener(cfg.socketPath)
-	if err != nil {
-		return nil, err
-	}
-
 	plan := wrapBuiltins(ctx, cfg.logger, cfg.plugins)
 	if !cfg.enginePluginsDisabled {
 		morePlugins, err := wrapExternalPlugins(cfg)
@@ -56,7 +51,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
-		if err := server.Serve(l); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
+		if err := server.Serve(cfg.listener); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
 			serverErr = errors.Join(serverErr, err)
 		}
 		serverErr = errors.Join(serverErr, shutdownManagedPlugins())
@@ -65,7 +60,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	return &engineImpl{
 		reg: reg,
 		close: sync.OnceValue(func() error {
-			defer l.Close()
+			defer cfg.listener.Close()
 			select {
 			case <-done:
 				return serverErr
