@@ -139,6 +139,28 @@ mod:
 	@go work sync
 	@go work vendor
 
+define HELP_BUMP
+Usage: make bump MOD=<module>
+
+Examples:
+  make bump MOD=engine
+
+Alternatively, run the go release helper directly:
+  go run ./x/release --help
+  go run ./x/release --dry engine
+
+endef
+export HELP_BUMP
+
+bump: MOD?=
+bump:
+	@if [ -z "$(MOD)" ]; then \
+		echo "$$HELP_BUMP"; \
+		exit 1; \
+	fi
+	git fetch --tags
+	go run ./x/release $(MOD)
+
 help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
