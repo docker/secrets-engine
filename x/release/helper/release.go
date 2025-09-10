@@ -33,14 +33,13 @@ func BumpIterative(mod string, level ReleaseLevel, repo RepoData, i FS) error {
 		if _, ok := queue[k]; ok {
 			continue
 		}
-		repo.RmMod(k)
+		repo.RemoveModule(k)
 	}
 
 	for len(queue) > 0 {
 		var nextMod string
 		for item := range queue {
 			if repo.GetDependencyCount(item) == 0 {
-				fmt.Printf("next candidate: %s\n", item)
 				nextMod = item
 				break
 			}
@@ -57,7 +56,7 @@ func BumpIterative(mod string, level ReleaseLevel, repo RepoData, i FS) error {
 		if err := BumpModule(nextMod, Patch, data, i); err != nil {
 			return err
 		}
-		repo.RmMod(nextMod)
+		repo.RemoveModule(nextMod)
 		delete(queue, nextMod)
 	}
 	return nil
@@ -66,8 +65,7 @@ func BumpIterative(mod string, level ReleaseLevel, repo RepoData, i FS) error {
 type FS interface {
 	GitTag(tag string) error
 	GitCommit(msg string) error
-	BumpModInFile(path, module, version string) error
-	BeforeCommit() error
+	BumpModInFile(path, module, version string) (bool, error)
 }
 
 func BumpModule(mod string, level ReleaseLevel, data ModData, i FS) error {
@@ -77,31 +75,36 @@ func BumpModule(mod string, level ReleaseLevel, data ModData, i FS) error {
 	if err := i.GitTag(tag); err != nil {
 		return err
 	}
+	needsCommit := false
 	for dep := range data.downstreams {
-		if err := i.BumpModInFile(filepath.Join(dep, "go.mod"), mod, release); err != nil {
+		modified, err := i.BumpModInFile(filepath.Join(dep, "go.mod"), mod, release)
+		if err != nil {
 			return err
 		}
+		if modified {
+			needsCommit = true
+		}
 	}
-	if err := i.BeforeCommit(); err != nil {
-		return err
+	if !needsCommit {
+		return nil
 	}
 	return i.GitCommit("chore: bump " + tag)
 }
 
 type RepoData map[string]ModData
 
-func (d *RepoData) AddMod(mod string, data FutureVersions, deps []string) {
+func (d RepoData) AddMod(mod string, data FutureVersions, deps []string) {
 	d.addVersionData(mod, data)
 	d.addDeps(mod, deps)
 }
 
-func (d *RepoData) addVersionData(mod string, data FutureVersions) {
+func (d RepoData) addVersionData(mod string, data FutureVersions) {
 	before := d.getOrInit(mod)
 	before.FutureVersions = data
-	(*d)[mod] = before
+	d[mod] = before
 }
 
-func (d *RepoData) addDeps(mod string, deps []string) {
+func (d RepoData) addDeps(mod string, deps []string) {
 	dependencies := map[string]struct{}{}
 	for _, dep := range deps {
 		dependencies[dep] = struct{}{}
@@ -109,34 +112,34 @@ func (d *RepoData) addDeps(mod string, deps []string) {
 	}
 	before := d.getOrInit(mod)
 	before.dependencies = dependencies
-	(*d)[mod] = before
+	d[mod] = before
 }
 
-func (d *RepoData) addDownstreamDep(mod, dep string) {
+func (d RepoData) addDownstreamDep(mod, dep string) {
 	before := d.getOrInit(dep)
 	before.downstreams[mod] = struct{}{}
-	(*d)[dep] = before
+	d[dep] = before
 }
 
-func (d *RepoData) getOrInit(mod string) ModData {
-	result, ok := (*d)[mod]
+func (d RepoData) getOrInit(mod string) ModData {
+	result, ok := d[mod]
 	if !ok {
 		return ModData{downstreams: map[string]struct{}{}}
 	}
 	return result
 }
 
-func (d *RepoData) GetDependencyCount(mod string) int {
-	data, ok := (*d)[mod]
+func (d RepoData) GetDependencyCount(mod string) int {
+	data, ok := d[mod]
 	if !ok {
 		return 0
 	}
 	return len(data.dependencies)
 }
 
-func (d *RepoData) RmMod(mod string) {
-	delete(*d, mod)
-	for _, v := range *d {
+func (d RepoData) RemoveModule(mod string) {
+	delete(d, mod)
+	for _, v := range d {
 		delete(v.dependencies, mod)
 	}
 }
