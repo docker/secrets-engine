@@ -171,19 +171,11 @@ func newRepoData(versionExtraAllowList []string) (helper.RepoData, error) {
 		if err != nil {
 			return nil, err
 		}
-		v, extra := helper.CutVersionExtra(latest)
-		if !slices.Contains(versionExtraAllowList, v) {
-			extra = ""
-		}
-		data, err := helper.NewFutureVersions(v, helper.WithExtra(extra))
-		if err != nil {
-			return nil, err
-		}
 		deps, err := getDirectProjectDependencies(mod)
 		if err != nil {
 			return nil, err
 		}
-		modules.AddMod(mod, *data, deps)
+		modules.AddMod(mod, helper.Version{Current: latest, KeepExtra: slices.Contains(versionExtraAllowList, mod)}, deps)
 	}
 	return modules, nil
 }

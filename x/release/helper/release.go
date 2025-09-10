@@ -100,7 +100,10 @@ type FS interface {
 }
 
 func BumpModule(mod string, level Level, data ModData, i FS) error {
-	release := data.getByLevel(level)
+	release, err := data.GetNextVersion(level)
+	if err != nil {
+		return err
+	}
 
 	tag := mod + "/" + release
 	if err := i.GitTag(tag); err != nil {
@@ -124,14 +127,14 @@ func BumpModule(mod string, level Level, data ModData, i FS) error {
 
 type RepoData map[string]ModData
 
-func (d RepoData) AddMod(mod string, data FutureVersions, deps []string) {
+func (d RepoData) AddMod(mod string, data Version, deps []string) {
 	d.addVersionData(mod, data)
 	d.addDeps(mod, deps)
 }
 
-func (d RepoData) addVersionData(mod string, data FutureVersions) {
+func (d RepoData) addVersionData(mod string, data Version) {
 	before := d.getOrInit(mod)
-	before.FutureVersions = data
+	before.Version = data
 	d[mod] = before
 }
 
@@ -178,59 +181,43 @@ func (d RepoData) RemoveModule(mod string) {
 type ModData struct {
 	downstreams  map[string]struct{}
 	dependencies map[string]struct{}
-	FutureVersions
+	Version
 }
 
-type FutureVersions struct {
-	patch string
-	minor string
-	major string
+type Version struct {
+	Current   string
+	KeepExtra bool
 }
 
-func (f *FutureVersions) getByLevel(level Level) string {
-	if level == Major {
-		return f.major
-	}
-	if level == Minor {
-		return f.minor
-	}
-	return f.patch
-}
-
-func WithExtra(value string) Opt {
-	return func(v *FutureVersions) {
-		v.patch += value
-		v.minor += value
-		v.major += value
-	}
-}
-
-type Opt func(f *FutureVersions)
-
-func NewFutureVersions(latest string, opts ...Opt) (*FutureVersions, error) {
-	v := semver.Canonical(latest)
+func (s *Version) GetNextVersion(level Level) (string, error) {
+	v, extra := CutVersionExtra(s.Current)
+	v = semver.Canonical(v)
 	if v == "" {
-		return nil, fmt.Errorf("not a canonical version: %s", latest)
+		return "", fmt.Errorf("not a canonical version: %s", s.Current)
 	}
 	parts := strings.SplitN(strings.TrimPrefix(v, "v"), ".", 3)
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("unexpected semver parts: %q", v)
+		return "", fmt.Errorf("unexpected semver parts: %q", v)
 	}
 	major, err1 := strconv.Atoi(parts[0])
 	minor, err2 := strconv.Atoi(parts[1])
 	patch, err3 := strconv.Atoi(parts[2])
 	if err1 != nil || err2 != nil || err3 != nil {
-		return nil, fmt.Errorf("failed to parse semver numbers %q: %s", v, errors.Join(err1, err2, err3))
+		return "", fmt.Errorf("failed to parse semver numbers %q: %s", v, errors.Join(err1, err2, err3))
 	}
-	result := &FutureVersions{
-		major: fmt.Sprintf("v%d.0.0", major+1),
-		minor: fmt.Sprintf("v%d.%d.0", major, minor+1),
-		patch: fmt.Sprintf("v%d.%d.%d", major, minor, patch+1),
+	var next string
+	switch level {
+	case Major:
+		next = fmt.Sprintf("v%d.0.0", major+1)
+	case Minor:
+		next = fmt.Sprintf("v%d.%d.0", major, minor+1)
+	default:
+		next = fmt.Sprintf("v%d.%d.%d", major, minor, patch+1)
 	}
-	for _, opt := range opts {
-		opt(result)
+	if !s.KeepExtra {
+		extra = ""
 	}
-	return result, nil
+	return next + extra, nil
 }
 
 func CutVersionExtra(cv string) (string, string) {
