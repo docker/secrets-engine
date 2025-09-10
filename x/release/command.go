@@ -25,13 +25,12 @@ type Config struct {
 type opts struct {
 	dryRun      bool
 	skipGit     bool
-	minor       bool
-	major       bool
+	level       helper.Level
 	noPropagate bool
 }
 
 func ReleaseCommand(cfg Config) (*cobra.Command, error) {
-	opts := opts{}
+	opts := opts{level: helper.Patch}
 	if _, err := os.Stat(".git"); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("not in a git repository root directory")
@@ -42,10 +41,6 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 		Use:  "bump [OPTIONS] <module>",
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			level, err := getLevel(opts)
-			if err != nil {
-				return err
-			}
 			mod := args[0]
 			data, err := newRepoData(cfg.EnableModulesWithPreReleaseVersion)
 			if err != nil {
@@ -59,33 +54,19 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 				if !ok {
 					return fmt.Errorf("module %s not found", mod)
 				}
-				return helper.BumpModule(mod, level, modData, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
 			}
-			return helper.BumpIterative(mod, level, data, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
 		},
 	}
 
 	flags := bump.Flags()
 	flags.BoolVar(&opts.dryRun, "dry", false, "Dry run: Only log all steps, no actual changes will be made.")
 	flags.BoolVar(&opts.skipGit, "skip-git", false, "Skip git operations: Useful to preview only the go.mod changes.")
-	flags.BoolVar(&opts.minor, "minor", false, "Do a minor release (downstream dependencies will only get a patch release bump).")
-	flags.BoolVar(&opts.major, "major", false, "Do a major release (downstream dependencies will only get a patch release bump).")
+	flags.Var(&opts.level, "release", fmt.Sprintf("Release type (default=patch): %s", helper.AllowedLevels()))
 	flags.BoolVar(&opts.noPropagate, "no-propagate", false, "Only release the specified module and do not propagate to internal downstream dependencies.")
 
 	return bump, nil
-}
-
-func getLevel(opts opts) (helper.ReleaseLevel, error) {
-	if opts.minor && opts.major {
-		return -1, fmt.Errorf("cannot use both --minor and --major at the same time")
-	}
-	if opts.major {
-		return helper.Major, nil
-	}
-	if opts.minor {
-		return helper.Minor, nil
-	}
-	return helper.Patch, nil
 }
 
 type projectFS struct {
