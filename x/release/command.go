@@ -220,10 +220,16 @@ func getLatestVersion(modName string) (string, error) {
 
 func gitTag(tag string) error {
 	cmd := exec.Command("git", "tag", tag)
-	return cmd.Run()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git tag (%s): %s", err, string(out))
+	}
+	return nil
 }
 
 func gitCommit(commit string) error {
-	cmd := exec.Command("git", "commit", "-m", commit)
-	return cmd.Run()
+	cmd := exec.Command("git", "commit", "-am", commit)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit (%s): %s", err, string(out))
+	}
+	return nil
 }
