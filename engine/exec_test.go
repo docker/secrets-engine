@@ -14,8 +14,8 @@ import (
 type mockCmd struct {
 	killReceived   chan struct{}
 	killDone       chan error
-	signalReceived chan struct{}
-	signalDone     chan error
+	sigintReceived chan struct{}
+	sigint         chan error
 	runReceived    chan struct{}
 	runDone        chan error
 }
@@ -32,16 +32,10 @@ func (m *mockCmd) Kill() error {
 	return err
 }
 
-func (m *mockCmd) Signal(os.Signal) error {
-	close(m.signalReceived)
-	err := <-m.signalDone
+func (m *mockCmd) Sigint() error {
+	close(m.sigintReceived)
+	err := <-m.sigint
 	return err
-}
-
-func (m *mockCmd) PID() int {
-	close(m.signalReceived)
-	<-m.signalDone
-	return -1
 }
 
 func Test_launchCmdWatched(t *testing.T) {
@@ -49,8 +43,8 @@ func Test_launchCmdWatched(t *testing.T) {
 	t.Run("Close races against cmd terminating on its own", func(t *testing.T) {
 		runErr := errors.New("run error")
 		cmd := &mockCmd{
-			signalReceived: make(chan struct{}),
-			signalDone:     make(chan error, 1),
+			sigintReceived: make(chan struct{}),
+			sigint:         make(chan error, 1),
 			runReceived:    make(chan struct{}),
 			runDone:        make(chan error, 1),
 		}
@@ -62,13 +56,13 @@ func Test_launchCmdWatched(t *testing.T) {
 			errClose <- wrapper.Close()
 		}()
 		assert.False(t, isClosed(wrapper.Closed()))
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.signalReceived))
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.sigintReceived))
 		cmd.runDone <- runErr
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.True(c, isClosed(wrapper.Closed()))
 		}, 2*time.Second, 100*time.Millisecond)
 		assert.False(t, isClosed(errClose))
-		cmd.signalDone <- os.ErrProcessDone
+		cmd.sigint <- os.ErrProcessDone
 		assert.Error(t, <-errClose)
 	})
 	t.Run("Close returns run error when cmd terminates on its own (no racing)", func(t *testing.T) {
@@ -89,8 +83,8 @@ func Test_launchCmdWatched(t *testing.T) {
 		cmd := &mockCmd{
 			runReceived:    make(chan struct{}),
 			runDone:        make(chan error, 1),
-			signalReceived: make(chan struct{}),
-			signalDone:     make(chan error, 1),
+			sigintReceived: make(chan struct{}),
+			sigint:         make(chan error, 1),
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
@@ -100,8 +94,8 @@ func Test_launchCmdWatched(t *testing.T) {
 			errClose <- wrapper.Close()
 		}()
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.runReceived))
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.signalReceived))
-		cmd.signalDone <- errors.New("signal error")
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.sigintReceived))
+		cmd.sigint <- errors.New("signal error")
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.killReceived))
 		cmd.killDone <- errors.New("kill error")
 		assert.ErrorContains(t, testhelper.WaitForErrorWithTimeout(errClose), "timeout killing plugin")
@@ -111,8 +105,8 @@ func Test_launchCmdWatched(t *testing.T) {
 		cmd := &mockCmd{
 			runReceived:    make(chan struct{}),
 			runDone:        make(chan error, 1),
-			signalReceived: make(chan struct{}),
-			signalDone:     make(chan error, 1),
+			sigintReceived: make(chan struct{}),
+			sigint:         make(chan error, 1),
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
@@ -122,8 +116,8 @@ func Test_launchCmdWatched(t *testing.T) {
 			errClose <- wrapper.Close()
 		}()
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.runReceived))
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.signalReceived))
-		cmd.signalDone <- errors.New("signal error")
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.sigintReceived))
+		cmd.sigint <- errors.New("signal error")
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.killReceived))
 		cmd.runDone <- runErr
 		cmd.killDone <- nil
@@ -134,8 +128,8 @@ func Test_launchCmdWatched(t *testing.T) {
 		cmd := &mockCmd{
 			runReceived:    make(chan struct{}),
 			runDone:        make(chan error, 1),
-			signalReceived: make(chan struct{}),
-			signalDone:     make(chan error, 1),
+			sigintReceived: make(chan struct{}),
+			sigint:         make(chan error, 1),
 		}
 		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, time.Second)
 		errClose := make(chan error)
@@ -143,8 +137,8 @@ func Test_launchCmdWatched(t *testing.T) {
 			errClose <- wrapper.Close()
 		}()
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.runReceived))
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.signalReceived))
-		cmd.signalDone <- nil
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.sigintReceived))
+		cmd.sigint <- nil
 		cmd.runDone <- runErr
 		assert.ErrorIs(t, testhelper.WaitForErrorWithTimeout(errClose), runErr)
 	})
