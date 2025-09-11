@@ -19,11 +19,11 @@ require (
 	connectrpc.com/connect v1.18.1
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/docker/docker-auth/auth v0.0.1-beta
-	github.com/docker/secrets-engine/client v0.0.9
-	github.com/docker/secrets-engine/mysecret v0.0.9
-	github.com/docker/secrets-engine/plugin v0.0.9
-	github.com/docker/secrets-engine/store v0.0.9
-	github.com/docker/secrets-engine/x v0.0.2-do.not.use
+	github.com/docker/secrets-engine/client v0.0.10
+	github.com/docker/secrets-engine/mysecret v0.0.10
+	github.com/docker/secrets-engine/plugin v0.0.10
+	github.com/docker/secrets-engine/store v0.0.10
+	github.com/docker/secrets-engine/x v0.0.3-do.not.use
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sys v0.35.0
