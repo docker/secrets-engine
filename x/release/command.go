@@ -54,9 +54,9 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 				if !ok {
 					return fmt.Errorf("module %s not found", mod)
 				}
-				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 			}
-			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 		},
 	}
 
@@ -220,10 +220,16 @@ func getLatestVersion(modName string) (string, error) {
 
 func gitTag(tag string) error {
 	cmd := exec.Command("git", "tag", tag)
-	return cmd.Run()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git tag (%s): %s", err, string(out))
+	}
+	return nil
 }
 
 func gitCommit(commit string) error {
-	cmd := exec.Command("git", "commit", "-m", commit)
-	return cmd.Run()
+	cmd := exec.Command("git", "commit", "-am", commit)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit (%s): %s", err, string(out))
+	}
+	return nil
 }
