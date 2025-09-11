@@ -159,6 +159,7 @@ bump:
 		exit 1; \
 	fi
 	git fetch --tags
+	git diff --quiet
 	go run ./x/release $(MOD)
 
 help: ## Show this help
