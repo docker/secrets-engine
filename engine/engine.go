@@ -51,26 +51,23 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
+		defer func() { _ = shutdownManagedPlugins() }()
 		if err := server.Serve(cfg.listener); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
 			serverErr = errors.Join(serverErr, err)
 		}
-		serverErr = errors.Join(serverErr, shutdownManagedPlugins())
 		close(done)
 	}()
 	return &engineImpl{
 		reg: reg,
 		close: sync.OnceValue(func() error {
 			defer cfg.listener.Close()
-			select {
-			case <-done:
-				return serverErr
-			default:
-			}
 			stopErr := shutdownManagedPlugins()
 			// Close() has its own context that's derived from the initial context passed to the engine
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), engineShutdownTimeout)
 			defer cancel()
-			return errors.Join(server.Shutdown(ctx), stopErr, serverErr)
+			shutdownErr := server.Shutdown(ctx)
+			<-done // it's safe to wait here (never blocks) as we just have shut down the server
+			return errors.Join(shutdownErr, stopErr, serverErr)
 		}),
 	}, nil
 }
