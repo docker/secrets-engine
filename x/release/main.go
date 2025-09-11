@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"syscall"
 
@@ -24,5 +25,8 @@ func main() {
 
 func makeMod() error {
 	cmd := exec.Command("make", "mod")
-	return cmd.Run()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("make mod (%s): %s", err, string(out))
+	}
+	return nil
 }
