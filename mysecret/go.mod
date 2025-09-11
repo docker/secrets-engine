@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/mysecret
 
-go 1.25.0
+go 1.24.6
 
 replace github.com/docker/secrets-engine/x => ../x
 
