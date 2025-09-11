@@ -14,38 +14,54 @@ import (
 
 type proc interface {
 	Run() error
-	Signal(sig os.Signal) error
 	Kill() error
-	PID() int
+	Sigint() error
 }
 
+// Concurrency safe wrapper around exec.Cmd:
+// Kill() and Sigint() can safely be called from other go routines.
 type procImpl struct {
-	cmd *exec.Cmd
+	cmd     *exec.Cmd
+	process *os.Process
+	m       sync.Mutex
 }
 
-func (p procImpl) Run() error {
-	return p.cmd.Run()
+func (p *procImpl) Run() error {
+	if err := p.cmd.Start(); err != nil {
+		return err
+	}
+	// We need to create another instance of os.Process as cmd.Process is not concurrency safe
+	// -> Calling cmd.Process.Kill from another Go routine while cmd.Wait is pending creates a data race
+	proc, err := os.FindProcess(p.cmd.Process.Pid)
+	if err != nil {
+		return err
+	}
+	p.setProcess(proc)
+	return p.cmd.Wait()
 }
 
-func (p procImpl) Signal(sig os.Signal) error {
-	if p.cmd.Process == nil {
+func (p *procImpl) Kill() error {
+	p.m.Lock()
+	defer p.m.Unlock()
+	if p.process == nil {
 		return nil
 	}
-	return p.cmd.Process.Signal(sig)
+	return p.process.Kill()
 }
 
-func (p procImpl) Kill() error {
-	if p.cmd.Process == nil {
+func (p *procImpl) setProcess(proc *os.Process) {
+	p.m.Lock()
+	defer p.m.Unlock()
+	p.process = proc
+}
+
+func (p *procImpl) Sigint() error {
+	p.m.Lock()
+	defer p.m.Unlock()
+	if p.process == nil {
 		return nil
 	}
-	return p.cmd.Process.Kill()
-}
-
-func (p procImpl) PID() int {
-	if p.cmd.Process == nil {
-		return 0
-	}
-	return p.cmd.Process.Pid
+	return askProcessToStop(p.process)
 }
 
 func fromCmd(cmd *exec.Cmd) proc {
@@ -114,7 +130,7 @@ func (w *cmdWatchWrapper) kill() {
 // terminating on its own for any kind of reason.
 // -> filter out os.ErrProcessDone
 func (w *cmdWatchWrapper) shutdownCMD() {
-	if err := askProcessToStop(w.p); err != nil {
+	if err := w.p.Sigint(); err != nil {
 		if errors.Is(err, os.ErrProcessDone) {
 			return
 		}

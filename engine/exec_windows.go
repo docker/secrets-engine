@@ -4,17 +4,14 @@ package engine
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 
 	"golang.org/x/sys/windows"
 )
 
-func askProcessToStop(p proc) error {
-	pid := p.PID()
-	if pid <= 0 {
-		return nil
-	}
-	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(pid))
+func askProcessToStop(proc *os.Process) error {
+	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(proc.Pid))
 }
 
 func isSigint(err error) bool {
