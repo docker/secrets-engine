@@ -65,11 +65,11 @@ clean: ## remove built binaries and packages
 unit-tests:
 	pids=""; \
 	err=0; \
-	go test -trimpath -v $(shell go list ./client/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./client/...) & pids="$$pids $$!"; \
 	go test -trimpath -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
-	go test -trimpath -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
-	go test -trimpath -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
-	go test -trimpath -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
 	done; \
