@@ -54,9 +54,9 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 				if !ok {
 					return fmt.Errorf("module %s not found", mod)
 				}
-				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 			}
-			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, logger: logging.NewDefaultLogger("")})
+			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 		},
 	}
 
