@@ -24,6 +24,19 @@ import (
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
+func onlyDirs(f fs.FS) ([]fs.DirEntry, error) {
+	var dirs []fs.DirEntry
+	return dirs, fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
+		if d.Name() == "." {
+			return nil
+		}
+		if d.IsDir() {
+			dirs = append(dirs, d)
+		}
+		return nil
+	})
+}
+
 func TestPOSIXAge(t *testing.T) {
 	t.Run("can save encrypted secret", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
@@ -52,7 +65,7 @@ func TestPOSIXAge(t *testing.T) {
 		id := secrets.MustParseID("test/something/" + uuid.NewString())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
-		fsFiles, err := fs.ReadDir(root.FS(), ".")
+		fsFiles, err := onlyDirs(root.FS())
 		require.NoError(t, err)
 		assert.Len(t, fsFiles, 1)
 
@@ -77,18 +90,20 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
-		decryptedFile, err := decryptSecret(t.Context(),
-			[]secretFile{
+		x := s.(*fileStore[*mocks.MockCredential])
+		x.registeredDecryptionFunc = []callbackFunc{
+			DecryptionPassword(func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+		}
+		decryptedFile, err := x.decryptSecret(t.Context(), &secretDirectory{
+			secrets: []secretFile{
 				{
 					fileName:      secretFileName + "pass",
 					encryptedData: encryptedFile,
 				},
 			},
-			[]callbackFunc{
-				DecryptionPassword(func(_ context.Context) ([]byte, error) {
-					return []byte(masterKey), nil
-				}),
-			})
+		})
 		require.NoError(t, err)
 		assert.Equal(t, unencrypted, decryptedFile)
 	})
@@ -165,7 +180,7 @@ func TestPOSIXAge(t *testing.T) {
 			require.NoError(t, s.Save(t.Context(), id, secret))
 		}
 
-		fsFiles, err := fs.ReadDir(root.FS(), ".")
+		fsFiles, err := onlyDirs(root.FS())
 		require.NoError(t, err)
 		assert.Len(t, fsFiles, 2)
 
@@ -221,7 +236,7 @@ func TestPOSIXAge(t *testing.T) {
 		for id, secret := range secrets {
 			require.NoError(t, s.Save(t.Context(), id, secret))
 		}
-		fsFiles, err := fs.ReadDir(root.FS(), ".")
+		fsFiles, err := onlyDirs(root.FS())
 		require.NoError(t, err)
 		assert.Len(t, fsFiles, 2)
 
@@ -269,7 +284,7 @@ func TestPOSIXAge(t *testing.T) {
 		id := secrets.MustParseID("test/something/" + uuid.NewString())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
-		fsFiles, err := fs.ReadDir(root.FS(), ".")
+		fsFiles, err := onlyDirs(root.FS())
 		require.NoError(t, err)
 		assert.Len(t, fsFiles, 1)
 
@@ -294,18 +309,21 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
-		decryptedFile, err := decryptSecret(t.Context(),
-			[]secretFile{
+		x := s.(*fileStore[*mocks.MockCredential])
+		x.registeredDecryptionFunc = []callbackFunc{
+			DecryptionPassword(func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+		}
+		decryptedFile, err := x.decryptSecret(t.Context(), &secretDirectory{
+			secrets: []secretFile{
 				{
 					fileName:      secretFileName + "pass",
 					encryptedData: encryptedFile,
 				},
 			},
-			[]callbackFunc{
-				DecryptionPassword(func(_ context.Context) ([]byte, error) {
-					return []byte(masterKey), nil
-				}),
-			})
+		})
+
 		require.NoError(t, err)
 		assert.Equal(t, unencrypted, decryptedFile)
 	})
@@ -346,7 +364,7 @@ func TestPOSIXAge(t *testing.T) {
 		id := secrets.MustParseID("test/something/" + uuid.NewString())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
-		fsFiles, err := fs.ReadDir(root.FS(), ".")
+		fsFiles, err := onlyDirs(root.FS())
 		require.NoError(t, err)
 		assert.Len(t, fsFiles, 1)
 
@@ -436,6 +454,69 @@ func TestPOSIXAge(t *testing.T) {
 			}),
 		}
 		storeSecret, err = s.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.Equal(t, secret, storeSecret)
+	})
+
+	t.Run("failure to decrypt will try next decryption key", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		masterKey := uuid.NewString()
+		identity, err := age.GenerateX25519Identity()
+		require.NoError(t, err)
+
+		prv, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		pub, err := ssh.NewPublicKey(&prv.PublicKey)
+		require.NoError(t, err)
+
+		s, err := New(root,
+			func() *mocks.MockCredential {
+				return &mocks.MockCredential{}
+			},
+			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+			WithEncryptionCallbackFunc[EncryptionAgeX25519](func(_ context.Context) ([]byte, error) {
+				return []byte(identity.Recipient().String()), nil
+			}),
+			WithEncryptionCallbackFunc[EncryptionSSH](func(_ context.Context) ([]byte, error) {
+				return ssh.MarshalAuthorizedKey(pub), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte("not-the-password"), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionSSH](func(_ context.Context) ([]byte, error) {
+				p, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(p),
+				}), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionAgeX25519](func(_ context.Context) ([]byte, error) {
+				i, err := age.GenerateX25519Identity()
+				require.NoError(t, err)
+				return []byte(i.String()), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(ctx context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+		)
+		require.NoError(t, err)
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: uuid.NewString(),
+			Attributes: map[string]string{
+				"val1": uuid.NewString(),
+				"val2": uuid.NewString(),
+			},
+		}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, secret))
+
+		storeSecret, err := s.Get(t.Context(), id)
 		require.NoError(t, err)
 		assert.Equal(t, secret, storeSecret)
 	})
