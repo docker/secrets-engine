@@ -230,18 +230,21 @@ func (f *secretDirectory) restoreMetadata(fs *os.Root) error {
 }
 
 // sortSecrets sorts the secrets in order of callback funcs
-func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) {
+func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) error {
 	// sort the secrets in order of callback funcs
-	alreadyMatched := map[string]struct{}{}
+	alreadyMatched := map[keyType]struct{}{}
 	var secretsIdx int
 	for _, registeredFunc := range registeredFuncs {
-		k := string(getCallbackFuncName(registeredFunc))
+		k, err := getCallbackFuncName(registeredFunc)
+		if err != nil {
+			return err
+		}
 		if _, ok := alreadyMatched[k]; ok {
 			continue
 		}
 		for i := range secrets {
 			// get the keyType and match it against the callbackFunc keyType
-			if k == strings.TrimPrefix(secrets[i].fileName, secretFileName) {
+			if string(k) == strings.TrimPrefix(secrets[i].fileName, secretFileName) {
 				alreadyMatched[k] = struct{}{}
 				secrets[secretsIdx], secrets[i] = secrets[i], secrets[secretsIdx]
 				secretsIdx++
@@ -249,21 +252,24 @@ func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) {
 			}
 		}
 	}
+	return nil
 }
 
-func decryptSecret(ctx context.Context, secrets []secretFile, registeredDecryptionFunc []callbackFunc) ([]byte, error) {
-	group, err := groupCallbackFuncs(ctx, registeredDecryptionFunc)
+func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirectory) ([]byte, error) {
+	group, err := groupCallbackFuncs(ctx, f.registeredDecryptionFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	sortSecrets(secrets, registeredDecryptionFunc)
+	sortSecrets(encSecret.secrets, f.registeredDecryptionFunc)
 
-	for _, s := range secrets {
+	for _, s := range encSecret.secrets {
 		var identities []age.Identity
 		groupType := keyType(strings.TrimPrefix(s.fileName, secretFileName))
+
 		values, ok := group[groupType]
 		if !ok {
+			f.logger.Warnf("decryption callback func not registered for key type %s", groupType)
 			continue
 		}
 
@@ -277,6 +283,7 @@ func decryptSecret(ctx context.Context, secrets []secretFile, registeredDecrypti
 
 		r, err := age.Decrypt(bytes.NewReader(s.encryptedData), identities...)
 		if err != nil {
+			f.logger.Errorf("decryption failed using key type %s with secret %s", groupType, encSecret.rootName)
 			return nil, err
 		}
 
@@ -295,11 +302,36 @@ func (f *fileStore[T]) Delete(_ context.Context, id store.ID) error {
 	f.l.Lock()
 	defer f.l.Unlock()
 
+	unlock, err := lockFile(f.filesystem, true)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}()
+
 	encFile := newSecretDirectory(id)
 	return encFile.delete(f.filesystem)
 }
 
 func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+	f.l.RLock()
+	defer f.l.RUnlock()
+
+	unlock, err := lockFile(f.filesystem, false)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}()
+
 	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
 	if err != nil {
 		return nil, err
@@ -327,7 +359,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 			continue
 		}
 
-		encFile := secretDirectory{
+		encFile := &secretDirectory{
 			rootName: dir.Name(),
 		}
 
@@ -335,7 +367,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 			continue
 		}
 
-		decryptedSecret, err := decryptSecret(ctx, encFile.secrets, f.registeredDecryptionFunc)
+		decryptedSecret, err := f.decryptSecret(ctx, encFile)
 		if err != nil {
 			return nil, err
 		}
@@ -356,8 +388,19 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 }
 
 func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	f.l.Lock()
-	defer f.l.Unlock()
+	f.l.RLock()
+	defer f.l.RUnlock()
+
+	unlock, err := lockFile(f.filesystem, false)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}()
 
 	encFile := newSecretDirectory(id)
 
@@ -365,7 +408,7 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 		return nil, err
 	}
 
-	decryptedSecret, err := decryptSecret(ctx, encFile.secrets, f.registeredDecryptionFunc)
+	decryptedSecret, err := f.decryptSecret(ctx, encFile)
 	if err != nil {
 		return nil, err
 	}
@@ -383,6 +426,17 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 func (f *fileStore[T]) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
 	f.l.Lock()
 	defer f.l.Unlock()
+
+	unlock, err := lockFile(f.filesystem, false)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}()
 
 	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
 	if err != nil {
@@ -432,6 +486,17 @@ func (f *fileStore[T]) GetAllMetadata(_ context.Context) (map[store.ID]store.Sec
 func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) error {
 	f.l.Lock()
 	defer f.l.Unlock()
+
+	unlock, err := lockFile(f.filesystem, true)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}()
 
 	groups, err := groupCallbackFuncs(ctx, f.registeredEncryptionFuncs)
 	if err != nil {
@@ -496,7 +561,7 @@ type Options func(c *config)
 
 // WithLogger adds a custom logger to the store.
 // If a no logger has been specified, a noop logger is used instead.
-func WithLogger[T store.Secret](l logging.Logger) Options {
+func WithLogger(l logging.Logger) Options {
 	return func(c *config) {
 		c.logger = l
 	}
