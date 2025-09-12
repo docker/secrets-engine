@@ -31,22 +31,22 @@ type callbackFunc interface {
 	call(context.Context) ([]byte, error)
 }
 
-func getCallbackFuncName(f callbackFunc) keyType {
+func getCallbackFuncName(f callbackFunc) (keyType, error) {
 	switch f.(type) {
 	case EncryptionPassword:
-		return passwordKeyType
+		return passwordKeyType, nil
 	case EncryptionAgeX25519:
-		return ageKeyType
+		return ageKeyType, nil
 	case EncryptionSSH:
-		return sshKeyType
+		return sshKeyType, nil
 	case DecryptionPassword:
-		return passwordKeyType
+		return passwordKeyType, nil
 	case DecryptionAgeX25519:
-		return ageKeyType
+		return ageKeyType, nil
 	case DecryptionSSH:
-		return sshKeyType
+		return sshKeyType, nil
 	default:
-		panic("invalid callbackFunc")
+		return "", errors.New("invalid callback function type")
 	}
 }
 
@@ -137,6 +137,11 @@ func getIdentity(g keyType, value string) (age.Identity, error) {
 func groupCallbackFuncs(ctx context.Context, funcs []callbackFunc) (map[keyType][]string, error) {
 	m := map[keyType][]string{}
 	for _, f := range funcs {
+		groupType, err := getCallbackFuncName(f)
+		if err != nil {
+			return nil, err
+		}
+
 		raw, err := f.call(ctx)
 		if err != nil {
 			return nil, err
@@ -145,7 +150,6 @@ func groupCallbackFuncs(ctx context.Context, funcs []callbackFunc) (map[keyType]
 		if len(raw) == 0 {
 			return nil, errors.New("empty key provided on registered callback function")
 		}
-		groupType := getCallbackFuncName(f)
 		m[groupType] = append(m[groupType], string(raw))
 	}
 	return m, nil
