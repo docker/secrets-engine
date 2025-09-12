@@ -557,13 +557,14 @@ type config struct {
 	registeredEncryptionFuncs []callbackFunc
 }
 
-type Options func(c *config)
+type Options func(c *config) error
 
 // WithLogger adds a custom logger to the store.
 // If a no logger has been specified, a noop logger is used instead.
 func WithLogger(l logging.Logger) Options {
-	return func(c *config) {
+	return func(c *config) error {
 		c.logger = l
+		return nil
 	}
 }
 
@@ -577,8 +578,9 @@ type encryptionFuncs interface {
 // Multiple callbacks may be registered. They are invoked in the same order
 // they were added.
 func WithEncryptionCallbackFunc[K encryptionFuncs](callback K) Options {
-	return func(c *config) {
+	return func(c *config) error {
 		c.registeredEncryptionFuncs = append(c.registeredEncryptionFuncs, callbackFunc(callback))
+		return nil
 	}
 }
 
@@ -592,8 +594,9 @@ type decryptionFuncs interface {
 // Multiple callbacks may be registered. They are invoked in the same order
 // they were added.
 func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
-	return func(c *config) {
+	return func(c *config) error {
 		c.registeredDecryptionFunc = append(c.registeredDecryptionFunc, callbackFunc(callback))
+		return nil
 	}
 }
 
@@ -613,7 +616,9 @@ func New[T store.Secret](rootDir *os.Root, f store.Factory[T], opts ...Options) 
 		logger: &noopLogger{},
 	}
 	for _, opt := range opts {
-		opt(cfg)
+		if err := opt(cfg); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(cfg.registeredEncryptionFuncs) == 0 {
