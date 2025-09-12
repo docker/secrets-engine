@@ -41,7 +41,7 @@ func (d defaultLogger) Errorf(format string, v ...interface{}) {
 }
 
 func suffix() string {
-	_, file, line, ok := runtime.Caller(1)
+	_, file, line, ok := runtime.Caller(2)
 	if !ok {
 		return ""
 	}
