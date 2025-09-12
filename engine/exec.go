@@ -13,7 +13,8 @@ import (
 )
 
 type proc interface {
-	Run() error
+	Start() error
+	Wait() error
 	Kill() error
 	Sigint() error
 }
@@ -26,7 +27,7 @@ type procImpl struct {
 	m       sync.Mutex
 }
 
-func (p *procImpl) Run() error {
+func (p *procImpl) Start() error {
 	if err := p.cmd.Start(); err != nil {
 		return err
 	}
@@ -37,6 +38,10 @@ func (p *procImpl) Run() error {
 		return err
 	}
 	p.setProcess(proc)
+	return nil
+}
+
+func (p *procImpl) Wait() error {
 	return p.cmd.Wait()
 }
 
@@ -84,8 +89,13 @@ type cmdWatchWrapper struct {
 
 func launchCmdWatched(logger logging.Logger, name string, p proc, timeout time.Duration) procWrapper {
 	result := &cmdWatchWrapper{logger: logger, name: name, p: p, done: make(chan struct{}), shutdownTimeout: timeout}
+	if err := p.Start(); err != nil {
+		result.err = err
+		close(result.done)
+		return result
+	}
 	go func() {
-		err := p.Run()
+		err := p.Wait()
 		// On linux, if the process doesn't listen to SIGINT / explicitly handles it, cmd.Wait() returns an error.
 		// It's not an error for us, but logging it could help giving feedback to improve the plugin implementation.
 		if isSigint(err) {
