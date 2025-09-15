@@ -13,9 +13,10 @@ import (
 )
 
 type proc interface {
-	Run() error
-	Kill() error
-	Sigint() error
+	start() error
+	wait() error
+	kill() error
+	sigint() error
 }
 
 // Concurrency safe wrapper around exec.Cmd:
@@ -26,7 +27,7 @@ type procImpl struct {
 	m       sync.Mutex
 }
 
-func (p *procImpl) Run() error {
+func (p *procImpl) start() error {
 	if err := p.cmd.Start(); err != nil {
 		return err
 	}
@@ -37,10 +38,14 @@ func (p *procImpl) Run() error {
 		return err
 	}
 	p.setProcess(proc)
+	return nil
+}
+
+func (p *procImpl) wait() error {
 	return p.cmd.Wait()
 }
 
-func (p *procImpl) Kill() error {
+func (p *procImpl) kill() error {
 	p.m.Lock()
 	defer p.m.Unlock()
 	if p.process == nil {
@@ -55,7 +60,7 @@ func (p *procImpl) setProcess(proc *os.Process) {
 	p.process = proc
 }
 
-func (p *procImpl) Sigint() error {
+func (p *procImpl) sigint() error {
 	p.m.Lock()
 	defer p.m.Unlock()
 	if p.process == nil {
@@ -84,8 +89,13 @@ type cmdWatchWrapper struct {
 
 func launchCmdWatched(logger logging.Logger, name string, p proc, timeout time.Duration) procWrapper {
 	result := &cmdWatchWrapper{logger: logger, name: name, p: p, done: make(chan struct{}), shutdownTimeout: timeout}
+	if err := p.start(); err != nil {
+		result.err = err
+		close(result.done)
+		return result
+	}
 	go func() {
-		err := p.Run()
+		err := p.wait()
 		// On linux, if the process doesn't listen to SIGINT / explicitly handles it, cmd.Wait() returns an error.
 		// It's not an error for us, but logging it could help giving feedback to improve the plugin implementation.
 		if isSigint(err) {
@@ -121,7 +131,7 @@ func (w *cmdWatchWrapper) Close() error {
 }
 
 func (w *cmdWatchWrapper) kill() {
-	if err := w.p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+	if err := w.p.kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 		w.logger.Errorf("sending SIGKILL to plugin: %v", err)
 	}
 }
@@ -130,7 +140,7 @@ func (w *cmdWatchWrapper) kill() {
 // terminating on its own for any kind of reason.
 // -> filter out os.ErrProcessDone
 func (w *cmdWatchWrapper) shutdownCMD() {
-	if err := w.p.Sigint(); err != nil {
+	if err := w.p.sigint(); err != nil {
 		if errors.Is(err, os.ErrProcessDone) {
 			return
 		}
