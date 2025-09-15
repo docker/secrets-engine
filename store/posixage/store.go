@@ -259,7 +259,9 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirec
 		return nil, err
 	}
 
-	sortSecrets(encSecret.secrets, f.registeredDecryptionFunc)
+	if err := sortSecrets(encSecret.secrets, f.registeredDecryptionFunc); err != nil {
+		return nil, err
+	}
 
 	for _, s := range encSecret.secrets {
 		var identities []age.Identity
