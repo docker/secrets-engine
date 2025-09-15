@@ -320,7 +320,7 @@ func Test_newEngine(t *testing.T) {
 		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
-	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
+	t.Run("external plugin crashes and gets recovered", func(t *testing.T) {
 		plugins := []testdummy.PluginBehaviour{{Value: "bar"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
