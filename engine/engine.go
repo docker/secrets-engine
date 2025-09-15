@@ -36,7 +36,7 @@ type engineImpl struct {
 }
 
 func newEngine(ctx context.Context, cfg config) (engine, error) {
-	plan := wrapBuiltins(ctx, cfg.logger, cfg.plugins)
+	plan := wrapBuiltins(ctx, cfg.logger, getPluginShutdownTimeout(), cfg.plugins)
 	if !cfg.enginePluginsDisabled {
 		morePlugins, err := wrapExternalPlugins(cfg)
 		if err != nil {

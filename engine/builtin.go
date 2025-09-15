@@ -19,7 +19,7 @@ type internalRuntime struct {
 	close  func() error
 }
 
-func newInternalRuntime(ctx context.Context, p Plugin, c metadata) (runtime, error) {
+func newInternalRuntime(ctx context.Context, p Plugin, c metadata, shutdownTimeout time.Duration) (runtime, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func newInternalRuntime(ctx context.Context, p Plugin, c metadata) (runtime, err
 			select {
 			case <-closed:
 				return runErr.Load()
-			case <-time.After(getPluginShutdownTimeout()):
+			case <-time.After(shutdownTimeout):
 				closeOnce()
 				return fmt.Errorf("timeout waiting for plugin %s shutdown", c.Name())
 			}
@@ -111,10 +111,10 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func wrapBuiltins(ctx context.Context, logger logging.Logger, plugins map[metadata]Plugin) []launchPlan {
+func wrapBuiltins(ctx context.Context, logger logging.Logger, shutdownTimeout time.Duration, plugins map[metadata]Plugin) []launchPlan {
 	var result []launchPlan
 	for c, p := range plugins {
-		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c) }
+		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c, shutdownTimeout) }
 		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
 		logger.Printf("discovered builtin plugin: %s", c.Name())
 	}
