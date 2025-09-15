@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"filippo.io/age"
 
@@ -29,13 +30,10 @@ import (
 )
 
 type fileStore[T store.Secret] struct {
-	filesystem                *os.Root
-	registeredEncryptionFuncs []callbackFunc
-	registeredDecryptionFunc  []callbackFunc
-	factory                   store.Factory[T]
-	l                         sync.RWMutex
-
-	logger logging.Logger
+	filesystem *os.Root
+	factory    store.Factory[T]
+	l          sync.RWMutex
+	*config
 }
 
 var _ store.Store = &fileStore[store.Secret]{}
@@ -302,7 +300,7 @@ func (f *fileStore[T]) Delete(_ context.Context, id store.ID) error {
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	unlock, err := lockFile(f.filesystem, true)
+	unlock, err := attemptLock(f.filesystem, true, f.lockTimeout)
 	if err != nil {
 		return err
 	}
@@ -321,7 +319,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 	f.l.RLock()
 	defer f.l.RUnlock()
 
-	unlock, err := lockFile(f.filesystem, false)
+	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +389,7 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 	f.l.RLock()
 	defer f.l.RUnlock()
 
-	unlock, err := lockFile(f.filesystem, false)
+	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +425,7 @@ func (f *fileStore[T]) GetAllMetadata(_ context.Context) (map[store.ID]store.Sec
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	unlock, err := lockFile(f.filesystem, false)
+	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +485,7 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	unlock, err := lockFile(f.filesystem, true)
+	unlock, err := attemptLock(f.filesystem, true, f.lockTimeout)
 	if err != nil {
 		return err
 	}
@@ -555,6 +553,7 @@ type config struct {
 	logger                    logging.Logger
 	registeredDecryptionFunc  []callbackFunc
 	registeredEncryptionFuncs []callbackFunc
+	lockTimeout               time.Duration
 }
 
 type Options func(c *config) error
@@ -600,6 +599,13 @@ func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
 	}
 }
 
+func WithLockTimeout(timeout time.Duration) Options {
+	return func(c *config) error {
+		c.lockTimeout = timeout
+		return nil
+	}
+}
+
 // New returns a [store.Store] that manages encrypted files on disk.
 //
 // Each secret is stored in its own directory, named with a base64-encoded
@@ -613,7 +619,8 @@ func New[T store.Secret](rootDir *os.Root, f store.Factory[T], opts ...Options) 
 	}
 
 	cfg := &config{
-		logger: &noopLogger{},
+		logger:      &noopLogger{},
+		lockTimeout: time.Millisecond * 100,
 	}
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
@@ -627,10 +634,7 @@ func New[T store.Secret](rootDir *os.Root, f store.Factory[T], opts ...Options) 
 	if len(cfg.registeredDecryptionFunc) == 0 {
 		return nil, errors.New("requires at least one decryption callback function to be registered")
 	}
-
-	store.registeredEncryptionFuncs = cfg.registeredEncryptionFuncs
-	store.registeredDecryptionFunc = cfg.registeredDecryptionFunc
-	store.logger = cfg.logger
+	store.config = cfg
 
 	return store, nil
 }
