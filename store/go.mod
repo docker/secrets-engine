@@ -8,6 +8,7 @@ go 1.25
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/danieljoos/wincred v1.2.2
 	github.com/docker/secrets-engine/x v0.0.3-do.not.use
 	github.com/godbus/dbus/v5 v5.1.0
