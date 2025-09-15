@@ -23,11 +23,12 @@ var (
 	mockPatternAny   = secrets.MustParsePattern("*")
 )
 
-func Test_SecretsEngine(t *testing.T) {
-	t.Parallel()
+func testEngine(t *testing.T) (secrets.Resolver, string) {
+	t.Helper()
 	dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: []testdummy.PluginBehaviour{{Value: "foo"}, {Value: "bar"}}})
-	socketPath := filepath.Join(t.TempDir(), "test.sock")
+	socketPath := testhelper.RandomShortSocketName()
 	runEngineAsync(t, "test-engine", "test-version",
+		WithLogger(testhelper.TestLogger(t)),
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
 		WithPlugins(map[Config]Plugin{
@@ -35,10 +36,16 @@ func Test_SecretsEngine(t *testing.T) {
 		}))
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
+	return c, socketPath
+}
+
+func Test_SecretsEngine(t *testing.T) {
+	t.Parallel()
 
 	t.Run("unique existing secrets across all plugin types", func(t *testing.T) {
 		t.Parallel()
 		t.Run("engine launched plugins", func(t *testing.T) {
+			c, _ := testEngine(t)
 			foo, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 			require.NoError(t, err)
 			require.NotEmpty(t, foo)
@@ -55,6 +62,7 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.Equal(t, "bar-value", string(bar[0].Value))
 		})
 		t.Run("internal plugin", func(t *testing.T) {
+			c, _ := testEngine(t)
 			mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 			require.NoError(t, err)
 			require.NotEmpty(t, mySecret)
@@ -63,6 +71,7 @@ func Test_SecretsEngine(t *testing.T) {
 			assert.Equal(t, "my-builtin", mySecret[0].Provider)
 		})
 		t.Run("externally launched plugins", func(t *testing.T) {
+			c, socketPath := testEngine(t)
 			shutdown1 := launchExternalPlugin(t, externalPluginTestConfig{
 				socketPath: socketPath,
 				name:       "my-plugin",
@@ -100,10 +109,12 @@ func Test_SecretsEngine(t *testing.T) {
 		})
 	})
 	t.Run("non existing secrets", func(t *testing.T) {
+		c, _ := testEngine(t)
 		_, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("fancy-secret"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("non-unique secrets", func(t *testing.T) {
+		c, _ := testEngine(t)
 		envelopes, err := c.GetSecrets(t.Context(), testdummy.MockSecretPattern)
 		assert.NoError(t, err)
 		require.Len(t, envelopes, 2)
