@@ -239,7 +239,7 @@ func Test_newEngine(t *testing.T) {
 		assert.Equal(t, "foo-value", string(foo[0].Value))
 	})
 	t.Run("external plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
-		plugins := []testdummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &testdummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		plugins := []testdummy.PluginBehaviour{{Value: "bar"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
@@ -254,7 +254,7 @@ func Test_newEngine(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			assert.ElementsMatch(collect, e.Plugins(), []string{"plugin-bar-2-1"})
+			assert.ElementsMatch(collect, e.Plugins(), []string{"plugin-bar"})
 		}, 2*time.Second, 100*time.Millisecond)
 		c, err := client.New(client.WithSocketPath(socketPath))
 		require.NoError(t, err)
@@ -263,6 +263,7 @@ func Test_newEngine(t *testing.T) {
 		require.NotEmpty(t, bar)
 		assert.Equal(t, "bar", bar[0].ID.String())
 		assert.Equal(t, "bar-value", string(bar[0].Value))
+		killAllPlugins(t, getRegistry(t, e))
 		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -309,7 +310,7 @@ func Test_newEngine(t *testing.T) {
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("external plugin crashes on second get secret request (recovery)", func(t *testing.T) {
-		plugins := []testdummy.PluginBehaviour{{Value: "bar", CrashBehaviour: &testdummy.CrashBehaviour{OnNthSecretRequest: 2, ExitCode: 1}}}
+		plugins := []testdummy.PluginBehaviour{{Value: "bar"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
 		cfg := config{
@@ -326,8 +327,7 @@ func Test_newEngine(t *testing.T) {
 		require.NoError(t, err)
 		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		require.NoError(t, err)
-		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
-		assert.ErrorIs(t, err, secrets.ErrNotFound)
+		killAllPlugins(t, getRegistry(t, e))
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			bar, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 			require.NoError(collect, err)
@@ -381,4 +381,18 @@ func Test_newEngine(t *testing.T) {
 		assert.Equal(t, "my-secret", mySecret[0].ID.String())
 		assert.Equal(t, "some-value", string(mySecret[0].Value))
 	})
+}
+
+func getRegistry(t *testing.T, e engine) registry {
+	t.Helper()
+	impl, ok := e.(*engineImpl)
+	require.True(t, ok)
+	return impl.reg
+}
+
+func killAllPlugins(t *testing.T, r registry) {
+	t.Helper()
+	for _, p := range r.GetAll() {
+		require.NoError(t, getProc(t, p).kill())
+	}
 }

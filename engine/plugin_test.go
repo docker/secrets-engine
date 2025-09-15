@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/yamux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -190,10 +191,6 @@ func Test_newPlugin(t *testing.T) {
 					Version: "v2",
 					Pattern: "foo-bar",
 					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
-					CrashBehaviour: &testdummy.CrashBehaviour{
-						OnNthSecretRequest: 1,
-						ExitCode:           0,
-					},
 				})
 				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
 					name: pluginNameFromTestName(t),
@@ -201,9 +198,12 @@ func Test_newPlugin(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
-				assert.ErrorContains(t, err, "unavailable: unexpected EOF")
+				assert.NoError(t, err)
+				require.NoError(t, getProc(t, p).kill())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
+				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
+				assert.ErrorIs(t, err, yamux.ErrSessionShutdown)
 				_, err = parseOutput()
 				assert.ErrorContains(t, err, "failed to unmarshal ''")
 			},
@@ -212,6 +212,16 @@ func Test_newPlugin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
+}
+
+func getProc(t *testing.T, r runtime) proc {
+	t.Helper()
+	impl, ok := r.(*runtimeImpl)
+	require.True(t, ok)
+	require.NotNil(t, impl)
+	p, ok := impl.cmd.(*cmdWatchWrapper)
+	require.True(t, ok)
+	return p.p
 }
 
 func pluginNameFromTestName(t *testing.T) string {

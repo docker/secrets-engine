@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,7 +55,6 @@ func PluginProcessFromBinaryName(name string) {
 				secrets.MustParseID(behaviour.Value): behaviour.Value + "-value",
 				MockSecretID:                         MockSecretValue,
 			},
-			CrashBehaviour: behaviour.CrashBehaviour,
 		})
 	} else {
 		pluginProcess(&pluginCfgRestored{ErrConfigPanic: "fake crash"})
@@ -161,9 +159,6 @@ type PluginResult struct {
 func (d *dummyPlugin) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	d.m.Lock()
 	defer d.m.Unlock()
-	if d.cfg.CrashBehaviour != nil && len(d.result.GetSecret)+1 >= d.cfg.OnNthSecretRequest {
-		os.Exit(d.cfg.ExitCode)
-	}
 	d.result.GetSecret = append(d.result.GetSecret, pattern.String())
 	if d.cfg.errGetSecret != nil {
 		return nil, d.cfg.errGetSecret
@@ -192,7 +187,6 @@ type PluginCfg struct {
 	ErrGetSecret   string            `json:"errGetSecret,omitempty"`
 	IgnoreSigint   bool              `json:"ignoreSigint,omitempty"`
 	ErrConfigPanic string            `json:"errConfigPanic,omitempty"`
-	*CrashBehaviour
 }
 
 type pluginCfgRestored struct {
@@ -202,7 +196,6 @@ type pluginCfgRestored struct {
 	errGetSecret   error
 	IgnoreSigint   bool
 	ErrConfigPanic string
-	*CrashBehaviour
 }
 
 func (c *PluginCfg) toString() (string, error) {
@@ -245,7 +238,6 @@ func newDummyPluginCfg(in string) (*pluginCfgRestored, error) {
 		errGetSecret:   errGetSecret,
 		IgnoreSigint:   cfg.IgnoreSigint,
 		ErrConfigPanic: cfg.ErrConfigPanic,
-		CrashBehaviour: cfg.CrashBehaviour,
 	}, nil
 }
 
@@ -324,22 +316,13 @@ func tryExitWithTestSetupErr(err error) {
 
 type PluginBehaviour struct {
 	Value string `json:"value"`
-	*CrashBehaviour
-}
-
-type CrashBehaviour struct {
-	OnNthSecretRequest int `json:"on_nth_secret_request"`
-	ExitCode           int `json:"exit_code"`
 }
 
 func (p PluginBehaviour) ToString() (string, error) {
 	if strings.Contains(p.Value, "-") {
 		return "", errors.New("no '-' in plugin value allowed")
 	}
-	if p.CrashBehaviour == nil {
-		return p.Value, nil
-	}
-	return fmt.Sprintf("%s-%d-%d", p.Value, p.OnNthSecretRequest, p.ExitCode), nil
+	return p.Value, nil
 }
 
 func ParsePluginBehaviour(s string) (PluginBehaviour, error) {
@@ -351,18 +334,5 @@ func ParsePluginBehaviour(s string) (PluginBehaviour, error) {
 		return PluginBehaviour{}, fmt.Errorf("invalid format: expected 3 parts, got %d", len(parts))
 	}
 
-	exitN, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return PluginBehaviour{}, fmt.Errorf("invalid exit count %q: %w", parts[1], err)
-	}
-
-	exitCode, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return PluginBehaviour{}, fmt.Errorf("invalid exit code %q: %w", parts[2], err)
-	}
-
-	return PluginBehaviour{
-		parts[0],
-		&CrashBehaviour{OnNthSecretRequest: exitN, ExitCode: exitCode},
-	}, nil
+	return PluginBehaviour{parts[0]}, nil
 }

@@ -14,18 +14,7 @@ func Test_dummyPluginBehaviour(t *testing.T) {
 		_, err := b.ToString()
 		assert.Error(t, err)
 	})
-	t.Run("with exit behaviour", func(t *testing.T) {
-		b := PluginBehaviour{
-			Value:          "foo",
-			CrashBehaviour: &CrashBehaviour{OnNthSecretRequest: 1, ExitCode: 0},
-		}
-		s, err := b.ToString()
-		require.NoError(t, err)
-		r, err := ParsePluginBehaviour(s)
-		require.NoError(t, err)
-		assert.Equal(t, b, r)
-	})
-	t.Run("without exit behaviour", func(t *testing.T) {
+	t.Run("valid value", func(t *testing.T) {
 		b := PluginBehaviour{Value: "foo"}
 		s, err := b.ToString()
 		require.NoError(t, err)

@@ -94,6 +94,8 @@ type runtimeImpl struct {
 	close          func() error
 	closed         <-chan struct{}
 	logger         logging.Logger
+	// TODO: actually store the PID here (we'll need this for security reasons later anyway)
+	cmd procWrapper
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -145,6 +147,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 		},
 		closed: helper.closed(),
 		logger: logger,
+		cmd:    cmdWrapper,
 	}, nil
 }
 
