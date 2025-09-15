@@ -26,14 +26,14 @@ import (
 
 func onlyDirs(f fs.FS) ([]fs.DirEntry, error) {
 	var dirs []fs.DirEntry
-	return dirs, fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
+	return dirs, fs.WalkDir(f, ".", func(_ string, d fs.DirEntry, err error) error {
 		if d.Name() == "." {
 			return nil
 		}
 		if d.IsDir() {
 			dirs = append(dirs, d)
 		}
-		return nil
+		return err
 	})
 }
 
@@ -500,7 +500,7 @@ func TestPOSIXAge(t *testing.T) {
 				require.NoError(t, err)
 				return []byte(i.String()), nil
 			}),
-			WithDecryptionCallbackFunc[DecryptionPassword](func(ctx context.Context) ([]byte, error) {
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
 		)
@@ -663,7 +663,7 @@ func TestSortSecrets(t *testing.T) {
 			}),
 		}
 
-		sortSecrets(secrets, funcs)
+		require.NoError(t, sortSecrets(secrets, funcs))
 		assert.Equal(t, []secretFile{
 			{
 				fileName: secretFileName + "ssh",
@@ -693,7 +693,7 @@ func TestSortSecrets(t *testing.T) {
 			}),
 		}
 
-		sortSecrets(secrets, funcs)
+		require.NoError(t, sortSecrets(secrets, funcs))
 		assert.Equal(t, []secretFile{
 			{
 				fileName: secretFileName + "pass",
@@ -735,7 +735,7 @@ func TestSortSecrets(t *testing.T) {
 			}),
 		}
 
-		sortSecrets(secrets, funcs)
+		require.NoError(t, sortSecrets(secrets, funcs))
 		assert.Equal(t, []secretFile{
 			{
 				fileName: secretFileName + "ssh",
