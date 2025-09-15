@@ -159,6 +159,7 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 			cfg.logger.Errorf("registering plugin '%s': %v", name, err)
 			return nil, err
 		}
+		exponentialBackOff.Reset()
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
