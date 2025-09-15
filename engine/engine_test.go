@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"net"
 	"os"
 	"path/filepath"
@@ -50,6 +51,16 @@ func (m *mockSlowRuntime) Close() error {
 	return fmt.Errorf("%s closed", m.name)
 }
 
+func newMockIterator(runtimes []runtime) iter.Seq[runtime] {
+	return func(yield func(runtime) bool) {
+		for i := 0; i < len(runtimes); i++ {
+			if !yield(runtimes[i]) {
+				return
+			}
+		}
+	}
+}
+
 // Unfortunately, there's no way to test this reliably using channels.
 // We instead have a tiny sleep per mockRuntime.Close() with a larger global timeout in case the parallelStop function locks.
 func Test_parallelStop(t *testing.T) {
@@ -59,7 +70,7 @@ func Test_parallelStop(t *testing.T) {
 	}
 	stopErr := make(chan error)
 	go func() {
-		stopErr <- parallelStop(runtimes)
+		stopErr <- parallelStop(newMockIterator(runtimes))
 	}()
 	select {
 	case err := <-stopErr:
@@ -108,6 +119,10 @@ type mockRegistry struct {
 	err          error
 }
 
+func (m *mockRegistry) Iterator() iter.Seq[runtime] {
+	return func(func(runtime) bool) {}
+}
+
 func (m *mockRegistry) Register(plugin runtime) (removeFunc, error) {
 	m.addCalled = append(m.addCalled, plugin)
 	return func() {
@@ -116,10 +131,6 @@ func (m *mockRegistry) Register(plugin runtime) (removeFunc, error) {
 			close(m.removed)
 		}
 	}, m.err
-}
-
-func (m *mockRegistry) GetAll() []runtime {
-	return nil
 }
 
 func testLoggerCtx(t *testing.T) context.Context {
@@ -392,7 +403,7 @@ func getRegistry(t *testing.T, e engine) registry {
 
 func killAllPlugins(t *testing.T, r registry) {
 	t.Helper()
-	for _, p := range r.GetAll() {
+	for p := range r.Iterator() {
 		require.NoError(t, getProc(t, p).kill())
 	}
 }

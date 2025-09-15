@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"net/http"
 	"os"
@@ -44,7 +45,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 		}
 		plan = append(plan, morePlugins...)
 	}
-	reg := &manager{logger: cfg.logger}
+	reg := newManager(cfg.logger)
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
 	server := newServer(cfg, reg)
@@ -78,8 +79,8 @@ func (e *engineImpl) Close() error {
 
 func (e *engineImpl) Plugins() []string {
 	var plugins []string
-	for _, p := range e.reg.GetAll() {
-		plugins = append(plugins, p.Name().String())
+	for plugin := range e.reg.Iterator() {
+		plugins = append(plugins, plugin.Name().String())
 	}
 	return plugins
 }
@@ -87,28 +88,28 @@ func (e *engineImpl) Plugins() []string {
 func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry) func() error {
 	return sync.OnceValue(func() error {
 		stopSupervisor()
-		return parallelStop(reg.GetAll())
+		return parallelStop(reg.Iterator())
 	})
 }
 
 // Runs all io.Close() calls in parallel so shutdown time is T(1) and not T(n) for n plugins.
-func parallelStop(plugins []runtime) error {
-	errCh := make(chan error, len(plugins))
+func parallelStop(it iter.Seq[runtime]) error {
+	var errList []error
+	m := sync.Mutex{}
 	wg := &sync.WaitGroup{}
-	for _, p := range plugins {
+	for p := range it {
 		wg.Add(1)
 		go func(pl runtime) {
 			defer wg.Done()
-			errCh <- pl.Close()
+			err := pl.Close()
+
+			m.Lock()
+			defer m.Unlock()
+			errList = append(errList, err)
 		}(p)
 	}
 	wg.Wait()
-	close(errCh)
-	var errs error
-	for err := range errCh {
-		errs = errors.Join(errs, err)
-	}
-	return errs
+	return errors.Join(errList...)
 }
 
 func wrapExternalPlugins(cfg config) ([]launchPlan, error) {
