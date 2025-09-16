@@ -74,7 +74,7 @@ func attemptLock(root *os.Root, exclusive bool, timeout time.Duration) (unlockFu
 	}
 	// truncate to update the modtime to signal to other processes that the
 	// current lock is valid so they don't attempt a recovery on it.
-	fl.Truncate(0)
+	_ = fl.Truncate(0)
 
 	return unlock, nil
 }
