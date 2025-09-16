@@ -41,6 +41,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can save encrypted secret", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		s, err := New(root,
 			func() *mocks.MockCredential {
@@ -111,6 +115,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can get encrypted secret", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		s, err := New(root,
 			func() *mocks.MockCredential {
@@ -145,6 +153,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can get all secret metadata", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		s, err := New(root,
 			func() *mocks.MockCredential {
@@ -198,6 +210,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can filter secrets", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		s, err := New(root,
 			func() *mocks.MockCredential {
@@ -251,6 +267,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can use multiple keys to encrypt and decrypt", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
@@ -331,6 +351,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("saving the secret again should remove then save", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
@@ -395,6 +419,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("can decrypt with any one of the encryption key", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
@@ -461,6 +489,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("failure to decrypt will try next decryption key", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
@@ -524,6 +556,10 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("decryption happens in order specified", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
 		masterKey := uuid.NewString()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
@@ -581,6 +617,9 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("an error on encryption callbackFunc is propagated on save", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		encryptError := errors.New("something went wrong inside the encryption callbackFunc")
 		s, err := New(root,
@@ -610,6 +649,9 @@ func TestPOSIXAge(t *testing.T) {
 	t.Run("an error on decryption callbackFunc is propagated on get", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		decryptError := errors.New("something went wrong inside the decryption callbackFunc")
 		s, err := New(root,
