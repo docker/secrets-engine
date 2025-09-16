@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,6 +13,9 @@ func TestFlock(t *testing.T) {
 	t.Run("can unlock", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		exclusive := true
 		unlock, err := attemptLock(root, exclusive, time.Millisecond*10)
@@ -25,6 +29,9 @@ func TestFlock(t *testing.T) {
 	t.Run("exclusive lock prevents others from acquiring lock", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		exclusive := true
 		unlock, err := attemptLock(root, exclusive, time.Millisecond)
@@ -43,6 +50,9 @@ func TestFlock(t *testing.T) {
 	t.Run("multiple non-exclusive locks can be held", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		exclusive := true
 		unlock, err := attemptLock(root, !exclusive, time.Millisecond)
@@ -64,6 +74,9 @@ func TestFlock(t *testing.T) {
 	t.Run("can recover from an exclusive lock", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		exclusive := true
 		_, err = attemptLock(root, exclusive, time.Millisecond)
@@ -81,6 +94,9 @@ func TestFlock(t *testing.T) {
 	t.Run("recoverLock errors if a recover was not possible", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		f, err := root.Create(lockFileName)
 		require.NoError(t, err)
@@ -91,6 +107,9 @@ func TestFlock(t *testing.T) {
 	t.Run("recoverLock removes the file if it is older than 30 seconds", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
 
 		f, err := root.Create(lockFileName)
 		require.NoError(t, err)
