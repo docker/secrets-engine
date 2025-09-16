@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"iter"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,12 +57,12 @@ type mockResolverRegistry struct {
 	resolver []runtime
 }
 
-func (m mockResolverRegistry) Register(runtime) (removeFunc, error) {
-	panic("implement me")
+func (m mockResolverRegistry) Iterator() iter.Seq[runtime] {
+	return newMockIterator(m.resolver)
 }
 
-func (m mockResolverRegistry) GetAll() []runtime {
-	return m.resolver
+func (m mockResolverRegistry) Register(runtime) (removeFunc, error) {
+	panic("implement me")
 }
 
 func TestResolver(t *testing.T) {

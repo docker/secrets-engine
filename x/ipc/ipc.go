@@ -38,15 +38,15 @@ type loggerWrapper struct {
 }
 
 func (l loggerWrapper) Print(v ...interface{}) {
-	l.logger.Printf(fmt.Sprint(v...))
+	l.logger.Errorf(fmt.Sprint(v...))
 }
 
 func (l loggerWrapper) Printf(format string, v ...interface{}) {
-	l.logger.Printf(format, v...)
+	l.logger.Errorf(format, v...)
 }
 
 func (l loggerWrapper) Println(v ...interface{}) {
-	l.logger.Printf(fmt.Sprintln(v...))
+	l.logger.Errorf(fmt.Sprintln(v...))
 }
 
 func NewClientIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {

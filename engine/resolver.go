@@ -19,7 +19,7 @@ type regResolver struct {
 func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	var results []secrets.Envelope
 
-	for _, plugin := range r.reg.GetAll() {
+	for plugin := range r.reg.Iterator() {
 		if !plugin.Pattern().Includes(pattern) {
 			continue
 		}
