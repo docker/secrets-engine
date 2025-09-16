@@ -5,6 +5,7 @@ package posixage
 import (
 	"errors"
 	"os"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -30,12 +31,12 @@ func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
 		return nil, errors.Join(ErrLockUnsuccessful, err)
 	}
 
-	return func() error {
+	return sync.OnceValue(func() error {
 		defer func() { _ = f.Close() }()
 		if err := unix.Flock(int(f.Fd()), unix.LOCK_UN); err != nil {
 			return errors.Join(ErrUnlockUnsuccessful, err)
 		}
 
 		return nil
-	}, nil
+	}), nil
 }

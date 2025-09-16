@@ -5,6 +5,7 @@ package posixage
 import (
 	"errors"
 	"os"
+	"sync"
 
 	"golang.org/x/sys/windows"
 )
@@ -29,7 +30,7 @@ func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
 		return nil, errors.Join(ErrLockUnsuccessful, err)
 	}
 
-	return func() error {
+	return sync.OnceValue(func() error {
 		defer func() { _ = f.Close() }()
 		var overlapped windows.Overlapped
 		err := windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &overlapped)
@@ -37,5 +38,5 @@ func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
 			return errors.Join(ErrUnlockUnsuccessful, err)
 		}
 		return nil
-	}, nil
+	}), nil
 }
