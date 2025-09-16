@@ -68,7 +68,7 @@ func attemptLock(root *os.Root, exclusive bool, timeout time.Duration) (unlockFu
 		}
 
 		// we could recover, re-run the lock
-		return lockFile(fl, exclusive)
+		return attemptLock(root, exclusive, timeout)
 	}
 	return unlock, nil
 }
