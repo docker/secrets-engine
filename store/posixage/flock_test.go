@@ -2,6 +2,7 @@ package posixage
 
 import (
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -72,6 +73,9 @@ func TestFlock(t *testing.T) {
 	})
 
 	t.Run("can recover from an exclusive lock", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("recovery from an exclusive lock is not supported on Windows yet")
+		}
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
 		t.Cleanup(func() {
