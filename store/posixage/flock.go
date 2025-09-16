@@ -22,6 +22,8 @@ type unlockFunc func() error
 
 // openFile is a helper function for internal use by [lockFile]
 func openFile(root *os.Root) (*os.File, error) {
+	// we need to open in readwrite mode so that the file modtime gets updated
+	// with os.Truncate when we actually acquire a lock.
 	fl, err := root.OpenFile(lockFileName, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
@@ -70,6 +72,10 @@ func attemptLock(root *os.Root, exclusive bool, timeout time.Duration) (unlockFu
 		// we could recover, re-run the lock
 		return attemptLock(root, exclusive, timeout)
 	}
+	// truncate to update the modtime to signal to other processes that the
+	// current lock is valid so they don't attempt a recovery on it.
+	fl.Truncate(0)
+
 	return unlock, nil
 }
 
