@@ -19,21 +19,23 @@ import (
 // It returns an [unlockFunc] on success which should always be called inside
 // a defer.
 func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
-	flag := windows.LOCKFILE_FAIL_IMMEDIATELY
+	var flag uint32 = windows.LOCKFILE_FAIL_IMMEDIATELY
 	if exclusive {
 		flag |= windows.LOCKFILE_EXCLUSIVE_LOCK
 	}
 
-	var overlapped windows.Overlapped
-	err := windows.LockFileEx(windows.Handle(f.Fd()), uint32(flag), 0, 1, 0, &overlapped)
+	var ov windows.Overlapped   // zero offset => start at 0
+	const maxBytes = ^uint32(0) // lock the whole file
+	h := windows.Handle(f.Fd())
+
+	err := windows.LockFileEx(h, flag, 0, maxBytes, maxBytes, &ov)
 	if err != nil {
 		return nil, errors.Join(ErrLockUnsuccessful, err)
 	}
 
 	return sync.OnceValue(func() error {
 		defer func() { _ = f.Close() }()
-		var overlapped windows.Overlapped
-		err := windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &overlapped)
+		err := windows.UnlockFileEx(h, 0, maxBytes, maxBytes, &ov)
 		if err != nil {
 			return errors.Join(ErrUnlockUnsuccessful, err)
 		}
