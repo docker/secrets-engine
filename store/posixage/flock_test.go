@@ -63,7 +63,7 @@ func TestFlock(t *testing.T) {
 		})
 
 		unlockTwo, err := attemptLock(t.Context(), root, !exclusive)
-		require.NoError(t, err, ErrLockUnsuccessful)
+		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlockTwo()
 		})
