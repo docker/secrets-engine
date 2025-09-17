@@ -25,6 +25,7 @@ import (
 	"filippo.io/age"
 
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/store/posixage/internal/flock"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -264,7 +265,7 @@ func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) error {
 func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 	f.l.Lock()
 
-	unlock, err := attemptLock(ctx, f.filesystem, true)
+	unlock, err := flock.TryLock(ctx, f.filesystem)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +290,7 @@ func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 	f.l.RLock()
 
-	unlock, err := attemptLock(ctx, f.filesystem, false)
+	unlock, err := flock.TryRLock(ctx, f.filesystem)
 	if err != nil {
 		return nil, err
 	}
