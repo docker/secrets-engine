@@ -20,9 +20,9 @@ const (
 	lockFileName       = ".posixage.lock"
 )
 
-// unlockFunc is the callback function returned by [attemptLock]
+// UnlockFunc is the callback function returned by [attemptLock]
 // it should always be called inside a defer.
-type unlockFunc func() error
+type UnlockFunc func() error
 
 // openFile is a helper function for internal use by [attemptLock]
 func openFile(root *os.Root) (*os.File, error) {
@@ -36,7 +36,7 @@ func openFile(root *os.Root) (*os.File, error) {
 	return fl, nil
 }
 
-func tryLock(ctx context.Context, root *os.Root, exclusive bool) (unlockFunc, error) {
+func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, error) {
 	var (
 		err error
 		fl  *os.File
@@ -128,7 +128,7 @@ func retryLock(ctx context.Context, f *os.File, exclusive bool) error {
 // manual intervention may be required.
 //
 // It returns an unlock function that must be called to release the lock.
-func TryLock(ctx context.Context, root *os.Root) (unlockFunc, error) {
+func TryLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {
 	return tryLock(ctx, root, true)
 }
 
@@ -143,6 +143,6 @@ func TryLock(ctx context.Context, root *os.Root) (unlockFunc, error) {
 // manual intervention may be required.
 //
 // It returns an unlock function that must be called to release the lock.
-func TryRLock(ctx context.Context, root *os.Root) (unlockFunc, error) {
+func TryRLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {
 	return tryLock(ctx, root, false)
 }
