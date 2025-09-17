@@ -97,7 +97,7 @@ func TestFlock(t *testing.T) {
 }
 
 func TestRecoverLock(t *testing.T) {
-	t.Run("recoverLock errors if a recover was not possible", func(t *testing.T) {
+	t.Run("recoverLock does not recover if the lock is newer than 30s", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
 		t.Cleanup(func() {
