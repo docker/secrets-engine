@@ -118,7 +118,6 @@ func recoverLock(root *os.Root, fl *os.File) error {
 	// it is possible that the application might have crashed before
 	// let's try recover from that so that we don't lock indefinitely.
 	if time.Since(info.ModTime()).Seconds() >= 30 {
-		_ = fl.Close()
 		if err := root.Remove(lockFileName); err != nil {
 			return err
 		}
