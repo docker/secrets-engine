@@ -15,6 +15,11 @@ import (
 )
 
 func main() {
+	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+	logger := logging.NewDefaultLogger("engine")
+	ctx = logging.WithLogger(ctx, logger)
+
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		panic("could not read build info")
@@ -28,7 +33,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger := logging.NewDefaultLogger("engine")
+
 	mysecretPlugin, err := mysecret.NewMySecretPlugin(logger)
 	if err != nil {
 		panic(err)
@@ -37,9 +42,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
 
 	opts := []engine.Option{
 		engine.WithLogger(logger),
