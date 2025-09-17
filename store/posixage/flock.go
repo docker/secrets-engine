@@ -46,29 +46,40 @@ func attemptLock(ctx context.Context, root *os.Root, exclusive bool) (unlockFunc
 		return nil, err
 	}
 
-	if err := tryLockFile(ctx, fl, exclusive); err != nil {
-		if recoverErr := recoverLock(root, fl); recoverErr != nil {
-			_ = fl.Close()
-			// return on recovery failed.
-			// perhaps the file is still locked and not older than 30 seconds?
-			// maybe a permission error prevented it from being removed?
-			return nil, errors.Join(err, filterRecoverError(recoverErr))
-		}
+	lockCtx, lockCtxCancel := context.WithTimeout(ctx, time.Millisecond*100)
+	defer lockCtxCancel()
+	err = tryLockFile(lockCtx, fl, exclusive)
+	// lock was successful if error == nil, so let's just return
+	if err == nil {
+		// truncate to update the modtime to signal to other processes that the
+		// current lock is valid so they don't attempt a recovery on it.
+		_ = fl.Truncate(0)
 
+		return sync.OnceValue(func() error {
+			return unlockFile(fl)
+		}), nil
+	}
+
+	// lock was unsuccessful so let's retry
+	if recoverErr := recoverLock(root, fl); recoverErr != nil {
+		// return on recovery failed.
+		// perhaps the file is still locked and not older than 30 seconds?
+		// maybe a permission error prevented it from being removed?
+		return nil, errors.Join(err, filterRecoverError(recoverErr))
+	}
+
+	fl, err = openFile(root)
+	if err != nil {
+		return nil, err
+	}
+	// recovery was successful. Let's try get another lock one last time.
+	lockAgainCtx, lockAgainCtxCancel := context.WithTimeout(ctx, time.Millisecond*100)
+	defer lockAgainCtxCancel()
+	// try acquire a lock - immediately return on any error
+	if err := tryLockFile(lockAgainCtx, fl, exclusive); err != nil {
+		// always close the lock file after an error
 		_ = fl.Close()
-		// recovery was successful. Let's try get another lock one last time.
-		fl, err = openFile(root)
-		if err != nil {
-			return nil, err
-		}
-		// try acquire a lock - immediately return on any error
-		if err := tryLockFile(ctx, fl, exclusive); err != nil {
-			// always close the lock file after an error
-			_ = fl.Close()
-			return nil, err
-		}
-
-		// looks like we were successful in getting a lock - let's continue
+		return nil, err
 	}
 	// truncate to update the modtime to signal to other processes that the
 	// current lock is valid so they don't attempt a recovery on it.
@@ -96,6 +107,8 @@ var errRecoverLock = errors.New("recovery failed. lock file is not older than 30
 //
 // It returns no error if the lock file was successfully removed.
 func recoverLock(root *os.Root, fl *os.File) error {
+	defer func() { _ = fl.Close() }()
+
 	info, err := fl.Stat()
 	if err != nil {
 		return err
