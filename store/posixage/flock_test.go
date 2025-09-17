@@ -1,7 +1,6 @@
 package posixage
 
 import (
-	"context"
 	"os"
 	"runtime"
 	"testing"
@@ -42,14 +41,10 @@ func TestFlock(t *testing.T) {
 			_ = unlock()
 		})
 
-		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
-		t.Cleanup(cancel)
-		_, err = attemptLock(ctx, root, exclusive)
+		_, err = attemptLock(t.Context(), root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 
-		ctx, cancel = context.WithTimeout(t.Context(), time.Millisecond)
-		t.Cleanup(cancel)
-		_, err = attemptLock(ctx, root, !exclusive)
+		_, err = attemptLock(t.Context(), root, !exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -73,9 +68,7 @@ func TestFlock(t *testing.T) {
 			_ = unlockTwo()
 		})
 
-		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
-		t.Cleanup(cancel)
-		_, err = attemptLock(ctx, root, exclusive)
+		_, err = attemptLock(t.Context(), root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -97,9 +90,7 @@ func TestFlock(t *testing.T) {
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
 
-		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*10)
-		t.Cleanup(cancel)
-		unlock, err := attemptLock(ctx, root, exclusive)
+		unlock, err := attemptLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 	})
