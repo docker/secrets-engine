@@ -117,6 +117,9 @@ func (f *secretDirectory) save(fs *os.Root) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = root.Close()
+	}()
 
 	meta, err := json.Marshal(f.metadata)
 	if err != nil {
@@ -145,6 +148,10 @@ func (f *secretDirectory) delete(fs *os.Root) error {
 
 // restore reads the secret and metadata files from its scoped directory
 func (f *secretDirectory) restore(filesystem *os.Root) error {
+	if err := f.restoreMetadata(filesystem); err != nil {
+		return err
+	}
+
 	root, err := filesystem.OpenRoot(f.rootName)
 	if err != nil {
 		return err
@@ -152,24 +159,6 @@ func (f *secretDirectory) restore(filesystem *os.Root) error {
 	defer func() {
 		_ = root.Close()
 	}()
-
-	metadataStore, err := root.Open(metadataFileName)
-	if err != nil {
-		return err
-	}
-	defer metadataStore.Close()
-
-	b, err := io.ReadAll(metadataStore)
-	if err != nil {
-		return err
-	}
-
-	var metadata map[string]string
-	if err := json.Unmarshal(b, &metadata); err != nil {
-		return err
-	}
-
-	f.metadata = metadata
 
 	files, err := fs.ReadDir(root.FS(), ".")
 	if err != nil {
