@@ -20,11 +20,11 @@ const (
 	lockFileName       = ".posixage.lock"
 )
 
-// UnlockFunc is the callback function returned by [attemptLock]
+// UnlockFunc is the callback function returned by [TryLock] and [TryRLock]
 // it should always be called inside a defer.
 type UnlockFunc func() error
 
-// openFile is a helper function for internal use by [attemptLock]
+// openFile is a helper function for internal use by [tryLock]
 func openFile(root *os.Root) (*os.File, error) {
 	// we need to open in readwrite mode so that the file modtime gets updated
 	// with os.Truncate when we actually acquire a lock.
