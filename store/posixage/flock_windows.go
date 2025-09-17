@@ -3,42 +3,64 @@
 package posixage
 
 import (
+	"context"
 	"errors"
 	"os"
-	"sync"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"golang.org/x/sys/windows"
 )
 
-// lockFile acquires a file-based lock using a temporary file.
+const (
+	maxBytes = ^uint32(0) // lock the whole file
+)
+
+// tryLockFile attempts to acquire an advisory lock on the provided file
+// using LockFileEx.
 //
-// The exclusive flag should be set for write or delete operations to prevent
-// concurrent reads. The timeout parameter defines how long to keep retrying
-// before giving up.
+// The function retries until the context is canceled, backing off
+// exponentially between attempts up to a maximum delay of 100ms.
 //
-// It returns an [unlockFunc] on success which should always be called inside
-// a defer.
-func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
+// Use the exclusive flag for write or delete operations to block concurrent
+// readers.
+func tryLockFile(ctx context.Context, f *os.File, exclusive bool) error {
 	var flag uint32 = windows.LOCKFILE_FAIL_IMMEDIATELY
 	if exclusive {
 		flag |= windows.LOCKFILE_EXCLUSIVE_LOCK
 	}
 
-	var ov windows.Overlapped   // zero offset => start at 0
-	const maxBytes = ^uint32(0) // lock the whole file
+	var ov windows.Overlapped // zero offset => start at 0
 	h := windows.Handle(f.Fd())
 
-	err := windows.LockFileEx(h, flag, 0, maxBytes, maxBytes, &ov)
+	ep := backoff.NewExponentialBackOff()
+	ep.InitialInterval = time.Millisecond * 10
+	ep.MaxInterval = time.Millisecond * 100
+	_, err := backoff.Retry(ctx, func() (bool, error) {
+		err := windows.LockFileEx(h, flag, 0, maxBytes, maxBytes, &ov)
+		if err != nil {
+			return false, errors.Join(ErrLockUnsuccessful, err)
+		}
+		return true, nil
+	}, backoff.WithBackOff(ep))
 	if err != nil {
-		return nil, errors.Join(ErrLockUnsuccessful, err)
+		return errors.Join(ErrLockUnsuccessful, err)
 	}
 
-	return sync.OnceValue(func() error {
-		defer func() { _ = f.Close() }()
-		err := windows.UnlockFileEx(h, 0, maxBytes, maxBytes, &ov)
-		if err != nil {
-			return errors.Join(ErrUnlockUnsuccessful, err)
-		}
-		return nil
-	}), nil
+	return nil
+}
+
+// unlockFile releases an advisory lock held on the given file using UnlockFileEx.
+//
+// The file is always closed before the function returns.
+func unlockFile(f *os.File) error {
+	defer func() { _ = f.Close() }()
+
+	var ov windows.Overlapped // zero offset => start at 0
+	h := windows.Handle(f.Fd())
+	err := windows.UnlockFileEx(h, 0, maxBytes, maxBytes, &ov)
+	if err != nil {
+		return errors.Join(ErrUnlockUnsuccessful, err)
+	}
+	return nil
 }
