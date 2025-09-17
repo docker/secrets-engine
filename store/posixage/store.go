@@ -21,7 +21,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"filippo.io/age"
 
@@ -253,6 +252,56 @@ func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) error {
 	return nil
 }
 
+// tryLock is an internal convenience function for acquiring an exclusive
+// store lock.
+//
+// It first attempts to acquire a lock using [sync.RWMutex], then applies
+// a file-based lock for process-level coordination. This helps applications
+// performing concurrent reads and writes, since acquiring a file lock can
+// take time-especially when recovering from a stale lock.
+//
+// It returns an unlock function that must be called to release the lock.
+func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
+	f.l.Lock()
+
+	unlock, err := attemptLock(ctx, f.filesystem, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return sync.OnceFunc(func() {
+		defer f.l.Unlock()
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}), nil
+}
+
+// tryRLock is an internal convenience function for acquiring a non-exclusive
+// store lock.
+//
+// It first attempts to acquire a lock using [sync.RWMutex], then applies
+// a file-based lock for process-level coordination. This helps applications
+// performing concurrent reads and writes, since acquiring a file lock can
+// take time-especially when recovering from a stale lock.
+//
+// It returns an unlock function that must be called to release the lock.
+func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
+	f.l.RLock()
+
+	unlock, err := attemptLock(ctx, f.filesystem, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return sync.OnceFunc(func() {
+		defer f.l.RUnlock()
+		if err := unlock(); err != nil {
+			f.logger.Errorf("%s", err)
+		}
+	}), nil
+}
+
 func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirectory) ([]byte, error) {
 	group, err := groupCallbackFuncs(ctx, f.registeredDecryptionFunc)
 	if err != nil {
@@ -298,39 +347,23 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirec
 	return nil, errors.New("could not decrypt secret with provided keys")
 }
 
-func (f *fileStore[T]) Delete(_ context.Context, id store.ID) error {
-	f.l.Lock()
-	defer f.l.Unlock()
-
-	unlock, err := attemptLock(f.filesystem, true, f.lockTimeout)
+func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {
+	unlock, err := f.tryLock(ctx)
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		if err := unlock(); err != nil {
-			f.logger.Errorf("%s", err)
-		}
-	}()
+	defer unlock()
 
 	encFile := newSecretDirectory(id)
 	return encFile.delete(f.filesystem)
 }
 
 func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
-	f.l.RLock()
-	defer f.l.RUnlock()
-
-	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
+	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if err := unlock(); err != nil {
-			f.logger.Errorf("%s", err)
-		}
-	}()
+	defer unlock()
 
 	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
 	if err != nil {
@@ -388,19 +421,11 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 }
 
 func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	f.l.RLock()
-	defer f.l.RUnlock()
-
-	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
+	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if err := unlock(); err != nil {
-			f.logger.Errorf("%s", err)
-		}
-	}()
+	defer unlock()
 
 	encFile := newSecretDirectory(id)
 
@@ -423,20 +448,12 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 	return secret, nil
 }
 
-func (f *fileStore[T]) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
-	f.l.Lock()
-	defer f.l.Unlock()
-
-	unlock, err := attemptLock(f.filesystem, false, f.lockTimeout)
+func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
+	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if err := unlock(); err != nil {
-			f.logger.Errorf("%s", err)
-		}
-	}()
+	defer unlock()
 
 	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
 	if err != nil {
@@ -484,19 +501,11 @@ func (f *fileStore[T]) GetAllMetadata(_ context.Context) (map[store.ID]store.Sec
 }
 
 func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) error {
-	f.l.Lock()
-	defer f.l.Unlock()
-
-	unlock, err := attemptLock(f.filesystem, true, f.lockTimeout)
+	unlock, err := f.tryLock(ctx)
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		if err := unlock(); err != nil {
-			f.logger.Errorf("%s", err)
-		}
-	}()
+	defer unlock()
 
 	groups, err := groupCallbackFuncs(ctx, f.registeredEncryptionFuncs)
 	if err != nil {
@@ -555,7 +564,6 @@ type config struct {
 	logger                    logging.Logger
 	registeredDecryptionFunc  []callbackFunc
 	registeredEncryptionFuncs []callbackFunc
-	lockTimeout               time.Duration
 }
 
 type Options func(c *config) error
@@ -601,13 +609,6 @@ func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
 	}
 }
 
-func WithLockTimeout(timeout time.Duration) Options {
-	return func(c *config) error {
-		c.lockTimeout = timeout
-		return nil
-	}
-}
-
 // New returns a [store.Store] that manages encrypted files on disk.
 //
 // Each secret is stored in its own directory, named with a base64-encoded
@@ -621,8 +622,7 @@ func New[T store.Secret](rootDir *os.Root, f store.Factory[T], opts ...Options) 
 	}
 
 	cfg := &config{
-		logger:      &noopLogger{},
-		lockTimeout: time.Millisecond * 100,
+		logger: &noopLogger{},
 	}
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
