@@ -1,6 +1,7 @@
 package posixage
 
 import (
+	"context"
 	"os"
 	"runtime"
 	"testing"
@@ -19,11 +20,11 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(root, exclusive, time.Millisecond*10)
+		unlock, err := attemptLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 
-		unlock, err = attemptLock(root, exclusive, time.Millisecond)
+		unlock, err = attemptLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 	})
@@ -35,16 +36,20 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(root, exclusive, time.Millisecond)
+		unlock, err := attemptLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlock()
 		})
 
-		_, err = attemptLock(root, exclusive, time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+		t.Cleanup(cancel)
+		_, err = attemptLock(ctx, root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 
-		_, err = attemptLock(root, !exclusive, time.Millisecond)
+		ctx, cancel = context.WithTimeout(t.Context(), time.Millisecond)
+		t.Cleanup(cancel)
+		_, err = attemptLock(ctx, root, !exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -56,19 +61,21 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(root, !exclusive, time.Millisecond)
+		unlock, err := attemptLock(t.Context(), root, !exclusive)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlock()
 		})
 
-		unlockTwo, err := attemptLock(root, !exclusive, time.Millisecond)
+		unlockTwo, err := attemptLock(t.Context(), root, !exclusive)
 		require.NoError(t, err, ErrLockUnsuccessful)
 		t.Cleanup(func() {
 			_ = unlockTwo()
 		})
 
-		_, err = attemptLock(root, exclusive, time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+		t.Cleanup(cancel)
+		_, err = attemptLock(ctx, root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -83,18 +90,22 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		_, err = attemptLock(root, exclusive, time.Millisecond)
+		_, err = attemptLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 
 		// change the lock file modification time
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
 
-		unlock, err := attemptLock(root, exclusive, time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*10)
+		t.Cleanup(cancel)
+		unlock, err := attemptLock(ctx, root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 	})
+}
 
+func TestRecoverLock(t *testing.T) {
 	t.Run("recoverLock errors if a recover was not possible", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)

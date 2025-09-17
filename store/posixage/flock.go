@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"time"
-
-	"github.com/cenkalti/backoff/v5"
 )
 
 var (
@@ -41,45 +40,53 @@ func openFile(root *os.Root) (*os.File, error) {
 // To recover from stale locks (e.g., if a process crashes before releasing),
 // the function removes the lock file if its modification time is older than
 // 30 seconds. This assumes no valid process would hold the lock that long.
-func attemptLock(root *os.Root, exclusive bool, timeout time.Duration) (unlockFunc, error) {
+func attemptLock(ctx context.Context, root *os.Root, exclusive bool) (unlockFunc, error) {
 	fl, err := openFile(root)
 	if err != nil {
 		return nil, err
 	}
 
-	ep := backoff.NewExponentialBackOff()
-	ep.InitialInterval = time.Millisecond * 10
-	ep.MaxInterval = time.Millisecond * 100
-
-	unlock, err := backoff.Retry(context.Background(), func() (unlockFunc, error) {
-		return lockFile(fl, exclusive)
-	},
-		backoff.WithBackOff(ep),
-		backoff.WithMaxElapsedTime(timeout),
-	)
-	if err != nil {
-		// recoverLock closes fl
-		recoverErr := recoverLock(root, fl)
-		if recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
-			// we want the underlying error - something went wrong to recover
-			// the file (e.g. could not remove).
-			return nil, errors.Join(err, recoverErr)
+	if err := tryLockFile(ctx, fl, exclusive); err != nil {
+		if recoverErr := recoverLock(root, fl); recoverErr != nil {
+			_ = fl.Close()
+			// return on recovery failed.
+			// perhaps the file is still locked and not older than 30 seconds?
+			// maybe a permission error prevented it from being removed?
+			return nil, errors.Join(err, filterRecoverError(recoverErr))
 		}
-		if recoverErr != nil && errors.Is(recoverErr, errRecoverLock) {
+
+		_ = fl.Close()
+		// recovery was successful. Let's try get another lock one last time.
+		fl, err = openFile(root)
+		if err != nil {
+			return nil, err
+		}
+		// try acquire a lock - immediately return on any error
+		if err := tryLockFile(ctx, fl, exclusive); err != nil {
+			// always close the lock file after an error
+			_ = fl.Close()
 			return nil, err
 		}
 
-		// we could recover, re-run the lock
-		return attemptLock(root, exclusive, timeout)
+		// looks like we were successful in getting a lock - let's continue
 	}
 	// truncate to update the modtime to signal to other processes that the
 	// current lock is valid so they don't attempt a recovery on it.
 	_ = fl.Truncate(0)
 
-	return unlock, nil
+	return sync.OnceValue(func() error {
+		return unlockFile(fl)
+	}), nil
 }
 
-var errRecoverLock = errors.New("lock file is not older than 30 seconds")
+func filterRecoverError(err error) error {
+	if errors.Is(err, errRecoverLock) {
+		return nil
+	}
+	return err
+}
+
+var errRecoverLock = errors.New("recovery failed. lock file is not older than 30 seconds")
 
 // recoverLock checks whether a lock file's modification time is older than
 // 30 seconds. If so, it removes the file to recover from a stale lock.
@@ -89,9 +96,6 @@ var errRecoverLock = errors.New("lock file is not older than 30 seconds")
 //
 // It returns no error if the lock file was successfully removed.
 func recoverLock(root *os.Root, fl *os.File) error {
-	// always close the file regardless
-	defer func() { _ = fl.Close() }()
-
 	info, err := fl.Stat()
 	if err != nil {
 		return err

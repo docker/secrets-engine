@@ -3,22 +3,24 @@
 package posixage
 
 import (
+	"context"
 	"errors"
 	"os"
-	"sync"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"golang.org/x/sys/unix"
 )
 
-// lockFile acquires a file-based lock using a temporary file.
+// tryLockFile attempts to acquire an advisory lock on the provided file
+// using flock.
 //
-// The exclusive flag should be set for write or delete operations to prevent
-// concurrent reads. The timeout parameter defines how long to keep retrying
-// before giving up.
+// The function retries until the context is canceled, backing off
+// exponentially between attempts up to a maximum delay of 100ms.
 //
-// It returns an [unlockFunc] on success which should always be called inside
-// a defer.
-func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
+// Use the exclusive flag for write or delete operations to block concurrent
+// readers.
+func tryLockFile(ctx context.Context, f *os.File, exclusive bool) error {
 	flag := unix.LOCK_NB
 	if exclusive {
 		flag |= unix.LOCK_EX
@@ -26,17 +28,29 @@ func lockFile(f *os.File, exclusive bool) (unlockFunc, error) {
 		flag |= unix.LOCK_SH
 	}
 
-	err := unix.Flock(int(f.Fd()), flag)
+	ep := backoff.NewExponentialBackOff()
+	ep.InitialInterval = time.Millisecond * 10
+	ep.MaxInterval = time.Millisecond * 100
+	_, err := backoff.Retry(ctx, func() (bool, error) {
+		if err := unix.Flock(int(f.Fd()), flag); err != nil {
+			return false, err
+		}
+		return true, nil
+	}, backoff.WithBackOff(ep))
 	if err != nil {
-		return nil, errors.Join(ErrLockUnsuccessful, err)
+		return errors.Join(ErrLockUnsuccessful, err)
 	}
 
-	return sync.OnceValue(func() error {
-		defer func() { _ = f.Close() }()
-		if err := unix.Flock(int(f.Fd()), unix.LOCK_UN); err != nil {
-			return errors.Join(ErrUnlockUnsuccessful, err)
-		}
+	return nil
+}
 
-		return nil
-	}), nil
+// unlockFile releases an advisory lock held on the given file using flock.
+//
+// The file is always closed before the function returns.
+func unlockFile(f *os.File) error {
+	defer func() { _ = f.Close() }()
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_UN); err != nil {
+		return errors.Join(ErrUnlockUnsuccessful, err)
+	}
+	return nil
 }
