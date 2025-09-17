@@ -1,4 +1,4 @@
-package posixage
+package flock
 
 import (
 	"os"
@@ -19,11 +19,11 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(t.Context(), root, exclusive)
+		unlock, err := tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 
-		unlock, err = attemptLock(t.Context(), root, exclusive)
+		unlock, err = tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 	})
@@ -35,16 +35,16 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(t.Context(), root, exclusive)
+		unlock, err := tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlock()
 		})
 
-		_, err = attemptLock(t.Context(), root, exclusive)
+		_, err = tryLock(t.Context(), root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 
-		_, err = attemptLock(t.Context(), root, !exclusive)
+		_, err = tryLock(t.Context(), root, !exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -56,19 +56,19 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		unlock, err := attemptLock(t.Context(), root, !exclusive)
+		unlock, err := tryLock(t.Context(), root, !exclusive)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlock()
 		})
 
-		unlockTwo, err := attemptLock(t.Context(), root, !exclusive)
+		unlockTwo, err := tryLock(t.Context(), root, !exclusive)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			_ = unlockTwo()
 		})
 
-		_, err = attemptLock(t.Context(), root, exclusive)
+		_, err = tryLock(t.Context(), root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
 	})
 
@@ -83,14 +83,14 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		_, err = attemptLock(t.Context(), root, exclusive)
+		_, err = tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 
 		// change the lock file modification time
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
 
-		unlock, err := attemptLock(t.Context(), root, exclusive)
+		unlock, err := tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
 	})
@@ -107,7 +107,7 @@ func TestRecoverLock(t *testing.T) {
 		f, err := root.Create(lockFileName)
 		require.NoError(t, err)
 
-		require.ErrorIs(t, recoverLock(root, f), errRecoverLock)
+		require.ErrorIs(t, recoverStaleLock(root, f), errRecoverLock)
 	})
 
 	t.Run("recoverLock removes the file if it is older than 30 seconds", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestRecoverLock(t *testing.T) {
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
 
-		require.NoError(t, recoverLock(root, f))
+		require.NoError(t, recoverStaleLock(root, f))
 		_, err = root.Stat(lockFileName)
 		require.ErrorIs(t, err, os.ErrNotExist)
 	})
