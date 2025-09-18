@@ -88,7 +88,7 @@ func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 }
 
 // decryptSecret attempts to decrypt a secret using the registered
-// [secretfile.PromptCaller] functions.
+// [promptCaller] functions.
 //
 // For each registered decryption function, the method:
 //  1. Determines the associated [secretfile.KeyType].
