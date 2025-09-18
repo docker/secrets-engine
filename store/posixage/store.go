@@ -279,7 +279,7 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 			_ = secretDir.Close()
 		}()
 
-		metadata, err := secretfile.RestoreMetadata(id, secretDir)
+		metadata, err := secretfile.RestoreMetadata(secretDir)
 		if err != nil {
 			return err
 		}
