@@ -10,10 +10,10 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	connectrpc.com/connect v1.18.1
 	github.com/docker/secrets-engine/x v0.0.3-do.not.use
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.8
 )
 
 require (
+	github.com/google/go-cmp v0.7.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
 )

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"os"
 	"runtime/debug"
 	"syscall"
+	"time"
 
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
@@ -12,6 +14,7 @@ import (
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 )
 
 func main() {
@@ -19,6 +22,20 @@ func main() {
 	defer cancel()
 	logger := logging.NewDefaultLogger("engine")
 	ctx = logging.WithLogger(ctx, logger)
+
+	if endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); endpoint != "" {
+		shutdown, err := telemetry.InitializeOTel(ctx, endpoint)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 100*time.Millisecond)
+			defer cancel()
+			shutdown(ctx)
+		}()
+	} else {
+		logger.Printf("No OTLP endpoint defined, tracing will not be enabled")
+	}
 
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
