@@ -9,12 +9,15 @@ import (
 )
 
 type (
-	// PromptFunc is a callback function the store uses when a file is
-	// encrypted/decrypted.
+	// PromptFunc is a callback invoked by the store when encrypting or
+	// decrypting a file. The function is expected to return the key material
+	// (as a byte slice) or an error if the key cannot be obtained.
 	PromptFunc func(context.Context) ([]byte, error)
-)
 
-type KeyType string
+	// KeyType identifies the type of encryption or decryption key associated
+	// with a secret (e.g., password, age, or SSH).
+	KeyType string
+)
 
 const (
 	PasswordKeyType KeyType = "pass"
@@ -66,6 +69,16 @@ func GetRecipients(k KeyType, encryptionKeys []string) ([]age.Recipient, error) 
 	return recipients, nil
 }
 
+// GetIdentity returns an [age.Identity] for the given key type and
+// decryption key.
+//
+// The identity implementation depends on the provided [KeyType]:
+//   - PasswordKeyType → [age.NewScryptIdentity]
+//   - AgeKeyType      → [age.ParseX25519Identity]
+//   - SSHKeyType      → [agessh.ParseIdentity]
+//
+// An error is returned if the key cannot be parsed or the key type is
+// unsupported.
 func GetIdentity(k KeyType, decryptionKey string) (age.Identity, error) {
 	var identity age.Identity
 	var err error
