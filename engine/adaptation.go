@@ -8,6 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
@@ -183,10 +187,21 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	if cfg.logger == nil {
 		cfg.logger = logging.NewDefaultLogger("engine")
 	}
+	ctx = logging.WithLogger(ctx, cfg.logger)
+	var span trace.Span
+	ctx, span = tracer().Start(ctx, "engine.run",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			attribute.String("service.name", cfg.name),
+			attribute.String("service.version", cfg.version),
+		))
+	defer span.End()
+
 	var socketInfo string
 	if cfg.listener == nil {
 		listener, err := createListener(api.DefaultSocketPath())
 		if err != nil {
+			recordErrorWithStatus(span, err, "create_listener", "create_failure")
 			return err
 		}
 		cfg.listener = listener
@@ -194,20 +209,29 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	}
 
 	cfg.logger.Printf("secrets engine starting up..." + socketInfo)
-	e, err := newEngine(logging.WithLogger(ctx, cfg.logger), *cfg)
+	e, err := newEngine(ctx, *cfg)
 	if err != nil {
+		recordErrorWithStatus(span, err, "create_engine", "init_failure")
 		return err
 	}
+	span.AddEvent("ready")
 	cfg.logger.Printf("secrets engine ready")
 	if cfg.upCb != nil {
 		if err := cfg.upCb(ctx); err != nil {
 			e.Close()
+			recordErrorWithStatus(span, err, "up_callback", "callback_failure")
 			return err
 		}
 	}
 	<-ctx.Done()
+	span.AddEvent("shutdown")
 	cfg.logger.Printf("secrets engine shutting down...")
-	return e.Close()
+	if err := e.Close(); err != nil {
+		recordErrorWithStatus(span, err, "shutdown", "shutdown_failure")
+		return err
+	}
+	span.SetStatus(codes.Ok, "clean shutdown")
+	return nil
 }
 
 func toDisplayName(filename string) string {
@@ -220,4 +244,9 @@ func tryMaskHomePath(path string) string {
 		return path
 	}
 	return strings.Replace(path, home, "~", 1)
+}
+
+func recordErrorWithStatus(span trace.Span, err error, phase, status string) {
+	span.SetStatus(codes.Error, status)
+	span.RecordError(err, trace.WithAttributes(attribute.String("phase", phase)))
 }
