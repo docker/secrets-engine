@@ -72,13 +72,13 @@ func TestResolver(t *testing.T) {
 			newMockResolverRuntime("foo", errors.New("foo")),
 			newMockResolverRuntime("bar", errors.New("bar")),
 		}}
-		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
+		resolver := newRegResolver(testhelper.TestLogger(t), reg)
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 	t.Run("no match no errors", func(t *testing.T) {
 		reg := mockResolverRegistry{resolver: []runtime{}}
-		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
+		resolver := newRegResolver(testhelper.TestLogger(t), reg)
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})
@@ -101,7 +101,7 @@ func TestResolver(t *testing.T) {
 				},
 			},
 		}}
-		resolver := &regResolver{reg: reg, logger: testhelper.TestLogger(t)}
+		resolver := newRegResolver(testhelper.TestLogger(t), reg)
 		e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.NoError(t, err)
 		require.Len(t, e, 3)

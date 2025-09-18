@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"go.opentelemetry.io/otel/metric"
+
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -14,9 +16,22 @@ var _ secrets.Resolver = &regResolver{}
 type regResolver struct {
 	reg    registry
 	logger logging.Logger
+	reqs   metric.Int64Counter
+}
+
+func newRegResolver(logger logging.Logger, reg registry) *regResolver {
+	return &regResolver{
+		reg:    reg,
+		logger: logger,
+		reqs: int64counter("secrets.requests",
+			metric.WithDescription("Total secret requests processed by the engine"),
+			metric.WithUnit("{request}")),
+	}
 }
 
 func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	r.reqs.Add(ctx, 1)
+
 	var results []secrets.Envelope
 
 	for plugin := range r.reg.Iterator() {
