@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type runnable func(ctx context.Context) error
@@ -18,6 +21,7 @@ type launchPlan struct {
 // Parallelizes the launch of all managed plugins but then still waits for synchronization until
 // all launch functions are at least executed once.
 func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []launchPlan) func() {
+	span := trace.SpanFromContext(ctx)
 	initialProcesses := map[string]runnable{}
 	upGroup := &sync.WaitGroup{}
 	for _, p := range plan {
@@ -46,6 +50,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []
 			defer downGroup.Done()
 			err := run(ctxChild)
 			if err != nil && !errors.Is(err, context.Canceled) {
+				span.RecordError(err, trace.WithAttributes(attribute.String("phase", "retry_ended")))
 				cfg.logger.Errorf("plugin '%s' stopped: %s", name, err)
 			}
 		}()

@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
@@ -248,6 +250,7 @@ func newServer(cfg config, reg registry) *http.Server {
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
 	if !cfg.dynamicPluginsDisabled {
 		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
+			span := trace.SpanFromContext(ctx)
 			launcher := launcher(func() (runtime, error) {
 				return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
 			})
@@ -259,6 +262,7 @@ func newServer(cfg config, reg registry) *http.Server {
 			case <-ctx.Done():
 			case err := <-errDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
+					span.RecordError(err, trace.WithAttributes(attribute.String("phase", "external_plugin_disconnected")))
 					cfg.logger.Errorf("external plugin '%s' stopped: %v", cfg.name, err)
 				}
 			}
