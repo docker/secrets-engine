@@ -96,7 +96,7 @@ func TestPOSIXAge(t *testing.T) {
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []secretfile.PromptCaller{
+		x.registeredDecryptionFunc = []promptCaller{
 			DecryptionPassword(func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -329,7 +329,7 @@ func TestPOSIXAge(t *testing.T) {
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []secretfile.PromptCaller{
+		x.registeredDecryptionFunc = []promptCaller{
 			DecryptionPassword(func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -399,7 +399,7 @@ func TestPOSIXAge(t *testing.T) {
 		assert.Len(t, secretFiles, 3)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredEncryptionFuncs = []secretfile.PromptCaller{
+		x.registeredEncryptionFuncs = []promptCaller{
 			EncryptionAgeX25519(func(_ context.Context) ([]byte, error) {
 				return []byte(identity.Recipient().String()), nil
 			}),
@@ -464,7 +464,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []secretfile.PromptCaller{
+		x.registeredDecryptionFunc = []promptCaller{
 			DecryptionAgeX25519(func(_ context.Context) ([]byte, error) {
 				return []byte(identity.String()), nil
 			}),
@@ -473,7 +473,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, secret, storeSecret)
 
-		x.registeredDecryptionFunc = []secretfile.PromptCaller{
+		x.registeredDecryptionFunc = []promptCaller{
 			DecryptionSSH(func(_ context.Context) ([]byte, error) {
 				return privatePem, nil
 			}),
