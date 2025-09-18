@@ -16,10 +16,17 @@ type EncryptedSecret struct {
 	EncryptedData []byte
 }
 
+// IDToDirName encodes a secret ID as a base64 string suitable for use
+// as a directory name. This avoids issues with unsupported characters
+// (such as slashes) in filesystem paths.
 func IDToDirName(id store.ID) string {
 	return base64.StdEncoding.EncodeToString([]byte(id.String()))
 }
 
+// DirNameToID decodes a base64-encoded directory name back into a secret ID.
+//
+// It returns an error if the directory name is not valid base64 or cannot
+// be parsed into a [store.ID].
 func DirNameToID(dirName string) (store.ID, error) {
 	s, err := base64.StdEncoding.DecodeString(dirName)
 	if err != nil {
@@ -33,10 +40,13 @@ const (
 	MetadataFileName = "metadata.json"
 )
 
-// atomicWrite writes the file to a temporary file first and upon successful write
-// renames the file.
-// This function does not guarantee concurrent writes and does not clean temporary
-// files upon failure.
+// atomicWrite writes data to a file atomically by first writing to a temporary
+// file and then renaming it to the target name.
+//
+// This ensures that the file is either fully written or not written at all,
+// preventing partial writes from being observed. However, the function does
+// not provide safety for concurrent writers and does not clean up temporary
+// files if the write fails.
 func atomicWrite(fs *os.Root, fileName string, data []byte) error {
 	tmpFileName := fileName + ".tmp"
 	tmpFile, err := fs.Create(tmpFileName)
