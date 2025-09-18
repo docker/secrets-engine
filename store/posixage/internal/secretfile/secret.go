@@ -145,7 +145,7 @@ func RestoreSecret(id store.ID, root *os.Root) ([]EncryptedSecret, map[string]st
 		_ = secretDir.Close()
 	}()
 
-	metadata, err := RestoreMetadata(id, secretDir)
+	metadata, err := RestoreMetadata(secretDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -177,7 +177,7 @@ func RestoreSecret(id store.ID, root *os.Root) ([]EncryptedSecret, map[string]st
 }
 
 // RestoreMetadata reads and unmarshals the [metadataFileName] file
-func RestoreMetadata(id store.ID, secretDir *os.Root) (map[string]string, error) {
+func RestoreMetadata(secretDir *os.Root) (map[string]string, error) {
 	metadataStore, err := secretDir.Open(MetadataFileName)
 	if err != nil {
 		return nil, err
