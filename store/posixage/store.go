@@ -118,7 +118,7 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encryptedSecrets []sec
 			return nil, fmt.Errorf("decryption function of type %s was specified, but the file was never encrypted with this type", keyType)
 		}
 
-		decryptionKey, err := prompt.Call(ctx)
+		decryptionKey, err := prompt.call(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -361,8 +361,8 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 
 type config struct {
 	logger                    logging.Logger
-	registeredDecryptionFunc  []secretfile.PromptCaller
-	registeredEncryptionFuncs []secretfile.PromptCaller
+	registeredDecryptionFunc  []promptCaller
+	registeredEncryptionFuncs []promptCaller
 }
 
 type Options func(c *config) error
@@ -387,7 +387,7 @@ type encryptionFuncs interface {
 // they were added.
 func WithEncryptionCallbackFunc[K encryptionFuncs](callback K) Options {
 	return func(c *config) error {
-		c.registeredEncryptionFuncs = append(c.registeredEncryptionFuncs, secretfile.PromptCaller(callback))
+		c.registeredEncryptionFuncs = append(c.registeredEncryptionFuncs, promptCaller(callback))
 		return nil
 	}
 }
@@ -403,7 +403,7 @@ type decryptionFuncs interface {
 // they were added.
 func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
 	return func(c *config) error {
-		c.registeredDecryptionFunc = append(c.registeredDecryptionFunc, secretfile.PromptCaller(callback))
+		c.registeredDecryptionFunc = append(c.registeredDecryptionFunc, promptCaller(callback))
 		return nil
 	}
 }
