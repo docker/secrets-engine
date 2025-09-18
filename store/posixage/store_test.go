@@ -21,6 +21,7 @@ import (
 
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
+	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
@@ -79,7 +80,7 @@ func TestPOSIXAge(t *testing.T) {
 		secretRoot, err := root.OpenRoot(encodedID)
 		require.NoError(t, err)
 
-		metadataFile, err := secretRoot.ReadFile(metadataFileName)
+		metadataFile, err := secretRoot.ReadFile(secretfile.MetadataFileName)
 		require.NoError(t, err)
 
 		var m map[string]string
@@ -87,7 +88,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		assert.EqualValues(t, secret.Metadata(), m)
 
-		encryptedFile, err := secretRoot.ReadFile(secretFileName + "pass")
+		encryptedFile, err := secretRoot.ReadFile(secretfile.SecretFileName + "pass")
 		require.NoError(t, err)
 
 		unencrypted, err := secret.Marshal()
@@ -95,17 +96,15 @@ func TestPOSIXAge(t *testing.T) {
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []callbackFunc{
+		x.registeredDecryptionFunc = []secretfile.PromptCaller{
 			DecryptionPassword(func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
 		}
-		decryptedFile, err := x.decryptSecret(t.Context(), &secretDirectory{
-			secrets: []secretFile{
-				{
-					fileName:      secretFileName + "pass",
-					encryptedData: encryptedFile,
-				},
+		decryptedFile, err := x.decryptSecret(t.Context(), []secretfile.EncryptedSecret{
+			{
+				KeyType:       secretfile.PasswordKeyType,
+				EncryptedData: encryptedFile,
 			},
 		})
 		require.NoError(t, err)
@@ -314,7 +313,7 @@ func TestPOSIXAge(t *testing.T) {
 		secretRoot, err := root.OpenRoot(encodedID)
 		require.NoError(t, err)
 
-		metadataFile, err := secretRoot.ReadFile(metadataFileName)
+		metadataFile, err := secretRoot.ReadFile(secretfile.MetadataFileName)
 		require.NoError(t, err)
 
 		var m map[string]string
@@ -322,7 +321,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		assert.EqualValues(t, secret.Metadata(), m)
 
-		encryptedFile, err := secretRoot.ReadFile(secretFileName + "pass")
+		encryptedFile, err := secretRoot.ReadFile(secretfile.SecretFileName + "pass")
 		require.NoError(t, err)
 
 		unencrypted, err := secret.Marshal()
@@ -330,17 +329,15 @@ func TestPOSIXAge(t *testing.T) {
 		assert.NotEqual(t, unencrypted, encryptedFile)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []callbackFunc{
+		x.registeredDecryptionFunc = []secretfile.PromptCaller{
 			DecryptionPassword(func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
 		}
-		decryptedFile, err := x.decryptSecret(t.Context(), &secretDirectory{
-			secrets: []secretFile{
-				{
-					fileName:      secretFileName + "pass",
-					encryptedData: encryptedFile,
-				},
+		decryptedFile, err := x.decryptSecret(t.Context(), []secretfile.EncryptedSecret{
+			{
+				KeyType:       secretfile.PasswordKeyType,
+				EncryptedData: encryptedFile,
 			},
 		})
 
@@ -402,7 +399,7 @@ func TestPOSIXAge(t *testing.T) {
 		assert.Len(t, secretFiles, 3)
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredEncryptionFuncs = []callbackFunc{
+		x.registeredEncryptionFuncs = []secretfile.PromptCaller{
 			EncryptionAgeX25519(func(_ context.Context) ([]byte, error) {
 				return []byte(identity.Recipient().String()), nil
 			}),
@@ -467,7 +464,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		x := s.(*fileStore[*mocks.MockCredential])
-		x.registeredDecryptionFunc = []callbackFunc{
+		x.registeredDecryptionFunc = []secretfile.PromptCaller{
 			DecryptionAgeX25519(func(_ context.Context) ([]byte, error) {
 				return []byte(identity.String()), nil
 			}),
@@ -476,7 +473,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, secret, storeSecret)
 
-		x.registeredDecryptionFunc = []callbackFunc{
+		x.registeredDecryptionFunc = []secretfile.PromptCaller{
 			DecryptionSSH(func(_ context.Context) ([]byte, error) {
 				return privatePem, nil
 			}),
@@ -679,115 +676,5 @@ func TestPOSIXAge(t *testing.T) {
 
 		_, err = s.Get(t.Context(), id)
 		assert.ErrorIs(t, err, decryptError)
-	})
-}
-
-func TestSortSecrets(t *testing.T) {
-	t.Run("more callbackFuncs than secrets", func(t *testing.T) {
-		secrets := []secretFile{
-			{
-				fileName: secretFileName + "pass",
-			},
-			{
-				fileName: secretFileName + "ssh",
-			},
-		}
-
-		funcs := []callbackFunc{
-			DecryptionSSH(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-			DecryptionAgeX25519(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-			DecryptionPassword(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-		}
-
-		require.NoError(t, sortSecrets(secrets, funcs))
-		assert.Equal(t, []secretFile{
-			{
-				fileName: secretFileName + "ssh",
-			},
-			{
-				fileName: secretFileName + "pass",
-			},
-		}, secrets)
-	})
-
-	t.Run("more secrets than callbackFuncs", func(t *testing.T) {
-		secrets := []secretFile{
-			{
-				fileName: secretFileName + "ssh",
-			},
-			{
-				fileName: secretFileName + "age",
-			},
-			{
-				fileName: secretFileName + "pass",
-			},
-		}
-
-		funcs := []callbackFunc{
-			DecryptionPassword(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-		}
-
-		require.NoError(t, sortSecrets(secrets, funcs))
-		assert.Equal(t, []secretFile{
-			{
-				fileName: secretFileName + "pass",
-			},
-			{
-				fileName: secretFileName + "age",
-			},
-			{
-				fileName: secretFileName + "ssh",
-			},
-		}, secrets)
-	})
-
-	t.Run("duplicate callbackFuncs are ignored", func(t *testing.T) {
-		secrets := []secretFile{
-			{
-				fileName: secretFileName + "ssh",
-			},
-			{
-				fileName: secretFileName + "age",
-			},
-			{
-				fileName: secretFileName + "pass",
-			},
-		}
-
-		funcs := []callbackFunc{
-			DecryptionSSH(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-			DecryptionAgeX25519(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-			DecryptionSSH(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-			DecryptionPassword(func(_ context.Context) ([]byte, error) {
-				return nil, nil
-			}),
-		}
-
-		require.NoError(t, sortSecrets(secrets, funcs))
-		assert.Equal(t, []secretFile{
-			{
-				fileName: secretFileName + "ssh",
-			},
-			{
-				fileName: secretFileName + "age",
-			},
-			{
-				fileName: secretFileName + "pass",
-			},
-		}, secrets)
 	})
 }

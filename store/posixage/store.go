@@ -13,19 +13,18 @@ package posixage
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"strings"
 	"sync"
 
 	"filippo.io/age"
 
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/posixage/internal/flock"
+	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -37,210 +36,6 @@ type fileStore[T store.Secret] struct {
 }
 
 var _ store.Store = &fileStore[store.Secret]{}
-
-type secretFile struct {
-	fileName      string
-	encryptedData []byte
-}
-
-type secretDirectory struct {
-	// rootName is a base64 encoding of the secret ID
-	rootName string
-	metadata map[string]string
-	secrets  []secretFile
-}
-
-func newSecretDirectory(id store.ID) *secretDirectory {
-	return &secretDirectory{
-		rootName: base64.StdEncoding.EncodeToString([]byte(id.String())),
-	}
-}
-
-const (
-	secretFileName   = "secret"
-	metadataFileName = "metadata.json"
-)
-
-// atomicWrite writes the file to a temporary file first and upon successful write
-// renames the file.
-// This function does not guarantee concurrent writes and does not clean temporary
-// files upon failure.
-func atomicWrite(fs *os.Root, fileName string, data []byte) error {
-	tmpFileName := fileName + ".tmp"
-	tmpFile, err := fs.Create(tmpFileName)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = tmpFile.Close()
-	}()
-
-	if _, err = tmpFile.Write(data); err != nil {
-		return err
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		return err
-	}
-
-	if err := fs.Rename(tmpFileName, fileName); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (f *secretDirectory) rootExists(fs *os.Root) bool {
-	_, err := fs.Stat(f.rootName)
-	return err == nil
-}
-
-// save creates the secret and metadata files inside its own directory.
-// The directory name is a base64 encoded string of the secret ID.
-// If the directory does not exist, it is created.
-// Any failure to write the files will result in the removal of the directory.
-func (f *secretDirectory) save(fs *os.Root) error {
-	// always delete the entire directory.
-	// since we support multiple encryption keys we should keep them synchronized
-	// to prevent some existing files from containing old data.
-	if f.rootExists(fs) {
-		if err := f.delete(fs); err != nil {
-			return err
-		}
-	}
-
-	if err := fs.Mkdir(f.rootName, 0o700); err != nil {
-		return err
-	}
-
-	root, err := fs.OpenRoot(f.rootName)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = root.Close()
-	}()
-
-	meta, err := json.Marshal(f.metadata)
-	if err != nil {
-		return err
-	}
-
-	if err := atomicWrite(root, metadataFileName, meta); err != nil {
-		_ = fs.RemoveAll(f.rootName)
-		return err
-	}
-
-	for _, s := range f.secrets {
-		if err := atomicWrite(root, s.fileName, s.encryptedData); err != nil {
-			_ = fs.RemoveAll(f.rootName)
-			return err
-		}
-	}
-
-	return nil
-}
-
-// delete removes the entire directory including any child directories
-func (f *secretDirectory) delete(fs *os.Root) error {
-	return fs.RemoveAll(f.rootName)
-}
-
-// restore reads the secret and metadata files from its scoped directory
-func (f *secretDirectory) restore(filesystem *os.Root) error {
-	if err := f.restoreMetadata(filesystem); err != nil {
-		return err
-	}
-
-	root, err := filesystem.OpenRoot(f.rootName)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = root.Close()
-	}()
-
-	files, err := fs.ReadDir(root.FS(), ".")
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		if !strings.HasPrefix(file.Name(), secretFileName) {
-			continue
-		}
-		encryptedData, err := root.ReadFile(file.Name())
-		if err != nil {
-			continue
-		}
-		sec := secretFile{
-			fileName:      file.Name(),
-			encryptedData: encryptedData,
-		}
-		f.secrets = append(f.secrets, sec)
-	}
-
-	return nil
-}
-
-func (f *secretDirectory) restoreMetadata(fs *os.Root) error {
-	root, err := fs.OpenRoot(f.rootName)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = root.Close()
-	}()
-
-	metadataStore, err := root.Open(metadataFileName)
-	if err != nil {
-		return err
-	}
-	defer metadataStore.Close()
-
-	b, err := io.ReadAll(metadataStore)
-	if err != nil {
-		return err
-	}
-
-	var metadata map[string]string
-	if err := json.Unmarshal(b, &metadata); err != nil {
-		return err
-	}
-
-	f.metadata = metadata
-
-	return nil
-}
-
-// sortSecrets sorts the secrets in order of callback funcs
-func sortSecrets(secrets []secretFile, registeredFuncs []callbackFunc) error {
-	// sort the secrets in order of callback funcs
-	alreadyMatched := map[keyType]struct{}{}
-	var secretsIdx int
-	for _, registeredFunc := range registeredFuncs {
-		k, err := getCallbackFuncName(registeredFunc)
-		if err != nil {
-			return err
-		}
-		if _, ok := alreadyMatched[k]; ok {
-			continue
-		}
-		for i := range secrets {
-			// get the keyType and match it against the callbackFunc keyType
-			if string(k) == strings.TrimPrefix(secrets[i].fileName, secretFileName) {
-				alreadyMatched[k] = struct{}{}
-				secrets[secretsIdx], secrets[i] = secrets[i], secrets[secretsIdx]
-				secretsIdx++
-				break
-			}
-		}
-	}
-	return nil
-}
 
 // tryLock is an internal convenience function for acquiring an exclusive
 // store lock.
@@ -292,38 +87,51 @@ func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 	}), nil
 }
 
-func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirectory) ([]byte, error) {
-	group, err := groupCallbackFuncs(ctx, f.registeredDecryptionFunc)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := sortSecrets(encSecret.secrets, f.registeredDecryptionFunc); err != nil {
-		return nil, err
-	}
-
-	for _, s := range encSecret.secrets {
-		var identities []age.Identity
-		groupType := keyType(strings.TrimPrefix(s.fileName, secretFileName))
-
-		values, ok := group[groupType]
-		if !ok {
-			f.logger.Warnf("decryption callback func not registered for key type %s", groupType)
-			continue
-		}
-
-		for _, v := range values {
-			identity, err := getIdentity(groupType, v)
-			if err != nil {
-				return nil, err
-			}
-			identities = append(identities, identity)
-		}
-
-		r, err := age.Decrypt(bytes.NewReader(s.encryptedData), identities...)
+// decryptSecret attempts to decrypt a secret using the registered
+// [secretfile.PromptCaller] functions.
+//
+// For each registered decryption function, the method:
+//  1. Determines the associated [secretfile.KeyType].
+//  2. Checks if an encrypted secret with the same key type exists.
+//  3. Prompts for a decryption key via the callback.
+//  4. Builds an identity and attempts decryption.
+//
+// The first successful decryption returns the plaintext secret. If no
+// matching secret file is found for a registered key type, or if all
+// decryption attempts fail, an error is returned.
+func (f *fileStore[T]) decryptSecret(ctx context.Context, encryptedSecrets []secretfile.EncryptedSecret) ([]byte, error) {
+	for _, prompt := range f.registeredDecryptionFunc {
+		keyType, err := getPromptCallerKeyType(prompt)
 		if err != nil {
-			f.logger.Errorf("decryption failed using key type %s with secret %s", groupType, encSecret.rootName)
 			return nil, err
+		}
+
+		index := -1
+		for i, v := range encryptedSecrets {
+			if v.KeyType == keyType {
+				index = i
+				break
+			}
+		}
+
+		if index == -1 {
+			return nil, fmt.Errorf("decryption function of type %s was specified, but the file was never encrypted with this type", keyType)
+		}
+
+		decryptionKey, err := prompt.Call(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		identity, err := secretfile.GetIdentity(keyType, string(decryptionKey))
+		if err != nil {
+			return nil, err
+		}
+
+		r, err := age.Decrypt(bytes.NewReader(encryptedSecrets[index].EncryptedData), identity)
+		if err != nil {
+			f.logger.Errorf("failed to decrypt secret of type :%s", keyType)
+			continue
 		}
 
 		decryptedSecret, err := io.ReadAll(r)
@@ -334,7 +142,7 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encSecret *secretDirec
 		return decryptedSecret, nil
 	}
 
-	return nil, errors.New("could not decrypt secret with provided keys")
+	return nil, errors.New("could not decrypt secret with provided decryption keys")
 }
 
 func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {
@@ -344,8 +152,7 @@ func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}
 	defer unlock()
 
-	encFile := newSecretDirectory(id)
-	return encFile.delete(f.filesystem)
+	return f.filesystem.RemoveAll(secretfile.IDToDirName(id))
 }
 
 func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
@@ -355,55 +162,60 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 	}
 	defer unlock()
 
-	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
-	if err != nil {
-		return nil, err
-	}
-	if len(fsDirectories) == 0 {
-		return nil, store.ErrCredentialNotFound
-	}
-
-	secrets := make(map[store.ID]store.Secret)
-	for _, dir := range fsDirectories {
-		if !dir.IsDir() {
-			continue
+	secrets := map[store.ID]store.Secret{}
+	err = fs.WalkDir(f.filesystem.FS(), ".", func(_ string, d fs.DirEntry, _ error) error {
+		// skip files, we are only interested in directories
+		if !d.IsDir() || d.Name() == "." {
+			return nil
 		}
 
-		s, err := base64.StdEncoding.DecodeString(dir.Name())
+		id, err := secretfile.DirNameToID(d.Name())
+		// we want to continue to the next directory
+		// don't stop because a directory does not conform to the
+		// secrets.ID
 		if err != nil {
-			return nil, err
-		}
-		id, err := store.ParseID(string(s))
-		if err != nil {
-			continue
+			f.logger.Warnf("could not parse secret ID from directory %s", d.Name())
+			return fs.SkipDir
 		}
 
+		// a pattern mismatch means we should move on to the next secret
+		// or directory in this case.
 		if !pattern.Match(id) {
-			continue
+			return fs.SkipDir
 		}
 
-		encFile := &secretDirectory{
-			rootName: dir.Name(),
-		}
-
-		if err := encFile.restore(f.filesystem); err != nil {
-			continue
-		}
-
-		decryptedSecret, err := f.decryptSecret(ctx, encFile)
+		encryptedSecrets, metadata, err := secretfile.RestoreSecret(id, f.filesystem)
+		// an error on restoring a secret should not prevent others from
+		// being read, let's just log and continue
 		if err != nil {
-			return nil, err
+			f.logger.Errorf("could not restore secret: %s. Got error: %s", id.String(), err)
+			return fs.SkipDir
+		}
+
+		decryptedSecret, err := f.decryptSecret(ctx, encryptedSecrets)
+		// perhaps an incorrect decryption key was given?
+		// we should abort here.
+		if err != nil {
+			return err
 		}
 
 		secret := f.factory()
-		if err := secret.SetMetadata(encFile.metadata); err != nil {
-			return nil, err
+		if err := secret.SetMetadata(metadata); err != nil {
+			return err
 		}
 		if err := secret.Unmarshal(decryptedSecret); err != nil {
-			return nil, err
+			return err
 		}
 		secrets[id] = secret
+
+		// WalkDir should skip the files in the current directory.
+		// it should move on to the next directory.
+		return fs.SkipDir
+	})
+	if err != nil {
+		return nil, err
 	}
+
 	if len(secrets) == 0 {
 		return nil, store.ErrCredentialNotFound
 	}
@@ -417,19 +229,18 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 	}
 	defer unlock()
 
-	encFile := newSecretDirectory(id)
-
-	if err := encFile.restore(f.filesystem); err != nil {
+	encryptedSecrets, metadata, err := secretfile.RestoreSecret(id, f.filesystem)
+	if err != nil {
 		return nil, err
 	}
 
-	decryptedSecret, err := f.decryptSecret(ctx, encFile)
+	decryptedSecret, err := f.decryptSecret(ctx, encryptedSecrets)
 	if err != nil {
 		return nil, err
 	}
 
 	secret := f.factory()
-	if err := secret.SetMetadata(encFile.metadata); err != nil {
+	if err := secret.SetMetadata(metadata); err != nil {
 		return nil, err
 	}
 	if err := secret.Unmarshal(decryptedSecret); err != nil {
@@ -445,43 +256,46 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 	}
 	defer unlock()
 
-	fsDirectories, err := fs.ReadDir(f.filesystem.FS(), ".")
-	if err != nil {
-		return nil, err
-	}
-	if len(fsDirectories) == 0 {
-		return nil, store.ErrCredentialNotFound
-	}
-
 	secrets := map[store.ID]store.Secret{}
-	for _, dir := range fsDirectories {
-		if !dir.IsDir() {
-			continue
+	err = fs.WalkDir(f.filesystem.FS(), ".", func(path string, d fs.DirEntry, _ error) error {
+		// skip files, we are only interested in directories
+		if !d.IsDir() || d.Name() == "." {
+			return nil
 		}
 
-		s, err := base64.StdEncoding.DecodeString(dir.Name())
+		id, err := secretfile.DirNameToID(d.Name())
+		// just continue to the next item, we don't want to stop because
+		// a directory failed to get decoded to a secrets.ID.
 		if err != nil {
-			return nil, err
+			f.logger.Warnf("could not parse directory name (%s) to secret ID: %s", path, err)
+			return fs.SkipDir
 		}
 
-		id, err := store.ParseID(string(s))
+		secretDir, err := f.filesystem.OpenRoot(d.Name())
 		if err != nil {
-			continue
+			return err
 		}
+		defer func() {
+			_ = secretDir.Close()
+		}()
 
-		encFile := secretDirectory{
-			rootName: dir.Name(),
-		}
-
-		if err := encFile.restoreMetadata(f.filesystem); err != nil {
-			return nil, err
+		metadata, err := secretfile.RestoreMetadata(id, secretDir)
+		if err != nil {
+			return err
 		}
 
 		secret := f.factory()
-		if err := secret.SetMetadata(encFile.metadata); err != nil {
-			return nil, err
+		if err := secret.SetMetadata(metadata); err != nil {
+			return err
 		}
 		secrets[id] = secret
+
+		// WalkDir should skip the files in the current directory.
+		// it should move on to the next directory.
+		return fs.SkipDir
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if len(secrets) == 0 {
@@ -497,28 +311,28 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	}
 	defer unlock()
 
-	groups, err := groupCallbackFuncs(ctx, f.registeredEncryptionFuncs)
+	// we need to get the encryption keys from the caller, this is a blocking
+	// call and we must wait for the caller to cancel the ctx or wait for the
+	// user to complete the interaction.
+	keyGroups, err := promptForEncryptionKeys(ctx, f.registeredEncryptionFuncs)
 	if err != nil {
 		return err
 	}
 
-	val, err := s.Marshal()
+	secret, err := s.Marshal()
 	if err != nil {
 		return err
 	}
 	metadata := s.Metadata()
 
-	var secrets []secretFile
-	for g, values := range groups {
-		fileName := secretFileName + string(g)
-
-		var recipients []age.Recipient
-		for _, value := range values {
-			recipient, err := getRecipient(g, value)
-			if err != nil {
-				return err
-			}
-			recipients = append(recipients, recipient)
+	var secrets []secretfile.EncryptedSecret
+	// each encryption key must be be used within its group - age does not
+	// support multiple encryption keys of different types, (e.g. age + password)
+	// however, multiple encryption keys of the same type can be used (e.g. password + password)
+	for k, encryptionKeys := range keyGroups {
+		recipients, err := secretfile.GetRecipients(k, encryptionKeys)
+		if err != nil {
+			return err
 		}
 
 		var encryptedSecret bytes.Buffer
@@ -526,34 +340,29 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = w.Close()
-		}()
 
-		if _, err := w.Write(val); err != nil {
+		if _, err := w.Write(secret); err != nil {
 			return err
 		}
 
+		// encrypt the last chunk and flush to our buffer, this must be called.
 		if err := w.Close(); err != nil {
 			return err
 		}
 
-		secrets = append(secrets, secretFile{
-			fileName:      fileName,
-			encryptedData: encryptedSecret.Bytes(),
+		secrets = append(secrets, secretfile.EncryptedSecret{
+			KeyType:       k,
+			EncryptedData: encryptedSecret.Bytes(),
 		})
 	}
 
-	encFile := newSecretDirectory(id)
-	encFile.metadata = metadata
-	encFile.secrets = secrets
-	return encFile.save(f.filesystem)
+	return secretfile.Persist(id, f.filesystem, metadata, secrets)
 }
 
 type config struct {
 	logger                    logging.Logger
-	registeredDecryptionFunc  []callbackFunc
-	registeredEncryptionFuncs []callbackFunc
+	registeredDecryptionFunc  []secretfile.PromptCaller
+	registeredEncryptionFuncs []secretfile.PromptCaller
 }
 
 type Options func(c *config) error
@@ -578,7 +387,7 @@ type encryptionFuncs interface {
 // they were added.
 func WithEncryptionCallbackFunc[K encryptionFuncs](callback K) Options {
 	return func(c *config) error {
-		c.registeredEncryptionFuncs = append(c.registeredEncryptionFuncs, callbackFunc(callback))
+		c.registeredEncryptionFuncs = append(c.registeredEncryptionFuncs, secretfile.PromptCaller(callback))
 		return nil
 	}
 }
@@ -594,7 +403,7 @@ type decryptionFuncs interface {
 // they were added.
 func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
 	return func(c *config) error {
-		c.registeredDecryptionFunc = append(c.registeredDecryptionFunc, callbackFunc(callback))
+		c.registeredDecryptionFunc = append(c.registeredDecryptionFunc, secretfile.PromptCaller(callback))
 		return nil
 	}
 }
