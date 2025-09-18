@@ -14,14 +14,6 @@ type (
 	PromptFunc func(context.Context) ([]byte, error)
 )
 
-type PromptCaller interface {
-	Call(context.Context) ([]byte, error)
-}
-
-func (k PromptFunc) Call(ctx context.Context) ([]byte, error) {
-	return k(ctx)
-}
-
 type KeyType string
 
 const (

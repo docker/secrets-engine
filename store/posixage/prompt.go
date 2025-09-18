@@ -21,31 +21,35 @@ type (
 	DecryptionPassword secretfile.PromptFunc
 )
 
-func (ep EncryptionPassword) Call(ctx context.Context) ([]byte, error) {
+type promptCaller interface {
+	call(context.Context) ([]byte, error)
+}
+
+func (ep EncryptionPassword) call(ctx context.Context) ([]byte, error) {
 	return ep(ctx)
 }
 
-func (ea EncryptionAgeX25519) Call(ctx context.Context) ([]byte, error) {
+func (ea EncryptionAgeX25519) call(ctx context.Context) ([]byte, error) {
 	return ea(ctx)
 }
 
-func (es EncryptionSSH) Call(ctx context.Context) ([]byte, error) {
+func (es EncryptionSSH) call(ctx context.Context) ([]byte, error) {
 	return es(ctx)
 }
 
-func (da DecryptionAgeX25519) Call(ctx context.Context) ([]byte, error) {
+func (da DecryptionAgeX25519) call(ctx context.Context) ([]byte, error) {
 	return da(ctx)
 }
 
-func (ds DecryptionSSH) Call(ctx context.Context) ([]byte, error) {
+func (ds DecryptionSSH) call(ctx context.Context) ([]byte, error) {
 	return ds(ctx)
 }
 
-func (dp DecryptionPassword) Call(ctx context.Context) ([]byte, error) {
+func (dp DecryptionPassword) call(ctx context.Context) ([]byte, error) {
 	return dp(ctx)
 }
 
-func getPromptCallerKeyType(f secretfile.PromptCaller) (secretfile.KeyType, error) {
+func getPromptCallerKeyType(f promptCaller) (secretfile.KeyType, error) {
 	switch f.(type) {
 	case EncryptionPassword:
 		return secretfile.PasswordKeyType, nil
@@ -64,7 +68,7 @@ func getPromptCallerKeyType(f secretfile.PromptCaller) (secretfile.KeyType, erro
 	}
 }
 
-// promptForEncryptionKeys invokes each registered [secretfile.PromptCaller]
+// promptForEncryptionKeys invokes each registered [promptCaller]
 // to collect encryption keys, grouped by their [secretfile.KeyType].
 //
 // Each callback is called in order. The returned key is trimmed of whitespace
@@ -74,7 +78,7 @@ func getPromptCallerKeyType(f secretfile.PromptCaller) (secretfile.KeyType, erro
 //
 // It returns an error if any callback fails, if the key type cannot be
 // determined, or if a callback returns an empty key.
-func promptForEncryptionKeys(ctx context.Context, funcs []secretfile.PromptCaller) (map[secretfile.KeyType][]string, error) {
+func promptForEncryptionKeys(ctx context.Context, funcs []promptCaller) (map[secretfile.KeyType][]string, error) {
 	m := map[secretfile.KeyType][]string{}
 	for _, f := range funcs {
 		groupType, err := getPromptCallerKeyType(f)
@@ -82,7 +86,7 @@ func promptForEncryptionKeys(ctx context.Context, funcs []secretfile.PromptCalle
 			return nil, err
 		}
 
-		raw, err := f.Call(ctx)
+		raw, err := f.call(ctx)
 		if err != nil {
 			return nil, err
 		}
