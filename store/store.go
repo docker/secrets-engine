@@ -77,3 +77,5 @@ type Store interface {
 	// an early return with a nil secrets map.
 	Filter(ctx context.Context, pattern Pattern) (map[ID]Secret, error)
 }
+
+type Factory[T Secret] func() T
