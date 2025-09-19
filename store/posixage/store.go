@@ -51,6 +51,7 @@ func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 
 	unlock, err := flock.TryLock(ctx, f.filesystem)
 	if err != nil {
+		f.l.Unlock()
 		return nil, err
 	}
 
@@ -76,6 +77,7 @@ func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 
 	unlock, err := flock.TryRLock(ctx, f.filesystem)
 	if err != nil {
+		f.l.RUnlock()
 		return nil, err
 	}
 
