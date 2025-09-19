@@ -29,7 +29,8 @@ var (
 	MustNewVersion   = api.MustNewVersion
 	NewDefaultLogger = logging.NewDefaultLogger
 
-	NotifyContext = oshelper.NotifyContext
+	NotifyContext     = oshelper.NotifyContext
+	DefaultSocketPath = api.DefaultSocketPath
 )
 
 const (
