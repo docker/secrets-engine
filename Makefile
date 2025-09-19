@@ -20,6 +20,15 @@ else
 	DOCKER_MYSECRET_DST = $(HOME)/.docker/cli-plugins/$(MYSECRET_BINARY)$(EXTENSION)
 endif
 
+define cross-package
+	@echo packaging $(1)
+	tar -C dist/linux_amd64 -czf dist/$(1)-linux-amd64.tar.gz $(1)
+	tar -C dist/linux_arm64 -czf dist/$(1)-linux-arm64.tar.gz $(1)
+	tar -C dist/darwin_amd64 -czf dist/$(1)-darwin-amd64.tar.gz $(1)
+	tar -C dist/darwin_arm64 -czf dist/$(1)-darwin-arm64.tar.gz $(1)
+	tar -C dist/windows_amd64 -czf dist/$(1)-windows-amd64.tar.gz $(1).exe
+	tar -C dist/windows_arm64 -czf dist/$(1)-windows-arm64.tar.gz $(1).exe
+endef
 
 # golangci-lint must be pinned - linters can become more strict on upgrade
 GOLANGCI_LINT_VERSION := v2.4.0
@@ -98,13 +107,8 @@ mysecret:
 mysecret-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
-mysecret-package: mysecret-cross ## Cross compile and package the host client binaries
-	tar -C dist/linux_amd64 -czf dist/$(MYSECRET_BINARY)-linux-amd64.tar.gz $(MYSECRET_BINARY)
-	tar -C dist/linux_arm64 -czf dist/$(MYSECRET_BINARY)-linux-arm64.tar.gz $(MYSECRET_BINARY)
-	tar -C dist/darwin_amd64 -czf dist/$(MYSECRET_BINARY)-darwin-amd64.tar.gz $(MYSECRET_BINARY)
-	tar -C dist/darwin_arm64 -czf dist/$(MYSECRET_BINARY)-darwin-arm64.tar.gz $(MYSECRET_BINARY)
-	tar -C dist/windows_amd64 -czf dist/$(MYSECRET_BINARY)-windows-amd64.tar.gz $(MYSECRET_BINARY).exe
-	tar -C dist/windows_arm64 -czf dist/$(MYSECRET_BINARY)-windows-arm64.tar.gz $(MYSECRET_BINARY).exe
+mysecret-package: mysecret-cross
+	$(call cross-package,$(MYSECRET_BINARY))
 
 engine:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
@@ -115,13 +119,8 @@ engine-cross: multiarch-builder
 		--platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 \
 		-o ./dist .
 
-engine-package: engine-cross ## Cross compile and package the host client binaries
-	tar -C dist/linux_amd64 -czf dist/$(ENGINE_BINARY)-linux-amd64.tar.gz $(ENGINE_BINARY)
-	tar -C dist/linux_arm64 -czf dist/$(ENGINE_BINARY)-linux-arm64.tar.gz $(ENGINE_BINARY)
-	tar -C dist/darwin_amd64 -czf dist/$(ENGINE_BINARY)-darwin-amd64.tar.gz $(ENGINE_BINARY)
-	tar -C dist/darwin_arm64 -czf dist/$(ENGINE_BINARY)-darwin-arm64.tar.gz $(ENGINE_BINARY)
-	tar -C dist/windows_amd64 -czf dist/$(ENGINE_BINARY)-windows-amd64.tar.gz $(ENGINE_BINARY).exe
-	tar -C dist/windows_arm64 -czf dist/$(ENGINE_BINARY)-windows-arm64.tar.gz $(ENGINE_BINARY).exe
+engine-package: engine-cross
+	$(call cross-package,$(ENGINE_BINARY))
 
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
@@ -129,13 +128,8 @@ nri-plugin:
 nri-plugin-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-nri-plugin --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
-nri-plugin-package: nri-plugin-cross ## Cross compile and package the host client binaries
-	tar -C dist/linux_amd64 -czf dist/$(NRI_PLUGIN_BINARY)-linux-amd64.tar.gz $(NRI_PLUGIN_BINARY)
-	tar -C dist/linux_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-linux-arm64.tar.gz $(NRI_PLUGIN_BINARY)
-	tar -C dist/darwin_amd64 -czf dist/$(NRI_PLUGIN_BINARY)-darwin-amd64.tar.gz $(NRI_PLUGIN_BINARY)
-	tar -C dist/darwin_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-darwin-arm64.tar.gz $(NRI_PLUGIN_BINARY)
-	tar -C dist/windows_amd64 -czf dist/$(NRI_PLUGIN_BINARY)-windows-amd64.tar.gz $(NRI_PLUGIN_BINARY).exe
-	tar -C dist/windows_arm64 -czf dist/$(NRI_PLUGIN_BINARY)-windows-arm64.tar.gz $(NRI_PLUGIN_BINARY).exe
+nri-plugin-package: nri-plugin-cross
+	$(call cross-package,$(NRI_PLUGIN_BINARY))
 
 proto-generate:
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-generate .
