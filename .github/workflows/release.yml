@@ -55,14 +55,3 @@ jobs:
           tag: ${{ env.TAG }}
           commit: ${{ env.BRANCH }}
           generateReleaseNotes: true
-      - name: Create module tags
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag client/${TAG}
-          git tag engine/${TAG}
-          git tag mysecret/${TAG}
-          git tag plugin/${TAG}
-          git tag store/${TAG}
-      - name: Push tags
-        run: git push origin --tags
