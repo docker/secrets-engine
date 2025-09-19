@@ -22,8 +22,30 @@ import (
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
+	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
+
+type testLogger struct {
+	t *testing.T
+}
+
+// Errorf implements logging.Logger.
+func (t *testLogger) Errorf(format string, v ...any) {
+	t.t.Logf(format, v...)
+}
+
+// Printf implements logging.Logger.
+func (t *testLogger) Printf(format string, v ...any) {
+	t.t.Logf(format, v...)
+}
+
+// Warnf implements logging.Logger.
+func (t *testLogger) Warnf(format string, v ...any) {
+	t.t.Logf(format, v...)
+}
+
+var _ logging.Logger = &testLogger{}
 
 func onlyDirs(f fs.FS) ([]fs.DirEntry, error) {
 	var dirs []fs.DirEntry
@@ -51,6 +73,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -123,6 +146,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -161,6 +185,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -218,6 +243,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -278,6 +304,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -360,6 +387,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -438,6 +466,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -504,6 +533,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -575,6 +605,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte(masterKey), nil
 			}),
@@ -623,6 +654,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return nil, encryptError
 			}),
@@ -655,6 +687,7 @@ func TestPOSIXAge(t *testing.T) {
 			func() *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
+			WithLogger(&testLogger{t}),
 			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
 				return []byte("a-password"), nil
 			}),
