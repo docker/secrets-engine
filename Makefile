@@ -107,6 +107,14 @@ engine-cross: multiarch-builder
 		--platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 \
 		-o ./dist .
 
+engine-package: engine-cross ## Cross compile and package the host client binaries
+	tar -C dist/linux_amd64 -czf dist/$(ENGINE_BINARY)-linux-amd64.tar.gz $(ENGINE_BINARY)
+	tar -C dist/linux_arm64 -czf dist/$(ENGINE_BINARY)-linux-arm64.tar.gz $(ENGINE_BINARY)
+	tar -C dist/darwin_amd64 -czf dist/$(ENGINE_BINARY)-darwin-amd64.tar.gz $(ENGINE_BINARY)
+	tar -C dist/darwin_arm64 -czf dist/$(ENGINE_BINARY)-darwin-arm64.tar.gz $(ENGINE_BINARY)
+	tar -C dist/windows_amd64 -czf dist/$(ENGINE_BINARY)-windows-amd64.tar.gz $(ENGINE_BINARY).exe
+	tar -C dist/windows_arm64 -czf dist/$(ENGINE_BINARY)-windows-arm64.tar.gz $(ENGINE_BINARY).exe
+
 nri-plugin:
 	CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o ./dist/$(NRI_PLUGIN_BINARY)$(EXTENSION) ./cmd/nri-plugin
 

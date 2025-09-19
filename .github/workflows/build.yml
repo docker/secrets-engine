@@ -63,7 +63,7 @@ jobs:
           install: true
 
       - name: Build secrets engine daemon
-        run: make BUILDER=${{ steps.buildx.outputs.name }} engine-cross
+        run: make BUILDER=${{ steps.buildx.outputs.name }} engine-package
 
   nri-plugin:
     name: Build NRI Plugin
