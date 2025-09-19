@@ -98,6 +98,14 @@ mysecret:
 mysecret-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
+mysecret-package: mysecret-cross ## Cross compile and package the host client binaries
+	tar -C dist/linux_amd64 -czf dist/$(MYSECRET_BINARY)-linux-amd64.tar.gz $(MYSECRET_BINARY)
+	tar -C dist/linux_arm64 -czf dist/$(MYSECRET_BINARY)-linux-arm64.tar.gz $(MYSECRET_BINARY)
+	tar -C dist/darwin_amd64 -czf dist/$(MYSECRET_BINARY)-darwin-amd64.tar.gz $(MYSECRET_BINARY)
+	tar -C dist/darwin_arm64 -czf dist/$(MYSECRET_BINARY)-darwin-arm64.tar.gz $(MYSECRET_BINARY)
+	tar -C dist/windows_amd64 -czf dist/$(MYSECRET_BINARY)-windows-amd64.tar.gz $(MYSECRET_BINARY).exe
+	tar -C dist/windows_arm64 -czf dist/$(MYSECRET_BINARY)-windows-arm64.tar.gz $(MYSECRET_BINARY).exe
+
 engine:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
 
