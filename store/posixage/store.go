@@ -328,9 +328,10 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	metadata := s.Metadata()
 
 	var secrets []secretfile.EncryptedSecret
-	// each encryption key must be be used within its group - age does not
-	// support multiple encryption keys of different types, (e.g. age + password)
-	// however, multiple encryption keys of the same type can be used (e.g. password + password)
+	// Encryption keys must be grouped by type. The age library does not
+	// support mixing different key types in a single encryption operation
+	// (e.g., age + password). However, multiple keys of the same type are
+	// allowed (e.g., password + password).
 	for k, encryptionKeys := range keyGroups {
 		recipients, err := secretfile.GetRecipients(k, encryptionKeys)
 		if err != nil {
@@ -347,7 +348,7 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 			return err
 		}
 
-		// encrypt the last chunk and flush to our buffer, this must be called.
+		// Finalize encryption and flush all data into the buffer.
 		if err := w.Close(); err != nil {
 			return err
 		}
