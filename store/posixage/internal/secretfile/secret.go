@@ -102,7 +102,7 @@ func Persist(id store.ID, root *os.Root, metadata map[string]string, secrets []E
 	}
 
 	var err error
-	// remove the secre directory if any error occurs
+	// remove the secret directory if any error occurs
 	defer func() {
 		if err != nil {
 			_ = root.RemoveAll(secretDirName)

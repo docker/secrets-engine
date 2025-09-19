@@ -1,6 +1,6 @@
 # Store posixage
 
-The posixage store is a POSIX compliant encrypted file store. It uses [age](https://github.com/filoSottile/age)
+The posixage store is a POSIX compliant encrypted file store. It uses [age](https://github.com/FiloSottile/age)
 to encrypt/decrypt its files and has support for password, ssh and age keys.
 
 ## Quickstart
