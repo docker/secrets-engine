@@ -8,6 +8,7 @@ Supported stores include:
 - Linux keychain (gnome-keyring and kdewallet)
 - macOS keychain
 - windows credential management API
+- file encryption via [age](https://github.com/filoSottile/age)
 
 ## Local Testing
 

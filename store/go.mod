@@ -8,6 +8,7 @@ go 1.25
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
+	filippo.io/age v1.2.1
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/danieljoos/wincred v1.2.2
 	github.com/docker/secrets-engine/x v0.0.3-do.not.use
@@ -21,6 +22,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

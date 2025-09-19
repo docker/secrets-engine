@@ -17,8 +17,6 @@ type keychainStore[T store.Secret] struct {
 
 var _ store.Store = &keychainStore[store.Secret]{}
 
-type Factory[T store.Secret] func() T
-
 // New creates a new keychain store.
 //
 // It takes ServiceGroup and ServiceName and a [Factory] as input.
@@ -42,7 +40,7 @@ type Factory[T store.Secret] func() T
 // Changing the service name can be done, but would require migrating existing credentials.
 //
 // [Factory] is a function used to instantiate new secrets of type T.
-func New[T store.Secret](serviceGroup, serviceName string, factory Factory[T]) (store.Store, error) {
+func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory[T]) (store.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")
 	}
