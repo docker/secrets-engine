@@ -122,12 +122,14 @@ func Persist(id store.ID, root *os.Root, metadata map[string]string, secrets []E
 		return err
 	}
 
-	if err := atomicWrite(secretDir, MetadataFileName, meta); err != nil {
+	err = atomicWrite(secretDir, MetadataFileName, meta)
+	if err != nil {
 		return err
 	}
 
 	for _, s := range secrets {
-		if err := atomicWrite(secretDir, SecretFileName+string(s.KeyType), s.EncryptedData); err != nil {
+		err = atomicWrite(secretDir, SecretFileName+string(s.KeyType), s.EncryptedData)
+		if err != nil {
 			return err
 		}
 	}
