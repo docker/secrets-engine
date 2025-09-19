@@ -34,7 +34,7 @@ jobs:
           install: true
 
       - name: Build docker-mysecret Plugin
-        run: make BUILDER=${{ steps.buildx.outputs.name }} mysecret-cross
+        run: make BUILDER=${{ steps.buildx.outputs.name }} mysecret-package
 
   engine:
     name: Build secrets engine daemon binary
