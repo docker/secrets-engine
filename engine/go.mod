@@ -23,7 +23,7 @@ require (
 	github.com/docker/secrets-engine/mysecret v0.0.10
 	github.com/docker/secrets-engine/plugin v0.0.10
 	github.com/docker/secrets-engine/store v0.0.10
-	github.com/docker/secrets-engine/x v0.0.3-do.not.use
+	github.com/docker/secrets-engine/x v0.0.4-do.not.use
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.38.0
