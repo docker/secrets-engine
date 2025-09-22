@@ -16,11 +16,8 @@ const (
 )
 
 func DefaultSocketPath() string {
-	if dir := os.Getenv("XDG_RUNTIME_DIR"); dir != "" {
-		return filepath.Join(dir, "secrets-engine", "engine.sock")
+	if dir, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(dir, "docker-secrets-engine", "engine.sock")
 	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".cache", "secrets-engine", "engine.sock")
-	}
-	return filepath.Join(os.TempDir(), "secrets-engine", "engine.sock")
+	return filepath.Join(os.TempDir(), "docker-secrets-engine", "engine.sock")
 }
