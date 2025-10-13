@@ -24,11 +24,13 @@ require (
 	github.com/docker/secrets-engine/plugin v0.0.15
 	github.com/docker/secrets-engine/store v0.0.12
 	github.com/docker/secrets-engine/x v0.0.5-do.not.use
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
+	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
 	google.golang.org/protobuf v1.36.8
 )

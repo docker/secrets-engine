@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	unsafe "unsafe"
@@ -532,6 +533,240 @@ func (b0 GetSecretsResponse_builder) Build() *GetSecretsResponse {
 	return m0
 }
 
+type GetCAResponse struct {
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_CaCertificate *string                `protobuf:"bytes,1,opt,name=ca_certificate,json=caCertificate"`
+	XXX_raceDetectHookData   protoimpl.RaceDetectHookData
+	XXX_presence             [1]uint32
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *GetCAResponse) Reset() {
+	*x = GetCAResponse{}
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCAResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCAResponse) ProtoMessage() {}
+
+func (x *GetCAResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *GetCAResponse) GetCaCertificate() string {
+	if x != nil {
+		if x.xxx_hidden_CaCertificate != nil {
+			return *x.xxx_hidden_CaCertificate
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *GetCAResponse) SetCaCertificate(v string) {
+	x.xxx_hidden_CaCertificate = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *GetCAResponse) HasCaCertificate() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *GetCAResponse) ClearCaCertificate() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_CaCertificate = nil
+}
+
+type GetCAResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	CaCertificate *string
+}
+
+func (b0 GetCAResponse_builder) Build() *GetCAResponse {
+	m0 := &GetCAResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.CaCertificate != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_CaCertificate = b.CaCertificate
+	}
+	return m0
+}
+
+type SignCertRequest struct {
+	state                         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_CertificateRequest *string                `protobuf:"bytes,1,opt,name=certificate_request,json=certificateRequest"`
+	XXX_raceDetectHookData        protoimpl.RaceDetectHookData
+	XXX_presence                  [1]uint32
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *SignCertRequest) Reset() {
+	*x = SignCertRequest{}
+	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignCertRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignCertRequest) ProtoMessage() {}
+
+func (x *SignCertRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *SignCertRequest) GetCertificateRequest() string {
+	if x != nil {
+		if x.xxx_hidden_CertificateRequest != nil {
+			return *x.xxx_hidden_CertificateRequest
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *SignCertRequest) SetCertificateRequest(v string) {
+	x.xxx_hidden_CertificateRequest = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *SignCertRequest) HasCertificateRequest() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *SignCertRequest) ClearCertificateRequest() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_CertificateRequest = nil
+}
+
+type SignCertRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	CertificateRequest *string
+}
+
+func (b0 SignCertRequest_builder) Build() *SignCertRequest {
+	m0 := &SignCertRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.CertificateRequest != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_CertificateRequest = b.CertificateRequest
+	}
+	return m0
+}
+
+type SignCertResponse struct {
+	state                        protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SignedCertificate *string                `protobuf:"bytes,1,opt,name=signed_certificate,json=signedCertificate"`
+	XXX_raceDetectHookData       protoimpl.RaceDetectHookData
+	XXX_presence                 [1]uint32
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
+}
+
+func (x *SignCertResponse) Reset() {
+	*x = SignCertResponse{}
+	mi := &file_resolver_v1_api_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignCertResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignCertResponse) ProtoMessage() {}
+
+func (x *SignCertResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_resolver_v1_api_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *SignCertResponse) GetSignedCertificate() string {
+	if x != nil {
+		if x.xxx_hidden_SignedCertificate != nil {
+			return *x.xxx_hidden_SignedCertificate
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *SignCertResponse) SetSignedCertificate(v string) {
+	x.xxx_hidden_SignedCertificate = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+}
+
+func (x *SignCertResponse) HasSignedCertificate() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *SignCertResponse) ClearSignedCertificate() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_SignedCertificate = nil
+}
+
+type SignCertResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	SignedCertificate *string
+}
+
+func (b0 SignCertResponse_builder) Build() *SignCertResponse {
+	m0 := &SignCertResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.SignedCertificate != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		x.xxx_hidden_SignedCertificate = b.SignedCertificate
+	}
+	return m0
+}
+
 type GetSecretsResponse_Envelope struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Id          *string                `protobuf:"bytes,1,opt,name=id"`
@@ -549,7 +784,7 @@ type GetSecretsResponse_Envelope struct {
 
 func (x *GetSecretsResponse_Envelope) Reset() {
 	*x = GetSecretsResponse_Envelope{}
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -561,7 +796,7 @@ func (x *GetSecretsResponse_Envelope) String() string {
 func (*GetSecretsResponse_Envelope) ProtoMessage() {}
 
 func (x *GetSecretsResponse_Envelope) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +1025,7 @@ var File_resolver_v1_api_proto protoreflect.FileDescriptor
 
 const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x15resolver/v1/api.proto\x12\vresolver.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\"_\n" +
+	"\x15resolver/v1/api.proto\x12\vresolver.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\"_\n" +
 	"\x15RegisterPluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
@@ -816,17 +1051,26 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\vresolved_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"resolvedAt\x129\n" +
 	"\n" +
-	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2j\n" +
+	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"6\n" +
+	"\rGetCAResponse\x12%\n" +
+	"\x0eca_certificate\x18\x01 \x01(\tR\rcaCertificate\"B\n" +
+	"\x0fSignCertRequest\x12/\n" +
+	"\x13certificate_request\x18\x01 \x01(\tR\x12certificateRequest\"A\n" +
+	"\x10SignCertResponse\x12-\n" +
+	"\x12signed_certificate\x18\x01 \x01(\tR\x11signedCertificate2j\n" +
 	"\rEngineService\x12Y\n" +
 	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2X\n" +
 	"\rPluginService\x12G\n" +
 	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponse2`\n" +
 	"\x0fResolverService\x12M\n" +
 	"\n" +
-	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponseB\xa7\x01\n" +
+	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponse2\x98\x01\n" +
+	"\vCertService\x12@\n" +
+	"\x05GetCA\x12\x16.google.protobuf.Empty\x1a\x1a.resolver.v1.GetCAResponse\"\x03\x90\x02\x01\x12G\n" +
+	"\bSignCert\x12\x1c.resolver.v1.SignCertRequest\x1a\x1d.resolver.v1.SignCertResponseB\xa7\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z=github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
-var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_resolver_v1_api_proto_goTypes = []any{
 	(*RegisterPluginRequest)(nil),       // 0: resolver.v1.RegisterPluginRequest
 	(*RegisterPluginResponse)(nil),      // 1: resolver.v1.RegisterPluginResponse
@@ -834,27 +1078,35 @@ var file_resolver_v1_api_proto_goTypes = []any{
 	(*ShutdownResponse)(nil),            // 3: resolver.v1.ShutdownResponse
 	(*GetSecretsRequest)(nil),           // 4: resolver.v1.GetSecretsRequest
 	(*GetSecretsResponse)(nil),          // 5: resolver.v1.GetSecretsResponse
-	(*GetSecretsResponse_Envelope)(nil), // 6: resolver.v1.GetSecretsResponse.Envelope
-	(*durationpb.Duration)(nil),         // 7: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),       // 8: google.protobuf.Timestamp
+	(*GetCAResponse)(nil),               // 6: resolver.v1.GetCAResponse
+	(*SignCertRequest)(nil),             // 7: resolver.v1.SignCertRequest
+	(*SignCertResponse)(nil),            // 8: resolver.v1.SignCertResponse
+	(*GetSecretsResponse_Envelope)(nil), // 9: resolver.v1.GetSecretsResponse.Envelope
+	(*durationpb.Duration)(nil),         // 10: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),       // 11: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),               // 12: google.protobuf.Empty
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	7, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
-	6, // 1: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
-	8, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
-	8, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
-	8, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 5: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	2, // 6: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	4, // 7: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
-	1, // 8: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 9: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	5, // 10: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	10, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
+	9,  // 1: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
+	11, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
+	11, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
+	11, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
+	2,  // 6: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4,  // 7: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
+	12, // 8: resolver.v1.CertService.GetCA:input_type -> google.protobuf.Empty
+	7,  // 9: resolver.v1.CertService.SignCert:input_type -> resolver.v1.SignCertRequest
+	1,  // 10: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3,  // 11: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5,  // 12: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
+	6,  // 13: resolver.v1.CertService.GetCA:output_type -> resolver.v1.GetCAResponse
+	8,  // 14: resolver.v1.CertService.SignCert:output_type -> resolver.v1.SignCertResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }
@@ -868,9 +1120,9 @@ func file_resolver_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   10,
 			NumExtensions: 0,
-			NumServices:   3,
+			NumServices:   4,
 		},
 		GoTypes:           file_resolver_v1_api_proto_goTypes,
 		DependencyIndexes: file_resolver_v1_api_proto_depIdxs,

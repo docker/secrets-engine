@@ -4,6 +4,7 @@ package resolver.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1";
 
@@ -68,4 +69,22 @@ message GetSecretsResponse {
 
     google.protobuf.Timestamp expires_at = 7;
   }
+}
+
+service CertService {
+  rpc GetCA(google.protobuf.Empty) returns (GetCAResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
+  rpc SignCert(SignCertRequest) returns (SignCertResponse);
+}
+
+message GetCAResponse {
+  string ca_certificate = 1;
+}
+
+message SignCertRequest {
+  string certificate_request = 1;
+}
+message SignCertResponse {
+  string signed_certificate = 1;
 }

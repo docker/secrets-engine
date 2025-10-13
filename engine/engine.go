@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -38,19 +41,29 @@ type engineImpl struct {
 	close func() error
 }
 
-func newEngine(ctx context.Context, cfg config) (engine, error) {
+func newEngine(ctx context.Context, config config) (engine, error) {
+	cfg := &config
 	plan := wrapBuiltins(ctx, cfg.logger, getPluginShutdownTimeout(), cfg.plugins)
 	if !cfg.enginePluginsDisabled {
-		morePlugins, err := wrapExternalPlugins(cfg)
+		morePlugins, err := wrapExternalPlugins(*cfg)
 		if err != nil {
 			return nil, err
 		}
 		plan = append(plan, morePlugins...)
 	}
 	reg := newManager(cfg.logger)
-	h := syncedParallelLaunch(ctx, cfg, reg, plan)
+	h := syncedParallelLaunch(ctx, *cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
-	server := newServer(cfg, reg)
+	server, err := newServer(cfg, reg)
+	if err != nil {
+		return nil, err
+	}
+	tlsConf, err := newTLS()
+	if err != nil {
+		return nil, err
+	}
+	// wrap the listener to always have TLS
+	cfg.listener = tls.NewListener(cfg.listener, tlsConf)
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
@@ -240,37 +253,15 @@ func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func newServer(cfg config, reg registry) *http.Server {
-	httpMux := http.NewServeMux()
-	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	r := newRegResolver(cfg.logger, cfg.tracker, reg)
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
-	if !cfg.dynamicPluginsDisabled {
-		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
-			span := trace.SpanFromContext(ctx)
-			launcher := launcher(func() (runtime, error) {
-				return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
-			})
-			errDone, err := register(logging.WithLogger(ctx, cfg.logger), reg, launcher)
-			if err != nil {
-				cfg.logger.Errorf("registering dynamic plugin: %v", err)
-			}
-			select {
-			case <-ctx.Done():
-			case err := <-errDone:
-				if err != nil && !errors.Is(err, context.Canceled) {
-					span.RecordError(err, trace.WithAttributes(attribute.String("phase", "external_plugin_disconnected")))
-					cfg.logger.Errorf("external plugin '%s' stopped: %v", cfg.name, err)
-				}
-			}
-		}))
+func newServer(cfg *config, reg registry) (*http.Server, error) {
+	mux := chi.NewRouter()
+	if err := addRoutes(mux, cfg, reg); err != nil {
+		return nil, err
 	}
+
 	return &http.Server{
-		Handler: httpMux,
-	}
+		Handler: mux,
+	}, nil
 }
 
 func createListener(socketPath string) (net.Listener, error) {
@@ -283,4 +274,95 @@ func createListener(socketPath string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to create socket %q: %w", socketPath, err)
 	}
 	return l, nil
+}
+
+func healthRoute() (string, http.Handler) {
+	return "/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+}
+
+func addRoutes(mux *chi.Mux, cfg *config, reg registry) error {
+	checkCertCfg := &checkCertMiddlewareConfig{
+		logger:        cfg.logger,
+		allowedRoutes: []string{},
+	}
+	mux.Use(checkCertMiddleware(checkCertCfg))
+
+	certService, err := resolver.NewCertificateService(cfg.logger)
+	if err != nil {
+		return err
+	}
+
+	publicRoutes := []func() (string, http.Handler){
+		healthRoute,
+		func() (string, http.Handler) {
+			path, h := resolverv1connect.NewCertServiceHandler(certService)
+			return path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				cfg.logger.Printf("Got a request on route: %s", r.URL.Path)
+				h.ServeHTTP(w, r)
+			})
+		},
+	}
+
+	for _, f := range publicRoutes {
+		path, h := f()
+		cfg.logger.Printf("registering public route: %s", path)
+		checkCertCfg.allowedRoutes = append(checkCertCfg.allowedRoutes, path)
+
+		// routes that end on the forward-slash '/' indicate that they handle sub-routes
+		// themselves. In an http.ServeMux it would match any route with such a
+		// prefix, but in go-chi/chi we need a wildcard '*'
+		if strings.HasSuffix(path, "/") {
+			path = path + "*"
+		}
+		mux.Handle(path, h)
+	}
+
+	r := newRegResolver(cfg.logger, cfg.tracker, reg)
+
+	protectedRoutes := []func() (string, http.Handler){
+		func() (string, http.Handler) {
+			return resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r))
+		},
+	}
+
+	if !cfg.dynamicPluginsDisabled {
+		protectedRoutes = append(protectedRoutes,
+			func() (string, http.Handler) {
+				return ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
+					span := trace.SpanFromContext(ctx)
+					launcher := launcher(func() (runtime, error) {
+						return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
+					})
+					errDone, err := register(logging.WithLogger(ctx, cfg.logger), reg, launcher)
+					if err != nil {
+						cfg.logger.Errorf("registering dynamic plugin: %v", err)
+					}
+					select {
+					case <-ctx.Done():
+					case err := <-errDone:
+						if err != nil && !errors.Is(err, context.Canceled) {
+							span.RecordError(err, trace.WithAttributes(attribute.String("phase", "external_plugin_disconnected")))
+							cfg.logger.Errorf("external plugin '%s' stopped: %v", cfg.name, err)
+						}
+					}
+				})
+			})
+	}
+
+	for _, f := range protectedRoutes {
+		path, h := f()
+		cfg.logger.Printf("registering protected route: %s", path)
+		// routes that end on the forward-slash '/' indicate that they handle sub-routes
+		// themselves. In an http.ServeMux it would match any route with such a
+		// prefix, but in go-chi/chi we need a wildcard '*'
+		if strings.HasSuffix(path, "/") {
+			path = path + "*"
+		}
+		mux.Handle(path, h)
+	}
+
+	return nil
 }

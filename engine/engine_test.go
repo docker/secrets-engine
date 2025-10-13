@@ -2,21 +2,27 @@ package engine
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"iter"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/x/api"
+	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/telemetry"
@@ -398,6 +404,43 @@ func Test_newEngine(t *testing.T) {
 		require.NotEmpty(t, mySecret)
 		assert.Equal(t, "my-secret", mySecret[0].ID.String())
 		assert.Equal(t, "some-value", string(mySecret[0].Value))
+	})
+	t.Run("engine endpoints are protected by mTLS", func(t *testing.T) {
+		plugins := []testdummy.PluginBehaviour{{Value: "foo"}}
+		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
+		socketPath := testhelper.RandomShortSocketName()
+		cfg := config{
+			name:       "test-engine",
+			version:    "v6",
+			pluginPath: dir,
+			listener:   newListener(t, socketPath),
+			logger:     testhelper.TestLogger(t),
+			maxTries:   1,
+			tracker:    telemetry.NoopTracker(),
+		}
+		e, err := newEngine(testLoggerCtx(t), cfg)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, e.Close()) })
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.ElementsMatch(collect, e.Plugins(), []string{"plugin-foo"})
+		}, 2*time.Second, 100*time.Millisecond)
+		c := resolverv1connect.NewResolverServiceClient(&http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					d := &net.Dialer{}
+					return d.DialContext(ctx, "unix", socketPath)
+				},
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}, "https://unix")
+
+		req := connect.NewRequest(v1.GetSecretsRequest_builder{
+			Pattern: proto.String("foo"),
+		}.Build())
+		_, err = c.GetSecrets(t.Context(), req)
+		require.ErrorContains(t, err, "permission_denied: 403 Forbidden")
 	})
 }
 

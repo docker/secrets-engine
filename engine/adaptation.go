@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -91,6 +92,7 @@ type config struct {
 	maxTries               uint
 	upCb                   func(ctx context.Context) error
 	tracker                telemetry.Tracker
+	certPool               *x509.CertPool
 }
 
 // Option to apply to the secrets engine.

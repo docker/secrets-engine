@@ -9,6 +9,7 @@ import (
 	context "context"
 	errors "errors"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
 )
@@ -27,6 +28,8 @@ const (
 	PluginServiceName = "resolver.v1.PluginService"
 	// ResolverServiceName is the fully-qualified name of the ResolverService service.
 	ResolverServiceName = "resolver.v1.ResolverService"
+	// CertServiceName is the fully-qualified name of the CertService service.
+	CertServiceName = "resolver.v1.CertService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -45,6 +48,10 @@ const (
 	// ResolverServiceGetSecretsProcedure is the fully-qualified name of the ResolverService's
 	// GetSecrets RPC.
 	ResolverServiceGetSecretsProcedure = "/resolver.v1.ResolverService/GetSecrets"
+	// CertServiceGetCAProcedure is the fully-qualified name of the CertService's GetCA RPC.
+	CertServiceGetCAProcedure = "/resolver.v1.CertService/GetCA"
+	// CertServiceSignCertProcedure is the fully-qualified name of the CertService's SignCert RPC.
+	CertServiceSignCertProcedure = "/resolver.v1.CertService/SignCert"
 )
 
 // EngineServiceClient is a client for the resolver.v1.EngineService service.
@@ -261,4 +268,102 @@ type UnimplementedResolverServiceHandler struct{}
 
 func (UnimplementedResolverServiceHandler) GetSecrets(context.Context, *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ResolverService.GetSecrets is not implemented"))
+}
+
+// CertServiceClient is a client for the resolver.v1.CertService service.
+type CertServiceClient interface {
+	GetCA(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetCAResponse], error)
+	SignCert(context.Context, *connect.Request[v1.SignCertRequest]) (*connect.Response[v1.SignCertResponse], error)
+}
+
+// NewCertServiceClient constructs a client for the resolver.v1.CertService service. By default, it
+// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
+// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
+// connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewCertServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) CertServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	certServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("CertService").Methods()
+	return &certServiceClient{
+		getCA: connect.NewClient[emptypb.Empty, v1.GetCAResponse](
+			httpClient,
+			baseURL+CertServiceGetCAProcedure,
+			connect.WithSchema(certServiceMethods.ByName("GetCA")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		signCert: connect.NewClient[v1.SignCertRequest, v1.SignCertResponse](
+			httpClient,
+			baseURL+CertServiceSignCertProcedure,
+			connect.WithSchema(certServiceMethods.ByName("SignCert")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// certServiceClient implements CertServiceClient.
+type certServiceClient struct {
+	getCA    *connect.Client[emptypb.Empty, v1.GetCAResponse]
+	signCert *connect.Client[v1.SignCertRequest, v1.SignCertResponse]
+}
+
+// GetCA calls resolver.v1.CertService.GetCA.
+func (c *certServiceClient) GetCA(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetCAResponse], error) {
+	return c.getCA.CallUnary(ctx, req)
+}
+
+// SignCert calls resolver.v1.CertService.SignCert.
+func (c *certServiceClient) SignCert(ctx context.Context, req *connect.Request[v1.SignCertRequest]) (*connect.Response[v1.SignCertResponse], error) {
+	return c.signCert.CallUnary(ctx, req)
+}
+
+// CertServiceHandler is an implementation of the resolver.v1.CertService service.
+type CertServiceHandler interface {
+	GetCA(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetCAResponse], error)
+	SignCert(context.Context, *connect.Request[v1.SignCertRequest]) (*connect.Response[v1.SignCertResponse], error)
+}
+
+// NewCertServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewCertServiceHandler(svc CertServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	certServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("CertService").Methods()
+	certServiceGetCAHandler := connect.NewUnaryHandler(
+		CertServiceGetCAProcedure,
+		svc.GetCA,
+		connect.WithSchema(certServiceMethods.ByName("GetCA")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	certServiceSignCertHandler := connect.NewUnaryHandler(
+		CertServiceSignCertProcedure,
+		svc.SignCert,
+		connect.WithSchema(certServiceMethods.ByName("SignCert")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/resolver.v1.CertService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case CertServiceGetCAProcedure:
+			certServiceGetCAHandler.ServeHTTP(w, r)
+		case CertServiceSignCertProcedure:
+			certServiceSignCertHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedCertServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedCertServiceHandler struct{}
+
+func (UnimplementedCertServiceHandler) GetCA(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.GetCAResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.CertService.GetCA is not implemented"))
+}
+
+func (UnimplementedCertServiceHandler) SignCert(context.Context, *connect.Request[v1.SignCertRequest]) (*connect.Response[v1.SignCertResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.CertService.SignCert is not implemented"))
 }
