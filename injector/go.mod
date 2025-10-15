@@ -2,7 +2,7 @@ module github.com/docker/secrets-engine/injector
 
 go 1.25
 
-require github.com/docker/docker v28.3.3+incompatible
+require github.com/docker/docker v28.5.1+incompatible
 
 require (
 	github.com/docker/go-connections v0.6.0 // indirect
