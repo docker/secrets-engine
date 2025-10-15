@@ -76,6 +76,7 @@ unit-tests:
 	err=0; \
 	go test -trimpath -race -v $(shell go list ./client/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./injector/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./x/...)      & pids="$$pids $$!"; \

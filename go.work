@@ -4,6 +4,7 @@ use (
 	./client
 	./cmd/nri-plugin
 	./engine
+	./injector
 	./mysecret
 	./plugin
 	./store
