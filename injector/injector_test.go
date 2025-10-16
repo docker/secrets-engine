@@ -91,7 +91,7 @@ func Test_resolveENV(t *testing.T) {
 		},
 		{
 			name: "no value but invalid key",
-			key:  "MY/VAR",
+			key:  "MY/*/VAR",
 		},
 		{
 			name:   "value but not a secrets engine path",
