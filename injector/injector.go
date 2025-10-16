@@ -70,18 +70,31 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 	return string(result[0].Value), nil
 }
 
-type ContainCreateRewriter struct {
+type ContainerCreateRewriter struct {
 	r *resolver
 }
 
-func New(logger logging.Logger, options ...client.Option) (*ContainCreateRewriter, error) {
+func New(logger logging.Logger, options ...client.Option) (*ContainerCreateRewriter, error) {
 	resolver, err := newResolver(logger, options...)
 	if err != nil {
 		return nil, err
 	}
-	return &ContainCreateRewriter{r: resolver}, nil
+	return &ContainerCreateRewriter{r: resolver}, nil
 }
 
-func (r *ContainCreateRewriter) ContainerCreateRequestRewrite(context.Context, *container.CreateRequest) error {
+func (r *ContainerCreateRewriter) ContainerCreateRequestRewrite(ctx context.Context, req *container.CreateRequest) error {
+	if req.Config == nil {
+		return nil
+	}
+	var resolvedEnvList []string
+	for _, env := range req.Env {
+		key, val, _ := strings.Cut(env, "=")
+		resolved, err := r.r.resolveENV(ctx, key, val)
+		if err != nil {
+			return err
+		}
+		resolvedEnvList = append(resolvedEnvList, key+"="+resolved)
+	}
+	req.Env = resolvedEnvList
 	return nil
 }

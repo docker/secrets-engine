@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -131,4 +132,27 @@ func Test_resolveENV(t *testing.T) {
 			assert.Equal(t, tt.result, value)
 		})
 	}
+}
+
+func mockedRewriter(t *testing.T) ContainerCreateRewriter {
+	t.Helper()
+	return ContainerCreateRewriter{r: &resolver{logger: testhelper.TestLogger(t), resolver: &mockInternalPlugin{secrets: map[secrets.ID]string{
+		secrets.MustParseID("FOO"): "some-value",
+		secrets.MustParseID("BAR"): "baz",
+	}}}}
+}
+
+func Test_ContainerCreateRequestRewrite(t *testing.T) {
+	t.Run("no config", func(t *testing.T) {
+		r := mockedRewriter(t)
+		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), &container.CreateRequest{}))
+	})
+	t.Run("no errors", func(t *testing.T) {
+		r := mockedRewriter(t)
+		req := &container.CreateRequest{
+			Config: &container.Config{Env: []string{"FOO", "something", "GH_TOKEN=", "BAR=foo", "BAZ=se://FOO"}},
+		}
+		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), req))
+		assert.Equal(t, []string{"FOO=some-value", "something=", "GH_TOKEN=", "BAR=foo", "BAZ=some-value"}, req.Env)
+	})
 }
