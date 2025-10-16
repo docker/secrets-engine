@@ -45,10 +45,14 @@ func newResolver(logger logging.Logger, options ...client.Option) (*resolver, er
 }
 
 func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, error) {
+	if value != "" && !strings.HasPrefix(value, prefix) {
+		return value, nil
+	}
+
 	withNoErrLegacyFallback := func(err error) error {
 		if value == "" {
 			// If the value was empty, but we tried to resolve the key to a secret and failed
-			// that should never return an error -> we stay backwards compatible
+			// that should never return an error -> we remain backwards compatible
 			return nil
 		}
 		return err
@@ -58,22 +62,13 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 		return "", withNoErrLegacyFallback(ErrInvalidEnvName)
 	}
 
-	var pattern secrets.Pattern
-	var err error
-	switch {
-	case value == "":
-		pattern, err = secrets.ParsePattern(key)
-		if err != nil {
-			r.logger.Printf("%s has no value but is not a valid secret ID (%s) -> cannot resolve", key, err)
-			return "", nil
-		}
-	case strings.HasPrefix(value, prefix):
-		pattern, err = secrets.ParsePattern(strings.TrimPrefix(value, prefix))
-		if err != nil {
-			return "", err
-		}
-	default:
-		return value, nil
+	v := value
+	if v == "" {
+		v = key
+	}
+	pattern, err := secrets.ParsePattern(strings.TrimPrefix(v, prefix))
+	if err != nil {
+		return "", withNoErrLegacyFallback(err)
 	}
 
 	result, err := r.resolver.GetSecrets(ctx, pattern)
@@ -114,7 +109,13 @@ func (r *ContainerCreateRewriter) ContainerCreateRequestRewrite(ctx context.Cont
 		if err != nil {
 			return err
 		}
-		resolvedEnvList = append(resolvedEnvList, key+"="+resolved)
+		if resolved == "" {
+			// If no error and nothing got resolved (it means val is empty)
+			// keep everything as is (and do not add a '=' character!)
+			resolvedEnvList = append(resolvedEnvList, env)
+		} else {
+			resolvedEnvList = append(resolvedEnvList, key+"="+resolved)
+		}
 	}
 	req.Env = resolvedEnvList
 	return nil

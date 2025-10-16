@@ -150,9 +150,17 @@ func Test_ContainerCreateRequestRewrite(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
 		r := mockedRewriter(t)
 		req := &container.CreateRequest{
-			Config: &container.Config{Env: []string{"FOO", "something", "GH_TOKEN=", "BAR=foo", "BAZ=se://FOO"}},
+			Config: &container.Config{Env: []string{"FOO", "BAZ=se://FOO"}},
 		}
 		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), req))
-		assert.Equal(t, []string{"FOO=some-value", "something=", "GH_TOKEN=", "BAR=foo", "BAZ=some-value"}, req.Env)
+		assert.Equal(t, []string{"FOO=some-value", "BAZ=some-value"}, req.Env)
+	})
+	t.Run("invariant if no secrets", func(t *testing.T) {
+		r := mockedRewriter(t)
+		req := &container.CreateRequest{
+			Config: &container.Config{Env: []string{"something", "GH_TOKEN=", "B*/R", "B/A/R = space before"}},
+		}
+		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), req))
+		assert.Equal(t, []string{"something", "GH_TOKEN=", "B*/R", "B/A/R = space before"}, req.Env)
 	})
 }
