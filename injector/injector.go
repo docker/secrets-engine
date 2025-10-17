@@ -20,6 +20,8 @@ type Option = client.Option
 var (
 	WithSocketPath = client.WithSocketPath
 	WithTimeout    = client.WithTimeout
+
+	ErrSecretNotFound = secrets.ErrNotFound
 )
 
 var ErrInvalidEnvName = errors.New("invalid environment variable name")

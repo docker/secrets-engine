@@ -58,6 +58,8 @@ var (
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
 	NewVersion       = api.NewVersion
+
+	ErrSecretNotFound = secrets.ErrNotFound
 )
 
 type Config struct {

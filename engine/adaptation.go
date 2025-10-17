@@ -31,6 +31,8 @@ var (
 
 	NotifyContext     = oshelper.NotifyContext
 	DefaultSocketPath = api.DefaultSocketPath
+
+	ErrSecretNotFound = secrets.ErrNotFound
 )
 
 const (
