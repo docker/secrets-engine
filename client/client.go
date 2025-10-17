@@ -28,6 +28,8 @@ var (
 
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
+
+	ErrSecretNotFound = secrets.ErrNotFound
 )
 
 var _ secrets.Resolver = &client{}
