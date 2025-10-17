@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/http"
 	"time"
@@ -32,22 +31,17 @@ var (
 
 var _ secrets.Resolver = &client{}
 
-type Option func(c *config) error
+type Option func(c *config)
 
 func WithSocketPath(path string) Option {
-	return func(s *config) error {
-		if path == "" {
-			return errors.New("no path provided")
-		}
+	return func(s *config) {
 		s.socketPath = path
-		return nil
 	}
 }
 
 func WithTimeout(timeout time.Duration) Option {
-	return func(s *config) error {
+	return func(s *config) {
 		s.requestTimeout = timeout
-		return nil
 	}
 }
 
@@ -60,15 +54,13 @@ type client struct {
 	resolverClient resolverv1connect.ResolverServiceClient
 }
 
-func New(options ...Option) (secrets.Resolver, error) {
+func New(options ...Option) secrets.Resolver {
 	cfg := &config{
 		socketPath:     api.DefaultSocketPath(),
 		requestTimeout: api.DefaultPluginRequestTimeout,
 	}
 	for _, opt := range options {
-		if err := opt(cfg); err != nil {
-			return nil, err
-		}
+		opt(cfg)
 	}
 	c := &http.Client{
 		Transport: &http.Transport{
@@ -83,7 +75,7 @@ func New(options ...Option) (secrets.Resolver, error) {
 	}
 	return &client{
 		resolverClient: resolverv1connect.NewResolverServiceClient(c, "http://unix"),
-	}, nil
+	}
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {

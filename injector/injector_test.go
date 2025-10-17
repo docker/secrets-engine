@@ -121,8 +121,7 @@ func Test_resolveENV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			socketPath := testEngine(t)
-			r, err := newResolver(testhelper.TestLogger(t), client.WithSocketPath(socketPath))
-			require.NoError(t, err)
+			r := newResolver(testhelper.TestLogger(t), client.WithSocketPath(socketPath))
 			value, err := r.resolveENV(t.Context(), tt.key, tt.value)
 			if tt.err != nil {
 				assert.Error(t, err)

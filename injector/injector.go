@@ -33,15 +33,11 @@ type resolver struct {
 	resolver secrets.Resolver
 }
 
-func newResolver(logger logging.Logger, options ...client.Option) (*resolver, error) {
-	c, err := client.New(options...)
-	if err != nil {
-		return nil, err
-	}
+func newResolver(logger logging.Logger, options ...client.Option) *resolver {
 	return &resolver{
 		logger:   logger,
-		resolver: c,
-	}, nil
+		resolver: client.New(options...),
+	}
 }
 
 func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, error) {
@@ -90,12 +86,8 @@ type ContainerCreateRewriter struct {
 	r *resolver
 }
 
-func New(logger logging.Logger, options ...client.Option) (*ContainerCreateRewriter, error) {
-	resolver, err := newResolver(logger, options...)
-	if err != nil {
-		return nil, err
-	}
-	return &ContainerCreateRewriter{r: resolver}, nil
+func New(logger logging.Logger, options ...client.Option) *ContainerCreateRewriter {
+	return &ContainerCreateRewriter{r: newResolver(logger, options...)}
 }
 
 func (r *ContainerCreateRewriter) ContainerCreateRequestRewrite(ctx context.Context, req *container.CreateRequest) error {

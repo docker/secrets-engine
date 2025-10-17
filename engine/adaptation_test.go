@@ -34,9 +34,7 @@ func testEngine(t *testing.T) (secrets.Resolver, string) {
 		WithPlugins(map[Config]Plugin{
 			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 		}))
-	c, err := client.New(client.WithSocketPath(socketPath))
-	require.NoError(t, err)
-	return c, socketPath
+	return client.New(client.WithSocketPath(socketPath)), socketPath
 }
 
 func Test_SecretsEngine(t *testing.T) {
@@ -173,9 +171,8 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				options = append(options, test.extraOption)
 			}
 			runEngineAsync(t, "test-engine", "test-version", options...)
-			c, err := client.New(client.WithSocketPath(socketPath))
-			require.NoError(t, err)
-			_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
+			c := client.New(client.WithSocketPath(socketPath))
+			_, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 			if test.shouldGetSecretFromExternalPlugin {
 				assert.NoError(t, err)
 			} else {
