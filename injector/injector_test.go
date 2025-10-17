@@ -136,10 +136,14 @@ func Test_resolveENV(t *testing.T) {
 
 func mockedRewriter(t *testing.T) ContainerCreateRewriter {
 	t.Helper()
-	return ContainerCreateRewriter{r: &resolver{logger: testhelper.TestLogger(t), resolver: &mockInternalPlugin{secrets: map[secrets.ID]string{
-		secrets.MustParseID("FOO"): "some-value",
-		secrets.MustParseID("BAR"): "baz",
-	}}}}
+	return ContainerCreateRewriter{r: &resolver{
+		logger: testhelper.TestLogger(t),
+		resolver: &mockInternalPlugin{secrets: map[secrets.ID]string{
+			secrets.MustParseID("FOO"): "some-value",
+			secrets.MustParseID("BAR"): "baz",
+		}},
+		envsResolved: int64counter("foo"),
+	}}
 }
 
 func Test_ContainerCreateRequestRewrite(t *testing.T) {
