@@ -15,6 +15,13 @@ import (
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
+type Option = client.Option
+
+var (
+	WithSocketPath = client.WithSocketPath
+	WithTimeout    = client.WithTimeout
+)
+
 var ErrInvalidEnvName = errors.New("invalid environment variable name")
 
 const (
