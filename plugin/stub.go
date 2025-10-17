@@ -18,6 +18,7 @@ type (
 	Envelope = secrets.Envelope
 
 	Version = api.Version
+	ID      = secrets.ID
 	Pattern = secrets.Pattern
 	Logger  = logging.Logger
 )
@@ -55,6 +56,8 @@ type stub struct {
 }
 
 var (
+	ParseID          = secrets.ParseID
+	MustParseID      = secrets.MustParseID
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
 	NewVersion       = api.NewVersion
