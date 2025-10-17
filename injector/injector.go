@@ -6,6 +6,9 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/logging"
@@ -17,7 +20,17 @@ var ErrInvalidEnvName = errors.New("invalid environment variable name")
 const (
 	prefix               = "se://"
 	illegalEnvCharacters = `!@#$%^&*()-+=\{}[]|;:'",<>?/ `
+	name                 = "secrets-engine-injector"
 )
+
+func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {
+	reqs, err := otel.Meter(name).Int64Counter(counter, opts...)
+	if err != nil {
+		otel.Handle(err)
+		reqs, _ = noop.NewMeterProvider().Meter(name).Int64Counter(counter, opts...)
+	}
+	return reqs
+}
 
 func hasIllegalChars(env string) bool {
 	for _, c := range illegalEnvCharacters {
@@ -29,8 +42,9 @@ func hasIllegalChars(env string) bool {
 }
 
 type resolver struct {
-	logger   logging.Logger
-	resolver secrets.Resolver
+	logger       logging.Logger
+	resolver     secrets.Resolver
+	envsResolved metric.Int64Counter
 }
 
 func newResolver(logger logging.Logger, options ...client.Option) (*resolver, error) {
@@ -41,6 +55,9 @@ func newResolver(logger logging.Logger, options ...client.Option) (*resolver, er
 	return &resolver{
 		logger:   logger,
 		resolver: c,
+		envsResolved: int64counter("secrets.injector.env",
+			metric.WithDescription("Total secrets in env injected by the injector client."),
+			metric.WithUnit("{injection}")),
 	}, nil
 }
 
@@ -57,6 +74,13 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 		}
 		return err
 	}
+	getSecrets := func(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+		result, err := r.resolver.GetSecrets(ctx, pattern)
+		if err == nil {
+			r.envsResolved.Add(ctx, 1)
+		}
+		return result, err
+	}
 
 	if hasIllegalChars(key) {
 		return "", withNoErrLegacyFallback(ErrInvalidEnvName)
@@ -71,7 +95,7 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 		return "", withNoErrLegacyFallback(err)
 	}
 
-	result, err := r.resolver.GetSecrets(ctx, pattern)
+	result, err := getSecrets(ctx, pattern)
 	if err != nil {
 		if value == "" && !errors.Is(err, secrets.ErrNotFound) {
 			r.logger.Errorf("resolving ENV %s to secret: %s", key, err)
