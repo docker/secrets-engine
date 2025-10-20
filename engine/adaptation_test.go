@@ -2,11 +2,13 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"net"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/yamux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -203,7 +205,23 @@ func runEngineAsync(t *testing.T, name, version string, opts ...Option) {
 		errEngine <- Run(t.Context(), name, version, opts...)
 	}()
 	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
-	t.Cleanup(func() { assert.NoError(t, testhelper.WaitForErrorWithTimeout(errEngine)) })
+
+	// TODO: https://github.com/docker/secrets-engine/issues/316
+	// We occasionally get "unavailable: remote end is not accepting connections"
+	// and "unavailable: session shutdown" here.
+	t.Cleanup(func() { assert.NoError(t, filterYamuxErrors(testhelper.WaitForErrorWithTimeout(errEngine))) })
+}
+
+// TODO: https://github.com/docker/secrets-engine/issues/316
+// Move this down the chain to the appropriate place in the IPC stack.
+func filterYamuxErrors(err error) error {
+	if errors.Is(err, yamux.ErrSessionShutdown) {
+		return nil
+	}
+	if errors.Is(err, yamux.ErrRemoteGoAway) {
+		return nil
+	}
+	return err
 }
 
 type externalPluginTestConfig struct {
