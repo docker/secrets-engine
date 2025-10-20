@@ -18,8 +18,9 @@ import (
 type Option = client.Option
 
 var (
-	WithSocketPath = client.WithSocketPath
-	WithTimeout    = client.WithTimeout
+	WithSocketPath  = client.WithSocketPath
+	WithDialContext = client.WithDialContext
+	WithTimeout     = client.WithTimeout
 
 	ErrSecretNotFound = secrets.ErrNotFound
 )

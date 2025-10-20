@@ -9,6 +9,8 @@ replace github.com/docker/secrets-engine/client => ../client
 
 replace github.com/docker/secrets-engine/engine => ../engine
 
+replace github.com/docker/secrets-engine/plugin => ../plugin
+
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
@@ -27,7 +29,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/plugin v0.0.11 // indirect
+	github.com/docker/secrets-engine/plugin v0.0.14 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
