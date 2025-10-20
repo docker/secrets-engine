@@ -61,7 +61,7 @@ var (
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
 	NewVersion       = api.NewVersion
-	MustNewVersion   = api.NewVersion
+	MustNewVersion   = api.MustNewVersion
 
 	ErrSecretNotFound = secrets.ErrNotFound
 )
