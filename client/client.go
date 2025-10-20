@@ -41,7 +41,20 @@ func WithSocketPath(path string) Option {
 		if path == "" {
 			return errors.New("no path provided")
 		}
-		s.socketPath = path
+		if s.dialContext != nil {
+			return errors.New("cannot set socket path and dial")
+		}
+		s.dialContext = dialFromPath(path)
+		return nil
+	}
+}
+
+func WithDialContext(dialContext func(ctx context.Context, network, addr string) (net.Conn, error)) Option {
+	return func(s *config) error {
+		if s.dialContext != nil {
+			return errors.New("cannot set socket path and dial")
+		}
+		s.dialContext = dialContext
 		return nil
 	}
 }
@@ -53,8 +66,10 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
+type dial func(ctx context.Context, network, addr string) (net.Conn, error)
+
 type config struct {
-	socketPath     string
+	dialContext    dial
 	requestTimeout time.Duration
 }
 
@@ -64,7 +79,6 @@ type client struct {
 
 func New(options ...Option) (secrets.Resolver, error) {
 	cfg := &config{
-		socketPath:     api.DefaultSocketPath(),
 		requestTimeout: api.DefaultPluginRequestTimeout,
 	}
 	for _, opt := range options {
@@ -72,12 +86,12 @@ func New(options ...Option) (secrets.Resolver, error) {
 			return nil, err
 		}
 	}
+	if cfg.dialContext == nil {
+		cfg.dialContext = dialFromPath(api.DefaultSocketPath())
+	}
 	c := &http.Client{
 		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				d := &net.Dialer{}
-				return d.DialContext(ctx, "unix", cfg.socketPath)
-			},
+			DialContext:        cfg.dialContext,
 			DisableKeepAlives:  true,
 			DisableCompression: true,
 		},
@@ -117,4 +131,11 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 		})
 	}
 	return envelopes, nil
+}
+
+func dialFromPath(path string) dial {
+	return func(ctx context.Context, _, _ string) (net.Conn, error) {
+		d := &net.Dialer{}
+		return d.DialContext(ctx, "unix", path)
+	}
 }
