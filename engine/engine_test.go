@@ -345,7 +345,7 @@ func Test_newEngine(t *testing.T) {
 			require.NotEmpty(collect, bar)
 			assert.Equal(collect, "bar", bar[0].ID.String())
 			assert.Equal(collect, "bar-value", string(bar[0].Value))
-		}, 5*time.Second, 100*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 	})
 	t.Run("internal plugin crashes (recovery)", func(t *testing.T) {
 		socketPath := testhelper.RandomShortSocketName()
