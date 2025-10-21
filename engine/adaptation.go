@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
@@ -20,11 +19,20 @@ import (
 )
 
 type (
+	Resolver = secrets.Resolver
+	Envelope = secrets.Envelope
+
 	Version = api.Version
+	ID      = secrets.ID
+	Pattern = secrets.Pattern
 	Logger  = logging.Logger
 )
 
 var (
+	ParseID          = secrets.ParseID
+	MustParseID      = secrets.MustParseID
+	ParsePattern     = secrets.ParsePattern
+	MustParsePattern = secrets.MustParsePattern
 	NewVersion       = api.NewVersion
 	MustNewVersion   = api.MustNewVersion
 	NewDefaultLogger = logging.NewDefaultLogger
@@ -41,7 +49,7 @@ const (
 )
 
 type Plugin interface {
-	plugin.Plugin
+	Resolver
 
 	Run(ctx context.Context) error
 }
