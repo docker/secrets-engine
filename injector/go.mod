@@ -9,11 +9,13 @@ replace github.com/docker/secrets-engine/client => ../client
 
 replace github.com/docker/secrets-engine/engine => ../engine
 
+replace github.com/docker/secrets-engine/plugin => ../plugin
+
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
 	github.com/docker/docker v28.5.1+incompatible
-	github.com/docker/secrets-engine/client v0.0.11
+	github.com/docker/secrets-engine/client v0.0.12
 	github.com/docker/secrets-engine/engine v0.0.16
 	github.com/docker/secrets-engine/x v0.0.4-do.not.use
 	github.com/stretchr/testify v1.11.1
@@ -27,7 +29,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/plugin v0.0.11 // indirect
+	github.com/docker/secrets-engine/plugin v0.0.14 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
