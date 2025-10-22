@@ -133,7 +133,7 @@ github.com/docker/go-units
 ## explicit; go 1.25
 # github.com/docker/secrets-engine/engine v0.0.16 => ./engine
 ## explicit; go 1.25.0
-# github.com/docker/secrets-engine/mysecret v0.0.11 => ./mysecret
+# github.com/docker/secrets-engine/mysecret v0.0.12 => ./mysecret
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.15 => ./plugin
 ## explicit; go 1.25
