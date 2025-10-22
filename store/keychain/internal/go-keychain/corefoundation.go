@@ -21,11 +21,11 @@ package keychain
 // TODO: Move this file into its own package depended on by go-kext
 // and this package.
 
-CFDictionaryRef CFDictionaryCreateSafe2(CFAllocatorRef allocator, const uintptr_t *keys, const uintptr_t *values, CFIndex numValues, const CFDictionaryKeyCallBacks *keyCallBacks, const CFDictionaryValueCallBacks *valueCallBacks) {
+CFDictionaryRef CFDictionaryCreateSafeSE(CFAllocatorRef allocator, const uintptr_t *keys, const uintptr_t *values, CFIndex numValues, const CFDictionaryKeyCallBacks *keyCallBacks, const CFDictionaryValueCallBacks *valueCallBacks) {
   return CFDictionaryCreate(allocator, (const void **)keys, (const void **)values, numValues, keyCallBacks, valueCallBacks);
 }
 
-CFArrayRef CFArrayCreateSafe2(CFAllocatorRef allocator, const uintptr_t *values, CFIndex numValues, const CFArrayCallBacks *callBacks) {
+CFArrayRef CFArrayCreateSafeSE(CFAllocatorRef allocator, const uintptr_t *values, CFIndex numValues, const CFArrayCallBacks *callBacks) {
   return CFArrayCreate(allocator, (const void **)values, numValues, callBacks);
 }
 */
@@ -83,7 +83,7 @@ func MapToCFDictionary(m map[C.CFTypeRef]C.CFTypeRef) (C.CFDictionaryRef, error)
 		keysPointer = &keys[0]
 		valuesPointer = &values[0]
 	}
-	cfDict := C.CFDictionaryCreateSafe2(C.kCFAllocatorDefault, keysPointer, valuesPointer, C.CFIndex(numValues),
+	cfDict := C.CFDictionaryCreateSafeSE(C.kCFAllocatorDefault, keysPointer, valuesPointer, C.CFIndex(numValues),
 		&C.kCFTypeDictionaryKeyCallBacks, &C.kCFTypeDictionaryValueCallBacks)
 	if cfDict == 0 {
 		return 0, fmt.Errorf("failed on CFDictionaryCreate")
@@ -163,7 +163,7 @@ func ArrayToCFArray(a []C.CFTypeRef) C.CFArrayRef {
 	if numValues > 0 {
 		valuesPointer = &values[0]
 	}
-	return C.CFArrayCreateSafe2(C.kCFAllocatorDefault, valuesPointer, C.CFIndex(numValues), &C.kCFTypeArrayCallBacks)
+	return C.CFArrayCreateSafeSE(C.kCFAllocatorDefault, valuesPointer, C.CFIndex(numValues), &C.kCFTypeArrayCallBacks)
 }
 
 // CFArrayToArray converts a CFArrayRef to an array of CFTypes.
