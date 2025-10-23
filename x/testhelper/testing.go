@@ -6,6 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -65,4 +70,27 @@ func randString(n int) string {
 func TestLogger(t *testing.T) logging.Logger {
 	t.Helper()
 	return logging.NewDefaultLogger(t.Name())
+}
+
+func SetupTelemetry(t *testing.T) (*tracetest.SpanRecorder, *metric.ManualReader) {
+	t.Helper()
+
+	spanRecorder := tracetest.NewSpanRecorder()
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithSpanProcessor(spanRecorder),
+	)
+	otel.SetTracerProvider(tracerProvider)
+
+	reader := metric.NewManualReader()
+	meterProvider := metric.NewMeterProvider(
+		metric.WithReader(reader),
+	)
+	otel.SetMeterProvider(meterProvider)
+
+	t.Cleanup(func() {
+		otel.SetTracerProvider(trace.NewTracerProvider())
+		otel.SetMeterProvider(metric.NewMeterProvider())
+	})
+
+	return spanRecorder, reader
 }
