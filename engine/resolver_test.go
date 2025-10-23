@@ -125,10 +125,10 @@ func TestResolver(t *testing.T) {
 			err = metricReader.Collect(t.Context(), &rm)
 			require.NoError(t, err)
 
-			emptyMetrics := filterMetrics(rm, "secrets.requests.empty")
+			emptyMetrics := testhelper.FilterMetrics(rm, "secrets.requests.empty")
 			require.Len(t, emptyMetrics, 1)
 			assert.Equal(t, int64(1), emptyMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
-			totalMetrics := filterMetrics(rm, "secrets.requests.total")
+			totalMetrics := testhelper.FilterMetrics(rm, "secrets.requests.total")
 			require.Len(t, totalMetrics, 1)
 			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
 		})
@@ -152,23 +152,11 @@ func TestResolver(t *testing.T) {
 			err = metricReader.Collect(t.Context(), &rm)
 			require.NoError(t, err)
 
-			emptyMetrics := filterMetrics(rm, "secrets.requests.empty")
+			emptyMetrics := testhelper.FilterMetrics(rm, "secrets.requests.empty")
 			assert.Empty(t, emptyMetrics)
-			totalMetrics := filterMetrics(rm, "secrets.requests.total")
+			totalMetrics := testhelper.FilterMetrics(rm, "secrets.requests.total")
 			require.Len(t, totalMetrics, 1)
 			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
 		})
 	})
-}
-
-func filterMetrics(rm metricdata.ResourceMetrics, name string) []metricdata.Metrics {
-	var filtered []metricdata.Metrics
-	for _, sm := range rm.ScopeMetrics {
-		for _, m := range sm.Metrics {
-			if m.Name == name {
-				filtered = append(filtered, m)
-			}
-		}
-	}
-	return filtered
 }
