@@ -14,23 +14,27 @@ import (
 var _ secrets.Resolver = &regResolver{}
 
 type regResolver struct {
-	reg    registry
-	logger logging.Logger
-	reqs   metric.Int64Counter
+	reg      registry
+	logger   logging.Logger
+	reqTotal metric.Int64Counter
+	reqEmpty metric.Int64Counter
 }
 
 func newRegResolver(logger logging.Logger, reg registry) *regResolver {
 	return &regResolver{
 		reg:    reg,
 		logger: logger,
-		reqs: int64counter("secrets.requests",
-			metric.WithDescription("Total secret requests processed by the engine"),
+		reqTotal: int64counter("secrets.requests.total",
+			metric.WithDescription("Total secret requests processed by the engine."),
+			metric.WithUnit("{request}")),
+		reqEmpty: int64counter("secrets.requests.empty",
+			metric.WithDescription("Total secret requests processed by the engine that returned no results."),
 			metric.WithUnit("{request}")),
 	}
 }
 
 func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	r.reqs.Add(ctx, 1)
+	r.reqTotal.Add(ctx, 1)
 
 	var results []secrets.Envelope
 
@@ -60,5 +64,6 @@ func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 		return results, nil
 	}
 
+	r.reqEmpty.Add(ctx, 1)
 	return results, secrets.ErrNotFound
 }
