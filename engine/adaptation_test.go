@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/yamux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
@@ -35,7 +37,8 @@ func testEngine(t *testing.T) (secrets.Resolver, string) {
 		WithPluginPath(dir),
 		WithPlugins(map[Config]Plugin{
 			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
-		}))
+		}),
+	)
 	c, err := client.New(client.WithSocketPath(socketPath))
 	require.NoError(t, err)
 	return c, socketPath
@@ -191,6 +194,46 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 			assert.Equal(t, "my-builtin", mySecret[0].Provider)
 		})
 	}
+}
+
+func TestTelemetry(t *testing.T) {
+	spanRecorder, _ := testhelper.SetupTelemetry(t)
+
+	socketPath := testhelper.RandomShortSocketName()
+	errEngine := make(chan error)
+	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		errEngine <- Run(ctx, "test-engine", "test-version",
+			WithSocketPath(socketPath),
+			WithExternallyLaunchedPluginsDisabled(),
+			WithEngineLaunchedPluginsDisabled(),
+			WithAfterHealthyHook(func(context.Context) error {
+				close(done)
+				return nil
+			}),
+		)
+	}()
+	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
+	cancel()
+	assert.NoError(t, filterYamuxErrors(testhelper.WaitForErrorWithTimeout(errEngine)))
+
+	spans := spanRecorder.Ended()
+	require.Len(t, spans, 1)
+
+	recordedSpan := spans[0]
+	assert.Equal(t, "engine.run", recordedSpan.Name())
+	assert.Equal(t, []string{"ready", "shutdown"}, toEventNames(recordedSpan.Events()))
+	assert.Equal(t, codes.Ok, recordedSpan.Status().Code)
+}
+
+func toEventNames(events []trace.Event) []string {
+	var names []string
+	for _, event := range events {
+		names = append(names, event.Name)
+	}
+	return names
 }
 
 func runEngineAsync(t *testing.T, name, version string, opts ...Option) {
