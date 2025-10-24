@@ -246,7 +246,7 @@ func newServer(cfg config, reg registry) *http.Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	r := newRegResolver(cfg.logger, reg)
+	r := newRegResolver(cfg.logger, cfg.tracker, reg)
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
 	if !cfg.dynamicPluginsDisabled {
 		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {

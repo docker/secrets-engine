@@ -5,37 +5,28 @@ import (
 	"errors"
 	"time"
 
-	"go.opentelemetry.io/otel/metric"
-
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 )
 
 var _ secrets.Resolver = &regResolver{}
 
 type regResolver struct {
-	reg      registry
-	logger   logging.Logger
-	reqTotal metric.Int64Counter
-	reqEmpty metric.Int64Counter
+	reg     registry
+	logger  logging.Logger
+	tracker telemetry.Tracker
 }
 
-func newRegResolver(logger logging.Logger, reg registry) *regResolver {
+func newRegResolver(logger logging.Logger, tracker telemetry.Tracker, reg registry) *regResolver {
 	return &regResolver{
-		reg:    reg,
-		logger: logger,
-		reqTotal: int64counter("secrets.requests.total",
-			metric.WithDescription("Total secret requests processed by the engine."),
-			metric.WithUnit("{request}")),
-		reqEmpty: int64counter("secrets.requests.empty",
-			metric.WithDescription("Total secret requests processed by the engine that returned no results."),
-			metric.WithUnit("{request}")),
+		reg:     reg,
+		logger:  logger,
+		tracker: tracker,
 	}
 }
 
 func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	r.reqTotal.Add(ctx, 1)
-
 	var results []secrets.Envelope
 
 	for plugin := range r.reg.Iterator() {
@@ -60,10 +51,15 @@ func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 		}
 	}
 
+	r.tracker.TrackEvent(EventSecretsEngineRequest{ResultsTotal: len(results)})
+
 	if len(results) > 0 {
 		return results, nil
 	}
 
-	r.reqEmpty.Add(ctx, 1)
 	return results, secrets.ErrNotFound
+}
+
+type EventSecretsEngineRequest struct {
+	ResultsTotal int `json:"results_total"`
 }

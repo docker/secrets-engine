@@ -7,12 +7,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
@@ -79,6 +79,7 @@ func Test_resolveENV(t *testing.T) {
 		key    string
 		value  string
 		result string
+		source string
 		err    error
 	}{
 		{
@@ -89,6 +90,7 @@ func Test_resolveENV(t *testing.T) {
 			name:   "no value and secret",
 			key:    "FOO",
 			result: "bar",
+			source: sourceKey,
 		},
 		{
 			name: "no value but invalid key",
@@ -117,33 +119,29 @@ func Test_resolveENV(t *testing.T) {
 			key:    "GH_TOKEN",
 			value:  "se://*/my-secret",
 			result: "some-other-value",
+			source: sourceValue,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, metricReader := testhelper.SetupTelemetry(t)
 			socketPath := testEngine(t)
-			r, err := newResolver(testhelper.TestLogger(t), client.WithSocketPath(socketPath))
+			tracker := testhelper.NewTestTracker()
+			r, err := newResolver(testhelper.TestLogger(t), tracker, client.WithSocketPath(socketPath))
 			require.NoError(t, err)
 
 			value, err := r.resolveENV(t.Context(), tt.key, tt.value)
 
-			var rm metricdata.ResourceMetrics
-			require.NoError(t, metricReader.Collect(t.Context(), &rm))
-			envMetrics := testhelper.FilterMetrics(rm, "secrets.injector.env")
-
 			if tt.err != nil {
-				assert.Empty(t, envMetrics)
+				assert.Empty(t, tracker.GetQueue())
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.result, value)
 			if tt.value != value {
-				require.Len(t, envMetrics, 1)
-				assert.Equal(t, int64(1), envMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
+				assert.Equal(t, []any{EventSecretsEngineInjectorEnvResolved{Source: tt.source}}, tracker.GetQueue())
 			} else {
-				assert.Empty(t, envMetrics)
+				assert.Empty(t, tracker.GetQueue())
 			}
 		})
 	}
@@ -157,7 +155,7 @@ func mockedRewriter(t *testing.T) ContainerCreateRewriter {
 			secrets.MustParseID("FOO"): "some-value",
 			secrets.MustParseID("BAR"): "baz",
 		}},
-		envsResolved: int64counter("foo"),
+		tracker: telemetry.NoopTracker(),
 	}}
 }
 

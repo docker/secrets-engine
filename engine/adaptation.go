@@ -16,6 +16,7 @@ import (
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 )
 
 type (
@@ -26,6 +27,8 @@ type (
 	ID      = secrets.ID
 	Pattern = secrets.Pattern
 	Logger  = logging.Logger
+
+	Tracker = telemetry.Tracker
 )
 
 var (
@@ -87,6 +90,7 @@ type config struct {
 	logger                 logging.Logger
 	maxTries               uint
 	upCb                   func(ctx context.Context) error
+	tracker                telemetry.Tracker
 }
 
 // Option to apply to the secrets engine.
@@ -183,6 +187,14 @@ func WithAfterHealthyHook(cb func(ctx context.Context) error) Option {
 	}
 }
 
+// WithTracker set a tracker (default: noop tracker)
+func WithTracker(tracker telemetry.Tracker) Option {
+	return func(r *config) error {
+		r.tracker = telemetry.AsyncWrapper(tracker)
+		return nil
+	}
+}
+
 func Run(ctx context.Context, name, version string, opts ...Option) error {
 	cfg := &config{
 		name:       name,
@@ -195,10 +207,14 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 			return fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
+	if cfg.tracker == nil {
+		cfg.tracker = telemetry.NoopTracker()
+	}
 	if cfg.logger == nil {
 		cfg.logger = logging.NewDefaultLogger("engine")
 	}
 	ctx = logging.WithLogger(ctx, cfg.logger)
+	cfg.tracker.TrackEvent(EventSecretsEngineStarted{})
 	var span trace.Span
 	ctx, span = tracer().Start(ctx, "engine.run",
 		trace.WithSpanKind(trace.SpanKindInternal),
@@ -212,7 +228,7 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	if cfg.listener == nil {
 		listener, err := createListener(api.DefaultSocketPath())
 		if err != nil {
-			recordErrorWithStatus(span, err, "create_listener", "create_failure")
+			recordErrorWithStatus(cfg.tracker, span, err, "create_listener", "create_failure")
 			return err
 		}
 		cfg.listener = listener
@@ -222,7 +238,7 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	cfg.logger.Printf("secrets engine starting up..." + socketInfo)
 	e, err := newEngine(ctx, *cfg)
 	if err != nil {
-		recordErrorWithStatus(span, err, "create_engine", "init_failure")
+		recordErrorWithStatus(cfg.tracker, span, err, "create_engine", "init_failure")
 		return err
 	}
 	span.AddEvent("ready")
@@ -230,7 +246,7 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	if cfg.upCb != nil {
 		if err := cfg.upCb(ctx); err != nil {
 			e.Close()
-			recordErrorWithStatus(span, err, "up_callback", "callback_failure")
+			recordErrorWithStatus(cfg.tracker, span, err, "up_callback", "callback_failure")
 			return err
 		}
 	}
@@ -238,7 +254,7 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	span.AddEvent("shutdown")
 	cfg.logger.Printf("secrets engine shutting down...")
 	if err := e.Close(); err != nil {
-		recordErrorWithStatus(span, err, "shutdown", "shutdown_failure")
+		recordErrorWithStatus(cfg.tracker, span, err, "shutdown", "shutdown_failure")
 		return err
 	}
 	span.SetStatus(codes.Ok, "clean shutdown")
@@ -257,7 +273,10 @@ func tryMaskHomePath(path string) string {
 	return strings.Replace(path, home, "~", 1)
 }
 
-func recordErrorWithStatus(span trace.Span, err error, phase, status string) {
+func recordErrorWithStatus(tracker telemetry.Tracker, span trace.Span, err error, phase, status string) {
+	tracker.Notify(err, phase, status)
 	span.SetStatus(codes.Error, status)
 	span.RecordError(err, trace.WithAttributes(attribute.String("phase", phase)))
 }
+
+type EventSecretsEngineStarted struct{}
