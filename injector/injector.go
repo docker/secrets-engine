@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/logging"
