@@ -228,7 +228,9 @@ func TestTelemetry(t *testing.T) {
 	assert.Equal(t, "engine.run", recordedSpan.Name())
 	assert.Equal(t, []string{"ready", "shutdown"}, toEventNames(recordedSpan.Events()))
 	assert.Equal(t, codes.Ok, recordedSpan.Status().Code)
-	assert.Equal(t, []any{EventSecretsEngineStarted{}}, tracker.GetQueue())
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Equal(collect, []any{EventSecretsEngineStarted{}}, tracker.GetQueue())
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func toEventNames(events []trace.Event) []string {
