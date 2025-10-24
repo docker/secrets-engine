@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
@@ -93,4 +94,16 @@ func SetupTelemetry(t *testing.T) (*tracetest.SpanRecorder, *metric.ManualReader
 	})
 
 	return spanRecorder, reader
+}
+
+func FilterMetrics(rm metricdata.ResourceMetrics, name string) []metricdata.Metrics {
+	var filtered []metricdata.Metrics
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == name {
+				filtered = append(filtered, m)
+			}
+		}
+	}
+	return filtered
 }
