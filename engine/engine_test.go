@@ -19,6 +19,7 @@ import (
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
@@ -237,6 +238,7 @@ func Test_newEngine(t *testing.T) {
 			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
+			tracker:    telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -260,6 +262,7 @@ func Test_newEngine(t *testing.T) {
 			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
 			maxTries:   1,
+			tracker:    telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -299,6 +302,7 @@ func Test_newEngine(t *testing.T) {
 					secrets:   map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 				},
 			},
+			tracker: telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -330,6 +334,7 @@ func Test_newEngine(t *testing.T) {
 			pluginPath: dir,
 			listener:   newListener(t, socketPath),
 			logger:     testhelper.TestLogger(t),
+			tracker:    telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -364,6 +369,7 @@ func Test_newEngine(t *testing.T) {
 				runExitCh:       runExitCh,
 				secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 			}},
+			tracker: telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)

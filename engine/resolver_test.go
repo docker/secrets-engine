@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -67,96 +66,53 @@ func (m mockResolverRegistry) Register(runtime) (removeFunc, error) {
 }
 
 func TestResolver(t *testing.T) {
-	t.Run("functionality", func(t *testing.T) {
-		t.Parallel()
-		t.Run("no match but errors", func(t *testing.T) {
-			reg := mockResolverRegistry{resolver: []runtime{
-				newMockResolverRuntime("foo", errors.New("foo")),
-				newMockResolverRuntime("bar", errors.New("bar")),
-			}}
-			resolver := newRegResolver(testhelper.TestLogger(t), reg)
-			_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-			assert.ErrorIs(t, err, secrets.ErrNotFound)
-		})
-		t.Run("no match no errors", func(t *testing.T) {
-			reg := mockResolverRegistry{resolver: []runtime{}}
-			resolver := newRegResolver(testhelper.TestLogger(t), reg)
-			_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-			assert.ErrorIs(t, err, secrets.ErrNotFound)
-		})
-		t.Run("multiple matches across multiple plugins", func(t *testing.T) {
-			reg := mockResolverRegistry{resolver: []runtime{
-				newMockResolverRuntime("foo", errors.New("foo")),
-				mockResolverRuntime{
-					name:    api.MustNewName("bar"),
-					version: api.MustNewVersion("v1"),
-					envelopes: []secrets.Envelope{
-						{ID: secrets.MustParseID("foo"), Value: []byte("foo")},
-						{ID: secrets.MustParseID("bar"), Value: []byte("bar")},
-					},
-				},
-				mockResolverRuntime{
-					name:    api.MustNewName("baz"),
-					version: api.MustNewVersion("v1"),
-					envelopes: []secrets.Envelope{
-						{ID: secrets.MustParseID("baz"), Value: []byte("baz")},
-					},
-				},
-			}}
-			resolver := newRegResolver(testhelper.TestLogger(t), reg)
-			e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-			assert.NoError(t, err)
-			require.Len(t, e, 3)
-			assert.Equal(t, "foo", string(e[0].Value))
-			assert.Equal(t, "bar", string(e[1].Value))
-			assert.Equal(t, "baz", string(e[2].Value))
-		})
+	t.Parallel()
+	t.Run("no match but errors", func(t *testing.T) {
+		tracker := testhelper.NewTestTracker()
+		reg := mockResolverRegistry{resolver: []runtime{
+			newMockResolverRuntime("foo", errors.New("foo")),
+			newMockResolverRuntime("bar", errors.New("bar")),
+		}}
+		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
+		assert.Equal(t, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
 	})
-	t.Run("telemetry", func(t *testing.T) {
-		t.Run("no results", func(t *testing.T) {
-			_, metricReader := testhelper.SetupTelemetry(t)
-
-			reg := mockResolverRegistry{resolver: []runtime{}}
-			resolver := newRegResolver(testhelper.TestLogger(t), reg)
-			_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-			require.Error(t, err)
-
-			var rm metricdata.ResourceMetrics
-			err = metricReader.Collect(t.Context(), &rm)
-			require.NoError(t, err)
-
-			emptyMetrics := testhelper.FilterMetrics(rm, "secrets.requests.empty")
-			require.Len(t, emptyMetrics, 1)
-			assert.Equal(t, int64(1), emptyMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
-			totalMetrics := testhelper.FilterMetrics(rm, "secrets.requests.total")
-			require.Len(t, totalMetrics, 1)
-			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
-		})
-		t.Run("results", func(t *testing.T) {
-			_, metricReader := testhelper.SetupTelemetry(t)
-
-			reg := mockResolverRegistry{resolver: []runtime{
-				mockResolverRuntime{
-					name:    api.MustNewName("baz"),
-					version: api.MustNewVersion("v1"),
-					envelopes: []secrets.Envelope{
-						{ID: secrets.MustParseID("baz"), Value: []byte("baz")},
-					},
+	t.Run("no match no errors", func(t *testing.T) {
+		tracker := testhelper.NewTestTracker()
+		reg := mockResolverRegistry{resolver: []runtime{}}
+		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
+		assert.Equal(t, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
+	})
+	t.Run("multiple matches across multiple plugins", func(t *testing.T) {
+		reg := mockResolverRegistry{resolver: []runtime{
+			newMockResolverRuntime("foo", errors.New("foo")),
+			mockResolverRuntime{
+				name:    api.MustNewName("bar"),
+				version: api.MustNewVersion("v1"),
+				envelopes: []secrets.Envelope{
+					{ID: secrets.MustParseID("foo"), Value: []byte("foo")},
+					{ID: secrets.MustParseID("bar"), Value: []byte("bar")},
 				},
-			}}
-			resolver := newRegResolver(testhelper.TestLogger(t), reg)
-			_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-			require.NoError(t, err)
-
-			var rm metricdata.ResourceMetrics
-			err = metricReader.Collect(t.Context(), &rm)
-			require.NoError(t, err)
-
-			emptyMetrics := testhelper.FilterMetrics(rm, "secrets.requests.empty")
-			assert.Empty(t, emptyMetrics)
-			totalMetrics := testhelper.FilterMetrics(rm, "secrets.requests.total")
-			require.Len(t, totalMetrics, 1)
-			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
-		})
+			},
+			mockResolverRuntime{
+				name:    api.MustNewName("baz"),
+				version: api.MustNewVersion("v1"),
+				envelopes: []secrets.Envelope{
+					{ID: secrets.MustParseID("baz"), Value: []byte("baz")},
+				},
+			},
+		}}
+		tracker := testhelper.NewTestTracker()
+		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+		assert.NoError(t, err)
+		require.Len(t, e, 3)
+		assert.Equal(t, "foo", string(e[0].Value))
+		assert.Equal(t, "bar", string(e[1].Value))
+		assert.Equal(t, "baz", string(e[2].Value))
+		assert.Equal(t, []any{EventSecretsEngineRequest{ResultsTotal: 3}}, tracker.GetQueue())
 	})
 }

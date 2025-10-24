@@ -6,16 +6,18 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/noop"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/telemetry"
 )
 
-type Option = client.Option
+type (
+	Option = client.Option
+
+	Tracker = telemetry.Tracker
+)
 
 var (
 	WithSocketPath  = client.WithSocketPath
@@ -30,17 +32,7 @@ var ErrInvalidEnvName = errors.New("invalid environment variable name")
 const (
 	prefix               = "se://"
 	illegalEnvCharacters = `!@#$%^&*()-+=\{}[]|;:'",<>?/ `
-	name                 = "secrets-engine-injector"
 )
-
-func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {
-	reqs, err := otel.Meter(name).Int64Counter(counter, opts...)
-	if err != nil {
-		otel.Handle(err)
-		reqs, _ = noop.NewMeterProvider().Meter(name).Int64Counter(counter, opts...)
-	}
-	return reqs
-}
 
 func hasIllegalChars(env string) bool {
 	for _, c := range illegalEnvCharacters {
@@ -52,12 +44,12 @@ func hasIllegalChars(env string) bool {
 }
 
 type resolver struct {
-	logger       logging.Logger
-	resolver     secrets.Resolver
-	envsResolved metric.Int64Counter
+	logger   logging.Logger
+	resolver secrets.Resolver
+	tracker  telemetry.Tracker
 }
 
-func newResolver(logger logging.Logger, options ...client.Option) (*resolver, error) {
+func newResolver(logger logging.Logger, tracker telemetry.Tracker, options ...client.Option) (*resolver, error) {
 	c, err := client.New(options...)
 	if err != nil {
 		return nil, err
@@ -65,9 +57,7 @@ func newResolver(logger logging.Logger, options ...client.Option) (*resolver, er
 	return &resolver{
 		logger:   logger,
 		resolver: c,
-		envsResolved: int64counter("secrets.injector.env",
-			metric.WithDescription("Total secrets in env injected by the injector client."),
-			metric.WithUnit("{injection}")),
+		tracker:  tracker,
 	}, nil
 }
 
@@ -84,10 +74,10 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 		}
 		return err
 	}
-	getSecrets := func(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	getSecrets := func(ctx context.Context, pattern secrets.Pattern, src string) ([]secrets.Envelope, error) {
 		result, err := r.resolver.GetSecrets(ctx, pattern)
 		if err == nil {
-			r.envsResolved.Add(ctx, 1)
+			r.tracker.TrackEvent(EventSecretsEngineInjectorEnvResolved{Source: src})
 		}
 		return result, err
 	}
@@ -96,16 +86,18 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 		return "", withNoErrLegacyFallback(ErrInvalidEnvName)
 	}
 
+	src := sourceValue
 	v := value
 	if v == "" {
 		v = key
+		src = sourceKey
 	}
 	pattern, err := secrets.ParsePattern(strings.TrimPrefix(v, prefix))
 	if err != nil {
 		return "", withNoErrLegacyFallback(err)
 	}
 
-	result, err := getSecrets(ctx, pattern)
+	result, err := getSecrets(ctx, pattern, src)
 	if err != nil {
 		if value == "" && !errors.Is(err, secrets.ErrNotFound) {
 			r.logger.Errorf("resolving ENV %s to secret: %s", key, err)
@@ -120,12 +112,28 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 	return string(result[0].Value), nil
 }
 
+const (
+	sourceKey   = "key"
+	sourceValue = "value"
+)
+
+type EventSecretsEngineInjectorEnvResolved struct {
+	Source string `json:"source"`
+}
+
 type ContainerCreateRewriter struct {
 	r *resolver
 }
 
-func New(logger logging.Logger, options ...client.Option) (*ContainerCreateRewriter, error) {
-	resolver, err := newResolver(logger, options...)
+// New creates a new injector resolver.
+// If [logger] is nil, a noop logger will be used. If [tracker] is nil, a noop tracker will be used.
+func New(logger logging.Logger, tracker telemetry.Tracker, options ...client.Option) (*ContainerCreateRewriter, error) {
+	if tracker == nil {
+		tracker = telemetry.NoopTracker()
+	} else {
+		tracker = telemetry.AsyncWrapper(tracker)
+	}
+	resolver, err := newResolver(logger, tracker, options...)
 	if err != nil {
 		return nil, err
 	}

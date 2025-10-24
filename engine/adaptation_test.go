@@ -204,6 +204,7 @@ func TestTelemetry(t *testing.T) {
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+	tracker := testhelper.NewTestTracker()
 	go func() {
 		errEngine <- Run(ctx, "test-engine", "test-version",
 			WithSocketPath(socketPath),
@@ -213,6 +214,7 @@ func TestTelemetry(t *testing.T) {
 				close(done)
 				return nil
 			}),
+			WithTracker(tracker),
 		)
 	}()
 	assert.NoError(t, testhelper.WaitForClosedWithTimeout(done))
@@ -226,6 +228,7 @@ func TestTelemetry(t *testing.T) {
 	assert.Equal(t, "engine.run", recordedSpan.Name())
 	assert.Equal(t, []string{"ready", "shutdown"}, toEventNames(recordedSpan.Events()))
 	assert.Equal(t, codes.Ok, recordedSpan.Status().Code)
+	assert.Equal(t, []any{EventSecretsEngineStarted{}}, tracker.GetQueue())
 }
 
 func toEventNames(events []trace.Event) []string {

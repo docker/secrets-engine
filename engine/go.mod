@@ -27,9 +27,7 @@ require (
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.38.0
-	go.opentelemetry.io/otel/metric v1.38.0
 	go.opentelemetry.io/otel/sdk v1.38.0
-	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
 	golang.org/x/sys v0.35.0
 	google.golang.org/protobuf v1.36.8
@@ -48,6 +46,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0 // indirect
+	go.opentelemetry.io/otel/metric v1.38.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
