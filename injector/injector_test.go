@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine"
@@ -120,16 +121,30 @@ func Test_resolveENV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, metricReader := testhelper.SetupTelemetry(t)
 			socketPath := testEngine(t)
 			r, err := newResolver(testhelper.TestLogger(t), client.WithSocketPath(socketPath))
 			require.NoError(t, err)
+
 			value, err := r.resolveENV(t.Context(), tt.key, tt.value)
+
+			var rm metricdata.ResourceMetrics
+			require.NoError(t, metricReader.Collect(t.Context(), &rm))
+			envMetrics := testhelper.FilterMetrics(rm, "secrets.injector.env")
+
 			if tt.err != nil {
+				assert.Empty(t, envMetrics)
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.result, value)
+			if tt.value != value {
+				require.Len(t, envMetrics, 1)
+				assert.Equal(t, int64(1), envMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
+			} else {
+				assert.Empty(t, envMetrics)
+			}
 		})
 	}
 }
