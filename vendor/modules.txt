@@ -139,7 +139,7 @@ github.com/docker/go-units
 ## explicit; go 1.25
 # github.com/docker/secrets-engine/store v0.0.12 => ./store
 ## explicit; go 1.25
-# github.com/docker/secrets-engine/x v0.0.4-do.not.use => ./x
+# github.com/docker/secrets-engine/x v0.0.5-do.not.use => ./x
 ## explicit; go 1.25
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
