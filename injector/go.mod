@@ -17,7 +17,7 @@ require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/secrets-engine/client v0.0.12
 	github.com/docker/secrets-engine/engine v0.0.16
-	github.com/docker/secrets-engine/x v0.0.4-do.not.use
+	github.com/docker/secrets-engine/x v0.0.5-do.not.use
 	github.com/stretchr/testify v1.11.1
 )
 
