@@ -11,7 +11,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/x/config"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
@@ -20,7 +20,7 @@ func main() {
 	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	if plugin.RunningStandalone() {
-		os.Args = append([]string{os.Args[0], "mysecret"}, os.Args[1:]...)
+		os.Args = append([]string{os.Args[0], "pass"}, os.Args[1:]...)
 	}
 	kc, err := service.KCService()
 	if err != nil {
