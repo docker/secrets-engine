@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"

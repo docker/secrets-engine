@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/mysecret/service"
-	"github.com/docker/secrets-engine/mysecret/teststore"
+	"github.com/docker/secrets-engine/pass/service"
+	"github.com/docker/secrets-engine/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
-func Test_mysecretPlugin(t *testing.T) {
+func Test_passPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
