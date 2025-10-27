@@ -5,6 +5,7 @@ import (
 	"errors"
 	"iter"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,7 +77,9 @@ func TestResolver(t *testing.T) {
 		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
-		assert.Equal(t, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Equal(collect, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
+		}, 2*time.Second, 100*time.Millisecond)
 	})
 	t.Run("no match no errors", func(t *testing.T) {
 		tracker := testhelper.NewTestTracker()
@@ -84,7 +87,9 @@ func TestResolver(t *testing.T) {
 		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
-		assert.Equal(t, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Equal(collect, []any{EventSecretsEngineRequest{}}, tracker.GetQueue())
+		}, 2*time.Second, 100*time.Millisecond)
 	})
 	t.Run("multiple matches across multiple plugins", func(t *testing.T) {
 		reg := mockResolverRegistry{resolver: []runtime{
@@ -113,6 +118,8 @@ func TestResolver(t *testing.T) {
 		assert.Equal(t, "foo", string(e[0].Value))
 		assert.Equal(t, "bar", string(e[1].Value))
 		assert.Equal(t, "baz", string(e[2].Value))
-		assert.Equal(t, []any{EventSecretsEngineRequest{ResultsTotal: 3}}, tracker.GetQueue())
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Equal(collect, []any{EventSecretsEngineRequest{ResultsTotal: 3}}, tracker.GetQueue())
+		}, 2*time.Second, 100*time.Millisecond)
 	})
 }

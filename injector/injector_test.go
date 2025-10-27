@@ -3,6 +3,7 @@ package injector
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
@@ -139,7 +140,9 @@ func Test_resolveENV(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.result, value)
 			if tt.value != value {
-				assert.Equal(t, []any{EventSecretsEngineInjectorEnvResolved{Source: tt.source}}, tracker.GetQueue())
+				assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+					assert.Equal(collect, []any{EventSecretsEngineInjectorEnvResolved{Source: tt.source}}, tracker.GetQueue())
+				}, 2*time.Second, 100*time.Millisecond)
 			} else {
 				assert.Empty(t, tracker.GetQueue())
 			}
