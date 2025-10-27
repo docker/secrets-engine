@@ -7,8 +7,8 @@ on:
   pull_request:
 
 jobs:
-  mysecret:
-    name: Build docker-mysecret Plugin
+  pass:
+    name: Build docker-pass Plugin
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -33,8 +33,8 @@ jobs:
           endpoint: "docker/secrets-engine"
           install: true
 
-      - name: Build docker-mysecret Plugin
-        run: make BUILDER=${{ steps.buildx.outputs.name }} mysecret-package
+      - name: Build docker-pass Plugin
+        run: make BUILDER=${{ steps.buildx.outputs.name }} pass-package
 
   engine:
     name: Build secrets engine daemon binary

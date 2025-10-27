@@ -14,21 +14,21 @@ $ make engine
 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/secrets-engine ./engine/daemon
 $ ./dist/secrets-engine
 2025/08/12 10:20:45 engine: secrets engine starting up... (~/.cache/secrets-engine/engine.sock)
-2025/08/12 10:20:45 engine: discovered builtin plugin: mysecret
-2025/08/12 10:20:45 engine: registering plugin 'mysecret'...
+2025/08/12 10:20:45 engine: discovered builtin plugin: pass
+2025/08/12 10:20:45 engine: registering plugin 'pass'...
 2025/08/12 10:20:45 engine: plugin priority order
-2025/08/12 10:20:45 engine:   #1: mysecret
+2025/08/12 10:20:45 engine:   #1: pass
 2025/08/12 10:20:45 engine: secrets engine ready
 ```
 
 Create secrets in your keychain:
 
 ```console
-$ make mysecret
-CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/docker-mysecret ./mysecret
-$ ./dist/docker-mysecret set foo=bar
-$ ./dist/docker-mysecret set baz=something
-$ ./dist/docker-mysecret ls
+$ make pass
+CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/docker-pass ./pass
+$ ./dist/docker-pass set foo=bar
+$ ./dist/docker-pass set baz=something
+$ ./dist/docker-pass ls
 baz
 foo
 ```
@@ -39,7 +39,7 @@ Query secrets from the engine:
 $ curl --unix-socket ~/.cache/secrets-engine/engine.sock \
     -X POST http://localhost/resolver.v1.ResolverService/GetSecrets \
     -H "Content-Type: application/json" -d '{"pattern": "foo"}'
-{"id":"foo","value":"bar","provider":"mysecret","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
+{"id":"foo","value":"bar","provider":"docker-pass","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
 ```
 
 > [!NOTE]
