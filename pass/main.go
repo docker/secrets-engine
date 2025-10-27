@@ -35,7 +35,7 @@ func main() {
 			SchemaVersion:    "0.1.0",
 			Vendor:           "Docker Inc.",
 			Version:          config.Version,
-			ShortDescription: "Docker MySecret Plugin",
+			ShortDescription: "Docker Pass Plugin",
 		},
 	)
 }
