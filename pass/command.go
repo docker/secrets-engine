@@ -47,7 +47,7 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 		},
 		Version: fmt.Sprintf("%s, commit %s", config.Version, config.Commit()),
 	}
-	cmd.SetVersionTemplate("Docker MySecret Plugin\n{{.Version}}\n")
+	cmd.SetVersionTemplate("Docker Pass Plugin\n{{.Version}}\n")
 	cmd.Flags().BoolP("version", "v", false, "Print version information and quit")
 	cmd.SetHelpTemplate(helpTemplate)
 
