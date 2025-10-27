@@ -1,26 +1,26 @@
-package mysecret
+package pass
 
 import (
 	"context"
 	"errors"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
-var _ engine.Plugin = &mysecretPlugin{}
+var _ engine.Plugin = &passPlugin{}
 
 var errUnknownSecretType = errors.New("unknown secret type")
 
-type mysecretPlugin struct {
+type passPlugin struct {
 	kc     store.Store
 	logger logging.Logger
 }
 
-func (m *mysecretPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+func (m *passPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	list, err := m.kc.Filter(ctx, pattern)
 	if err != nil {
 		return nil, err
@@ -54,15 +54,15 @@ func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
 	}, nil
 }
 
-func (m *mysecretPlugin) Run(ctx context.Context) error {
+func (m *passPlugin) Run(ctx context.Context) error {
 	<-ctx.Done()
 	return nil
 }
 
-func NewMySecretPlugin(logger logging.Logger) (engine.Plugin, error) {
-	mysecretStore, err := service.KCService()
+func NewPassPlugin(logger logging.Logger) (engine.Plugin, error) {
+	store, err := service.KCService()
 	if err != nil {
 		return nil, err
 	}
-	return &mysecretPlugin{kc: mysecretStore, logger: logger}, nil
+	return &passPlugin{kc: store, logger: logger}, nil
 }

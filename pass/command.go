@@ -7,13 +7,13 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/mysecret/commands"
+	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/config"
 )
 
 // Note: We use a custom help template to make it more brief.
-const helpTemplate = `Docker MySecret CLI - Manage your local secrets.
+const helpTemplate = `Docker Pass CLI - Manage your local secrets.
 {{if .UseLine}}
 Usage: {{.UseLine}}
 {{end}}{{if .HasAvailableLocalFlags}}
@@ -31,7 +31,7 @@ Examples:
 // rootCommand returns the root command for the init plugin
 func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:              "mysecret [OPTIONS]",
+		Use:              "pass [OPTIONS]",
 		SilenceUsage:     true,
 		TraverseChildren: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -51,7 +51,7 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	cmd.Flags().BoolP("version", "v", false, "Print version information and quit")
 	cmd.SetHelpTemplate(helpTemplate)
 
-	_ = cmd.RegisterFlagCompletionFunc("mysecret", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	_ = cmd.RegisterFlagCompletionFunc("pass", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 

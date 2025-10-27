@@ -5,7 +5,7 @@ use (
 	./cmd/nri-plugin
 	./engine
 	./injector
-	./mysecret
+	./pass
 	./plugin
 	./store
 	./x

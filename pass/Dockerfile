@@ -37,10 +37,10 @@ ENV CC=o64-clang
 ENV CXX=o64-clang++
 
 ARG TARGETOS
-FROM ${TARGETOS}-base AS build-mysecret
+FROM ${TARGETOS}-base AS build-pass
 ARG TARGETOS
 ARG TARGETARCH
-ARG MYSECRET_BINARY
+ARG PASS_BINARY
 ENV CGO_ENABLED=1
 WORKDIR /src
 RUN mkdir /out
@@ -51,8 +51,8 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    go build -trimpath -ldflags "-s -w" -o "/out/${MYSECRET_BINARY}${EXT}" ./mysecret
+    go build -trimpath -ldflags "-s -w" -o "/out/${PASS_BINARY}${EXT}" ./pass
 EOT
 
-FROM scratch AS package-mysecret
-COPY --link --from=build-mysecret /out .
+FROM scratch AS package-pass
+COPY --link --from=build-pass /out .

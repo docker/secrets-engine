@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
 
@@ -15,11 +15,11 @@ import (
 
 const setExample = `
 # Set a secret:
-docker mysecret set POSTGRES_PASSWORD=my-secret-password
+docker pass set POSTGRES_PASSWORD=my-secret-password
 
 # Or pass the secret via STDIN:
 echo my-secret-password > pwd.txt
-cat pwd.txt | docker mysecret set POSTGRES_PASSWORD
+cat pwd.txt | docker pass set POSTGRES_PASSWORD
 `
 
 func SetCommand(kc store.Store) *cobra.Command {

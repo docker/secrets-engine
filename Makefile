@@ -5,19 +5,19 @@ GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.work")
 export BUF_VERSION := v1.56.0
 
 export NRI_PLUGIN_BINARY := nri-secrets-engine
-export MYSECRET_BINARY := docker-mysecret
+export PASS_BINARY := docker-pass
 export ENGINE_BINARY := secrets-engine
 
 ifeq ($(OS),Windows_NT)
 	WINDOWS = $(OS)
 	EXTENSION = .exe
 	DOCKER_SOCKET = //var/run/docker.sock
-	DOCKER_MYSECRET_DST = $(USERPROFILE)\.docker\cli-plugins\$(MYSECRET_BINARY)$(EXTENSION)
+	DOCKER_PASS_DST = $(USERPROFILE)\.docker\cli-plugins\$(PASS_BINARY)$(EXTENSION)
 else
 	WINDOWS =
 	EXTENSION =
 	DOCKER_SOCKET = /var/run/docker.sock
-	DOCKER_MYSECRET_DST = $(HOME)/.docker/cli-plugins/$(MYSECRET_BINARY)$(EXTENSION)
+	DOCKER_PASS_DST = $(HOME)/.docker/cli-plugins/$(PASS_BINARY)$(EXTENSION)
 endif
 
 define cross-package
@@ -39,7 +39,7 @@ BUILDER=buildx-multiarch
 DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg NRI_PLUGIN_BINARY \
-          			--build-arg MYSECRET_BINARY \
+          			--build-arg PASS_BINARY \
           			--build-arg ENGINE_BINARY \
           			--build-arg BUF_VERSION \
           			--build-arg GIT_TAG
@@ -77,7 +77,7 @@ unit-tests:
 	go test -trimpath -race -v $(shell go list ./client/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./injector/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./mysecret/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./pass/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
@@ -100,16 +100,16 @@ keychain-unit-tests:
 engine-unit-tests:
 	go test -trimpath -race -v $$(go list ./engine/...)
 
-mysecret:
-	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(MYSECRET_BINARY)$(EXTENSION) ./mysecret
-	rm "$(DOCKER_MYSECRET_DST)" || true
-	cp "dist/$(MYSECRET_BINARY)$(EXTENSION)" "$(DOCKER_MYSECRET_DST)"
+pass:
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(PASS_BINARY)$(EXTENSION) ./pass
+	rm "$(DOCKER_PASS_DST)" || true
+	cp "dist/$(PASS_BINARY)$(EXTENSION)" "$(DOCKER_PASS_DST)"
 
-mysecret-cross: multiarch-builder
-	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-mysecret --file mysecret/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+pass-cross: multiarch-builder
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-pass --file pass/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
-mysecret-package: mysecret-cross
-	$(call cross-package,$(MYSECRET_BINARY))
+pass-package: pass-cross
+	$(call cross-package,$(PASS_BINARY))
 
 engine:
 	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
@@ -177,4 +177,4 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests mysecret mysecret-cross engine engine-cross
+.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests pass pass-cross engine engine-cross

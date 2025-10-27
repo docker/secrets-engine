@@ -9,6 +9,7 @@ github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443/go.mod h1:W+zGtBO5Y1Ig
 github.com/containerd/typeurl/v2 v2.2.0/go.mod h1:8XOOxnyatxSWuG8OfsZXVnAF4iZfedjS/8UHSPJnX4g=
 github.com/docker/secrets-engine v0.0.7 h1:DVdrx5DLZhTo6ef2vO/ZauBuFbJYClrcp0QOkEyioEA=
 github.com/docker/secrets-engine v0.0.7/go.mod h1:Gs9tyhVJC28cd8XEqGf0MSV4Qni+k+T2YE2LPxBxs+Y=
+github.com/docker/secrets-engine/mysecret v0.0.12/go.mod h1:5Q47SUB+HGV+CdFuXBMqA00mf5ZuvWwKh+hcHF1NxSA=
 github.com/envoyproxy/go-control-plane v0.13.4/go.mod h1:kDfuBlDVsSj2MjrLEtRWtHlsWIFcGyB2RMO44Dc5GZA=
 github.com/envoyproxy/go-control-plane/envoy v1.32.4/go.mod h1:Gzjc5k8JcJswLjAx1Zm+wSYE20UrLtt7JZMWiWQXQEw=
 github.com/envoyproxy/go-control-plane/ratelimit v0.1.0/go.mod h1:Wk+tMFAFbCXaJPzVVHnPgRKdUdwW/KdbRt94AzgRee4=
