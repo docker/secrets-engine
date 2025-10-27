@@ -9,7 +9,7 @@ import (
 
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
-	"github.com/docker/secrets-engine/engine/builtins/mysecret"
+	"github.com/docker/secrets-engine/engine/builtins/pass"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
@@ -51,7 +51,7 @@ func main() {
 		panic(err)
 	}
 
-	mysecretPlugin, err := mysecret.NewMySecretPlugin(logger)
+	passPlugin, err := pass.NewPassPlugin(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +63,7 @@ func main() {
 	opts := []engine.Option{
 		engine.WithLogger(logger),
 		engine.WithPlugins(map[engine.Config]engine.Plugin{
-			{Name: "mysecret", Version: version, Pattern: secrets.MustParsePattern("**")}:    mysecretPlugin,
+			{Name: "docker-pass", Version: version, Pattern: secrets.MustParsePattern("**")}: passPlugin,
 			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("**")}: dockerAuthPlugin,
 		}),
 		engine.WithEngineLaunchedPluginsDisabled(),
