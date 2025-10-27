@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/mysecret/service"
+	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/store"
 )
 

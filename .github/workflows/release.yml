@@ -49,8 +49,8 @@ jobs:
         run: make BUILDER=${{ steps.buildx.outputs.name }} nri-plugin-package
       - name: Build secrets engine
         run: make BUILDER=${{ steps.buildx.outputs.name }} engine-package
-      - name: Build mysecret docker cli plugin
-        run: make BUILDER=${{ steps.buildx.outputs.name }} mysecret-package
+      - name: Build pass docker cli plugin
+        run: make BUILDER=${{ steps.buildx.outputs.name }} pass-package
       - name: Ship it
         uses: ncipollo/release-action@v1
         with:
