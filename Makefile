@@ -75,6 +75,8 @@ unit-tests:
 	pids=""; \
 	err=0; \
 	go test -trimpath -race -v $(shell go list ./client/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./cmd/engine/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./cmd/pass/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./injector/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./pass/...) & pids="$$pids $$!"; \
@@ -106,17 +108,17 @@ pass:
 	cp "dist/$(PASS_BINARY)$(EXTENSION)" "$(DOCKER_PASS_DST)"
 
 pass-cross: multiarch-builder
-	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-pass --file pass/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
+	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-pass --file cmd/pass/Dockerfile --platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 -o ./dist .
 
 pass-package: pass-cross
 	$(call cross-package,$(PASS_BINARY))
 
 engine:
-	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./engine/daemon
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(ENGINE_BINARY)$(EXTENSION) ./cmd/engine
 
 engine-cross: multiarch-builder
 	docker buildx build $(DOCKER_BUILD_ARGS) --pull --builder=$(BUILDER) --target=package-engine \
-		--file engine/daemon/Dockerfile \
+		--file cmd/engine/Dockerfile \
 		--platform=linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64 \
 		-o ./dist .
 
