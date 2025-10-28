@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -84,7 +83,11 @@ func (m projectFS) BumpModInFile(filename, mod, version string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	mod = path.Dir(f.Module.Mod.Path) + "/" + mod
+	base, err := getModBase(f.Module.Mod.Path)
+	if err != nil {
+		return false, err
+	}
+	mod = base + "/" + mod
 	needsAction := false
 	for _, require := range f.Require {
 		if require.Indirect {
@@ -154,30 +157,33 @@ func newRepoData(versionExtraAllowList []string) (helper.RepoData, error) {
 		return helper.RepoData{}, err
 	}
 	root := os.DirFS(cwd)
-	entries, err := fs.ReadDir(root, ".")
-	if err != nil {
-		return nil, err
-	}
 	modules := helper.RepoData{}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	err = fs.WalkDir(root, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		mod := entry.Name()
+		if d.IsDir() && d.Type()&fs.ModeSymlink != 0 {
+			return fs.SkipDir
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		mod := path
 		if _, err := os.Stat(filepath.Join(mod, "go.mod")); err != nil {
-			continue
+			return nil
 		}
 		latest, err := getLatestVersion(mod)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		deps, err := getDirectProjectDependencies(mod)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		modules.AddMod(mod, helper.Version{Current: latest, KeepExtra: slices.Contains(versionExtraAllowList, mod)}, deps)
-	}
-	return modules, nil
+		return nil
+	})
+	return modules, err
 }
 
 func getDirectProjectDependencies(mod string) ([]string, error) {
@@ -191,13 +197,24 @@ func getDirectProjectDependencies(mod string) ([]string, error) {
 		return nil, err
 	}
 	var deps []string
-	project := path.Dir(f.Module.Mod.Path)
+	base, err := getModBase(f.Module.Mod.Path)
+	if err != nil {
+		return nil, err
+	}
 	for _, require := range f.Require {
-		if strings.HasPrefix(require.Mod.Path, project) {
-			deps = append(deps, strings.TrimPrefix(require.Mod.Path, project+"/"))
+		if strings.HasPrefix(require.Mod.Path, base) {
+			deps = append(deps, strings.TrimPrefix(require.Mod.Path, base+"/"))
 		}
 	}
 	return deps, nil
+}
+
+func getModBase(modPath string) (string, error) {
+	parts := strings.SplitN(modPath, "/", 4)
+	if len(parts) != 4 {
+		return "", fmt.Errorf("unexpected module format: %s", modPath)
+	}
+	return strings.Join(parts[:3], "/"), nil
 }
 
 func getLatestVersion(modName string) (string, error) {
@@ -212,6 +229,11 @@ func getLatestVersion(modName string) (string, error) {
 	}
 	latest := strings.TrimSpace(lines[0])
 	prefix := modName + "/"
+
+	if latest == "" {
+		latest = prefix + "v0.0.0"
+	}
+
 	if !strings.HasPrefix(latest, prefix) {
 		return "", fmt.Errorf("unexptected format of latest release: %s", latest)
 	}
