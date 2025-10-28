@@ -51,7 +51,7 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    go build -trimpath -ldflags "-s -w" -o "/out/${PASS_BINARY}${EXT}" ./pass
+    go build -trimpath -ldflags "-s -w" -o "/out/${PASS_BINARY}${EXT}" ./cmd/pass
 EOT
 
 FROM scratch AS package-pass

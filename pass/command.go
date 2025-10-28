@@ -1,4 +1,4 @@
-package main
+package pass
 
 import (
 	"context"
@@ -34,8 +34,8 @@ Examples:
 {{.Example}}{{end}}
 `
 
-// PassCommand returns the root command for the docker-pass CLI plugin
-func PassCommand(ctx context.Context, s store.Store) *cobra.Command {
+// Root returns the root command for the docker-pass CLI plugin
+func Root(ctx context.Context, s store.Store) *cobra.Command {
 	invokedCounter := int64counter("secrets.pass.invoked",
 		metric.WithDescription("docker-pass called"),
 		metric.WithUnit("invocation"),
