@@ -23,11 +23,11 @@ func GetCommand(kc store.Store) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			impl, ok := s.(*service.MyValue)
+			_, ok := s.(*service.MyValue)
 			if !ok {
 				return errors.New("unknown secret type")
 			}
-			cmd.Printf("ID: %s\nValue: %s\n", id.String(), impl.Value)
+			cmd.Printf("ID: %s\nValue: %s\n", id.String(), "**********")
 			return nil
 		},
 	}

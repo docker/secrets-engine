@@ -136,7 +136,7 @@ func Test_rootCommand(t *testing.T) {
 			}))
 			out, err := executeCommand(Root(t.Context(), mock), "get", "foo")
 			assert.NoError(t, err)
-			assert.Equal(t, "ID: foo\nValue: bar\n", out)
+			assert.Equal(t, "ID: foo\nValue: **********\n", out)
 		})
 		t.Run("store error", func(t *testing.T) {
 			errGet := errors.New("get error")
