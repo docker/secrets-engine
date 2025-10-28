@@ -34,8 +34,8 @@ Examples:
 {{.Example}}{{end}}
 `
 
-// rootCommand returns the root command for the init plugin
-func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
+// PassCommand returns the root command for the docker-pass CLI plugin
+func PassCommand(ctx context.Context, s store.Store) *cobra.Command {
 	invokedCounter := int64counter("secrets.pass.invoked",
 		metric.WithDescription("docker-pass called"),
 		metric.WithUnit("invocation"),
@@ -88,7 +88,7 @@ func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int6
 	return reqs
 }
 
-func tracer() trace.Tracer {
+func Tracer() trace.Tracer {
 	return otel.Tracer(tracerName)
 }
 
@@ -99,7 +99,7 @@ func wrapRunEWithSpan(cmd *cobra.Command) *cobra.Command {
 
 func withSpan(runE func(cmd *cobra.Command, args []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		ctx, span := tracer().Start(cmd.Context(), cmd.Name(), trace.WithSpanKind(trace.SpanKindInternal))
+		ctx, span := Tracer().Start(cmd.Context(), cmd.Name(), trace.WithSpanKind(trace.SpanKindInternal))
 		defer span.End()
 		cmd.SetContext(ctx)
 		if err := runE(cmd, args); err != nil {
