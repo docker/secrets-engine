@@ -2,7 +2,9 @@ go 1.25.0
 
 use (
 	./client
+	./cmd/engine
 	./cmd/nri-plugin
+	./cmd/pass
 	./engine
 	./injector
 	./pass
