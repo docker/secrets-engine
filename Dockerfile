@@ -66,6 +66,7 @@ RUN --mount=type=bind,target=.,ro \
     fi
 
     (cd client && go mod tidy --diff)
+    (cd cmd/engine && go mod tidy --diff)
     (cd cmd/nri-plugin && go mod tidy --diff)
     (cd engine && go mod tidy --diff)
     (cd injector && go mod tidy --diff)
