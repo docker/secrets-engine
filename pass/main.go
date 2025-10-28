@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	ctx, span := tracer().Start(context.Background(), "root")
+	ctx, span := Tracer().Start(context.Background(), "root")
 	defer span.End()
 	ctx, cancel := oshelper.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
@@ -34,7 +34,7 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return rootCommand(ctx, kc)
+		return PassCommand(ctx, kc)
 	},
 		manager.Metadata{
 			SchemaVersion:    "0.1.0",
