@@ -8,11 +8,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 func Test_rootCommand(t *testing.T) {
@@ -143,6 +145,51 @@ func Test_rootCommand(t *testing.T) {
 			assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
 		})
 	})
+}
+
+func Test_rootCommandTelemetry(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "set",
+			args: []string{"set", "foo=bar"},
+		},
+		{
+			name: "get",
+			args: []string{"get", "baz"},
+		},
+		{
+			name: "ls",
+			args: []string{"list"},
+		},
+		{
+			name: "rm",
+			args: []string{"delete", "baz"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, metricReader := testhelper.SetupTelemetry(t)
+			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+				store.MustParseID("baz"): &service.MyValue{Value: []byte("bar")},
+			}))
+			_, err := executeCommand(rootCommand(t.Context(), mock), tc.args...)
+			assert.NoError(t, err)
+
+			var rm metricdata.ResourceMetrics
+			err = metricReader.Collect(t.Context(), &rm)
+			require.NoError(t, err)
+
+			totalMetrics := testhelper.FilterMetrics(rm, "secrets.pass.invoked")
+			require.Len(t, totalMetrics, 1)
+			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
+			data, ok := totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Attributes.Value("command")
+			require.True(t, ok)
+			assert.Equal(t, tc.name, data.AsString())
+		})
+	}
 }
 
 func executeCommandWithStdin(root *cobra.Command, stdin string, args ...string) (output string, err error) {
