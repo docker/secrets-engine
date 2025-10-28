@@ -6,6 +6,10 @@ import (
 
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 
 	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/store"
@@ -30,6 +34,10 @@ Examples:
 
 // rootCommand returns the root command for the init plugin
 func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
+	invokedCounter := int64counter("secrets.pass.invoked",
+		metric.WithDescription("docker-pass called"),
+		metric.WithUnit("invocation"),
+	)
 	cmd := &cobra.Command{
 		Use:              "pass [OPTIONS]",
 		SilenceUsage:     true,
@@ -40,6 +48,7 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
+			invokedCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("command", cmd.Name())))
 			if plugin.PersistentPreRunE != nil {
 				return plugin.PersistentPreRunE(cmd, args)
 			}
@@ -61,4 +70,15 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 	cmd.AddCommand(commands.GetCommand(s))
 
 	return cmd
+}
+
+const meterName = "github.com/docker/secrets-engine/pass"
+
+func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {
+	reqs, err := otel.Meter(meterName).Int64Counter(counter, opts...)
+	if err != nil {
+		otel.Handle(err)
+		reqs, _ = noop.NewMeterProvider().Meter(meterName).Int64Counter(counter, opts...)
+	}
+	return reqs
 }
