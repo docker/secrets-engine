@@ -229,6 +229,11 @@ func getLatestVersion(modName string) (string, error) {
 	}
 	latest := strings.TrimSpace(lines[0])
 	prefix := modName + "/"
+
+	if latest == "" {
+		latest = prefix + "v0.0.0"
+	}
+
 	if !strings.HasPrefix(latest, prefix) {
 		return "", fmt.Errorf("unexptected format of latest release: %s", latest)
 	}
