@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/docker/secrets-engine/pass/commands"
+	"github.com/docker/secrets-engine/pass/command/internal/commands"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/config"
 )

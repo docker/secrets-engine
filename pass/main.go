@@ -12,13 +12,14 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/codes"
 
+	cmd "github.com/docker/secrets-engine/pass/command"
 	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/x/config"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
 
 func main() {
-	ctx, span := Tracer().Start(context.Background(), "root")
+	ctx, span := cmd.Tracer().Start(context.Background(), "root")
 	defer span.End()
 	ctx, cancel := oshelper.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
@@ -34,7 +35,7 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return PassCommand(ctx, kc)
+		return cmd.PassCommand(ctx, kc)
 	},
 		manager.Metadata{
 			SchemaVersion:    "0.1.0",
