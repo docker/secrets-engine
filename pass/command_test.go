@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/docker/secrets-engine/pass/service"
@@ -171,7 +172,7 @@ func Test_rootCommandTelemetry(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, metricReader := testhelper.SetupTelemetry(t)
+			spanRecorder, metricReader := testhelper.SetupTelemetry(t)
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 				store.MustParseID("baz"): &service.MyValue{Value: []byte("bar")},
 			}))
@@ -188,6 +189,12 @@ func Test_rootCommandTelemetry(t *testing.T) {
 			data, ok := totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Attributes.Value("command")
 			require.True(t, ok)
 			assert.Equal(t, tc.name, data.AsString())
+
+			spans := spanRecorder.Ended()
+			require.Len(t, spans, 1)
+			recordedSpan := spans[0]
+			assert.Equal(t, tc.name, recordedSpan.Name())
+			assert.Equal(t, codes.Ok, recordedSpan.Status().Code)
 		})
 	}
 }
