@@ -8,8 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/store"
@@ -64,15 +66,18 @@ func rootCommand(ctx context.Context, s store.Store) *cobra.Command {
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	cmd.AddCommand(commands.SetCommand(s))
-	cmd.AddCommand(commands.ListCommand(s))
-	cmd.AddCommand(commands.RmCommand(s))
-	cmd.AddCommand(commands.GetCommand(s))
+	cmd.AddCommand(wrapRunEWithSpan(commands.SetCommand(s)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
 
 	return cmd
 }
 
-const meterName = "github.com/docker/secrets-engine/pass"
+const (
+	meterName  = "github.com/docker/secrets-engine/pass"
+	tracerName = "github.com/docker/secrets-engine/pass"
+)
 
 func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {
 	reqs, err := otel.Meter(meterName).Int64Counter(counter, opts...)
@@ -81,4 +86,28 @@ func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int6
 		reqs, _ = noop.NewMeterProvider().Meter(meterName).Int64Counter(counter, opts...)
 	}
 	return reqs
+}
+
+func tracer() trace.Tracer {
+	return otel.Tracer(tracerName)
+}
+
+func wrapRunEWithSpan(cmd *cobra.Command) *cobra.Command {
+	cmd.RunE = withSpan(cmd.RunE)
+	return cmd
+}
+
+func withSpan(runE func(cmd *cobra.Command, args []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		ctx, span := tracer().Start(cmd.Context(), cmd.Name(), trace.WithSpanKind(trace.SpanKindInternal))
+		defer span.End()
+		cmd.SetContext(ctx)
+		if err := runE(cmd, args); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return err
+		}
+		span.SetStatus(codes.Ok, "success")
+		return nil
+	}
 }

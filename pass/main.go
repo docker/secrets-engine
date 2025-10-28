@@ -10,6 +10,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/docker/secrets-engine/pass/service"
 	"github.com/docker/secrets-engine/x/config"
@@ -17,13 +18,17 @@ import (
 )
 
 func main() {
-	ctx, cancel := oshelper.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	ctx, span := tracer().Start(context.Background(), "root")
+	defer span.End()
+	ctx, cancel := oshelper.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	if plugin.RunningStandalone() {
 		os.Args = append([]string{os.Args[0], "pass"}, os.Args[1:]...)
 	}
 	kc, err := service.KCService()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
