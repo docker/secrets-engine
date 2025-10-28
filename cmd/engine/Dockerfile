@@ -37,10 +37,10 @@ ENV CC=o64-clang
 ENV CXX=o64-clang++
 
 ARG TARGETOS
-FROM ${TARGETOS}-base AS build-pass
+FROM ${TARGETOS}-base AS build-engine
 ARG TARGETOS
 ARG TARGETARCH
-ARG PASS_BINARY
+ARG ENGINE_BINARY
 ENV CGO_ENABLED=1
 WORKDIR /src
 RUN mkdir /out
@@ -51,8 +51,8 @@ RUN --mount=type=bind,target=. \
     set -euo pipefail
     EXT=""
     [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    go build -trimpath -ldflags "-s -w" -o "/out/${PASS_BINARY}${EXT}" ./pass
+    go build -trimpath -ldflags "-s -w" -o "/out/${ENGINE_BINARY}${EXT}" ./cmd/engine
 EOT
 
-FROM scratch AS package-pass
-COPY --link --from=build-pass /out .
+FROM scratch AS package-engine
+COPY --link --from=build-engine /out .
