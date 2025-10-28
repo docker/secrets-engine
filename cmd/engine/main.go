@@ -9,7 +9,7 @@ import (
 
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
-	"github.com/docker/secrets-engine/engine/builtins/pass"
+	"github.com/docker/secrets-engine/pass"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
