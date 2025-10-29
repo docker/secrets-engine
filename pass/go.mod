@@ -2,9 +2,11 @@ module github.com/docker/secrets-engine/pass
 
 go 1.25.0
 
-replace github.com/docker/secrets-engine/x => ../x
+replace github.com/docker/secrets-engine/engine => ../engine
 
 replace github.com/docker/secrets-engine/store => ../store
+
+replace github.com/docker/secrets-engine/x => ../x
 
 require (
 	github.com/docker/cli v28.3.3+incompatible
