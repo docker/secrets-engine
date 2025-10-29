@@ -14,8 +14,8 @@ replace github.com/docker/secrets-engine/store => ../../store
 replace github.com/docker/secrets-engine/x => ../../x
 
 require (
-	github.com/docker/secrets-engine/engine v0.0.18
-	github.com/docker/secrets-engine/pass v0.0.2
+	github.com/docker/secrets-engine/engine v0.0.19
+	github.com/docker/secrets-engine/pass v0.0.4
 	github.com/docker/secrets-engine/x v0.0.5-do.not.use
 )
 
