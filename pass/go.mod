@@ -2,13 +2,15 @@ module github.com/docker/secrets-engine/pass
 
 go 1.25.0
 
-replace github.com/docker/secrets-engine/x => ../x
+replace github.com/docker/secrets-engine/engine => ../engine
 
 replace github.com/docker/secrets-engine/store => ../store
 
+replace github.com/docker/secrets-engine/x => ../x
+
 require (
 	github.com/docker/cli v28.3.3+incompatible
-	github.com/docker/secrets-engine/engine v0.0.18
+	github.com/docker/secrets-engine/engine v0.0.19
 	github.com/docker/secrets-engine/store v0.0.12
 	github.com/docker/secrets-engine/x v0.0.5-do.not.use
 	github.com/spf13/cobra v1.10.1
