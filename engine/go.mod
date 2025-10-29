@@ -7,8 +7,6 @@ go 1.25.0
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/client => ../client
 
-replace github.com/docker/secrets-engine/pass => ./../pass
-
 replace github.com/docker/secrets-engine/plugin => ../plugin
 
 replace github.com/docker/secrets-engine/store => ../store
