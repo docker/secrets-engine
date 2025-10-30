@@ -183,7 +183,7 @@ func Test_rootCommandTelemetry(t *testing.T) {
 			err = metricReader.Collect(t.Context(), &rm)
 			require.NoError(t, err)
 
-			totalMetrics := testhelper.FilterMetrics(rm, "secrets.pass.invoked")
+			totalMetrics := testhelper.FilterMetrics(rm, "secrets.pass.called")
 			require.Len(t, totalMetrics, 1)
 			assert.Equal(t, int64(1), totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Value)
 			data, ok := totalMetrics[0].Data.(metricdata.Sum[int64]).DataPoints[0].Attributes.Value("command")
@@ -193,7 +193,9 @@ func Test_rootCommandTelemetry(t *testing.T) {
 			spans := spanRecorder.Ended()
 			require.Len(t, spans, 1)
 			recordedSpan := spans[0]
-			assert.Equal(t, tc.name, recordedSpan.Name())
+			assert.Equal(t, "secrets.pass.called", recordedSpan.Name())
+			require.Len(t, recordedSpan.Attributes(), 1)
+			assert.Equal(t, tc.name, recordedSpan.Attributes()[0].Value.AsString())
 			assert.Equal(t, codes.Ok, recordedSpan.Status().Code)
 		})
 	}

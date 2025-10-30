@@ -3,6 +3,7 @@ package pass
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
@@ -12,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/term"
 
 	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/store"
@@ -36,10 +38,6 @@ Examples:
 
 // Root returns the root command for the docker-pass CLI plugin
 func Root(ctx context.Context, s store.Store) *cobra.Command {
-	invokedCounter := int64counter("secrets.pass.invoked",
-		metric.WithDescription("docker-pass called"),
-		metric.WithUnit("invocation"),
-	)
 	cmd := &cobra.Command{
 		Use:              "pass [OPTIONS]",
 		SilenceUsage:     true,
@@ -50,7 +48,6 @@ func Root(ctx context.Context, s store.Store) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
-			invokedCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("command", cmd.Name())))
 			if plugin.PersistentPreRunE != nil {
 				return plugin.PersistentPreRunE(cmd, args)
 			}
@@ -80,7 +77,7 @@ const (
 )
 
 func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {
-	reqs, err := otel.Meter(meterName).Int64Counter(counter, opts...)
+	reqs, err := otel.GetMeterProvider().Meter(meterName).Int64Counter(counter, opts...)
 	if err != nil {
 		otel.Handle(err)
 		reqs, _ = noop.NewMeterProvider().Meter(meterName).Int64Counter(counter, opts...)
@@ -89,20 +86,25 @@ func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int6
 }
 
 func Tracer() trace.Tracer {
-	return otel.Tracer(tracerName)
+	return otel.GetTracerProvider().Tracer(tracerName)
 }
 
 func wrapRunEWithSpan(cmd *cobra.Command) *cobra.Command {
-	cmd.RunE = withSpan(cmd.RunE)
+	cmd.RunE = withOTEL(cmd.RunE)
 	return cmd
 }
 
-func withSpan(runE func(cmd *cobra.Command, args []string) error) func(*cobra.Command, []string) error {
+func withOTEL(runE func(cmd *cobra.Command, args []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		ctx, span := Tracer().Start(cmd.Context(), cmd.Name(), trace.WithSpanKind(trace.SpanKindInternal))
+		ctx, span := Tracer().Start(cmd.Context(), "secrets.pass.called",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(attribute.String("command", cmd.Name())),
+		)
 		defer span.End()
 		cmd.SetContext(ctx)
-		if err := runE(cmd, args); err != nil {
+		err := runE(cmd, args)
+		calledMetric(ctx, cmd, err)
+		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			return err
@@ -110,4 +112,20 @@ func withSpan(runE func(cmd *cobra.Command, args []string) error) func(*cobra.Co
 		span.SetStatus(codes.Ok, "success")
 		return nil
 	}
+}
+
+func calledMetric(ctx context.Context, cmd *cobra.Command, err error) {
+	counter := int64counter("secrets.pass.called",
+		metric.WithDescription("docker-pass called"),
+		metric.WithUnit("invocation"),
+	)
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
+	counter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("command", cmd.Name()),
+		attribute.String("error", errMsg),
+		attribute.Bool("tty", term.IsTerminal(int(os.Stdout.Fd()))),
+	))
 }
