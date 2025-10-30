@@ -3,6 +3,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -12,6 +13,8 @@ type MockRuntime struct {
 	CloseCalled   int
 	RuntimeClosed chan struct{}
 }
+
+var _ plugin.Runtime = &MockRuntime{}
 
 func (m *MockRuntime) Name() api.Name {
 	return m.RuntimeName

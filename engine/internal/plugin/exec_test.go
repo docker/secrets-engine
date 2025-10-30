@@ -1,4 +1,4 @@
-package engine
+package plugin
 
 import (
 	"errors"
@@ -52,7 +52,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			waitReceived:   make(chan struct{}),
 			waitDone:       make(chan error, 1),
 		}
-		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, 5*time.Second)
+		wrapper := WatchProcess(testhelper.TestLogger(t), "foo", cmd, 5*time.Second)
 		assert.False(t, isClosed(wrapper.Closed()))
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.waitReceived))
 		errClose := make(chan error)
@@ -75,7 +75,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			waitReceived: make(chan struct{}),
 			waitDone:     make(chan error, 1),
 		}
-		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, 5*time.Second)
+		wrapper := WatchProcess(testhelper.TestLogger(t), "foo", cmd, 5*time.Second)
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(cmd.waitReceived))
 		cmd.waitDone <- runErr
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -92,7 +92,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
-		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, 100*time.Millisecond)
+		wrapper := WatchProcess(testhelper.TestLogger(t), "foo", cmd, 100*time.Millisecond)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()
@@ -114,7 +114,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			killReceived:   make(chan struct{}),
 			killDone:       make(chan error, 1),
 		}
-		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, time.Second)
+		wrapper := WatchProcess(testhelper.TestLogger(t), "foo", cmd, time.Second)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()
@@ -135,7 +135,7 @@ func Test_launchCmdWatched(t *testing.T) {
 			sigintReceived: make(chan struct{}),
 			sigintErr:      make(chan error, 1),
 		}
-		wrapper := launchCmdWatched(testhelper.TestLogger(t), "foo", cmd, time.Second)
+		wrapper := WatchProcess(testhelper.TestLogger(t), "foo", cmd, time.Second)
 		errClose := make(chan error)
 		go func() {
 			errClose <- wrapper.Close()
@@ -164,25 +164,25 @@ func Test_shutdownHelper(t *testing.T) {
 		firstOuterErr := errors.New("first error")
 		expectedErr := errors.Join(firstOuterErr, innerErr)
 		counter := 0
-		helper := newShutdownHelper(func() error {
+		helper := NewShutdownHelper(func() error {
 			counter++
 			return innerErr
 		})
-		assert.ErrorContains(t, helper.shutdown(firstOuterErr), expectedErr.Error())
-		assert.ErrorContains(t, helper.shutdown(errors.New("another error")), expectedErr.Error())
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.closed()))
+		assert.ErrorContains(t, helper.Shutdown(firstOuterErr), expectedErr.Error())
+		assert.ErrorContains(t, helper.Shutdown(errors.New("another error")), expectedErr.Error())
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.Closed()))
 		assert.Equal(t, 1, counter)
 	})
 	t.Run("shutdown only executes once (no error)", func(t *testing.T) {
 		innerErr := errors.New("inner error")
 		counter := 0
-		helper := newShutdownHelper(func() error {
+		helper := NewShutdownHelper(func() error {
 			counter++
 			return innerErr
 		})
-		assert.ErrorIs(t, helper.shutdown(nil), innerErr)
-		assert.ErrorIs(t, helper.shutdown(errors.New("another error")), innerErr)
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.closed()))
+		assert.ErrorIs(t, helper.Shutdown(nil), innerErr)
+		assert.ErrorIs(t, helper.Shutdown(errors.New("another error")), innerErr)
+		assert.NoError(t, testhelper.WaitForClosedWithTimeout(helper.Closed()))
 		assert.Equal(t, 1, counter)
 	})
 }
