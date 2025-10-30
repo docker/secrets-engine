@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/yamux"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
@@ -74,7 +75,7 @@ type runtime interface {
 
 	io.Closer
 
-	metadata
+	plugin.Metadata
 
 	Closed() <-chan struct{}
 }
@@ -88,7 +89,7 @@ const (
 )
 
 type runtimeImpl struct {
-	metadata
+	plugin.Metadata
 	pluginClient   resolverv1connect.PluginServiceClient
 	resolverClient resolverv1connect.ResolverServiceClient
 	close          func() error
@@ -139,7 +140,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runt
 	}()
 
 	return &runtimeImpl{
-		metadata:       r.cfg,
+		Metadata:       r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: func() error {
@@ -185,7 +186,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 	}
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
 	return &runtimeImpl{
-		metadata:       r.cfg,
+		Metadata:       r.cfg,
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: sync.OnceValue(func() error {

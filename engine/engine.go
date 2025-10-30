@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -38,16 +39,16 @@ type engineImpl struct {
 	close func() error
 }
 
-func newEngine(ctx context.Context, cfg config) (engine, error) {
-	plan := wrapBuiltins(ctx, cfg.logger, getPluginShutdownTimeout(), cfg.plugins)
-	if !cfg.enginePluginsDisabled {
+func newEngine(ctx context.Context, cfg config.Engine) (engine, error) {
+	plan := wrapBuiltins(ctx, cfg, getPluginShutdownTimeout())
+	if cfg.LaunchedPluginsEnabled() {
 		morePlugins, err := wrapExternalPlugins(cfg)
 		if err != nil {
 			return nil, err
 		}
 		plan = append(plan, morePlugins...)
 	}
-	reg := newManager(cfg.logger)
+	reg := newManager(cfg.Logger())
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
 	server := newServer(cfg, reg)
@@ -55,7 +56,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	var serverErr error
 	go func() {
 		defer func() { _ = shutdownManagedPlugins() }()
-		if err := server.Serve(cfg.listener); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
+		if err := server.Serve(cfg.Listener()); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
 			serverErr = errors.Join(serverErr, err)
 		}
 		close(done)
@@ -63,7 +64,7 @@ func newEngine(ctx context.Context, cfg config) (engine, error) {
 	return &engineImpl{
 		reg: reg,
 		close: sync.OnceValue(func() error {
-			defer cfg.listener.Close()
+			defer cfg.Listener().Close()
 			stopErr := shutdownManagedPlugins()
 			// Close() has its own context that's derived from the initial context passed to the engine
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), engineShutdownTimeout)
@@ -114,9 +115,9 @@ func parallelStop(it iter.Seq[runtime]) error {
 	return errors.Join(errList...)
 }
 
-func wrapExternalPlugins(cfg config) ([]launchPlan, error) {
-	cfg.logger.Printf("scanning plugin dir...")
-	discoveredPlugins, err := scanPluginDir(cfg.logger, cfg.pluginPath)
+func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
+	cfg.Logger().Printf("scanning plugin dir...")
+	discoveredPlugins, err := scanPluginDir(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -124,16 +125,16 @@ func wrapExternalPlugins(cfg config) ([]launchPlan, error) {
 	for _, p := range discoveredPlugins {
 		name, l := newLauncher(cfg, p)
 		result = append(result, launchPlan{l, internalPlugin, name})
-		cfg.logger.Printf("discovered plugin: %s", name)
+		cfg.Logger().Printf("discovered plugin: %s", name)
 	}
 	return result, nil
 }
 
-func newLauncher(cfg config, pluginFile string) (string, launcher) {
+func newLauncher(cfg config.Engine, pluginFile string) (string, launcher) {
 	name := toDisplayName(pluginFile)
 	return name, func() (runtime, error) {
-		return newLaunchedPlugin(cfg.logger, exec.Command(filepath.Join(cfg.pluginPath, pluginFile)), runtimeCfg{
-			out:  pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()},
+		return newLaunchedPlugin(cfg.Logger(), exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)), runtimeCfg{
+			out:  pluginCfgOut{engineName: cfg.Name(), engineVersion: cfg.Version(), requestTimeout: getPluginRequestTimeout()},
 			name: name,
 		})
 	}
@@ -141,16 +142,16 @@ func newLauncher(cfg config, pluginFile string) (string, launcher) {
 
 type launcher func() (runtime, error)
 
-func retryLoop(ctx context.Context, cfg config, reg registry, name string, l launcher) error {
-	cfg.logger.Printf("registering plugin '%s'...", name)
+func retryLoop(ctx context.Context, cfg config.Engine, reg registry, name string, l launcher) error {
+	cfg.Logger().Printf("registering plugin '%s'...", name)
 
 	exponentialBackOff := backoff.NewExponentialBackOff()
 	exponentialBackOff.InitialInterval = 2 * time.Second
 	opts := []backoff.RetryOption{
 		backoff.WithNotify(func(err error, duration time.Duration) {
-			cfg.logger.Printf("retry registering plugin '%s' (timeout: %s): %s", name, duration, err)
+			cfg.Logger().Printf("retry registering plugin '%s' (timeout: %s): %s", name, duration, err)
 		}),
-		backoff.WithMaxTries(cfg.maxTries),
+		backoff.WithMaxTries(cfg.PluginLaunchMaxRetries()),
 		backoff.WithMaxElapsedTime(2 * time.Minute),
 		backoff.WithBackOff(exponentialBackOff),
 	}
@@ -158,7 +159,7 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 	_, err := backoff.Retry(ctx, func() (any, error) {
 		errClosed, err := register(ctx, reg, l)
 		if err != nil {
-			cfg.logger.Errorf("registering plugin '%s': %v", name, err)
+			cfg.Logger().Errorf("registering plugin '%s': %v", name, err)
 			return nil, err
 		}
 		exponentialBackOff.Reset()
@@ -167,7 +168,7 @@ func retryLoop(ctx context.Context, cfg config, reg registry, name string, l lau
 			return nil, ctx.Err()
 		case err := <-errClosed:
 			if err != nil {
-				cfg.logger.Errorf("plugin '%s' terminated: %v", name, err)
+				cfg.Logger().Errorf("plugin '%s' terminated: %v", name, err)
 			}
 			return nil, err
 		}
@@ -206,20 +207,20 @@ func register(ctx context.Context, reg registry, launch launcher) (<-chan error,
 	return errClosed, nil
 }
 
-func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
-	if pluginPath == "" {
+func scanPluginDir(cfg config.Engine) ([]string, error) {
+	if cfg.PluginPath() == "" {
 		return nil, nil
 	}
 
 	var result []string
 
-	entries, err := os.ReadDir(pluginPath)
+	entries, err := os.ReadDir(cfg.PluginPath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Warnf("Plugin directory does not exist: %s", pluginPath)
+			cfg.Logger().Warnf("Plugin directory does not exist: %s", cfg.PluginPath())
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to discover plugins in %s: %w", pluginPath, err)
+		return nil, fmt.Errorf("failed to discover plugins in %s: %w", cfg.PluginPath(), err)
 	}
 
 	for _, e := range entries {
@@ -240,30 +241,37 @@ func scanPluginDir(logger logging.Logger, pluginPath string) ([]string, error) {
 	return result, nil
 }
 
-func newServer(cfg config, reg registry) *http.Server {
+func newServer(cfg config.Engine, reg registry) *http.Server {
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	r := newRegResolver(cfg.logger, cfg.tracker, reg)
+	r := newRegResolver(cfg, reg)
 	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
-	if !cfg.dynamicPluginsDisabled {
-		httpMux.Handle(ipc.NewHijackAcceptor(cfg.logger, func(ctx context.Context, conn io.ReadWriteCloser) {
+	if cfg.DynamicPluginsEnabled() {
+		httpMux.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
 			span := trace.SpanFromContext(ctx)
 			launcher := launcher(func() (runtime, error) {
-				return newExternalPlugin(cfg.logger, conn, runtimeCfg{out: pluginCfgOut{engineName: cfg.name, engineVersion: cfg.version, requestTimeout: getPluginRequestTimeout()}})
+				return newExternalPlugin(cfg.Logger(), conn, runtimeCfg{
+					out: pluginCfgOut{
+						engineName:     cfg.Name(),
+						engineVersion:  cfg.Version(),
+						requestTimeout: getPluginRequestTimeout(),
+					},
+				},
+				)
 			})
-			errDone, err := register(logging.WithLogger(ctx, cfg.logger), reg, launcher)
+			errDone, err := register(logging.WithLogger(ctx, cfg.Logger()), reg, launcher)
 			if err != nil {
-				cfg.logger.Errorf("registering dynamic plugin: %v", err)
+				cfg.Logger().Errorf("registering dynamic plugin: %v", err)
 			}
 			select {
 			case <-ctx.Done():
 			case err := <-errDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
 					span.RecordError(err, trace.WithAttributes(attribute.String("phase", "external_plugin_disconnected")))
-					cfg.logger.Errorf("external plugin '%s' stopped: %v", cfg.name, err)
+					cfg.Logger().Errorf("external plugin '%s' stopped: %v", cfg.Name(), err)
 				}
 			}
 		}))

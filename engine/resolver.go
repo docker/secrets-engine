@@ -5,24 +5,21 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/x/secrets"
-	"github.com/docker/secrets-engine/x/telemetry"
 )
 
 var _ secrets.Resolver = &regResolver{}
 
 type regResolver struct {
-	reg     registry
-	logger  logging.Logger
-	tracker telemetry.Tracker
+	reg registry
+	cfg config.Engine
 }
 
-func newRegResolver(logger logging.Logger, tracker telemetry.Tracker, reg registry) *regResolver {
+func newRegResolver(cfg config.Engine, reg registry) *regResolver {
 	return &regResolver{
-		reg:     reg,
-		logger:  logger,
-		tracker: tracker,
+		cfg: cfg,
+		reg: reg,
 	}
 }
 
@@ -37,7 +34,7 @@ func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 		envelopes, err := plugin.GetSecrets(ctx, pattern)
 		if err != nil {
 			if !errors.Is(err, secrets.ErrNotFound) {
-				r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
+				r.cfg.Logger().Errorf("plugin '%s': %s", plugin.Name(), err)
 			}
 			continue
 		}
@@ -51,7 +48,7 @@ func (r regResolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 		}
 	}
 
-	r.tracker.TrackEvent(EventSecretsEngineRequest{ResultsTotal: len(results)})
+	r.cfg.Tracker().TrackEvent(EventSecretsEngineRequest{ResultsTotal: len(results)})
 
 	if len(results) > 0 {
 		return results, nil

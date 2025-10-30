@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -32,7 +33,7 @@ var (
 	mockPluginCfgIn = mustNewValidatedConfig(mockPluginCfgInUnvalidated)
 )
 
-func mustNewValidatedConfig(in pluginDataUnvalidated) metadata {
+func mustNewValidatedConfig(in pluginDataUnvalidated) plugin.Metadata {
 	r, err := newValidatedConfig(in)
 	if err != nil {
 		panic(err)
@@ -46,7 +47,7 @@ type mockValidator struct {
 	err error
 }
 
-func (m mockValidator) Validate(in pluginDataUnvalidated) (metadata, *pluginCfgOut, error) {
+func (m mockValidator) Validate(in pluginDataUnvalidated) (plugin.Metadata, *pluginCfgOut, error) {
 	assert.Equal(m.t, mockPluginCfgInUnvalidated, in)
 	return mockPluginCfgIn, m.out, m.err
 }

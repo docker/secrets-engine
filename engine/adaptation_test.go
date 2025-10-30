@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	p "github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
@@ -35,7 +36,7 @@ func testEngine(t *testing.T) (secrets.Resolver, string) {
 		WithLogger(testhelper.TestLogger(t)),
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
-		WithPlugins(map[Config]Plugin{
+		WithPlugins(map[Config]plugin.Plugin{
 			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 		}),
 	)
@@ -170,7 +171,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithSocketPath(socketPath),
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
-				WithPlugins(map[Config]Plugin{
+				WithPlugins(map[Config]plugin.Plugin{
 					{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 				}),
 			}

@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/docker/secrets-engine/engine/internal/config"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
@@ -29,6 +31,8 @@ type (
 	Logger  = logging.Logger
 
 	Tracker = telemetry.Tracker
+
+	Plugin = plugin.Plugin
 )
 
 var (
@@ -51,12 +55,6 @@ const (
 	DefaultPluginPath = "/opt/docker/secrets-engine/plugins"
 )
 
-type Plugin interface {
-	Resolver
-
-	Run(ctx context.Context) error
-}
-
 type Config struct {
 	Name string
 	// Version of the plugin in semver format.
@@ -65,7 +63,7 @@ type Config struct {
 	Pattern secrets.Pattern
 }
 
-func (c *Config) validated() (metadata, error) {
+func (c *Config) validated() (plugin.Metadata, error) {
 	name, err := api.NewName(c.Name)
 	if err != nil {
 		return nil, err
@@ -79,26 +77,68 @@ func (c *Config) validated() (metadata, error) {
 	return &configValidated{name, c.Version, c.Pattern}, nil
 }
 
-type config struct {
-	name                   string
-	version                string
-	pluginPath             string
-	listener               net.Listener
-	plugins                map[metadata]Plugin
-	dynamicPluginsDisabled bool
-	enginePluginsDisabled  bool
-	logger                 logging.Logger
-	maxTries               uint
-	upCb                   func(ctx context.Context) error
-	tracker                telemetry.Tracker
+type engineConfig struct {
+	name                    string
+	version                 string
+	pluginPath              string
+	listener                net.Listener
+	plugins                 map[plugin.Metadata]plugin.Plugin
+	dynamicPluginsDisabled  bool
+	launchedPluginsDisabled bool
+	logger                  logging.Logger
+	pluginLaunchMaxRetries  uint
+	upCb                    func(ctx context.Context) error
+	tracker                 telemetry.Tracker
 }
 
+func (e *engineConfig) Plugins() map[plugin.Metadata]plugin.Plugin {
+	return e.plugins
+}
+
+func (e *engineConfig) LaunchedPluginsEnabled() bool {
+	return !e.launchedPluginsDisabled
+}
+
+func (e *engineConfig) Listener() net.Listener {
+	return e.listener
+}
+
+func (e *engineConfig) PluginLaunchMaxRetries() uint {
+	return e.pluginLaunchMaxRetries
+}
+
+func (e *engineConfig) DynamicPluginsEnabled() bool {
+	return !e.dynamicPluginsDisabled
+}
+
+func (e *engineConfig) Tracker() telemetry.Tracker {
+	return e.tracker
+}
+
+func (e *engineConfig) Logger() logging.Logger {
+	return e.logger
+}
+
+func (e *engineConfig) Name() string {
+	return e.name
+}
+
+func (e *engineConfig) PluginPath() string {
+	return e.pluginPath
+}
+
+func (e *engineConfig) Version() string {
+	return e.version
+}
+
+var _ config.Engine = &engineConfig{}
+
 // Option to apply to the secrets engine.
-type Option func(*config) error
+type Option func(*engineConfig) error
 
 // WithPluginPath returns an option to override the default plugin path.
 func WithPluginPath(path string) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		r.pluginPath = path
 		return nil
 	}
@@ -106,7 +146,7 @@ func WithPluginPath(path string) Option {
 
 // WithSocketPath returns an option to override the default socket path.
 func WithSocketPath(path string) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		if r.listener != nil {
 			return errors.New("listener already set")
 		}
@@ -121,7 +161,7 @@ func WithSocketPath(path string) Option {
 
 // WithListener sets the listener (and thereby overwrites using the default socket path)
 func WithListener(listener net.Listener) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		if r.listener != nil {
 			return errors.New("listener already set")
 		}
@@ -131,9 +171,9 @@ func WithListener(listener net.Listener) Option {
 }
 
 // WithPlugins sets a list of plugins that get bundled with the engine (batteries included plugins)
-func WithPlugins(plugins map[Config]Plugin) Option {
-	return func(r *config) error {
-		pluginsValidated := map[metadata]Plugin{}
+func WithPlugins(plugins map[Config]plugin.Plugin) Option {
+	return func(r *engineConfig) error {
+		pluginsValidated := map[plugin.Metadata]plugin.Plugin{}
 		for unvalidated, p := range plugins {
 			c, err := unvalidated.validated()
 			if err != nil {
@@ -149,7 +189,7 @@ func WithPlugins(plugins map[Config]Plugin) Option {
 // WithExternallyLaunchedPluginsDisabled disables accepting plugin registration requests coming
 // from plugins that have been launched externally
 func WithExternallyLaunchedPluginsDisabled() Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		r.dynamicPluginsDisabled = true
 		return nil
 	}
@@ -157,14 +197,14 @@ func WithExternallyLaunchedPluginsDisabled() Option {
 
 // WithEngineLaunchedPluginsDisabled disables launching any plugins from the plugin directory
 func WithEngineLaunchedPluginsDisabled() Option {
-	return func(r *config) error {
-		r.enginePluginsDisabled = true
+	return func(r *engineConfig) error {
+		r.launchedPluginsDisabled = true
 		return nil
 	}
 }
 
 func WithLogger(logger logging.Logger) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		r.logger = logger
 		return nil
 	}
@@ -173,15 +213,15 @@ func WithLogger(logger logging.Logger) Option {
 // WithMaxTries limits the number of all attempts.
 // Unlimited by default (maxTries == 0).
 func WithMaxTries(maxTries uint) Option {
-	return func(r *config) error {
-		r.maxTries = maxTries
+	return func(r *engineConfig) error {
+		r.pluginLaunchMaxRetries = maxTries
 		return nil
 	}
 }
 
 // WithAfterHealthyHook set a callback that gets called once the engine is ready to accept requests.
 func WithAfterHealthyHook(cb func(ctx context.Context) error) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		r.upCb = cb
 		return nil
 	}
@@ -189,14 +229,14 @@ func WithAfterHealthyHook(cb func(ctx context.Context) error) Option {
 
 // WithTracker set a tracker (default: noop tracker)
 func WithTracker(tracker telemetry.Tracker) Option {
-	return func(r *config) error {
+	return func(r *engineConfig) error {
 		r.tracker = telemetry.AsyncWrapper(tracker)
 		return nil
 	}
 }
 
 func Run(ctx context.Context, name, version string, opts ...Option) error {
-	cfg := &config{
+	cfg := &engineConfig{
 		name:       name,
 		version:    version,
 		pluginPath: DefaultPluginPath,
@@ -236,7 +276,7 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	}
 
 	cfg.logger.Printf("secrets engine starting up..." + socketInfo)
-	e, err := newEngine(ctx, *cfg)
+	e, err := newEngine(ctx, cfg)
 	if err != nil {
 		recordErrorWithStatus(cfg.tracker, span, err, "create_engine", "init_failure")
 		return err
