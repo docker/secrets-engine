@@ -200,7 +200,7 @@ func Test_newPlugin(t *testing.T) {
 				assert.NoError(t, err)
 				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
 				assert.NoError(t, err)
-				require.NoError(t, getProc(t, p).kill())
+				require.NoError(t, p.Watcher().Kill())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
 				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
@@ -213,16 +213,6 @@ func Test_newPlugin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
-}
-
-func getProc(t *testing.T, r plugin.Runtime) proc {
-	t.Helper()
-	impl, ok := r.(*runtimeImpl)
-	require.True(t, ok)
-	require.NotNil(t, impl)
-	p, ok := impl.cmd.(*cmdWatchWrapper)
-	require.True(t, ok)
-	return p.p
 }
 
 func pluginNameFromTestName(t *testing.T) string {

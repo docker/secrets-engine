@@ -29,3 +29,8 @@ type Runtime interface {
 
 	Closed() <-chan struct{}
 }
+
+type ExternalRuntime interface {
+	Runtime
+	Watcher() Watcher
+}

@@ -394,6 +394,8 @@ func getRegistry(t *testing.T, e engine) registry.Registry {
 func killAllPlugins(t *testing.T, r registry.Registry) {
 	t.Helper()
 	for p := range r.Iterator() {
-		require.NoError(t, getProc(t, p).kill())
+		if ep, ok := p.(plugin.ExternalRuntime); ok {
+			require.NoError(t, ep.Watcher().Kill())
+		}
 	}
 }

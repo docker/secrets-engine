@@ -86,11 +86,11 @@ type runtimeImpl struct {
 	closed         <-chan struct{}
 	logger         logging.Logger
 	// TODO: actually store the PID here (we'll need this for security reasons later anyway)
-	cmd procWrapper
+	cmd plugin.Watcher
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plugin.Runtime, error) {
+func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plugin.ExternalRuntime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -109,24 +109,25 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 	}
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
-	cmdWrapper := launchCmdWatched(logger, v.name, fromCmd(cmd), getPluginShutdownTimeout())
+	process := plugin.NewProcess(cmd)
+	watcher := plugin.WatchProcess(logger, v.name, process, getPluginShutdownTimeout())
 
 	ipcClosed, setIpcClosed := closeOnce()
 	r, err := setup(logger, rwc, setIpcClosed, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
-		cmdWrapper.Close()
+		watcher.Close()
 		return nil, err
 	}
 
 	c := resolverv1connect.NewPluginServiceClient(r.client, "http://unix")
-	helper := newShutdownHelper(func() error {
-		return errors.Join(callPluginShutdown(c, ipcClosed), filterClientAlreadyClosed(r.close()), cmdWrapper.Close())
+	helper := plugin.NewShutdownHelper(func() error {
+		return errors.Join(callPluginShutdown(c, ipcClosed), filterClientAlreadyClosed(r.close()), watcher.Close())
 	})
 
 	go func() {
-		<-cmdWrapper.Closed()
-		_ = helper.shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", v.name))
+		<-watcher.Closed()
+		_ = helper.Shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", v.name))
 	}()
 
 	return &runtimeImpl{
@@ -134,11 +135,11 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 		pluginClient:   c,
 		resolverClient: resolverv1connect.NewResolverServiceClient(r.client, "http://unix"),
 		close: func() error {
-			return helper.shutdown(nil)
+			return helper.Shutdown(nil)
 		},
-		closed: helper.closed(),
+		closed: helper.Closed(),
 		logger: logger,
-		cmd:    cmdWrapper,
+		cmd:    watcher,
 	}, nil
 }
 
@@ -225,4 +226,8 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, pattern secrets.Pattern) (
 		})
 	}
 	return items, nil
+}
+
+func (r *runtimeImpl) Watcher() plugin.Watcher {
+	return r.cmd
 }
