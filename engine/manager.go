@@ -7,19 +7,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
+	"github.com/docker/secrets-engine/engine/internal/registry"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
-type removeFunc func()
-
-type registry interface {
-	Register(plugin runtime) (removeFunc, error)
-	Iterator() iter.Seq[runtime]
-}
-
 type manager struct {
 	m        sync.RWMutex
-	plugins  []runtime
+	plugins  []plugin.Runtime
 	visitors map[*visitor]struct{}
 	logger   logging.Logger
 }
@@ -32,9 +27,9 @@ type visitor struct {
 	index int
 }
 
-var _ registry = &manager{}
+var _ registry.Registry = &manager{}
 
-func (m *manager) Register(plugin runtime) (removeFunc, error) {
+func (m *manager) Register(plugin plugin.Runtime) (registry.RemoveFunc, error) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	for _, p := range m.plugins {
@@ -50,7 +45,7 @@ func (m *manager) Register(plugin runtime) (removeFunc, error) {
 }
 
 func (m *manager) sort() {
-	slices.SortFunc(m.plugins, func(a, b runtime) int {
+	slices.SortFunc(m.plugins, func(a, b plugin.Runtime) int {
 		return strings.Compare(a.Name().String(), b.Name().String())
 	})
 	if len(m.plugins) > 0 {
@@ -61,7 +56,7 @@ func (m *manager) sort() {
 	}
 }
 
-func (m *manager) Iterator() iter.Seq[runtime] {
+func (m *manager) Iterator() iter.Seq[plugin.Runtime] {
 	m.m.Lock()
 	defer m.m.Unlock()
 	startIdx := -1
@@ -71,7 +66,7 @@ func (m *manager) Iterator() iter.Seq[runtime] {
 	v := &visitor{index: startIdx}
 	m.visitors[v] = struct{}{}
 
-	return func(yield func(runtime) bool) {
+	return func(yield func(plugin.Runtime) bool) {
 		defer m.removeVisitor(v)
 
 		for {
@@ -92,7 +87,7 @@ func (m *manager) removeVisitor(v *visitor) {
 	delete(m.visitors, v)
 }
 
-func (m *manager) visit(v *visitor) (runtime, bool) {
+func (m *manager) visit(v *visitor) (plugin.Runtime, bool) {
 	m.m.RLock()
 	defer m.m.RUnlock()
 
@@ -116,7 +111,7 @@ func (m *manager) visit(v *visitor) (runtime, bool) {
 	return p, true
 }
 
-func (m *manager) remove(plugin runtime) {
+func (m *manager) remove(plugin plugin.Runtime) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	idx := -1

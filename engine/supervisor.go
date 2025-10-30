@@ -10,6 +10,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/secrets-engine/engine/internal/config"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
+	"github.com/docker/secrets-engine/engine/internal/registry"
 )
 
 type runnable func(ctx context.Context) error
@@ -22,7 +24,7 @@ type launchPlan struct {
 
 // Parallelizes the launch of all managed plugins but then still waits for synchronization until
 // all launch functions are at least executed once.
-func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry, plan []launchPlan) func() {
+func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.Registry, plan []launchPlan) func() {
 	span := trace.SpanFromContext(ctx)
 	initialProcesses := map[string]runnable{}
 	upGroup := &sync.WaitGroup{}
@@ -30,7 +32,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry, 
 		upGroup.Add(1)
 		launchedOnce := sync.OnceFunc(func() { upGroup.Done() })
 		initialProcesses[fmt.Sprintf("[%s] %s", p.pluginType, p.name)] = func(ctx context.Context) error {
-			launcherWithOnce := launcher(func() (runtime, error) {
+			launcherWithOnce := launcher(func() (plugin.Runtime, error) {
 				defer launchedOnce()
 				return p.launcher()
 			})

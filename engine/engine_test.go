@@ -16,7 +16,9 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/enginetesthelper"
+	"github.com/docker/secrets-engine/engine/internal/mocks"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
+	"github.com/docker/secrets-engine/engine/internal/registry"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
@@ -53,8 +55,8 @@ func (m *mockSlowRuntime) Close() error {
 	return fmt.Errorf("%s closed", m.name)
 }
 
-func newMockIterator(runtimes []runtime) iter.Seq[runtime] {
-	return func(yield func(runtime) bool) {
+func newMockIterator(runtimes []plugin.Runtime) iter.Seq[plugin.Runtime] {
+	return func(yield func(plugin.Runtime) bool) {
 		for i := 0; i < len(runtimes); i++ {
 			if !yield(runtimes[i]) {
 				return
@@ -66,7 +68,7 @@ func newMockIterator(runtimes []runtime) iter.Seq[runtime] {
 // Unfortunately, there's no way to test this reliably using channels.
 // We instead have a tiny sleep per mockRuntime.Close() with a larger global timeout in case the parallelStop function locks.
 func Test_parallelStop(t *testing.T) {
-	var runtimes []runtime
+	var runtimes []plugin.Runtime
 	for i := range 10000 {
 		runtimes = append(runtimes, &mockSlowRuntime{name: api.MustNewName(fmt.Sprintf("r%d", i))})
 	}
@@ -83,49 +85,18 @@ func Test_parallelStop(t *testing.T) {
 	}
 }
 
-type mockRuntime struct {
-	name        api.Name
-	closeCalled int
-	closed      chan struct{}
-}
-
-func (m *mockRuntime) Name() api.Name {
-	return m.name
-}
-
-func (m *mockRuntime) Version() api.Version {
-	return mockValidVersion
-}
-
-func (m *mockRuntime) Pattern() secrets.Pattern {
-	return mockPatternAny
-}
-
-func (m *mockRuntime) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
-	return []secrets.Envelope{}, nil
-}
-
-func (m *mockRuntime) Close() error {
-	m.closeCalled++
-	return nil
-}
-
-func (m *mockRuntime) Closed() <-chan struct{} {
-	return m.closed
-}
-
 type mockRegistry struct {
-	addCalled    []runtime
+	addCalled    []plugin.Runtime
 	removed      chan struct{}
 	removeCalled int
 	err          error
 }
 
-func (m *mockRegistry) Iterator() iter.Seq[runtime] {
-	return func(func(runtime) bool) {}
+func (m *mockRegistry) Iterator() iter.Seq[plugin.Runtime] {
+	return func(func(plugin.Runtime) bool) {}
 }
 
-func (m *mockRegistry) Register(plugin runtime) (removeFunc, error) {
+func (m *mockRegistry) Register(plugin plugin.Runtime) (registry.RemoveFunc, error) {
 	m.addCalled = append(m.addCalled, plugin)
 	return func() {
 		m.removeCalled++
@@ -145,7 +116,7 @@ func Test_Register(t *testing.T) {
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
 		reg := &mockRegistry{}
 		launchErr := errors.New("launch error")
-		l := func() (runtime, error) {
+		l := func() (plugin.Runtime, error) {
 			return nil, launchErr
 		}
 		errCh, err := register(testLoggerCtx(t), reg, l)
@@ -155,33 +126,33 @@ func Test_Register(t *testing.T) {
 	t.Run("when Register() returns an error, Close() is called", func(t *testing.T) {
 		errRegister := errors.New("register error")
 		reg := &mockRegistry{err: errRegister}
-		r := &mockRuntime{}
-		l := func() (runtime, error) {
+		r := &mocks.MockRuntime{}
+		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
 		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.ErrorIs(t, err, errRegister)
 		assert.Nil(t, errCh)
-		assert.Equal(t, 1, r.closeCalled)
+		assert.Equal(t, 1, r.CloseCalled)
 	})
 	t.Run("runtime gets unregistered when channel is closed", func(t *testing.T) {
 		reg := &mockRegistry{removed: make(chan struct{})}
-		r := &mockRuntime{closed: make(chan struct{})}
-		l := func() (runtime, error) {
+		r := &mocks.MockRuntime{RuntimeClosed: make(chan struct{})}
+		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
 		errCh, err := register(testLoggerCtx(t), reg, l)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, reg.removeCalled)
-		close(r.closed)
+		close(r.RuntimeClosed)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
 		assert.NoError(t, testhelper.WaitForErrorWithTimeout(errCh))
 	})
 	t.Run("runtime gets unregistered when runtime closed channel is nil", func(t *testing.T) {
 		reg := &mockRegistry{removed: make(chan struct{})}
-		r := &mockRuntime{}
-		l := func() (runtime, error) {
+		r := &mocks.MockRuntime{}
+		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
 		errCh, err := register(testLoggerCtx(t), reg, l)
@@ -413,14 +384,14 @@ func Test_newEngine(t *testing.T) {
 	})
 }
 
-func getRegistry(t *testing.T, e engine) registry {
+func getRegistry(t *testing.T, e engine) registry.Registry {
 	t.Helper()
 	impl, ok := e.(*engineImpl)
 	require.True(t, ok)
 	return impl.reg
 }
 
-func killAllPlugins(t *testing.T, r registry) {
+func killAllPlugins(t *testing.T, r registry.Registry) {
 	t.Helper()
 	for p := range r.Iterator() {
 		require.NoError(t, getProc(t, p).kill())

@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"io"
 
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -17,4 +18,14 @@ type Metadata interface {
 	Name() api.Name
 	Version() api.Version
 	Pattern() secrets.Pattern
+}
+
+type Runtime interface {
+	secrets.Resolver
+
+	io.Closer
+
+	Metadata
+
+	Closed() <-chan struct{}
 }

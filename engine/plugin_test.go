@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	p "github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
@@ -214,7 +215,7 @@ func Test_newPlugin(t *testing.T) {
 	}
 }
 
-func getProc(t *testing.T, r runtime) proc {
+func getProc(t *testing.T, r plugin.Runtime) proc {
 	t.Helper()
 	impl, ok := r.(*runtimeImpl)
 	require.True(t, ok)
@@ -407,7 +408,7 @@ func (m *mockExternalRuntime) shutdown() error {
 	return testhelper.WaitForErrorWithTimeout(m.serverErr)
 }
 
-func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (runtime, error) {
+func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (plugin.Runtime, error) {
 	item, err := testhelper.WaitForWithTimeoutV(m.ch)
 	if err != nil {
 		return nil, err
