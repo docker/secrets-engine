@@ -7,19 +7,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/secrets-engine/engine/internal/config"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type internalRuntime struct {
-	metadata
-	p      Plugin
+	plugin.Metadata
+	p      plugin.Plugin
 	closed chan struct{}
 	runErr func() error
 	close  func() error
 }
 
-func newInternalRuntime(ctx context.Context, p Plugin, c metadata, shutdownTimeout time.Duration) (runtime, error) {
+func newInternalRuntime(ctx context.Context, p plugin.Plugin, c plugin.Metadata, shutdownTimeout time.Duration) (runtime, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -47,7 +49,7 @@ func newInternalRuntime(ctx context.Context, p Plugin, c metadata, shutdownTimeo
 		runErr.StoreFirst(err)
 	}()
 	return &internalRuntime{
-		metadata: c,
+		Metadata: c,
 		p:        p,
 		closed:   closed,
 		runErr:   runErr.Load,
@@ -111,12 +113,12 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
 }
 
-func wrapBuiltins(ctx context.Context, logger logging.Logger, shutdownTimeout time.Duration, plugins map[metadata]Plugin) []launchPlan {
+func wrapBuiltins(ctx context.Context, cfg config.Engine, shutdownTimeout time.Duration) []launchPlan {
 	var result []launchPlan
-	for c, p := range plugins {
+	for c, p := range cfg.Plugins() {
 		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c, shutdownTimeout) }
 		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
-		logger.Printf("discovered builtin plugin: %s", c.Name())
+		cfg.Logger().Printf("discovered builtin plugin: %s", c.Name())
 	}
 	return result
 }

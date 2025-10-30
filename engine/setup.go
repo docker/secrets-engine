@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/yamux"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -18,7 +19,7 @@ import (
 
 type setupResult struct {
 	client *http.Client
-	cfg    metadata
+	cfg    plugin.Metadata
 	close  func() error
 }
 
@@ -50,7 +51,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 	if err != nil {
 		return nil, err
 	}
-	var out metadata
+	var out plugin.Metadata
 	select {
 	case r := <-chRegistrationResult:
 		if r.err != nil || r.cfg == nil {
@@ -98,7 +99,7 @@ type pluginDataUnvalidated struct {
 	Pattern string
 }
 
-func (p runtimeCfg) Validate(in pluginDataUnvalidated) (metadata, *pluginCfgOut, error) {
+func (p runtimeCfg) Validate(in pluginDataUnvalidated) (plugin.Metadata, *pluginCfgOut, error) {
 	if p.name != "" && in.Name != p.name {
 		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
 	}
@@ -109,7 +110,7 @@ func (p runtimeCfg) Validate(in pluginDataUnvalidated) (metadata, *pluginCfgOut,
 	return data, &p.out, nil
 }
 
-func newValidatedConfig(in pluginDataUnvalidated) (metadata, error) {
+func newValidatedConfig(in pluginDataUnvalidated) (plugin.Metadata, error) {
 	name, err := api.NewName(in.Name)
 	if err != nil {
 		return nil, err
@@ -141,10 +142,4 @@ func (c configValidated) Version() api.Version {
 
 func (c configValidated) Pattern() secrets.Pattern {
 	return c.pattern
-}
-
-type metadata interface {
-	Name() api.Name
-	Version() api.Version
-	Pattern() secrets.Pattern
 }

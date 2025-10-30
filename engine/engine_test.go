@@ -15,11 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/engine/internal/enginetesthelper"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
-	"github.com/docker/secrets-engine/x/telemetry"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
@@ -199,7 +200,11 @@ func Test_discoverPlugins(t *testing.T) {
 		assert.NoError(t, os.WriteFile(filepath.Join(dir, "text-file"), []byte(""), 0o644))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "binary-file")))
 		assert.NoError(t, createFakeExecutable(filepath.Join(dir, "my-plugin")))
-		plugins, err := scanPluginDir(testhelper.TestLogger(t), dir)
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:              t,
+			TestPluginPath: dir,
+		}
+		plugins, err := scanPluginDir(cfg)
 		assert.NoError(t, err)
 		assert.Len(t, plugins, 2)
 		assert.Contains(t, plugins, "binary-file"+suffix)
@@ -207,12 +212,20 @@ func Test_discoverPlugins(t *testing.T) {
 	})
 	t.Run("empty list but no error if directory does not exist", func(t *testing.T) {
 		dir := t.TempDir()
-		plugins, err := scanPluginDir(testhelper.TestLogger(t), filepath.Join(dir, "does-not-exist"))
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:              t,
+			TestPluginPath: filepath.Join(dir, "does-not-exist"),
+		}
+		plugins, err := scanPluginDir(cfg)
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
 	t.Run("empty dir string", func(t *testing.T) {
-		plugins, err := scanPluginDir(testhelper.TestLogger(t), "")
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:              t,
+			TestPluginPath: "",
+		}
+		plugins, err := scanPluginDir(cfg)
 		assert.NoError(t, err)
 		assert.Empty(t, plugins)
 	})
@@ -231,14 +244,13 @@ func Test_newEngine(t *testing.T) {
 		plugins := []testdummy.PluginBehaviour{{Value: "foo"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
-		cfg := config{
-			name:       "test-engine",
-			version:    "v6",
-			pluginPath: dir,
-			listener:   newListener(t, socketPath),
-			logger:     testhelper.TestLogger(t),
-			maxTries:   1,
-			tracker:    telemetry.NoopTracker(),
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:                          t,
+			TestName:                   "test-engine",
+			TestVersion:                "v6",
+			TestPluginPath:             dir,
+			TestPluginLaunchMaxRetries: 1,
+			TestListener:               newListener(t, socketPath),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -255,14 +267,13 @@ func Test_newEngine(t *testing.T) {
 		plugins := []testdummy.PluginBehaviour{{Value: "bar"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
-		cfg := config{
-			name:       "test-engine",
-			version:    "v8",
-			pluginPath: dir,
-			listener:   newListener(t, socketPath),
-			logger:     testhelper.TestLogger(t),
-			maxTries:   1,
-			tracker:    telemetry.NoopTracker(),
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:                          t,
+			TestName:                   "test-engine",
+			TestVersion:                "v8",
+			TestPluginPath:             dir,
+			TestListener:               newListener(t, socketPath),
+			TestPluginLaunchMaxRetries: 1,
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -289,20 +300,19 @@ func Test_newEngine(t *testing.T) {
 	t.Run("internal plugin crashes on second get secret request (no recovery -> plugins get removed)", func(t *testing.T) {
 		socketPath := testhelper.RandomShortSocketName()
 		internalPluginRunExitCh := make(chan struct{})
-		cfg := config{
-			name:                  "test-engine",
-			version:               "v9",
-			enginePluginsDisabled: true,
-			listener:              newListener(t, socketPath),
-			logger:                testhelper.TestLogger(t),
-			maxTries:              1,
-			plugins: map[metadata]Plugin{
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:                          t,
+			TestName:                   "test-engine",
+			TestVersion:                "v9",
+			TestPluginsDisabled:        true,
+			TestListener:               newListener(t, socketPath),
+			TestPluginLaunchMaxRetries: 1,
+			TestPlugins: map[plugin.Metadata]plugin.Plugin{
 				&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
 					runExitCh: internalPluginRunExitCh,
 					secrets:   map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 				},
 			},
-			tracker: telemetry.NoopTracker(),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -328,13 +338,12 @@ func Test_newEngine(t *testing.T) {
 		plugins := []testdummy.PluginBehaviour{{Value: "bar"}}
 		dir := testdummy.CreateDummyPlugins(t, testdummy.Plugins{Plugins: plugins})
 		socketPath := testhelper.RandomShortSocketName()
-		cfg := config{
-			name:       "test-engine",
-			version:    "v99",
-			pluginPath: dir,
-			listener:   newListener(t, socketPath),
-			logger:     testhelper.TestLogger(t),
-			tracker:    telemetry.NoopTracker(),
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:              t,
+			TestName:       "test-engine",
+			TestVersion:    "v99",
+			TestPluginPath: dir,
+			TestListener:   newListener(t, socketPath),
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)
@@ -358,18 +367,21 @@ func Test_newEngine(t *testing.T) {
 		blockRunCh := make(chan struct{}, 1)
 		blockRunCh <- struct{}{}
 		runExitCh := make(chan struct{}, 1)
-		cfg := config{
-			name:                  "test-engine",
-			version:               "v1",
-			enginePluginsDisabled: true,
-			listener:              newListener(t, socketPath),
-			logger:                testhelper.TestLogger(t),
-			plugins: map[metadata]Plugin{&configValidated{api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny}: &mockInternalPlugin{
-				blockRunForever: blockRunCh,
-				runExitCh:       runExitCh,
-				secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
-			}},
-			tracker: telemetry.NoopTracker(),
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:                   t,
+			TestName:            "test-engine",
+			TestVersion:         "v1",
+			TestPluginsDisabled: true,
+			TestListener:        newListener(t, socketPath),
+			TestPlugins: map[plugin.Metadata]plugin.Plugin{
+				&configValidated{
+					api.MustNewName("my-builtin"), mockValidVersion, mockPatternAny,
+				}: &mockInternalPlugin{
+					blockRunForever: blockRunCh,
+					runExitCh:       runExitCh,
+					secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
+				},
+			},
 		}
 		e, err := newEngine(testLoggerCtx(t), cfg)
 		require.NoError(t, err)

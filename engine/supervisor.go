@@ -8,6 +8,8 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/docker/secrets-engine/engine/internal/config"
 )
 
 type runnable func(ctx context.Context) error
@@ -20,7 +22,7 @@ type launchPlan struct {
 
 // Parallelizes the launch of all managed plugins but then still waits for synchronization until
 // all launch functions are at least executed once.
-func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []launchPlan) func() {
+func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry, plan []launchPlan) func() {
 	span := trace.SpanFromContext(ctx)
 	initialProcesses := map[string]runnable{}
 	upGroup := &sync.WaitGroup{}
@@ -33,7 +35,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []
 				return p.launcher()
 			})
 			if err := retryLoop(ctx, cfg, reg, p.name, launcherWithOnce); err != nil && !errors.Is(err, context.Canceled) {
-				cfg.logger.Errorf("plugin '%s' stopped: %s", p.name, err)
+				cfg.Logger().Errorf("plugin '%s' stopped: %s", p.name, err)
 				return err
 			}
 			return nil
@@ -51,7 +53,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config, reg registry, plan []
 			err := run(ctxChild)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				span.RecordError(err, trace.WithAttributes(attribute.String("phase", "retry_ended")))
-				cfg.logger.Errorf("plugin '%s' stopped: %s", name, err)
+				cfg.Logger().Errorf("plugin '%s' stopped: %s", name, err)
 			}
 		}()
 	}

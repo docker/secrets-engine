@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/engine/internal/enginetesthelper"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
@@ -74,7 +75,13 @@ func TestResolver(t *testing.T) {
 			newMockResolverRuntime("foo", errors.New("foo")),
 			newMockResolverRuntime("bar", errors.New("bar")),
 		}}
-		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:           t,
+			TestTracker: tracker,
+		}
+
+		resolver := newRegResolver(cfg, reg)
+
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -84,7 +91,13 @@ func TestResolver(t *testing.T) {
 	t.Run("no match no errors", func(t *testing.T) {
 		tracker := testhelper.NewTestTracker()
 		reg := mockResolverRegistry{resolver: []runtime{}}
-		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:           t,
+			TestTracker: tracker,
+		}
+
+		resolver := newRegResolver(cfg, reg)
+
 		_, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -92,26 +105,34 @@ func TestResolver(t *testing.T) {
 		}, 2*time.Second, 100*time.Millisecond)
 	})
 	t.Run("multiple matches across multiple plugins", func(t *testing.T) {
-		reg := mockResolverRegistry{resolver: []runtime{
-			newMockResolverRuntime("foo", errors.New("foo")),
-			mockResolverRuntime{
-				name:    api.MustNewName("bar"),
-				version: api.MustNewVersion("v1"),
-				envelopes: []secrets.Envelope{
-					{ID: secrets.MustParseID("foo"), Value: []byte("foo")},
-					{ID: secrets.MustParseID("bar"), Value: []byte("bar")},
+		reg := mockResolverRegistry{
+			resolver: []runtime{
+				newMockResolverRuntime("foo", errors.New("foo")),
+				mockResolverRuntime{
+					name:    api.MustNewName("bar"),
+					version: api.MustNewVersion("v1"),
+					envelopes: []secrets.Envelope{
+						{ID: secrets.MustParseID("foo"), Value: []byte("foo")},
+						{ID: secrets.MustParseID("bar"), Value: []byte("bar")},
+					},
+				},
+				mockResolverRuntime{
+					name:    api.MustNewName("baz"),
+					version: api.MustNewVersion("v1"),
+					envelopes: []secrets.Envelope{
+						{ID: secrets.MustParseID("baz"), Value: []byte("baz")},
+					},
 				},
 			},
-			mockResolverRuntime{
-				name:    api.MustNewName("baz"),
-				version: api.MustNewVersion("v1"),
-				envelopes: []secrets.Envelope{
-					{ID: secrets.MustParseID("baz"), Value: []byte("baz")},
-				},
-			},
-		}}
+		}
 		tracker := testhelper.NewTestTracker()
-		resolver := newRegResolver(testhelper.TestLogger(t), tracker, reg)
+		cfg := &enginetesthelper.TestEngineConfig{
+			T:           t,
+			TestTracker: tracker,
+		}
+
+		resolver := newRegResolver(cfg, reg)
+
 		e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 		assert.NoError(t, err)
 		require.Len(t, e, 3)

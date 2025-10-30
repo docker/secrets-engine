@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/logging"
@@ -56,11 +57,11 @@ func (r *RegisterService) RegisterPlugin(ctx context.Context, c *connect.Request
 }
 
 type pluginCfgInValidator interface {
-	Validate(pluginDataUnvalidated) (metadata, *pluginCfgOut, error)
+	Validate(pluginDataUnvalidated) (plugin.Metadata, *pluginCfgOut, error)
 }
 
 type registrationResult struct {
-	cfg metadata
+	cfg plugin.Metadata
 	err error
 }
 
