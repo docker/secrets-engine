@@ -15,12 +15,14 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/secrets-engine/engine/internal/config"
-	"github.com/docker/secrets-engine/x/api/resolver"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
+	"github.com/docker/secrets-engine/engine/internal/registry"
+	"github.com/docker/secrets-engine/engine/internal/routes"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
 )
@@ -35,7 +37,7 @@ type engine interface {
 }
 
 type engineImpl struct {
-	reg   registry
+	reg   registry.Registry
 	close func() error
 }
 
@@ -51,7 +53,12 @@ func newEngine(ctx context.Context, cfg config.Engine) (engine, error) {
 	reg := newManager(cfg.Logger())
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
-	server := newServer(cfg, reg)
+
+	server, err := newServer(cfg, reg)
+	if err != nil {
+		return nil, err
+	}
+
 	done := make(chan struct{})
 	var serverErr error
 	go func() {
@@ -88,7 +95,7 @@ func (e *engineImpl) Plugins() []string {
 	return plugins
 }
 
-func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry) func() error {
+func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry.Registry) func() error {
 	return sync.OnceValue(func() error {
 		stopSupervisor()
 		return parallelStop(reg.Iterator())
@@ -96,13 +103,13 @@ func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry) func() erro
 }
 
 // Runs all io.Close() calls in parallel so shutdown time is T(1) and not T(n) for n plugins.
-func parallelStop(it iter.Seq[runtime]) error {
+func parallelStop(it iter.Seq[plugin.Runtime]) error {
 	var errList []error
 	m := sync.Mutex{}
 	wg := &sync.WaitGroup{}
 	for p := range it {
 		wg.Add(1)
-		go func(pl runtime) {
+		go func(pl plugin.Runtime) {
 			defer wg.Done()
 			err := pl.Close()
 
@@ -132,7 +139,7 @@ func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
 
 func newLauncher(cfg config.Engine, pluginFile string) (string, launcher) {
 	name := toDisplayName(pluginFile)
-	return name, func() (runtime, error) {
+	return name, func() (plugin.Runtime, error) {
 		return newLaunchedPlugin(cfg.Logger(), exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)), runtimeCfg{
 			out:  pluginCfgOut{engineName: cfg.Name(), engineVersion: cfg.Version(), requestTimeout: getPluginRequestTimeout()},
 			name: name,
@@ -140,9 +147,9 @@ func newLauncher(cfg config.Engine, pluginFile string) (string, launcher) {
 	}
 }
 
-type launcher func() (runtime, error)
+type launcher func() (plugin.Runtime, error)
 
-func retryLoop(ctx context.Context, cfg config.Engine, reg registry, name string, l launcher) error {
+func retryLoop(ctx context.Context, cfg config.Engine, reg registry.Registry, name string, l launcher) error {
 	cfg.Logger().Printf("registering plugin '%s'...", name)
 
 	exponentialBackOff := backoff.NewExponentialBackOff()
@@ -176,7 +183,7 @@ func retryLoop(ctx context.Context, cfg config.Engine, reg registry, name string
 	return err
 }
 
-func register(ctx context.Context, reg registry, launch launcher) (<-chan error, error) {
+func register(ctx context.Context, reg registry.Registry, launch launcher) (<-chan error, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -241,18 +248,17 @@ func scanPluginDir(cfg config.Engine) ([]string, error) {
 	return result, nil
 }
 
-func newServer(cfg config.Engine, reg registry) *http.Server {
-	httpMux := http.NewServeMux()
-	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	r := newRegResolver(cfg, reg)
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r)))
+func newServer(cfg config.Engine, reg registry.Registry) (*http.Server, error) {
+	router := chi.NewRouter()
+
+	if err := routes.Setup(cfg, reg, router); err != nil {
+		return nil, err
+	}
+
 	if cfg.DynamicPluginsEnabled() {
-		httpMux.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
+		router.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
 			span := trace.SpanFromContext(ctx)
-			launcher := launcher(func() (runtime, error) {
+			launcher := launcher(func() (plugin.Runtime, error) {
 				return newExternalPlugin(cfg.Logger(), conn, runtimeCfg{
 					out: pluginCfgOut{
 						engineName:     cfg.Name(),
@@ -277,8 +283,8 @@ func newServer(cfg config.Engine, reg registry) *http.Server {
 		}))
 	}
 	return &http.Server{
-		Handler: httpMux,
-	}
+		Handler: router,
+	}, nil
 }
 
 func createListener(socketPath string) (net.Listener, error) {

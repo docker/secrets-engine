@@ -21,7 +21,7 @@ type internalRuntime struct {
 	close  func() error
 }
 
-func newInternalRuntime(ctx context.Context, p plugin.Plugin, c plugin.Metadata, shutdownTimeout time.Duration) (runtime, error) {
+func newInternalRuntime(ctx context.Context, p plugin.Plugin, c plugin.Metadata, shutdownTimeout time.Duration) (plugin.Runtime, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (i *internalRuntime) Closed() <-chan struct{} {
 func wrapBuiltins(ctx context.Context, cfg config.Engine, shutdownTimeout time.Duration) []launchPlan {
 	var result []launchPlan
 	for c, p := range cfg.Plugins() {
-		l := func() (runtime, error) { return newInternalRuntime(ctx, p, c, shutdownTimeout) }
+		l := func() (plugin.Runtime, error) { return newInternalRuntime(ctx, p, c, shutdownTimeout) }
 		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
 		cfg.Logger().Printf("discovered builtin plugin: %s", c.Name())
 	}

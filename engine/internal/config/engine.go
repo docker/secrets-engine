@@ -8,15 +8,24 @@ import (
 	"github.com/docker/secrets-engine/x/telemetry"
 )
 
-type Engine interface {
-	Name() string
-	Version() string
-	Listener() net.Listener
+type Plugins interface {
 	PluginPath() string
-	Logger() logging.Logger
-	Tracker() telemetry.Tracker
 	DynamicPluginsEnabled() bool
 	PluginLaunchMaxRetries() uint
 	LaunchedPluginsEnabled() bool
 	Plugins() map[plugin.Metadata]plugin.Plugin
+}
+
+type Debugging interface {
+	Logger() logging.Logger
+	Tracker() telemetry.Tracker
+}
+
+type Engine interface {
+	Name() string
+	Version() string
+	Listener() net.Listener
+
+	Plugins
+	Debugging
 }

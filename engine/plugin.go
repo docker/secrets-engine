@@ -70,16 +70,6 @@ func getPluginShutdownTimeout() time.Duration {
 
 var _ secrets.Resolver = &runtimeImpl{}
 
-type runtime interface {
-	secrets.Resolver
-
-	io.Closer
-
-	plugin.Metadata
-
-	Closed() <-chan struct{}
-}
-
 type pluginType string
 
 const (
@@ -100,7 +90,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (runtime, error) {
+func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plugin.Runtime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -177,7 +167,7 @@ func filterClientAlreadyClosed(err error) error {
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (runtime, error) {
+func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (plugin.Runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
 	r, err := setup(logger, conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
