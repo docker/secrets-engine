@@ -1,4 +1,4 @@
-package engine
+package registry
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/docker/secrets-engine/engine/internal/plugin"
-	"github.com/docker/secrets-engine/engine/internal/registry"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -19,7 +18,7 @@ type manager struct {
 	logger   logging.Logger
 }
 
-func newManager(l logging.Logger) *manager {
+func NewManager(l logging.Logger) Registry {
 	return &manager{logger: l, visitors: map[*visitor]struct{}{}}
 }
 
@@ -27,9 +26,9 @@ type visitor struct {
 	index int
 }
 
-var _ registry.Registry = &manager{}
+var _ Registry = &manager{}
 
-func (m *manager) Register(plugin plugin.Runtime) (registry.RemoveFunc, error) {
+func (m *manager) Register(plugin plugin.Runtime) (RemoveFunc, error) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	for _, p := range m.plugins {
@@ -117,7 +116,7 @@ func (m *manager) remove(plugin plugin.Runtime) {
 	idx := -1
 	for i, p := range m.plugins {
 		if p == plugin {
-			m.plugins = append(m.plugins[:i], m.plugins[i+1:]...)
+			m.plugins = slices.Delete(m.plugins, i, i+1)
 			idx = i
 			break
 		}

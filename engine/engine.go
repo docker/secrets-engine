@@ -50,7 +50,7 @@ func newEngine(ctx context.Context, cfg config.Engine) (engine, error) {
 		}
 		plan = append(plan, morePlugins...)
 	}
-	reg := newManager(cfg.Logger())
+	reg := registry.NewManager(cfg.Logger())
 	h := syncedParallelLaunch(ctx, cfg, reg, plan)
 	shutdownManagedPlugins := shutdownManagedPluginsOnce(h, reg)
 
