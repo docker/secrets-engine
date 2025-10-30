@@ -103,7 +103,7 @@ engine-unit-tests:
 	go test -trimpath -race -v $$(go list ./engine/...)
 
 pass:
-	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(PASS_BINARY)$(EXTENSION) ./pass
+	CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/$(PASS_BINARY)$(EXTENSION) ./cmd/pass
 	rm "$(DOCKER_PASS_DST)" || true
 	cp "dist/$(PASS_BINARY)$(EXTENSION)" "$(DOCKER_PASS_DST)"
 
