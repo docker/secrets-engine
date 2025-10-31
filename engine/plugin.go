@@ -20,6 +20,11 @@ import (
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
+
+	// register the plugin routes
+	// this will most likely move or get cleaned up once this file and its
+	// associated dependencies get moved to the internal package.
+	_ "github.com/docker/secrets-engine/engine/internal/routes/plugin"
 )
 
 var (
@@ -90,7 +95,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plugin.ExternalRuntime, error) {
+func newLaunchedPlugin(cfg runtimeConfig, cmd *exec.Cmd) (plugin.ExternalRuntime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -98,7 +103,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 	defer fd.Close()
 
 	envCfg := &ipc.PluginConfigFromEngine{
-		Name:                v.name,
+		Name:                cfg.Name(),
 		RegistrationTimeout: getPluginRegistrationTimeout(),
 		Custom:              fd.ToCustomCfg(),
 	}
@@ -110,10 +115,10 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
 	process := plugin.NewProcess(cmd)
-	watcher := plugin.WatchProcess(logger, v.name, process, getPluginShutdownTimeout())
+	watcher := plugin.WatchProcess(cfg.Logger(), cfg.Name(), process, getPluginShutdownTimeout())
 
 	ipcClosed, setIpcClosed := closeOnce()
-	r, err := setup(logger, rwc, setIpcClosed, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(cfg, rwc, setIpcClosed, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		watcher.Close()
@@ -127,7 +132,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 
 	go func() {
 		<-watcher.Closed()
-		_ = helper.Shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", v.name))
+		_ = helper.Shutdown(fmt.Errorf("plugin '%s' stopped unexpectedly", cfg.Name()))
 	}()
 
 	return &runtimeImpl{
@@ -138,7 +143,7 @@ func newLaunchedPlugin(logger logging.Logger, cmd *exec.Cmd, v runtimeCfg) (plug
 			return helper.Shutdown(nil)
 		},
 		closed: helper.Closed(),
-		logger: logger,
+		logger: cfg.Logger(),
 		cmd:    watcher,
 	}, nil
 }
@@ -168,10 +173,10 @@ func filterClientAlreadyClosed(err error) error {
 }
 
 // newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtimeCfg) (plugin.Runtime, error) {
+func newExternalPlugin(cfg runtimeConfig, conn io.ReadWriteCloser) (plugin.Runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(logger, conn, once, v, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(cfg, conn, once, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +189,7 @@ func newExternalPlugin(logger logging.Logger, conn io.ReadWriteCloser, v runtime
 			return errors.Join(callPluginShutdown(c, closed), filterClientAlreadyClosed(r.close()))
 		}),
 		closed: closed,
-		logger: logger,
+		logger: cfg.Logger(),
 	}, nil
 }
 

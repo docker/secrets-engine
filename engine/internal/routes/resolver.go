@@ -12,8 +12,8 @@ func init() {
 	registerPrivateRoute(resolverHandler)
 }
 
-func resolverHandler(c routeConfig) (routePath, http.Handler, error) {
+func resolverHandler(c Config) (Path, http.Handler, error) {
 	r := service.NewService(c.Logger(), c.Tracker(), c.Registry())
 	path, h := resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(r))
-	return routePath(path), h, nil
+	return Path(path), h, nil
 }

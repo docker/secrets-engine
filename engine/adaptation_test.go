@@ -172,7 +172,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
 				WithPlugins(map[Config]plugin.Plugin{
-					{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
+					{Name: "my-builtin", Version: mockValidVersion, Pattern: mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 				}),
 			}
 			if test.extraOption != nil {

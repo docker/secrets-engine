@@ -19,10 +19,10 @@ import (
 
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
+	et "github.com/docker/secrets-engine/engine/internal/testhelper"
 	p "github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/ipc"
-	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -99,12 +99,22 @@ func Test_newPlugin(t *testing.T) {
 				cmd, parseOutput := testdummy.PluginCommand(t, testdummy.PluginCfg{
 					Version: version.String(),
 					Pattern: pattern,
-					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
+					Secrets: map[string]string{
+						testdummy.MockSecretID.String(): testdummy.MockSecretValue,
+					},
 				})
-				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
-					name: pluginNameFromTestName(t),
-					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-				})
+				p, err := newLaunchedPlugin(
+					newRuntimeConfig(
+						pluginNameFromTestName(t),
+						plugin.ConfigOut{
+							EngineName:     mockEngineName,
+							EngineVersion:  mockEngineVersion,
+							RequestTimeout: 30 * time.Second,
+						},
+						et.NewEngineConfig(t),
+					),
+					cmd,
+				)
 				require.NoError(t, err)
 				assert.Equal(t, pluginNameFromTestName(t), p.Name().String())
 				assert.Equal(t, version.String(), p.Version().String())
@@ -132,11 +142,15 @@ func Test_newPlugin(t *testing.T) {
 					Pattern:      "foo-bar",
 					ErrGetSecret: errGetSecret,
 				})
-				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
-					name: pluginNameFromTestName(t),
-					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-				})
-				assert.NoError(t, err)
+				p, err := newLaunchedPlugin(
+					newRuntimeConfig(
+						pluginNameFromTestName(t),
+						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
+						et.NewEngineConfig(t),
+					),
+					cmd,
+				)
+				require.NoError(t, err)
 				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
 				assert.ErrorContains(t, err, errGetSecret)
 				assert.NoError(t, p.Close())
@@ -156,11 +170,15 @@ func Test_newPlugin(t *testing.T) {
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
-					name: pluginNameFromTestName(t),
-					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-				})
-				assert.NoError(t, err)
+				p, err := newLaunchedPlugin(
+					newRuntimeConfig(
+						pluginNameFromTestName(t),
+						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
+						et.NewEngineConfig(t),
+					),
+					cmd,
+				)
+				require.NoError(t, err)
 				assert.NoError(t, p.Close())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 			},
@@ -173,11 +191,15 @@ func Test_newPlugin(t *testing.T) {
 					Pattern:      "foo-bar",
 					IgnoreSigint: true,
 				})
-				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
-					name: pluginNameFromTestName(t),
-					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-				})
-				assert.NoError(t, err)
+				p, err := newLaunchedPlugin(
+					newRuntimeConfig(
+						pluginNameFromTestName(t),
+						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
+						et.NewEngineConfig(t),
+					),
+					cmd,
+				)
+				require.NoError(t, err)
 				_ = cmd.Process.Kill()
 				assert.ErrorContains(t, p.Close(), fmt.Sprintf("plugin %s crashed:", pluginNameFromTestName(t)))
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
@@ -193,13 +215,17 @@ func Test_newPlugin(t *testing.T) {
 					Pattern: "foo-bar",
 					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
 				})
-				p, err := newLaunchedPlugin(testhelper.TestLogger(t), cmd, runtimeCfg{
-					name: pluginNameFromTestName(t),
-					out:  pluginCfgOut{engineName: mockEngineName, engineVersion: mockEngineVersion, requestTimeout: 30 * time.Second},
-				})
-				assert.NoError(t, err)
+				p, err := newLaunchedPlugin(
+					newRuntimeConfig(
+						pluginNameFromTestName(t),
+						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
+						et.NewEngineConfig(t),
+					),
+					cmd,
+				)
+				require.NoError(t, err)
 				_, err = p.GetSecrets(context.Background(), testdummy.MockSecretPattern)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				require.NoError(t, p.Watcher().Kill())
 				assert.NoError(t, testhelper.WaitForClosedWithTimeout(p.Closed()))
 				assert.ErrorContains(t, p.Close(), "stopped unexpectedly")
@@ -230,7 +256,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "create external plugin",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
+				m := newMockExternalRuntime(t, l)
 
 				config := testExternalPluginConfig(t)
 				s, err := p.New(newMockedPlugin(), config, p.WithPluginName("my-plugin"), p.WithConnection(conn))
@@ -257,7 +283,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "secret not found",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
+				m := newMockExternalRuntime(t, l)
 				s, err := p.New(newMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
@@ -278,7 +304,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "cancelling plugin.run() shuts down the runtime",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
+				m := newMockExternalRuntime(t, l)
 
 				s, err := p.New(newMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
@@ -307,7 +333,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			name: "plugins with invalid patterns are rejected",
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
-				m := newMockExternalRuntime(testhelper.TestLogger(t), l)
+				m := newMockExternalRuntime(t, l)
 
 				doneRuntime := make(chan struct{})
 				go func() {
@@ -316,7 +342,11 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(doneRuntime)
 				}()
 
-				s, err := p.New(newMockedPlugin(), p.Config{Version: mockValidVersion, Pattern: &maliciousPattern{}, Logger: testhelper.TestLogger(t)}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(newMockedPlugin(), p.Config{
+					Version: mockValidVersion,
+					Pattern: &maliciousPattern{},
+					Logger:  testhelper.TestLogger(t),
+				}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				assert.ErrorContains(t, s.Run(t.Context()), "invalid pattern")
 				<-doneRuntime
@@ -366,10 +396,10 @@ func runAsync(ctx context.Context, run func(ctx context.Context) error) chan err
 }
 
 type mockExternalRuntime struct {
+	t         *testing.T
 	server    *http.Server
 	ch        chan nextConn
 	serverErr chan error
-	logger    logging.Logger
 }
 
 type nextConn struct {
@@ -377,10 +407,10 @@ type nextConn struct {
 	done func()
 }
 
-func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternalRuntime {
+func newMockExternalRuntime(t *testing.T, l net.Listener) *mockExternalRuntime {
 	httpMux := http.NewServeMux()
 	ch := make(chan nextConn)
-	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(_ context.Context, conn io.ReadWriteCloser) {
+	httpMux.Handle(ipc.NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, conn io.ReadWriteCloser) {
 		wait := make(chan struct{})
 		ch <- nextConn{conn: conn, done: sync.OnceFunc(func() { close(wait) })}
 		<-wait
@@ -390,7 +420,7 @@ func newMockExternalRuntime(logger logging.Logger, l net.Listener) *mockExternal
 	go func() {
 		serverErr <- server.Serve(l)
 	}()
-	return &mockExternalRuntime{logger: logger, server: server, ch: ch, serverErr: serverErr}
+	return &mockExternalRuntime{t: t, server: server, ch: ch, serverErr: serverErr}
 }
 
 func (m *mockExternalRuntime) shutdown() error {
@@ -403,9 +433,14 @@ func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (plugin.Runtime, e
 	if err != nil {
 		return nil, err
 	}
-	r, err := newExternalPlugin(m.logger, item.conn, runtimeCfg{
-		out: pluginCfgOut{engineName: "test-engine", engineVersion: "v1.0.0", requestTimeout: 30 * time.Second},
-	})
+	r, err := newExternalPlugin(
+		newRuntimeConfig(
+			"", // TODO:(@benehiko) this needs to be empty otherwise the validation step will compare
+			// the plugin name and will fail "launched plugin name cannot be changed"...
+			plugin.ConfigOut{EngineName: "test-engine", EngineVersion: "v1.0.0", RequestTimeout: 30 * time.Second},
+			et.NewEngineConfig(m.t),
+		),
+		item.conn)
 	if err != nil {
 		item.done()
 		return nil, err

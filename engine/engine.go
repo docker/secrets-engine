@@ -140,10 +140,16 @@ func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
 func newLauncher(cfg config.Engine, pluginFile string) (string, launcher) {
 	name := toDisplayName(pluginFile)
 	return name, func() (plugin.Runtime, error) {
-		return newLaunchedPlugin(cfg.Logger(), exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)), runtimeCfg{
-			out:  pluginCfgOut{engineName: cfg.Name(), engineVersion: cfg.Version(), requestTimeout: getPluginRequestTimeout()},
-			name: name,
-		})
+		runtimeConfig := newRuntimeConfig(
+			name,
+			plugin.ConfigOut{
+				EngineName:     cfg.Name(),
+				EngineVersion:  cfg.Version(),
+				RequestTimeout: getPluginRequestTimeout(),
+			},
+			cfg,
+		)
+		return newLaunchedPlugin(runtimeConfig, exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)))
 	}
 }
 
@@ -259,13 +265,17 @@ func newServer(cfg config.Engine, reg registry.Registry) (*http.Server, error) {
 		router.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
 			span := trace.SpanFromContext(ctx)
 			launcher := launcher(func() (plugin.Runtime, error) {
-				return newExternalPlugin(cfg.Logger(), conn, runtimeCfg{
-					out: pluginCfgOut{
-						engineName:     cfg.Name(),
-						engineVersion:  cfg.Version(),
-						requestTimeout: getPluginRequestTimeout(),
-					},
-				},
+				return newExternalPlugin(
+					newRuntimeConfig(
+						"", // TODO:(@benehiko) might need a name here? original code omitted it
+						plugin.ConfigOut{
+							EngineName:     cfg.Name(),
+							EngineVersion:  cfg.Version(),
+							RequestTimeout: getPluginRequestTimeout(),
+						},
+						cfg,
+					),
+					conn,
 				)
 			})
 			errDone, err := register(logging.WithLogger(ctx, cfg.Logger()), reg, launcher)

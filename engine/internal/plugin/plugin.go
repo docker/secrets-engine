@@ -34,3 +34,8 @@ type ExternalRuntime interface {
 	Runtime
 	Watcher() Watcher
 }
+
+type RegistrationResult struct {
+	Config Metadata
+	Err    error
+}

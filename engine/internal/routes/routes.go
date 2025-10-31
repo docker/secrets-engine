@@ -8,48 +8,75 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/docker/secrets-engine/engine/internal/config"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/registry"
 )
 
-type routeConfig interface {
+type Config interface {
 	config.Debugging
 	config.Plugins
 	Registry() registry.Registry
 }
 
+type PluginConfig interface {
+	config.Debugging
+	RegistrationChannel() chan plugin.RegistrationResult
+	ConfigValidator() plugin.ConfigValidator
+}
+
 type (
-	routePath    string
-	route        func(routeConfig) (routePath, http.Handler, error)
-	publicRoute  route
-	privateRoute route
+	Path               string
+	Route              func(Config) (Path, http.Handler, error)
+	PublicRoute        Route
+	PrivateRoute       Route
+	PluginRoute        func(PluginConfig) (Path, http.Handler, error)
+	PluginPublicRoute  PluginRoute
+	PluginPrivateRoute PluginRoute
 )
 
 var errRouteDisabled = errors.New("disabled route")
 
 var (
-	pubRoutes  []publicRoute
-	privRoutes []privateRoute
+	pubRoutes  []PublicRoute
+	privRoutes []PrivateRoute
+
+	pubPluginRoutes  []PluginPublicRoute
+	privPluginRoutes []PluginPrivateRoute
 )
 
-func registerPublicRoute(r publicRoute) {
+func registerPublicRoute(r PublicRoute) {
 	pubRoutes = append(pubRoutes, r)
 }
 
-func registerPrivateRoute(r privateRoute) {
+func registerPrivateRoute(r PrivateRoute) {
 	privRoutes = append(privRoutes, r)
+}
+
+func RegisterPublicPluginRoute(r PluginPublicRoute) {
+	pubPluginRoutes = append(pubPluginRoutes, r)
+}
+
+func RegisterPrivatePluginRoute(r PluginPrivateRoute) {
+	privPluginRoutes = append(privPluginRoutes, r)
 }
 
 type routes struct {
 	config.Engine
-	registeredPublicRoutes []routePath
+	registeredPublicRoutes []Path
 	reg                    registry.Registry
 	router                 *chi.Mux
 }
 
-var _ routeConfig = &routes{}
+var _ Config = &routes{}
 
 func (r *routes) Registry() registry.Registry {
 	return r.reg
+}
+
+type pluginRoutes struct {
+	PluginConfig
+	registeredPublicRoutes []Path
+	router                 *chi.Mux
 }
 
 func registerRoutes(r *routes) error {
@@ -97,6 +124,61 @@ func registerRoutes(r *routes) error {
 }
 
 func registerMiddleware(_ *routes) error {
+	return nil
+}
+
+func registerPluginRoutes(r *pluginRoutes) error {
+	for _, f := range pubPluginRoutes {
+		path, h, err := f(r)
+		if errors.Is(err, errRouteDisabled) {
+			r.Logger().Printf("public plugin route disabled: %s", path)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		r.Logger().Printf("registering plugin public route: %s", path)
+		r.registeredPublicRoutes = append(r.registeredPublicRoutes, path)
+
+		// routes that end on the forward-slash '/' indicate that they handle sub-routes
+		// themselves. In an http.ServeMux it would match any route with such a
+		// prefix, but in go-chi/chi we need a wildcard '*'
+		if strings.HasSuffix(string(path), "/") {
+			path = path + "*"
+		}
+		r.router.Handle(string(path), h)
+	}
+
+	for _, f := range privPluginRoutes {
+		path, h, err := f(r)
+		if errors.Is(err, errRouteDisabled) {
+			r.Logger().Printf("protected plugin route disabled: %s", path)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		r.Logger().Printf("registering protected plugin route: %s", path)
+		// routes that end on the forward-slash '/' indicate that they handle sub-routes
+		// themselves. In an http.ServeMux it would match any route with such a
+		// prefix, but in go-chi/chi we need a wildcard '*'
+		if strings.HasSuffix(string(path), "/") {
+			path = path + "*"
+		}
+		r.router.Handle(string(path), h)
+	}
+
+	return nil
+}
+
+func SetupPlugins(cfg PluginConfig, router *chi.Mux) error {
+	r := &pluginRoutes{
+		PluginConfig: cfg,
+		router:       router,
+	}
+	if err := registerPluginRoutes(r); err != nil {
+		return err
+	}
 	return nil
 }
 
