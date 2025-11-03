@@ -79,7 +79,7 @@ type client struct {
 
 func New(options ...Option) (secrets.Resolver, error) {
 	cfg := &config{
-		requestTimeout: api.DefaultPluginRequestTimeout,
+		requestTimeout: api.DefaultClientRequestTimeout,
 	}
 	for _, opt := range options {
 		if err := opt(cfg); err != nil {
@@ -91,10 +91,23 @@ func New(options ...Option) (secrets.Resolver, error) {
 	}
 	c := &http.Client{
 		Transport: &http.Transport{
+			// re-use the same connection to the engine, this speeds up subsequent
+			// calls.
+			MaxConnsPerHost:     api.DefaultClientMaxConnsPerHost,
+			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
+			// keep the connection alive (good for long-lived clients)
+			IdleConnTimeout: api.DefaultClientIdleConnTimeout,
+			// Set short timeouts on headers
+			ResponseHeaderTimeout: api.DefaultClientResponseHeaderTimeout,
+			TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
+
 			DialContext:        cfg.dialContext,
-			DisableKeepAlives:  true,
-			DisableCompression: true,
+			DisableKeepAlives:  false,
+			DisableCompression: false,
+			ForceAttemptHTTP2:  true,
 		},
+		// by default Timeout will be 0 (meaning no timeout)
+		// it can be overwritten with [WithTimeout]
 		Timeout: cfg.requestTimeout,
 	}
 	return &client{

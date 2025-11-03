@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	engineShutdownTimeout = 2 * time.Second
+	engineShutdownTimeout                   = 2 * time.Second
+	engineServerDefaultRequestHeaderTimeout = 2 * time.Second
 )
 
 type engine interface {
@@ -283,7 +284,19 @@ func newServer(cfg config.Engine, reg registry.Registry) (*http.Server, error) {
 		}))
 	}
 	return &http.Server{
-		Handler: router,
+		// We are setting no timeouts on the server itself.
+		// A middleware will set the request timeout for us.
+		// This gives us more granular control over what requires a short
+		// timeout vs what should be kept alive for a long time.
+		// e.g. request secret might prompt the user for input, the input
+		// could take more than 1 minute, we should keep the request alive for
+		// that duration minimum.
+		ReadTimeout:  0,
+		WriteTimeout: 0,
+		// The header should be relatively quick to read. Let's set a limit on
+		// that so that any connection drops will cancel the request.
+		ReadHeaderTimeout: engineServerDefaultRequestHeaderTimeout,
+		Handler:           router,
 	}, nil
 }
 
