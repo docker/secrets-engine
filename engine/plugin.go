@@ -24,7 +24,7 @@ import (
 
 var (
 	pluginRegistrationTimeout = api.DefaultPluginRegistrationTimeout
-	pluginRequestTimeout      = api.DefaultPluginRequestTimeout
+	pluginRequestTimeout      = api.DefaultClientRequestTimeout
 	pluginShutdownTimeout     = 2 * time.Second
 	timeoutCfgLock            sync.RWMutex
 )
