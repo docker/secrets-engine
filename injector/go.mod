@@ -16,7 +16,7 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/secrets-engine/client v0.0.13
-	github.com/docker/secrets-engine/engine v0.0.20
+	github.com/docker/secrets-engine/engine v0.0.21
 	github.com/docker/secrets-engine/x v0.0.6-do.not.use
 	github.com/stretchr/testify v1.11.1
 )
