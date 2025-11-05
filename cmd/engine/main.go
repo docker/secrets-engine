@@ -10,6 +10,7 @@ import (
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
 	"github.com/docker/secrets-engine/pass"
+	"github.com/docker/secrets-engine/plugins/credentialhelper"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
@@ -51,6 +52,8 @@ func main() {
 		panic(err)
 	}
 
+	plugins := map[engine.Config]engine.Plugin{}
+
 	passPlugin, err := pass.NewPassPlugin(logger)
 	if err != nil {
 		panic(err)
@@ -60,12 +63,21 @@ func main() {
 		panic(err)
 	}
 
+	matchAllPattern := secrets.MustParsePattern("**")
+
+	plugins[engine.Config{Name: "docker-pass", Version: version, Pattern: matchAllPattern}] = passPlugin
+	plugins[engine.Config{Name: "docker-auth", Version: version, Pattern: matchAllPattern}] = dockerAuthPlugin
+
+	credentialHelperPlugin, err := credentialhelper.New(logger)
+	if err != nil {
+		logger.Warnf("could not initialize credential-helper engine plugin: %s", err)
+	} else {
+		plugins[engine.Config{Name: "docker-credential-helper", Version: version, Pattern: matchAllPattern}] = credentialHelperPlugin
+	}
+
 	opts := []engine.Option{
 		engine.WithLogger(logger),
-		engine.WithPlugins(map[engine.Config]engine.Plugin{
-			{Name: "docker-pass", Version: version, Pattern: secrets.MustParsePattern("**")}: passPlugin,
-			{Name: "docker-auth", Version: version, Pattern: secrets.MustParsePattern("**")}: dockerAuthPlugin,
-		}),
+		engine.WithPlugins(plugins),
 		engine.WithEngineLaunchedPluginsDisabled(),
 		// engine.WithExternallyLaunchedPluginsDisabled(),
 	}

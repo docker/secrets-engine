@@ -81,6 +81,7 @@ unit-tests:
 	go test -trimpath -race -v $(shell go list ./injector/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./pass/...) & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
+	go test -trimpath -race -v $(shell go list ./plugins/credentialhelper/...)      & pids="$$pids $$!"; \
 	go test -trimpath -race -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
