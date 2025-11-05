@@ -18,7 +18,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/docker/docker-auth/auth v0.0.1-beta
 	github.com/docker/secrets-engine/client v0.0.13
-	github.com/docker/secrets-engine/plugin v0.0.16
+	github.com/docker/secrets-engine/plugin v0.0.17
 	github.com/docker/secrets-engine/store v0.0.13
 	github.com/docker/secrets-engine/x v0.0.7-do.not.use
 	github.com/go-chi/chi/v5 v5.2.3
