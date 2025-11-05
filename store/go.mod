@@ -10,14 +10,14 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	filippo.io/age v1.2.1
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/danieljoos/wincred v1.2.2
+	github.com/danieljoos/wincred v1.2.3
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.41.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/sys v0.37.0
 	golang.org/x/text v0.28.0
 )
 

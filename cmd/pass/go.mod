@@ -15,7 +15,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/cli v28.3.3+incompatible
-	github.com/docker/secrets-engine/pass v0.0.9
+	github.com/docker/secrets-engine/pass v0.0.10
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	github.com/spf13/cobra v1.10.1
 	go.opentelemetry.io/otel v1.38.0
@@ -29,14 +29,14 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
-	github.com/danieljoos/wincred v1.2.2 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v28.5.1+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/engine v0.0.23 // indirect
+	github.com/docker/secrets-engine/engine v0.0.24 // indirect
 	github.com/docker/secrets-engine/store v0.0.16 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
@@ -77,7 +77,7 @@ require (
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
