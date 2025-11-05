@@ -16,7 +16,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 require (
 	github.com/docker/secrets-engine/engine v0.0.20
 	github.com/docker/secrets-engine/pass v0.0.6
-	github.com/docker/secrets-engine/x v0.0.5-do.not.use
+	github.com/docker/secrets-engine/x v0.0.6-do.not.use
 )
 
 require (
