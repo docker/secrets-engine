@@ -15,8 +15,8 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/cli v28.3.3+incompatible
-	github.com/docker/secrets-engine/pass v0.0.6
-	github.com/docker/secrets-engine/x v0.0.5-do.not.use
+	github.com/docker/secrets-engine/pass v0.0.9
+	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	github.com/spf13/cobra v1.10.1
 	go.opentelemetry.io/otel v1.38.0
 )
@@ -36,8 +36,8 @@ require (
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/engine v0.0.20 // indirect
-	github.com/docker/secrets-engine/store v0.0.12 // indirect
+	github.com/docker/secrets-engine/engine v0.0.23 // indirect
+	github.com/docker/secrets-engine/store v0.0.16 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.3 // indirect

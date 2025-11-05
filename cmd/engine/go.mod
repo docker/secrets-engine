@@ -14,9 +14,9 @@ replace github.com/docker/secrets-engine/store => ../../store
 replace github.com/docker/secrets-engine/x => ../../x
 
 require (
-	github.com/docker/secrets-engine/engine v0.0.20
-	github.com/docker/secrets-engine/pass v0.0.6
-	github.com/docker/secrets-engine/x v0.0.5-do.not.use
+	github.com/docker/secrets-engine/engine v0.0.23
+	github.com/docker/secrets-engine/pass v0.0.9
+	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 )
 
 require (
@@ -36,7 +36,7 @@ require (
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/store v0.0.12 // indirect
+	github.com/docker/secrets-engine/store v0.0.16 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.3 // indirect
