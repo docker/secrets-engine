@@ -131,7 +131,13 @@ func (m projectFS) GitTag(tag string) error {
 	if m.dryRun || m.skipGit {
 		return nil
 	}
-	return gitTag(tag)
+	if err := gitTag(tag); err != nil {
+		return err
+	}
+	if !m.noPropagate && !m.dryRun {
+		return gitPushTags()
+	}
+	return nil
 }
 
 func (m projectFS) GitCommit(commit string) error {
@@ -244,6 +250,14 @@ func gitTag(tag string) error {
 	cmd := exec.Command("git", "tag", tag)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git tag (%s): %s", err, string(out))
+	}
+	return nil
+}
+
+func gitPushTags() error {
+	cmd := exec.Command("git", "push", "--tags")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git push --tags (%s): %s", err, string(out))
 	}
 	return nil
 }
