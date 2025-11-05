@@ -19,7 +19,7 @@ require (
 	github.com/docker/docker-auth/auth v0.0.1-beta
 	github.com/docker/secrets-engine/client v0.0.12
 	github.com/docker/secrets-engine/plugin v0.0.18
-	github.com/docker/secrets-engine/store v0.0.12
+	github.com/docker/secrets-engine/store v0.0.16
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/hashicorp/yamux v0.1.2
