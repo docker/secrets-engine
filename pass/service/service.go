@@ -30,7 +30,7 @@ func (m *MyValue) SetMetadata(map[string]string) error {
 
 func KCService() (store.Store, error) {
 	kc, err := keychain.New(
-		"io.docker.secrets",
+		"secrets.com.docker",
 		"docker-pass-cli",
 		func() *MyValue {
 			return &MyValue{}
