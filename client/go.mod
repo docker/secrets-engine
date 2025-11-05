@@ -9,7 +9,7 @@ replace github.com/docker/secrets-engine/x => ../x
 
 require (
 	connectrpc.com/connect v1.18.1
-	github.com/docker/secrets-engine/x v0.0.5-do.not.use
+	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	google.golang.org/protobuf v1.36.8
 )
 
