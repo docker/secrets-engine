@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
+	"github.com/docker/secrets-engine/engine/internal/services/resolver"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"
@@ -30,7 +31,8 @@ type (
 	Pattern = secrets.Pattern
 	Logger  = logging.Logger
 
-	Tracker = telemetry.Tracker
+	Tracker                   = telemetry.Tracker
+	EventSecretsEngineRequest = resolver.EventSecretsEngineRequest
 
 	Plugin = plugin.Plugin
 )
