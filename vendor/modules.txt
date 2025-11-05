@@ -50,7 +50,7 @@ github.com/containerd/nri/pkg/stub
 # github.com/containerd/ttrpc v1.2.7
 ## explicit; go 1.19
 github.com/containerd/ttrpc
-# github.com/danieljoos/wincred v1.2.2
+# github.com/danieljoos/wincred v1.2.3
 ## explicit; go 1.18
 github.com/danieljoos/wincred
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -137,9 +137,9 @@ github.com/docker/go-connections/tlsconfig
 github.com/docker/go-units
 # github.com/docker/secrets-engine/client v0.0.16 => ./client
 ## explicit; go 1.25
-# github.com/docker/secrets-engine/engine v0.0.23 => ./engine
+# github.com/docker/secrets-engine/engine v0.0.24 => ./engine
 ## explicit; go 1.25.0
-# github.com/docker/secrets-engine/pass v0.0.9 => ./pass
+# github.com/docker/secrets-engine/pass v0.0.10 => ./pass
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.18 => ./plugin
 ## explicit; go 1.25
@@ -414,8 +414,8 @@ golang.org/x/net/trace
 # golang.org/x/sync v0.16.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.35.0
-## explicit; go 1.23.0
+# golang.org/x/sys v0.37.0
+## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix

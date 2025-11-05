@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/x => ../x
 
 require (
 	github.com/docker/cli v28.3.3+incompatible
-	github.com/docker/secrets-engine/engine v0.0.23
+	github.com/docker/secrets-engine/engine v0.0.24
 	github.com/docker/secrets-engine/store v0.0.16
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 	github.com/spf13/cobra v1.10.1
@@ -30,7 +30,7 @@ require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/danieljoos/wincred v1.2.2 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
@@ -77,7 +77,7 @@ require (
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
