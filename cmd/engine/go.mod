@@ -9,6 +9,8 @@ replace github.com/docker/secrets-engine/engine => ../../engine
 
 replace github.com/docker/secrets-engine/pass => ../../pass
 
+replace github.com/docker/secrets-engine/plugins/credentialhelper => ../../plugins/credentialhelper/
+
 replace github.com/docker/secrets-engine/store => ../../store
 
 replace github.com/docker/secrets-engine/x => ../../x
@@ -16,6 +18,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 require (
 	github.com/docker/secrets-engine/engine v0.0.24
 	github.com/docker/secrets-engine/pass v0.0.10
+	github.com/docker/secrets-engine/plugins/credentialhelper v0.0.0-00010101000000-000000000000
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 )
 
@@ -32,7 +35,7 @@ require (
 	github.com/docker/cli v28.3.3+incompatible // indirect
 	github.com/docker/docker v28.5.1+incompatible // indirect
 	github.com/docker/docker-auth/auth v0.0.1-beta // indirect
-	github.com/docker/docker-credential-helpers v0.9.3 // indirect
+	github.com/docker/docker-credential-helpers v0.9.4 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
