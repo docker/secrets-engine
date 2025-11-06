@@ -9,6 +9,7 @@ use (
 	./injector
 	./pass
 	./plugin
+	./plugins/credentialhelper
 	./store
 	./x
 )
