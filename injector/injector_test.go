@@ -150,7 +150,7 @@ func Test_resolveENV(t *testing.T) {
 	}
 }
 
-func mockedRewriter(t *testing.T) ContainerCreateRewriter {
+func mockedRewriter(t *testing.T, legacyFallback bool) ContainerCreateRewriter {
 	t.Helper()
 	return ContainerCreateRewriter{r: &resolver{
 		logger: testhelper.TestLogger(t),
@@ -159,24 +159,32 @@ func mockedRewriter(t *testing.T) ContainerCreateRewriter {
 			secrets.MustParseID("BAR"): "baz",
 		}},
 		tracker: telemetry.NoopTracker(),
-	}}
+	}, legacyFallback: legacyFallback}
 }
 
 func Test_ContainerCreateRequestRewrite(t *testing.T) {
 	t.Run("no config", func(t *testing.T) {
-		r := mockedRewriter(t)
+		r := mockedRewriter(t, false)
 		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), &container.CreateRequest{}))
 	})
-	t.Run("no errors", func(t *testing.T) {
-		r := mockedRewriter(t)
+	t.Run("no errors, legacy fallback", func(t *testing.T) {
+		r := mockedRewriter(t, true)
 		req := &container.CreateRequest{
 			Config: &container.Config{Env: []string{"FOO", "BAZ=se://FOO"}},
 		}
 		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), req))
 		assert.Equal(t, []string{"FOO=some-value", "BAZ=some-value"}, req.Env)
 	})
+	t.Run("no errors, no legacy fallback", func(t *testing.T) {
+		r := mockedRewriter(t, false)
+		req := &container.CreateRequest{
+			Config: &container.Config{Env: []string{"FOO", "BAZ=se://FOO"}},
+		}
+		assert.Nil(t, r.ContainerCreateRequestRewrite(t.Context(), req))
+		assert.Equal(t, []string{"FOO", "BAZ=some-value"}, req.Env)
+	})
 	t.Run("invariant if no secrets", func(t *testing.T) {
-		r := mockedRewriter(t)
+		r := mockedRewriter(t, true)
 		req := &container.CreateRequest{
 			Config: &container.Config{Env: []string{"something", "GH_TOKEN=", "B*/R", "B/A/R = space before"}},
 		}
