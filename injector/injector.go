@@ -122,12 +122,14 @@ type EventSecretsEngineInjectorEnvResolved struct {
 }
 
 type ContainerCreateRewriter struct {
-	r *resolver
+	r              *resolver
+	legacyFallback bool
 }
 
 // New creates a new injector resolver.
 // If [logger] is nil, a noop logger will be used. If [tracker] is nil, a noop tracker will be used.
-func New(logger logging.Logger, tracker telemetry.Tracker, options ...client.Option) (*ContainerCreateRewriter, error) {
+// With [legacyFallback] enabled, for ENVs with empty value, the key will be tried to resolve as secret.
+func New(logger logging.Logger, tracker telemetry.Tracker, legacyFallback bool, options ...client.Option) (*ContainerCreateRewriter, error) {
 	if tracker == nil {
 		tracker = telemetry.NoopTracker()
 	} else {
@@ -137,7 +139,7 @@ func New(logger logging.Logger, tracker telemetry.Tracker, options ...client.Opt
 	if err != nil {
 		return nil, err
 	}
-	return &ContainerCreateRewriter{r: resolver}, nil
+	return &ContainerCreateRewriter{r: resolver, legacyFallback: legacyFallback}, nil
 }
 
 func (r *ContainerCreateRewriter) ContainerCreateRequestRewrite(ctx context.Context, req *container.CreateRequest) error {
@@ -147,6 +149,10 @@ func (r *ContainerCreateRewriter) ContainerCreateRequestRewrite(ctx context.Cont
 	var resolvedEnvList []string
 	for _, env := range req.Env {
 		key, val, _ := strings.Cut(env, "=")
+		if val == "" && !r.legacyFallback {
+			resolvedEnvList = append(resolvedEnvList, env)
+			continue
+		}
 		resolved, err := r.r.resolveENV(ctx, key, val)
 		if err != nil {
 			return err
