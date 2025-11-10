@@ -15,14 +15,19 @@ import (
 	"github.com/docker/docker-credential-helpers/client"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
+// KeyRewriter provides a credential-helper credential ID (a server URL).
+// The server URL can consist of an http or https prefix and may end with
+// a trailing forward-slash
+type KeyRewriter func(serverURL string) (secrets.ID, error)
+
 type credentialHelperStore struct {
 	client.ProgramFunc
 	logging.Logger
+	rewriter KeyRewriter
 }
 
 func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -37,11 +42,19 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pa
 
 	replacer := strings.NewReplacer("https://", "", "http://", "")
 	for serverURL := range credentials {
-		// some credentials have a trailing '/'
-		o := strings.TrimSuffix(replacer.Replace(serverURL), "/")
-		p, err := store.ParseID(o)
+		var p secrets.ID
+		var err error
+
+		if s.rewriter != nil {
+			p, err = s.rewriter(serverURL)
+		} else {
+			// some credentials have a trailing '/'
+			o := strings.TrimSuffix(replacer.Replace(serverURL), "/")
+			p, err = secrets.ParseID(o)
+		}
+
 		if err != nil {
-			s.Warnf("could not parse key '%s' as store.ID: %s", serverURL, err)
+			s.Warnf("could not parse key '%s' as secrets.ID: %s", serverURL, err)
 			continue
 		}
 		if pattern.Match(p) {
@@ -101,32 +114,54 @@ func getConfigPath() string {
 	return path.Join(home, ".docker", "config.json")
 }
 
-func New(logger logging.Logger) (engine.Plugin, error) {
-	configPath := getConfigPath()
-	f, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+type Options func(*credentialHelperStore)
 
-	// limit the size of the file we are reading.
-	// Don't want the plugin to get taken down by a really large file.
-	config, err := io.ReadAll(io.LimitReader(f, 1024*1024))
-	if err != nil {
-		return nil, err
+func WithKeyRewriter(rewriter KeyRewriter) Options {
+	return func(chs *credentialHelperStore) {
+		chs.rewriter = rewriter
 	}
+}
 
-	var v map[string]any
-	if err := json.Unmarshal(config, &v); err != nil {
-		return nil, err
+func WithShellProgramFunc(f client.ProgramFunc) Options {
+	return func(chs *credentialHelperStore) {
+		chs.ProgramFunc = f
 	}
-	suffix, ok := v["credsStore"].(string)
-	if !ok || suffix == "" {
-		return nil, fmt.Errorf("credential-helper not specified in '%s'", configPath)
+}
+
+func New(logger logging.Logger, opts ...Options) (engine.Plugin, error) {
+	c := &credentialHelperStore{
+		Logger: logger,
+	}
+	for _, opt := range opts {
+		opt(c)
 	}
 
-	return &credentialHelperStore{
-		Logger:      logger,
-		ProgramFunc: client.NewShellProgramFunc("docker-credential-" + suffix),
-	}, nil
+	if c.ProgramFunc == nil {
+		configPath := getConfigPath()
+		f, err := os.Open(configPath)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		// limit the size of the file we are reading.
+		// Don't want the plugin to get taken down by a really large file.
+		config, err := io.ReadAll(io.LimitReader(f, 1024*1024))
+		if err != nil {
+			return nil, err
+		}
+
+		var v map[string]any
+		if err := json.Unmarshal(config, &v); err != nil {
+			return nil, err
+		}
+		suffix, ok := v["credsStore"].(string)
+		if !ok || suffix == "" {
+			return nil, fmt.Errorf("credential-helper not specified in '%s'", configPath)
+		}
+
+		c.ProgramFunc = client.NewShellProgramFunc("docker-credential-" + suffix)
+	}
+
+	return c, nil
 }
