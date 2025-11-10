@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/pass/service"
+	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -44,7 +44,7 @@ func (m *passPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 }
 
 func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
-	impl, ok := secret.(*service.MyValue)
+	impl, ok := secret.(*pass.PassValue)
 	if !ok {
 		return nil, errUnknownSecretType
 	}
@@ -59,10 +59,6 @@ func (m *passPlugin) Run(ctx context.Context) error {
 	return nil
 }
 
-func NewPassPlugin(logger logging.Logger) (engine.Plugin, error) {
-	store, err := service.KCService()
-	if err != nil {
-		return nil, err
-	}
+func NewPassPlugin(logger logging.Logger, store store.Store) (engine.Plugin, error) {
 	return &passPlugin{kc: store, logger: logger}, nil
 }

@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/docker/secrets-engine/pass/service"
+	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -28,7 +28,7 @@ func Test_rootCommand(t *testing.T) {
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
 			require.NoError(t, err)
-			impl, ok := s.(*service.MyValue)
+			impl, ok := s.(*pass.PassValue)
 			require.True(t, ok)
 			assert.Equal(t, "bar=bar=bar", string(impl.Value))
 		})
@@ -39,7 +39,7 @@ func Test_rootCommand(t *testing.T) {
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
 			require.NoError(t, err)
-			impl, ok := s.(*service.MyValue)
+			impl, ok := s.(*pass.PassValue)
 			require.True(t, ok)
 			assert.Equal(t, "my\nmultiline\nvalue", string(impl.Value))
 		})
@@ -62,8 +62,8 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("list", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
+				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(Root(t.Context(), mock), "list")
 			assert.NoError(t, err)
@@ -80,8 +80,8 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("rm", func(t *testing.T) {
 		t.Run("ok (two secrets)", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
+				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(Root(t.Context(), mock), "rm", "foo", "baz")
 			assert.NoError(t, err)
@@ -92,8 +92,8 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("--all", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &service.MyValue{Value: []byte("0")},
+				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
 			}))
 			out, err := executeCommand(Root(t.Context(), mock), "rm", "--all")
 			assert.NoError(t, err)
@@ -132,7 +132,7 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("get", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
+				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
 			}))
 			out, err := executeCommand(Root(t.Context(), mock), "get", "foo")
 			assert.NoError(t, err)
@@ -174,7 +174,7 @@ func Test_rootCommandTelemetry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			spanRecorder, metricReader := testhelper.SetupTelemetry(t)
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("baz"): &service.MyValue{Value: []byte("bar")},
+				store.MustParseID("baz"): &pass.PassValue{Value: []byte("bar")},
 			}))
 			_, err := executeCommand(Root(t.Context(), mock), tc.args...)
 			assert.NoError(t, err)

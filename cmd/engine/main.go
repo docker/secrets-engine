@@ -10,6 +10,7 @@ import (
 	"github.com/docker/secrets-engine/engine"
 	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
 	"github.com/docker/secrets-engine/pass"
+	pstore "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/plugins/credentialhelper"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
@@ -54,7 +55,11 @@ func main() {
 
 	plugins := map[engine.Config]engine.Plugin{}
 
-	passPlugin, err := pass.NewPassPlugin(logger)
+	s, err := pstore.PassStore("com.docker.docker-pass")
+	if err != nil {
+		panic(err)
+	}
+	passPlugin, err := pass.NewPassPlugin(logger, s)
 	if err != nil {
 		panic(err)
 	}

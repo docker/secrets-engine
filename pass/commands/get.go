@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/pass/service"
+	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/store"
 )
 
@@ -23,7 +23,7 @@ func GetCommand(kc store.Store) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, ok := s.(*service.MyValue)
+			_, ok := s.(*pass.PassValue)
 			if !ok {
 				return errors.New("unknown secret type")
 			}
