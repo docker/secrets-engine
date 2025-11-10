@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/docker/secrets-engine/pass"
-	"github.com/docker/secrets-engine/pass/service"
+	"github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/x/config"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
@@ -26,7 +26,7 @@ func main() {
 	if plugin.RunningStandalone() {
 		os.Args = append([]string{os.Args[0], "pass"}, os.Args[1:]...)
 	}
-	kc, err := service.KCService()
+	kc, err := store.PassStore("com.docker.docker-pass")
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
