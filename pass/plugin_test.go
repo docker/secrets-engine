@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/pass/service"
+	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -20,7 +20,7 @@ func Test_passPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): &service.MyValue{Value: []byte("bar")},
+			store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
 		}))
 		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))

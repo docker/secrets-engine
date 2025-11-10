@@ -6,11 +6,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/secrets-engine/pass/service"
+	"github.com/spf13/cobra"
+
+	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
-
-	"github.com/spf13/cobra"
 )
 
 const setExample = `
@@ -48,7 +48,7 @@ func SetCommand(kc store.Store) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kc.Save(cmd.Context(), id, &service.MyValue{Value: []byte(s.val)})
+			return kc.Save(cmd.Context(), id, &pass.PassValue{Value: []byte(s.val)})
 		},
 	}
 	return cmd
