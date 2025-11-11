@@ -14,7 +14,6 @@ import (
 
 	"github.com/docker/secrets-engine/pass"
 	"github.com/docker/secrets-engine/pass/store"
-	"github.com/docker/secrets-engine/x/config"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
 
@@ -35,12 +34,12 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return pass.Root(ctx, kc)
+		return pass.Root(ctx, kc, "dev")
 	},
 		manager.Metadata{
 			SchemaVersion:    "0.1.0",
 			Vendor:           "Docker Inc.",
-			Version:          config.Version,
+			Version:          "dev",
 			ShortDescription: "Docker Pass Plugin",
 		},
 	)
