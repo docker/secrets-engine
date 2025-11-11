@@ -17,7 +17,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/secrets-engine/engine v0.0.24
-	github.com/docker/secrets-engine/pass v0.0.11
+	github.com/docker/secrets-engine/pass v0.0.12
 	github.com/docker/secrets-engine/plugins/credentialhelper v0.0.2
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
 )
