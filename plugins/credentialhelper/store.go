@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/user"
 	"path"
@@ -19,15 +20,49 @@ import (
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
-// KeyRewriter provides a credential-helper credential ID (a server URL).
+// KeyRewriter provides a credential-helper credential username and ID (a server URL).
 // The server URL can consist of an http or https prefix and may end with
-// a trailing forward-slash
-type KeyRewriter func(serverURL string) (secrets.ID, error)
+// a trailing forward-slash.
+//
+// For example:
+//
+//	{
+//	  "ServerURL": "http://127.0.0.1/test",
+//	  "Username": "bob"
+//	}
+//
+// Errors returned by a KeyRewriter will simply log and the current credential
+// will be skipped when [GetSecrets] is called.
+//
+// It is recommended to use [DefaultKeyRewriter] for credential-helper
+// credentials when writing custom rules in your [KeyRewriter].
+type KeyRewriter func(serverURL, username string) (secrets.ID, error)
 
 type credentialHelperStore struct {
 	client.ProgramFunc
 	logging.Logger
 	rewriter KeyRewriter
+}
+
+// DefaultKeyRewriter can be used to remove the "https://", "http://" prefix
+// and any trailing forward-slash "/". Additionally it will replace colons ":"
+// in an IP address with "-port-".
+//
+// Example:
+//
+//	https://mydomain.com/key -> mydomain.com/key
+//	http://182.31.42.33:8455/key -> 182.31.42.33-port-8455/key
+//	https://io.docker.com/access-token/ -> io.docker.com/access-token
+func DefaultKeyRewriter(serverURL string) string {
+	replacer := strings.NewReplacer("https://", "", "http://", "")
+	o := strings.TrimSuffix(replacer.Replace(serverURL), "/")
+	parts := strings.Split(o, "/")
+
+	_, _, err := net.SplitHostPort(parts[0])
+	if err == nil {
+		return strings.ReplaceAll(o, ":", "-port-")
+	}
+	return o
 }
 
 func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -40,17 +75,14 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pa
 
 	resolvedAt := time.Now()
 
-	replacer := strings.NewReplacer("https://", "", "http://", "")
-	for serverURL := range credentials {
+	for serverURL, username := range credentials {
 		var p secrets.ID
 		var err error
 
 		if s.rewriter != nil {
-			p, err = s.rewriter(serverURL)
+			p, err = s.rewriter(serverURL, username)
 		} else {
-			// some credentials have a trailing '/'
-			o := strings.TrimSuffix(replacer.Replace(serverURL), "/")
-			p, err = secrets.ParseID(o)
+			p, err = secrets.ParseID(DefaultKeyRewriter(serverURL))
 		}
 
 		if err != nil {
