@@ -2,7 +2,6 @@ package pass
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/docker/cli/cli-plugins/plugin"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/store"
-	"github.com/docker/secrets-engine/x/config"
 )
 
 // Note: We use a custom help template to make it more brief.
@@ -37,7 +35,7 @@ Examples:
 `
 
 // Root returns the root command for the docker-pass CLI plugin
-func Root(ctx context.Context, s store.Store) *cobra.Command {
+func Root(ctx context.Context, s store.Store, version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "pass [OPTIONS]",
 		SilenceUsage:     true,
@@ -53,10 +51,7 @@ func Root(ctx context.Context, s store.Store) *cobra.Command {
 			}
 			return nil
 		},
-		Version: fmt.Sprintf("%s, commit %s", config.Version, config.Commit()),
 	}
-	cmd.SetVersionTemplate("Docker Pass Plugin\n{{.Version}}\n")
-	cmd.Flags().BoolP("version", "v", false, "Print version information and quit")
 	cmd.SetHelpTemplate(helpTemplate)
 
 	_ = cmd.RegisterFlagCompletionFunc("pass", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
@@ -67,6 +62,7 @@ func Root(ctx context.Context, s store.Store) *cobra.Command {
 	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
+	cmd.AddCommand(commands.VersionCommand(version))
 
 	return cmd
 }
