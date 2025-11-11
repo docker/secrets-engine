@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker-credential-helpers/client"
 	"github.com/docker/docker-credential-helpers/credentials"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/x/secrets"
@@ -124,7 +125,7 @@ func TestCredentialHelper(t *testing.T) {
 		store := map[string]credentials.Credentials{}
 
 		c, err := New(testhelper.TestLogger(t),
-			WithKeyRewriter(func(serverURL string) (secrets.ID, error) {
+			WithKeyRewriter(func(serverURL, _ string) (secrets.ID, error) {
 				return secrets.ParseID("docker/test/" + strings.TrimPrefix(serverURL, "https://"))
 			}),
 			WithShellProgramFunc(func(args ...string) client.Program {
@@ -196,4 +197,37 @@ func TestCredentialHelper(t *testing.T) {
 			ResolvedAt: result[0].ResolvedAt,
 		}, result[0])
 	})
+}
+
+func TestDefaultKeyRewriter(t *testing.T) {
+	for _, tc := range []struct {
+		desc      string
+		serverURL string
+		expected  string
+	}{
+		{
+			desc:      "valid URL with IP and without port",
+			serverURL: "http://127.0.0.1/something",
+			expected:  "127.0.0.1/something",
+		},
+		{
+			desc:      "URL with IP and Port",
+			serverURL: "http://192.162.233.123:8313/key/another",
+			expected:  "192.162.233.123-port-8313/key/another",
+		},
+		{
+			desc:      "URL with hostname",
+			serverURL: "https://docker.com/credential/key",
+			expected:  "docker.com/credential/key",
+		},
+		{
+			desc:      "trailing forward-slash",
+			serverURL: "https://example.com/credential/key/",
+			expected:  "example.com/credential/key",
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			assert.Equal(t, tc.expected, DefaultKeyRewriter(tc.serverURL))
+		})
+	}
 }
