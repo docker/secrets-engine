@@ -14,10 +14,10 @@ replace github.com/docker/secrets-engine/plugin => ../plugin
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
-	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/secrets-engine/client v0.0.16
 	github.com/docker/secrets-engine/engine v0.0.24
 	github.com/docker/secrets-engine/x v0.0.9-do.not.use
+	github.com/moby/moby/api v1.52.0
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -25,7 +25,6 @@ require (
 	connectrpc.com/connect v1.18.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -56,5 +55,4 @@ require (
 	google.golang.org/grpc v1.75.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/v3 v3.5.2 // indirect
 )
