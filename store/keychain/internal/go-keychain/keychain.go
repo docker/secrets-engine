@@ -70,6 +70,8 @@ var (
 	ErrorInvalidOwnerEdit = Error(C.errSecInvalidOwnerEdit)
 	// ErrorUserCanceled corresponds to errSecUserCanceled result code
 	ErrorUserCanceled = Error(C.errSecUserCanceled)
+	// ErrMissingEntitlement corresponds to errSecMissingEntitlement result code
+	ErrMissingEntitlement = Error(C.errSecMissingEntitlement)
 )
 
 func checkError(errCode C.OSStatus) error {
@@ -128,6 +130,8 @@ func (k Error) Error() (msg string) {
 		msg = "An invalid attempt to change the owner of an item."
 	case ErrorUserCanceled:
 		msg = "User canceled the operation."
+	case ErrMissingEntitlement:
+		msg = "A required entitlement is missing."
 	default:
 		msg = "Keychain Error."
 	}
