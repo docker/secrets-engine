@@ -38,6 +38,7 @@ func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 
 	item.SetService(k.serviceName)
 	item.SetAccessGroup(k.serviceGroup)
+	item.SetUseDataProtectionKeychain(kc.UseDataProtectionKeychainYes)
 
 	if id != "" {
 		item.SetAccount(id)
