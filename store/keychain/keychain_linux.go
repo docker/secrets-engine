@@ -94,6 +94,12 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service *kc.SecretServ
 	return errCollectionLocked
 }
 
+type keychainStore[T store.Secret] struct {
+	serviceGroup string
+	serviceName  string
+	factory      func() T
+}
+
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	service, err := kc.NewService()
 	if err != nil {

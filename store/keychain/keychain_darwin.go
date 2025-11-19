@@ -16,6 +16,17 @@ var (
 	ErrAuthFailed            = errors.New("user incorrectly enterered their credentials")
 )
 
+type keychainStore[T store.Secret] struct {
+	serviceGroup              string
+	serviceName               string
+	factory                   func() T
+	useDataProtectionKeychain bool
+}
+
+func (k *keychainStore[T]) setUseDataProtectionKeychain(v bool) {
+	k.useDataProtectionKeychain = v
+}
+
 // newKeychainItem creates a new keychain item with valid default parameters.
 //
 // It uses a generic password class, which is suitable for most use cases.
@@ -38,7 +49,9 @@ func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 
 	item.SetService(k.serviceName)
 	item.SetAccessGroup(k.serviceGroup)
-	item.SetUseDataProtectionKeychain(kc.UseDataProtectionKeychainYes)
+	if k.useDataProtectionKeychain {
+		item.SetUseDataProtectionKeychain(kc.UseDataProtectionKeychainYes)
+	}
 
 	if id != "" {
 		item.SetAccount(id)
