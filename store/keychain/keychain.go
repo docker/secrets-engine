@@ -9,13 +9,42 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
-type keychainStore[T store.Secret] struct {
-	serviceGroup string
-	serviceName  string
-	factory      func() T
+var _ store.Store = &keychainStore[store.Secret]{}
+
+type (
+	Option            interface{ apply(any) error }
+	optionFunc[K any] func(K) error
+)
+
+//nolint:unused
+func (f optionFunc[K]) apply(s K) error { return f(s) }
+
+type darwinOptions interface {
+	setUseDataProtectionKeychain(bool)
 }
 
-var _ store.Store = &keychainStore[store.Secret]{}
+type DarwinOptions optionFunc[darwinOptions]
+
+var errSkipOptions = errors.New("skip unsupported option")
+
+func WithDarwinOptions(opt DarwinOptions) Option {
+	return optionFunc[any](func(settings any) error {
+		s, ok := settings.(darwinOptions)
+		if !ok {
+			return errSkipOptions
+		}
+		return opt(s)
+	})
+}
+
+// WithUseDataProtectionKeychain forces the use of entitlements to share
+// credentials stored in the keychain between applications
+func WithUseDataProtectionKeychain() DarwinOptions {
+	return func(do darwinOptions) error {
+		do.setUseDataProtectionKeychain(true)
+		return nil
+	}
+}
 
 // New creates a new keychain store.
 //
@@ -40,7 +69,7 @@ var _ store.Store = &keychainStore[store.Secret]{}
 // Changing the service name can be done, but would require migrating existing credentials.
 //
 // [Factory] is a function used to instantiate new secrets of type T.
-func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory[T]) (store.Store, error) {
+func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")
 	}
@@ -49,6 +78,15 @@ func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory
 		factory:      factory,
 		serviceGroup: serviceGroup,
 		serviceName:  serviceName,
+	}
+	for _, opt := range opts {
+		err := opt.apply(k)
+		if err != nil && errors.Is(err, errSkipOptions) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	return k, nil
 }
