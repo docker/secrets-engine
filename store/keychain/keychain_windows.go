@@ -51,6 +51,12 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 	return secret.Unmarshal(val)
 }
 
+type keychainStore[T store.Secret] struct {
+	serviceGroup string
+	serviceName  string
+	factory      func() T
+}
+
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	err := g.Delete()
