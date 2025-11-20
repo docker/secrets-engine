@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -69,7 +69,8 @@ func (m *mockInternalPlugin) Run(ctx context.Context) error {
 
 func Test_internalRuntime(t *testing.T) {
 	const shutdownTimeout = 100 * time.Millisecond
-	mockConfig := &configValidated{api.MustNewName("foo"), api.MustNewVersion("v5"), mockPatternAny}
+	mockConfig, err := plugin.NewValidatedConfig(plugin.Unvalidated{Name: "foo", Version: "v5", Pattern: mockPatternAny.String()})
+	require.NoError(t, err)
 
 	t.Parallel()
 	t.Run("start / get secret -> value / stop / get secret -> no value", func(t *testing.T) {

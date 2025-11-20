@@ -7,14 +7,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/hashicorp/yamux"
 
+	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
-	"github.com/docker/secrets-engine/x/api"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/engine/internal/routes"
 	"github.com/docker/secrets-engine/x/ipc"
-	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type setupResult struct {
@@ -23,27 +22,64 @@ type setupResult struct {
 	close  func() error
 }
 
-var _ pluginCfgInValidator = &runtimeCfg{}
-
-type runtimeCfg struct {
-	out  pluginCfgOut
-	name string
+type runtimeConfig interface {
+	plugin.ConfigValidator
+	routes.PluginConfig
+	Name() string
 }
 
-func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeCfg, option ...ipc.Option) (*setupResult, error) {
-	chRegistrationResult := make(chan registrationResult, 1)
-	httpMux := http.NewServeMux()
-	httpMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	registrator := newRegistrationLogic(v, chRegistrationResult)
-	httpMux.Handle(resolverv1connect.NewEngineServiceHandler(&RegisterService{logger: logger, r: registrator}))
+type runtimeConfigImpl struct {
+	config.Debugging
+	out  plugin.ConfigOut
+	name string
+
+	registrationResult chan plugin.RegistrationResult
+}
+
+func newRuntimeConfig(name string, out plugin.ConfigOut, debugging config.Debugging) runtimeConfig {
+	return &runtimeConfigImpl{
+		Debugging:          debugging,
+		name:               name,
+		out:                out,
+		registrationResult: make(chan plugin.RegistrationResult, 1),
+	}
+}
+
+func (p *runtimeConfigImpl) Name() string {
+	return p.name
+}
+
+func (p *runtimeConfigImpl) ConfigValidator() plugin.ConfigValidator {
+	return p
+}
+
+func (p *runtimeConfigImpl) RegistrationChannel() chan plugin.RegistrationResult {
+	return p.registrationResult
+}
+
+func (p *runtimeConfigImpl) Validate(in plugin.Unvalidated) (plugin.Metadata, *plugin.ConfigOut, error) {
+	if p.name != "" && in.Name != p.name {
+		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
+	}
+	data, err := plugin.NewValidatedConfig(in)
+	if err != nil {
+		return nil, nil, err
+	}
+	return data, &p.out, nil
+}
+
+func setup(cfg runtimeConfig, conn io.ReadWriteCloser, cb func(), option ...ipc.Option) (*setupResult, error) {
+	router := chi.NewRouter()
+
+	if err := routes.SetupPlugins(cfg, router); err != nil {
+		return nil, err
+	}
+
 	chIpcErr := make(chan error, 1)
 	name := make(chan string, 1)
-	i, c, err := ipc.NewServerIPC(logger, conn, httpMux, func(err error) {
+	i, c, err := ipc.NewServerIPC(cfg.Logger(), conn, router, func(err error) {
 		if errors.Is(err, io.EOF) {
-			logger.Printf("Connection to plugin %v closed", readWithTimeout(name, v.name))
+			cfg.Logger().Printf("Connection to plugin %v closed", readWithTimeout(name, cfg.Name()))
 		}
 		cb()
 		chIpcErr <- err
@@ -53,13 +89,13 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 	}
 	var out plugin.Metadata
 	select {
-	case r := <-chRegistrationResult:
-		if r.err != nil || r.cfg == nil {
+	case r := <-cfg.RegistrationChannel():
+		if r.Err != nil || r.Config == nil {
 			i.Close()
-			return nil, fmt.Errorf("failed to register plugin: %w", r.err)
+			return nil, fmt.Errorf("failed to register plugin: %w", r.Err)
 		}
-		name <- r.cfg.Name().String()
-		out = r.cfg
+		name <- r.Config.Name().String()
+		out = r.Config
 	case err := <-chIpcErr:
 		i.Close()
 		return nil, fmt.Errorf("failed to register plugin, ipc error: %w", err)
@@ -67,7 +103,7 @@ func setup(logger logging.Logger, conn io.ReadWriteCloser, cb func(), v runtimeC
 		i.Close()
 		return nil, errors.New("plugin registration timed out")
 	}
-	logger.Printf("Plugin %s@%s registered successfully with pattern %v", out.Name(), out.Version(), out.Pattern())
+	cfg.Logger().Printf("Plugin %s@%s registered successfully with pattern %v", out.Name(), out.Version(), out.Pattern())
 	return &setupResult{
 		client: c,
 		cfg:    out,
@@ -91,55 +127,4 @@ func readWithTimeout(ch <-chan string, fallback string) string {
 	case <-time.After(getPluginRegistrationTimeout()):
 		return fallback
 	}
-}
-
-type pluginDataUnvalidated struct {
-	Name    string
-	Version string
-	Pattern string
-}
-
-func (p runtimeCfg) Validate(in pluginDataUnvalidated) (plugin.Metadata, *pluginCfgOut, error) {
-	if p.name != "" && in.Name != p.name {
-		return nil, nil, errors.New("plugin name cannot be changed when launched by engine")
-	}
-	data, err := newValidatedConfig(in)
-	if err != nil {
-		return nil, nil, err
-	}
-	return data, &p.out, nil
-}
-
-func newValidatedConfig(in pluginDataUnvalidated) (plugin.Metadata, error) {
-	name, err := api.NewName(in.Name)
-	if err != nil {
-		return nil, err
-	}
-	version, err := api.NewVersion(in.Version)
-	if err != nil {
-		return nil, err
-	}
-	pattern, err := secrets.ParsePattern(in.Pattern)
-	if err != nil {
-		return nil, err
-	}
-	return &configValidated{name: name, version: version, pattern: pattern}, nil
-}
-
-type configValidated struct {
-	name    api.Name
-	version api.Version
-	pattern secrets.Pattern
-}
-
-func (c configValidated) Name() api.Name {
-	return c.name
-}
-
-func (c configValidated) Version() api.Version {
-	return c.version
-}
-
-func (c configValidated) Pattern() secrets.Pattern {
-	return c.pattern
 }

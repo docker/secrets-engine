@@ -66,17 +66,18 @@ type Config struct {
 }
 
 func (c *Config) validated() (plugin.Metadata, error) {
-	name, err := api.NewName(c.Name)
-	if err != nil {
-		return nil, err
-	}
 	if c.Version == nil {
 		return nil, errors.New("version is required")
 	}
 	if c.Pattern == nil {
 		return nil, errors.New("pattern is required")
 	}
-	return &configValidated{name, c.Version, c.Pattern}, nil
+
+	return plugin.NewValidatedConfig(plugin.Unvalidated{
+		Name:    c.Name,
+		Version: c.Version.String(),
+		Pattern: c.Pattern.String(),
+	})
 }
 
 type engineConfig struct {
