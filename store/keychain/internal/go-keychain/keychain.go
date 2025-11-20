@@ -70,6 +70,8 @@ var (
 	ErrorInvalidOwnerEdit = Error(C.errSecInvalidOwnerEdit)
 	// ErrorUserCanceled corresponds to errSecUserCanceled result code
 	ErrorUserCanceled = Error(C.errSecUserCanceled)
+	// ErrMissingEntitlement corresponds to errSecMissingEntitlement result code
+	ErrMissingEntitlement = Error(C.errSecMissingEntitlement)
 )
 
 func checkError(errCode C.OSStatus) error {
@@ -128,6 +130,8 @@ func (k Error) Error() (msg string) {
 		msg = "An invalid attempt to change the owner of an item."
 	case ErrorUserCanceled:
 		msg = "User canceled the operation."
+	case ErrMissingEntitlement:
+		msg = "A required entitlement is missing."
 	default:
 		msg = "Keychain Error."
 	}
@@ -216,6 +220,25 @@ var (
 		SynchronizableAny: C.CFTypeRef(C.kSecAttrSynchronizableAny),
 		SynchronizableYes: C.CFTypeRef(C.kCFBooleanTrue),
 		SynchronizableNo:  C.CFTypeRef(C.kCFBooleanFalse),
+	}
+)
+
+// UseDataProtectionKeychain is the items data protection status
+type UseDataProtectionKeychain int
+
+const (
+	// UseDataProtectionKeychainYes enables data protection mode
+	UseDataProtectionKeychainYes = 1
+	// UseDataProtectionKeychainNo disables data protection mode
+	UseDataProtectionKeychainNo = 2
+)
+
+// UseDataProtectionKey is the key type for DataProtection
+var (
+	UseDataProtectionKey  = attrKey(C.CFTypeRef(C.kSecUseDataProtectionKeychain))
+	dataProtectionTypeRef = map[UseDataProtectionKeychain]C.CFTypeRef{
+		UseDataProtectionKeychainYes: C.CFTypeRef(C.kCFBooleanTrue),
+		UseDataProtectionKeychainNo:  C.CFTypeRef(C.kCFBooleanFalse),
 	}
 )
 
@@ -379,6 +402,11 @@ func (k *Item) SetSynchronizable(sync Synchronizable) {
 	} else {
 		delete(k.attr, SynchronizableKey)
 	}
+}
+
+// SetUseDataProtectionKeychain sets the synchronizable attribute
+func (k *Item) SetUseDataProtectionKeychain(dataProtection UseDataProtectionKeychain) {
+	k.attr[UseDataProtectionKey] = dataProtectionTypeRef[dataProtection]
 }
 
 // SetAccessible sets the accessible attribute
