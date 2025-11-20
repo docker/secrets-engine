@@ -28,13 +28,14 @@ func (m *PassValue) SetMetadata(map[string]string) error {
 	return nil
 }
 
-func PassStore(serviceGroup string) (store.Store, error) {
+func PassStore(serviceGroup string, opts ...keychain.Option) (store.Store, error) {
 	kc, err := keychain.New(
 		serviceGroup,
 		"docker-pass-cli",
 		func() *PassValue {
 			return &PassValue{}
 		},
+		opts...,
 	)
 	return kc, err
 }
