@@ -16,7 +16,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 require (
 	github.com/docker/cli v29.0.4+incompatible
 	github.com/docker/secrets-engine/pass v0.0.14
-	github.com/docker/secrets-engine/x v0.0.9-do.not.use
+	github.com/docker/secrets-engine/x v0.0.10-do.not.use
 	github.com/spf13/cobra v1.10.1
 	go.opentelemetry.io/otel v1.38.0
 )
