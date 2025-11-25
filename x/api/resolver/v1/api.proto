@@ -67,5 +67,7 @@ message GetSecretsResponse {
     google.protobuf.Timestamp resolved_at = 6;
 
     google.protobuf.Timestamp expires_at = 7;
+
+    map<string, string> metadata = 8;
   }
 }
