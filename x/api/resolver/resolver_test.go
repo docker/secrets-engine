@@ -19,8 +19,11 @@ const (
 )
 
 var (
-	mockPattern = secrets.MustParsePattern("**")
-	mockID      = secrets.MustParseID("mockID")
+	mockPattern  = secrets.MustParsePattern("**")
+	mockID       = secrets.MustParseID("mockID")
+	mockMetadata = map[string]string{
+		"Test": "test",
+	}
 )
 
 type mockResolver struct {
@@ -28,6 +31,7 @@ type mockResolver struct {
 	secretsID secrets.ID
 	value     string
 	err       error
+	metadata  map[string]string
 }
 
 func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver {
@@ -35,6 +39,7 @@ func newMockResolver(t *testing.T, options ...mockResolverOption) *mockResolver 
 		t:         t,
 		secretsID: mockID,
 		value:     mockSecretValue,
+		metadata:  mockMetadata,
 	}
 	for _, opt := range options {
 		resolver = opt(resolver)
@@ -56,7 +61,7 @@ func (m mockResolver) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]
 		return []secrets.Envelope{}, m.err
 	}
 	if pattern.Match(m.secretsID) {
-		return []secrets.Envelope{{ID: m.secretsID, Value: []byte(m.value)}}, nil
+		return []secrets.Envelope{{ID: m.secretsID, Value: []byte(m.value), Metadata: m.metadata}}, nil
 	}
 	return []secrets.Envelope{}, nil
 }
@@ -108,6 +113,16 @@ func TestResolverService_GetSecret(t *testing.T) {
 				require.NotEmpty(t, resp.Msg.GetEnvelopes())
 				assert.Equal(t, mockID.String(), resp.Msg.GetEnvelopes()[0].GetId())
 				assert.Equal(t, mockSecretValue, string(resp.Msg.GetEnvelopes()[0].GetValue()))
+			},
+		},
+		{
+			name: "return secret metadata",
+			test: func(t *testing.T) {
+				s := NewResolverHandler(newMockResolver(t))
+				resp, err := s.GetSecrets(t.Context(), newGetSecretRequest(mockPattern))
+				assert.NoError(t, err)
+				assert.Equal(t, mockID.String(), resp.Msg.GetEnvelopes()[0].GetId())
+				assert.EqualValues(t, mockMetadata, resp.Msg.GetEnvelopes()[0].GetMetadata())
 			},
 		},
 	}

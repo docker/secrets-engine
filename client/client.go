@@ -136,6 +136,7 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 		envelopes = append(envelopes, secrets.Envelope{
 			ID:         id,
 			Value:      item.GetValue(),
+			Metadata:   item.GetMetadata(),
 			Provider:   item.GetProvider(),
 			Version:    item.GetVersion(),
 			CreatedAt:  item.GetCreatedAt().AsTime(),
