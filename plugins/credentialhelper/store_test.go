@@ -109,12 +109,14 @@ func TestCredentialHelper(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, result, 1)
-		expected, err := json.Marshal(cred)
-		require.NoError(t, err)
 
 		require.Equal(t, secrets.Envelope{
-			ID:         secrets.MustParseID("test.com"),
-			Value:      expected,
+			ID:    secrets.MustParseID("test.com"),
+			Value: []byte(cred.Secret),
+			Metadata: map[string]string{
+				"ServerURL": cred.ServerURL,
+				"Username":  cred.Username,
+			},
 			Provider:   "docker-credential-helper",
 			Version:    "0.0.1",
 			ResolvedAt: result[0].ResolvedAt,
@@ -148,12 +150,14 @@ func TestCredentialHelper(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, result, 1)
-		expected, err := json.Marshal(cred)
-		require.NoError(t, err)
 
 		require.Equal(t, secrets.Envelope{
-			ID:         secrets.MustParseID("docker/test/test.com"),
-			Value:      expected,
+			ID:    secrets.MustParseID("docker/test/test.com"),
+			Value: []byte(cred.Secret),
+			Metadata: map[string]string{
+				"ServerURL": cred.ServerURL,
+				"Username":  cred.Username,
+			},
 			Provider:   "docker-credential-helper",
 			Version:    "0.0.1",
 			ResolvedAt: result[0].ResolvedAt,
@@ -186,12 +190,14 @@ func TestCredentialHelper(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, result, 1)
-		expected, err := json.Marshal(cred)
-		require.NoError(t, err)
 
 		require.Equal(t, secrets.Envelope{
-			ID:         secrets.MustParseID(strings.TrimPrefix(serverURL, "https://")),
-			Value:      expected,
+			ID:    secrets.MustParseID(strings.TrimPrefix(serverURL, "https://")),
+			Value: []byte(cred.Secret),
+			Metadata: map[string]string{
+				"ServerURL": cred.ServerURL,
+				"Username":  cred.Username,
+			},
 			Provider:   "docker-credential-helper",
 			Version:    "0.0.1",
 			ResolvedAt: result[0].ResolvedAt,
