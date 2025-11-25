@@ -34,7 +34,7 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return pass.Root(ctx, kc, "dev")
+		return wrapPersistentPreRun(pass.Root(ctx, kc, "dev"))
 	},
 		metadata.Metadata{
 			SchemaVersion:    "0.1.0",
@@ -43,4 +43,17 @@ func main() {
 			ShortDescription: "Docker Pass Plugin",
 		},
 	)
+}
+
+func wrapPersistentPreRun(cmd *cobra.Command) *cobra.Command {
+	if plugin.PersistentPreRunE != nil {
+		oldPreRunE := cmd.PersistentPreRunE
+		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			if err := oldPreRunE(cmd, args); err != nil {
+				return err
+			}
+			return plugin.PersistentPreRunE(cmd, args)
+		}
+	}
+	return cmd
 }
