@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -44,11 +43,8 @@ func Root(ctx context.Context, s store.Store, version string) *cobra.Command {
 			DisableDefaultCmd: false,
 			HiddenDefaultCmd:  true,
 		},
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			cmd.SetContext(ctx)
-			if plugin.PersistentPreRunE != nil {
-				return plugin.PersistentPreRunE(cmd, args)
-			}
 			return nil
 		},
 	}
