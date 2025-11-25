@@ -47,6 +47,7 @@ func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[reso
 		items = append(items, resolverv1.GetSecretsResponse_Envelope_builder{
 			Id:         proto.String(envelope.ID.String()),
 			Value:      envelope.Value,
+			Metadata:   envelope.Metadata,
 			Provider:   proto.String(envelope.Provider),
 			Version:    proto.String(envelope.Version),
 			CreatedAt:  timestamppb.New(envelope.CreatedAt),
