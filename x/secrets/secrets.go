@@ -13,13 +13,14 @@ var (
 )
 
 type Envelope struct {
-	ID         ID        `json:"-"`
-	Value      []byte    `json:"-"`
-	Provider   string    `json:"-"`
-	Version    string    `json:"-"`
-	CreatedAt  time.Time `json:"-"`
-	ResolvedAt time.Time `json:"-"`
-	ExpiresAt  time.Time `json:"-"`
+	ID         ID                `json:"-"`
+	Value      []byte            `json:"-"`
+	Metadata   map[string]string `json:"-"`
+	Provider   string            `json:"-"`
+	Version    string            `json:"-"`
+	CreatedAt  time.Time         `json:"-"`
+	ResolvedAt time.Time         `json:"-"`
+	ExpiresAt  time.Time         `json:"-"`
 }
 
 var _ json.Marshaler = Envelope{}
