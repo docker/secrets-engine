@@ -8,8 +8,8 @@ github.com/docker/docker-credential-helpers v0.9.4 h1:76ItO69/AP/V4yT9V4uuuItG0B
 github.com/docker/docker-credential-helpers v0.9.4/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
 github.com/docker/secrets-engine/client v0.0.16 h1:x6IeuuJXE7E9zfK0ZZzOBTJhtgli/abRX2qWUV6wLDc=
 github.com/docker/secrets-engine/client v0.0.16/go.mod h1:0/DJvZvZKVwxum7gGKbP44v3vHr4y03skTBrD0Asn2k=
-github.com/docker/secrets-engine/engine v0.0.24 h1:P+SlH3EKRdIla2x+HNiQ/6HdKtX3FLh2kOZfCHKKeh0=
-github.com/docker/secrets-engine/engine v0.0.24/go.mod h1:aJTReIJYo9ZKxPUzsaKxusx4j4H4seecTtPINwKOKg0=
+github.com/docker/secrets-engine/engine v0.0.26 h1:+wlFo+TXEi+fxrqU4YCs4XsCFlS+7DHnbrkulus7se4=
+github.com/docker/secrets-engine/engine v0.0.26/go.mod h1:0bQwsI0dE2t+2tYhXTxlHhlVRQZpNt6gQCYGi6KWKxc=
 github.com/go-chi/chi/v5 v5.2.3 h1:WQIt9uxdsAbgIYgid+BpYc+liqQZGMHRaUwp0JUcvdE=
 github.com/go-chi/chi/v5 v5.2.3/go.mod h1:L2yAIGWB3H+phAw1NxKwWM+7eUH/lU8pOMm5hHcoops=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
