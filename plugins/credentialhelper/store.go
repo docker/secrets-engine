@@ -96,14 +96,13 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pa
 				s.Warnf("could not get matched secret key '%s' from the credential-helper: %s", serverURL, err)
 				continue
 			}
-			value, err := json.Marshal(cred)
-			if err != nil {
-				s.Errorf("could not marshal credential-helper credential with key '%s'", serverURL)
-				continue
-			}
 			result = append(result, secrets.Envelope{
-				ID:         p,
-				Value:      value,
+				ID:    p,
+				Value: []byte(cred.Secret),
+				Metadata: map[string]string{
+					"ServerURL": cred.ServerURL,
+					"Username":  cred.Username,
+				},
 				Provider:   "docker-credential-helper",
 				Version:    "0.0.1",
 				ResolvedAt: resolvedAt,
