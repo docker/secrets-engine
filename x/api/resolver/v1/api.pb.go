@@ -541,6 +541,7 @@ type GetSecretsResponse_Envelope struct {
 	xxx_hidden_CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt"`
 	xxx_hidden_ResolvedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=resolved_at,json=resolvedAt"`
 	xxx_hidden_ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt"`
+	xxx_hidden_Metadata    map[string]string      `protobuf:"bytes,8,rep,name=metadata" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -630,9 +631,16 @@ func (x *GetSecretsResponse_Envelope) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *GetSecretsResponse_Envelope) GetMetadata() map[string]string {
+	if x != nil {
+		return x.xxx_hidden_Metadata
+	}
+	return nil
+}
+
 func (x *GetSecretsResponse_Envelope) SetId(v string) {
 	x.xxx_hidden_Id = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 8)
 }
 
 func (x *GetSecretsResponse_Envelope) SetValue(v []byte) {
@@ -640,17 +648,17 @@ func (x *GetSecretsResponse_Envelope) SetValue(v []byte) {
 		v = []byte{}
 	}
 	x.xxx_hidden_Value = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 8)
 }
 
 func (x *GetSecretsResponse_Envelope) SetProvider(v string) {
 	x.xxx_hidden_Provider = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 8)
 }
 
 func (x *GetSecretsResponse_Envelope) SetVersion(v string) {
 	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 8)
 }
 
 func (x *GetSecretsResponse_Envelope) SetCreatedAt(v *timestamppb.Timestamp) {
@@ -663,6 +671,10 @@ func (x *GetSecretsResponse_Envelope) SetResolvedAt(v *timestamppb.Timestamp) {
 
 func (x *GetSecretsResponse_Envelope) SetExpiresAt(v *timestamppb.Timestamp) {
 	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *GetSecretsResponse_Envelope) SetMetadata(v map[string]string) {
+	x.xxx_hidden_Metadata = v
 }
 
 func (x *GetSecretsResponse_Envelope) HasId() bool {
@@ -758,6 +770,7 @@ type GetSecretsResponse_Envelope_builder struct {
 	CreatedAt  *timestamppb.Timestamp
 	ResolvedAt *timestamppb.Timestamp
 	ExpiresAt  *timestamppb.Timestamp
+	Metadata   map[string]string
 }
 
 func (b0 GetSecretsResponse_Envelope_builder) Build() *GetSecretsResponse_Envelope {
@@ -765,24 +778,25 @@ func (b0 GetSecretsResponse_Envelope_builder) Build() *GetSecretsResponse_Envelo
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Id != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 8)
 		x.xxx_hidden_Id = b.Id
 	}
 	if b.Value != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 8)
 		x.xxx_hidden_Value = b.Value
 	}
 	if b.Provider != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 8)
 		x.xxx_hidden_Provider = b.Provider
 	}
 	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 8)
 		x.xxx_hidden_Version = b.Version
 	}
 	x.xxx_hidden_CreatedAt = b.CreatedAt
 	x.xxx_hidden_ResolvedAt = b.ResolvedAt
 	x.xxx_hidden_ExpiresAt = b.ExpiresAt
+	x.xxx_hidden_Metadata = b.Metadata
 	return m0
 }
 
@@ -803,9 +817,9 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x0fShutdownRequest\"\x12\n" +
 	"\x10ShutdownResponse\"-\n" +
 	"\x11GetSecretsRequest\x12\x18\n" +
-	"\apattern\x18\x01 \x01(\tR\apattern\"\xf8\x02\n" +
+	"\apattern\x18\x01 \x01(\tR\apattern\"\x89\x04\n" +
 	"\x12GetSecretsResponse\x12F\n" +
-	"\tenvelopes\x18\x01 \x03(\v2(.resolver.v1.GetSecretsResponse.EnvelopeR\tenvelopes\x1a\x99\x02\n" +
+	"\tenvelopes\x18\x01 \x03(\v2(.resolver.v1.GetSecretsResponse.EnvelopeR\tenvelopes\x1a\xaa\x03\n" +
 	"\bEnvelope\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05value\x12\x1a\n" +
@@ -816,7 +830,11 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\vresolved_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"resolvedAt\x129\n" +
 	"\n" +
-	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2j\n" +
+	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12R\n" +
+	"\bmetadata\x18\b \x03(\v26.resolver.v1.GetSecretsResponse.Envelope.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012j\n" +
 	"\rEngineService\x12Y\n" +
 	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2X\n" +
 	"\rPluginService\x12G\n" +
@@ -826,7 +844,7 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponseB\xa7\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z=github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
-var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_resolver_v1_api_proto_goTypes = []any{
 	(*RegisterPluginRequest)(nil),       // 0: resolver.v1.RegisterPluginRequest
 	(*RegisterPluginResponse)(nil),      // 1: resolver.v1.RegisterPluginResponse
@@ -835,26 +853,28 @@ var file_resolver_v1_api_proto_goTypes = []any{
 	(*GetSecretsRequest)(nil),           // 4: resolver.v1.GetSecretsRequest
 	(*GetSecretsResponse)(nil),          // 5: resolver.v1.GetSecretsResponse
 	(*GetSecretsResponse_Envelope)(nil), // 6: resolver.v1.GetSecretsResponse.Envelope
-	(*durationpb.Duration)(nil),         // 7: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),       // 8: google.protobuf.Timestamp
+	nil,                                 // 7: resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	(*durationpb.Duration)(nil),         // 8: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),       // 9: google.protobuf.Timestamp
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	7, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
+	8, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
 	6, // 1: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
-	8, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
-	8, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
-	8, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 5: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	2, // 6: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	4, // 7: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
-	1, // 8: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	3, // 9: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	5, // 10: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	9, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
+	9, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
+	9, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
+	7, // 5: resolver.v1.GetSecretsResponse.Envelope.metadata:type_name -> resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	0, // 6: resolver.v1.EngineService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
+	2, // 7: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4, // 8: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
+	1, // 9: resolver.v1.EngineService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 10: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5, // 11: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
+	9, // [9:12] is the sub-list for method output_type
+	6, // [6:9] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }
@@ -868,7 +888,7 @@ func file_resolver_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

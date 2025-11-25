@@ -223,6 +223,7 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, pattern secrets.Pattern) (
 		items = append(items, secrets.Envelope{
 			ID:         id,
 			Value:      item.GetValue(),
+			Metadata:   item.GetMetadata(),
 			Provider:   r.Name().String(),
 			Version:    item.GetVersion(),
 			CreatedAt:  item.GetCreatedAt().AsTime(),
