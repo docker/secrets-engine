@@ -1,32 +1,22 @@
 package commands
 
 import (
-	"runtime/debug"
-	"sync"
-
 	"github.com/spf13/cobra"
 )
 
-var commit = sync.OnceValue(func() string {
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range bi.Settings {
-			if setting.Key == "vcs.revision" {
-				return setting.Value
-			}
-		}
-	}
+type VersionInfo struct {
+	Version string
+	Commit  string
+}
 
-	return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-})
-
-func VersionCommand(version string) *cobra.Command {
+func VersionCommand(info VersionInfo) *cobra.Command {
 	return &cobra.Command{
 		Short:  "Show the version information",
 		Use:    "version",
 		Hidden: true,
 		Args:   cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, _ []string) {
-			cmd.Printf("Version: %s\nCommit: %s\n", version, commit())
+			cmd.Printf("Version: %s\nCommit: %s\n", info.Version, info.Commit)
 		},
 	}
 }
