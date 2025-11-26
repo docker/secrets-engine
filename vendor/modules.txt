@@ -116,6 +116,8 @@ github.com/docker/go-units
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.18 => ./plugin
 ## explicit; go 1.25
+# github.com/docker/secrets-engine/plugins v0.0.1 => ./plugins
+## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugins/credentialhelper v0.0.3 => ./plugins/credentialhelper
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/store v0.0.17 => ./store
