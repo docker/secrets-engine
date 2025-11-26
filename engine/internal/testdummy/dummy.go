@@ -142,7 +142,7 @@ func PluginCommand(t *testing.T, cfg PluginCfg) (*exec.Cmd, func() (*PluginResul
 	}
 }
 
-var _ plugin.Plugin = &dummyPlugin{}
+var _ plugin.ExternalPlugin = &dummyPlugin{}
 
 type dummyPlugin struct {
 	m      sync.Mutex
