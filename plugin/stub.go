@@ -23,7 +23,7 @@ type (
 	Logger  = logging.Logger
 )
 
-type Plugin interface {
+type ExternalPlugin interface {
 	Resolver
 }
 
@@ -89,7 +89,7 @@ func (c *Config) Valid() error {
 // ManualLaunchOption only apply when the plugin is launched manually.
 // If launched by the secrets engine, they are ignored.
 // If logger is nil, a default logger will be created and used.
-func New(p Plugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
+func New(p ExternalPlugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	if err := config.Valid(); err != nil {
 		return nil, err
 	}
