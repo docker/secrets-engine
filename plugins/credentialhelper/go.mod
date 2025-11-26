@@ -13,7 +13,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/docker-credential-helpers v0.9.4
-	github.com/docker/secrets-engine/engine v0.0.26
+	github.com/docker/secrets-engine/plugin v0.0.18
 	github.com/docker/secrets-engine/x v0.0.10-do.not.use
 	github.com/stretchr/testify v1.11.1
 )
@@ -22,7 +22,6 @@ require (
 	connectrpc.com/connect v1.18.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
