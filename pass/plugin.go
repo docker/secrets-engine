@@ -4,29 +4,27 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/secrets-engine/engine"
 	pass "github.com/docker/secrets-engine/pass/store"
+	"github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/store"
-	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
-var _ engine.Plugin = &passPlugin{}
+var _ plugin.Plugin = &passPlugin{}
 
 var errUnknownSecretType = errors.New("unknown secret type")
 
 type passPlugin struct {
 	kc     store.Store
-	logger logging.Logger
+	logger plugin.Logger
 }
 
-func (m *passPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+func (m *passPlugin) GetSecrets(ctx context.Context, pattern plugin.Pattern) ([]plugin.Envelope, error) {
 	list, err := m.kc.Filter(ctx, pattern)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []secrets.Envelope
+	var result []plugin.Envelope
 	for id, value := range list {
 		s, err := unpackValue(id, value)
 		if err != nil {
@@ -37,18 +35,18 @@ func (m *passPlugin) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([
 	}
 
 	if len(result) == 0 {
-		return nil, secrets.ErrNotFound
+		return nil, plugin.ErrNotFound
 	}
 
 	return result, nil
 }
 
-func unpackValue(id store.ID, secret store.Secret) (*secrets.Envelope, error) {
+func unpackValue(id store.ID, secret store.Secret) (*plugin.Envelope, error) {
 	impl, ok := secret.(*pass.PassValue)
 	if !ok {
 		return nil, errUnknownSecretType
 	}
-	return &secrets.Envelope{
+	return &plugin.Envelope{
 		ID:    id,
 		Value: impl.Value,
 	}, nil
@@ -59,6 +57,6 @@ func (m *passPlugin) Run(ctx context.Context) error {
 	return nil
 }
 
-func NewPassPlugin(logger logging.Logger, store store.Store) (engine.Plugin, error) {
+func NewPassPlugin(logger plugin.Logger, store store.Store) (plugin.Plugin, error) {
 	return &passPlugin{kc: store, logger: logger}, nil
 }
