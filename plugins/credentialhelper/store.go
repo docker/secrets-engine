@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker-credential-helpers/client"
 
 	"github.com/docker/secrets-engine/engine"
+	"github.com/docker/secrets-engine/plugins"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -120,7 +121,7 @@ func (s *credentialHelperStore) Run(ctx context.Context) error {
 	return nil
 }
 
-var _ engine.Plugin = &credentialHelperStore{}
+var _ plugins.Plugin = &credentialHelperStore{}
 
 // only the CLI owns the config file
 // unfortunately it also specifies the credential helper in use
