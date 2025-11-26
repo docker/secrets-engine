@@ -34,7 +34,7 @@ Examples:
 `
 
 // Root returns the root command for the docker-pass CLI plugin
-func Root(ctx context.Context, s store.Store, version string) *cobra.Command {
+func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "pass [OPTIONS]",
 		SilenceUsage:     true,
@@ -58,7 +58,7 @@ func Root(ctx context.Context, s store.Store, version string) *cobra.Command {
 	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
-	cmd.AddCommand(commands.VersionCommand(version))
+	cmd.AddCommand(commands.VersionCommand(info))
 
 	return cmd
 }
