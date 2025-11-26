@@ -47,6 +47,8 @@ github.com/docker/secrets-engine/client v0.0.16 h1:x6IeuuJXE7E9zfK0ZZzOBTJhtgli/
 github.com/docker/secrets-engine/client v0.0.16/go.mod h1:0/DJvZvZKVwxum7gGKbP44v3vHr4y03skTBrD0Asn2k=
 github.com/docker/secrets-engine/plugin v0.0.18 h1:Pv49tHQaBwSSq+F7MnFeXlmXtqWqtASeC1E+zPQ49/Q=
 github.com/docker/secrets-engine/plugin v0.0.18/go.mod h1:HKbAC9AKMQZPFQ2KJ9v3bb6/XQVPlqx2LiGoiRrzML8=
+github.com/docker/secrets-engine/plugins v0.0.1 h1:afaMV42OY0I/xEDiD2vD1pmFfpzrx8jaknyatdScVSs=
+github.com/docker/secrets-engine/plugins v0.0.1/go.mod h1:sQhsz4PaqK5Vyb+dgdGpQuTDufgeGSMwjd8H+zFVPIQ=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/fvbommel/sortorder v1.1.0 h1:fUmoe+HLsBTctBDoaBwpQo5N+nrCp8g/BjKb/6ZQmYw=

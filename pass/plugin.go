@@ -6,12 +6,13 @@ import (
 
 	"github.com/docker/secrets-engine/engine"
 	pass "github.com/docker/secrets-engine/pass/store"
+	"github.com/docker/secrets-engine/plugins"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
-var _ engine.Plugin = &passPlugin{}
+var _ plugins.Plugin = &passPlugin{}
 
 var errUnknownSecretType = errors.New("unknown secret type")
 
