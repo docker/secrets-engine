@@ -7,10 +7,6 @@ go 1.25.0
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/plugin => ../../plugin
 
-replace github.com/docker/secrets-engine/store => ../../store
-
-replace github.com/docker/secrets-engine/x => ../../x
-
 require (
 	github.com/docker/docker-credential-helpers v0.9.4
 	github.com/docker/secrets-engine/plugin v0.0.18
