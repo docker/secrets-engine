@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/docker/secrets-engine/pass"
+	"github.com/docker/secrets-engine/pass/commands"
 	"github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
@@ -34,7 +35,7 @@ func main() {
 	}
 
 	plugin.Run(func(command.Cli) *cobra.Command {
-		return wrapPersistentPreRun(pass.Root(ctx, kc, "dev"))
+		return wrapPersistentPreRun(pass.Root(ctx, kc, commands.VersionInfo{Version: "dev", Commit: "main"}))
 	},
 		metadata.Metadata{
 			SchemaVersion:    "0.1.0",
