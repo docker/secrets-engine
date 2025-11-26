@@ -16,8 +16,6 @@ import (
 	"github.com/docker/docker-credential-helpers/client"
 
 	"github.com/docker/secrets-engine/plugin"
-	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 // KeyRewriter provides a credential-helper credential username and ID (a server URL).
@@ -36,11 +34,11 @@ import (
 //
 // It is recommended to use [DefaultKeyRewriter] for credential-helper
 // credentials when writing custom rules in your [KeyRewriter].
-type KeyRewriter func(serverURL, username string) (secrets.ID, error)
+type KeyRewriter func(serverURL, username string) (plugin.ID, error)
 
 type credentialHelperStore struct {
 	client.ProgramFunc
-	logging.Logger
+	plugin.Logger
 	rewriter KeyRewriter
 }
 
@@ -65,24 +63,24 @@ func DefaultKeyRewriter(serverURL string) string {
 	return o
 }
 
-func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern plugin.Pattern) ([]plugin.Envelope, error) {
 	credentials, err := client.List(s.ProgramFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	result := []secrets.Envelope{}
+	result := []plugin.Envelope{}
 
 	resolvedAt := time.Now()
 
 	for serverURL, username := range credentials {
-		var p secrets.ID
+		var p plugin.ID
 		var err error
 
 		if s.rewriter != nil {
 			p, err = s.rewriter(serverURL, username)
 		} else {
-			p, err = secrets.ParseID(DefaultKeyRewriter(serverURL))
+			p, err = plugin.ParseID(DefaultKeyRewriter(serverURL))
 		}
 
 		if err != nil {
@@ -96,7 +94,7 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pa
 				s.Warnf("could not get matched secret key '%s' from the credential-helper: %s", serverURL, err)
 				continue
 			}
-			result = append(result, secrets.Envelope{
+			result = append(result, plugin.Envelope{
 				ID:    p,
 				Value: []byte(cred.Secret),
 				Metadata: map[string]string{
@@ -110,7 +108,7 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern secrets.Pa
 		}
 	}
 	if len(result) == 0 {
-		return nil, secrets.ErrNotFound
+		return nil, plugin.ErrNotFound
 	}
 	return result, nil
 }
@@ -164,7 +162,7 @@ func WithShellProgramFunc(f client.ProgramFunc) Options {
 	}
 }
 
-func New(logger logging.Logger, opts ...Options) (plugin.Plugin, error) {
+func New(logger plugin.Logger, opts ...Options) (plugin.Plugin, error) {
 	c := &credentialHelperStore{
 		Logger: logger,
 	}
