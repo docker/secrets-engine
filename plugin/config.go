@@ -55,13 +55,13 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 
 type cfg struct {
 	Config
-	plugin              Plugin
+	plugin              ExternalPlugin
 	name                string
 	conn                io.ReadWriteCloser
 	registrationTimeout time.Duration
 }
 
-func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
+func newCfg(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, error) {
 	engineCfg, err := restoreConfig(p)
 	if errors.Is(err, errPluginNotLaunchedByEngine) {
 		cfg, err := newCfgForManualLaunch(p, opts...)
@@ -70,7 +70,7 @@ func newCfg(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 	return engineCfg, err
 }
 
-func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
+func newCfgForManualLaunch(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, error) {
 	cfg := &cfg{
 		plugin:              p,
 		registrationTimeout: api.DefaultPluginRegistrationTimeout,
@@ -104,7 +104,7 @@ func newCfgForManualLaunch(p Plugin, opts ...ManualLaunchOption) (*cfg, error) {
 
 var errPluginNotLaunchedByEngine = errors.New("plugin not launched by secrets engine")
 
-func restoreConfig(p Plugin) (*cfg, error) {
+func restoreConfig(p ExternalPlugin) (*cfg, error) {
 	cfgString := os.Getenv(api.PluginLaunchedByEngineVar)
 	if cfgString == "" {
 		return nil, errPluginNotLaunchedByEngine
