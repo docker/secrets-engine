@@ -20,7 +20,7 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
-var _ Plugin = &mockPlugin{}
+var _ ExternalPlugin = &mockPlugin{}
 
 type mockPlugin struct{}
 
