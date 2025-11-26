@@ -1,18 +1,14 @@
 package plugin
 
 import (
-	"context"
 	"io"
 
 	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/plugins"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
-type Plugin interface {
-	secrets.Resolver
-
-	Run(ctx context.Context) error
-}
+type Plugin = plugins.Plugin
 
 type Metadata interface {
 	Name() api.Name
