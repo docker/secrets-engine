@@ -11,14 +11,20 @@ import (
 )
 
 type (
+	// Resolver is a type alias for secrets.Resolver, used to resolve secrets.
 	Resolver = secrets.Resolver
+	// Envelope is a type alias for secrets.Envelope, representing a secret envelope.
 	Envelope = secrets.Envelope
 
+	// Version is a type alias for api.Version, representing the plugin version.
 	Version = api.Version
-	ID      = secrets.ID
+	// ID is a type alias for secrets.ID, representing a secret identifier.
+	ID = secrets.ID
+	// Pattern is a type alias for secrets.Pattern, used to match secret IDs.
 	Pattern = secrets.Pattern
-	Logger  = logging.Logger
-	// Plugin is an internal engine plugin
+	// Logger is a type alias for logging.Logger, used for logging within plugins.
+	Logger = logging.Logger
+	// Plugin is an internal engine plugin.
 	Plugin = plugins.Plugin
 )
 
