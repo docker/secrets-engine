@@ -19,8 +19,8 @@ func TestResolver(t *testing.T) {
 	t.Run("no match but errors", func(t *testing.T) {
 		tracker := testhelper.NewTestTracker()
 		reg := mocks.MockResolverRegistry{Resolver: []plugin.Runtime{
-			mocks.NewMockResolverRuntime("foo", "v1", nil, errors.New("foo")),
-			mocks.NewMockResolverRuntime("bar", "v1", nil, errors.New("bar")),
+			mocks.NewMockResolverRuntime("foo", "v1", nil, mocks.WithError(errors.New("foo"))),
+			mocks.NewMockResolverRuntime("bar", "v1", nil, mocks.WithError(errors.New("bar"))),
 		}}
 		res := NewService(testhelper.TestLogger(t), tracker, reg)
 		_, err := res.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
@@ -41,7 +41,7 @@ func TestResolver(t *testing.T) {
 	})
 	t.Run("multiple matches across multiple plugins", func(t *testing.T) {
 		reg := mocks.MockResolverRegistry{Resolver: []plugin.Runtime{
-			mocks.NewMockResolverRuntime("foo", "v1", nil, errors.New("foo")),
+			mocks.NewMockResolverRuntime("foo", "v1", nil, mocks.WithError(errors.New("foo"))),
 			mocks.NewMockResolverRuntime("bar", "v1", []secrets.Envelope{
 				{ID: secrets.MustParseID("foo"), Value: []byte("foo")},
 				{ID: secrets.MustParseID("bar"), Value: []byte("bar")},
@@ -61,5 +61,62 @@ func TestResolver(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.Equal(collect, []any{EventSecretsEngineRequest{ResultsTotal: 3}}, tracker.GetQueue())
 		}, 2*time.Second, 100*time.Millisecond)
+	})
+	t.Run("plugin patterns optimize per plugin requests", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			pattern    string
+			nrResults  int
+			nrRequests int
+		}{
+			{
+				name:       "everything glob",
+				pattern:    "**",
+				nrResults:  3,
+				nrRequests: 2,
+			},
+			{
+				name:       "everything below glob",
+				pattern:    "base/**",
+				nrResults:  3,
+				nrRequests: 2,
+			},
+			{
+				name:       "everything inside plugin 1",
+				pattern:    "base/sub1/*",
+				nrResults:  2,
+				nrRequests: 1,
+			},
+			{
+				name:       "everything inside plugin 2",
+				pattern:    "base/sub2/*",
+				nrResults:  1,
+				nrRequests: 1,
+			},
+			{
+				name:       "specific secret",
+				pattern:    "base/sub2/baz",
+				nrResults:  1,
+				nrRequests: 1,
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				r1 := mocks.NewMockResolverRuntime("bar", "v1", []secrets.Envelope{
+					{ID: secrets.MustParseID("base/sub1/foo"), Value: []byte("foo")},
+					{ID: secrets.MustParseID("base/sub1/bar"), Value: []byte("bar")},
+				}, mocks.WithPattern(secrets.MustParsePattern("base/sub1/*")))
+				r2 := mocks.NewMockResolverRuntime("baz", "v1", []secrets.Envelope{
+					{ID: secrets.MustParseID("base/sub2/baz"), Value: []byte("baz")},
+				}, mocks.WithPattern(secrets.MustParsePattern("base/sub2/*")))
+				reg := mocks.MockResolverRegistry{Resolver: []plugin.Runtime{r1, r2}}
+				tracker := testhelper.NewTestTracker()
+				resolver := NewService(testhelper.TestLogger(t), tracker, reg)
+				e, err := resolver.GetSecrets(t.Context(), secrets.MustParsePattern(test.pattern))
+				require.NoError(t, err)
+				assert.Len(t, e, test.nrResults)
+				assert.Equal(t, test.nrRequests, r1.GetSecretRequests+r2.GetSecretRequests)
+			})
+		}
 	})
 }
