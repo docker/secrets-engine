@@ -75,6 +75,10 @@ func TestPatternIncludes(t *testing.T) {
 		{"*", "*", true},
 		{"*/foo", "*", false},
 		{"*", "*/foo", false},
+		{"docker/*/mcp/*", "docker/proj1/**", false},
+		{"docker/proj1/**", "docker/*/mcp/*", true},
+		{"docker/proj1/**", "docker/**/mcp/**", false},
+		{"docker/**", "docker/**/mcp/**", true},
 	}
 	for idx, tc := range tests {
 		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
