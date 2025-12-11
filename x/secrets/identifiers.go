@@ -81,7 +81,7 @@ func match(pattern, path []string) bool {
 			pi++
 			si++
 		default:
-			if pattern[pi] != path[si] {
+			if pattern[pi] != path[si] && path[pi] != "*" {
 				return false
 			}
 			pi++
