@@ -35,11 +35,12 @@ func (r resolver) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]se
 	var results []secrets.Envelope
 
 	for plugin := range r.reg.Iterator() {
-		if !pattern.Includes(plugin.Pattern()) && !plugin.Pattern().Includes(pattern) {
+		filteredPattern, ok := secrets.Filter(plugin.Pattern(), pattern)
+		if !ok {
 			continue
 		}
 
-		envelopes, err := plugin.GetSecrets(ctx, pattern)
+		envelopes, err := plugin.GetSecrets(ctx, filteredPattern)
 		if err != nil {
 			if !errors.Is(err, secrets.ErrNotFound) {
 				r.logger.Errorf("plugin '%s': %s", plugin.Name(), err)
