@@ -72,9 +72,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
+          - macOS-26
           - macOS-15
           - macOS-14
-          - macOS-13
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/go
