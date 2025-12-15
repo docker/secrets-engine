@@ -73,6 +73,7 @@ RUN --mount=type=bind,target=.,ro \
     (cd injector && go mod tidy --diff)
     (cd pass && go mod tidy --diff)
     (cd plugin && go mod tidy --diff)
+    (cd plugins/credentialhelper && go mod tidy --diff)
     (cd store && go mod tidy --diff)
     (cd x && go mod tidy --diff)
 EOT
