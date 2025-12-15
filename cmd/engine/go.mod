@@ -19,7 +19,7 @@ require (
 	github.com/docker/secrets-engine/engine v0.0.27
 	github.com/docker/secrets-engine/pass v0.0.15
 	github.com/docker/secrets-engine/plugins/credentialhelper v0.0.4
-	github.com/docker/secrets-engine/x v0.0.11-do.not.use
+	github.com/docker/secrets-engine/x v0.0.12-do.not.use
 )
 
 require (
