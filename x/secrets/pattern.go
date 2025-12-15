@@ -117,3 +117,20 @@ func MustParsePattern(s string) Pattern {
 	}
 	return pattern(s)
 }
+
+// Filter returns a reduced [Pattern] that is subset equal to [filter].
+// Returns false if there's no overlap between [filter] and [other].
+// Examples:
+// - Filter(MustParsePattern("bar/**"), MustParsePattern("**")) => returns "bar/**"
+// - Filter(MustParsePattern("**"), MustParsePattern("**")) => returns "**"
+// - Filter(MustParsePattern("bar/**"), MustParsePattern("bar")) => returns "bar"
+// - Filter(MustParsePattern("bar/**"), MustParsePattern("foo/**")) => returns false
+func Filter(filter, other Pattern) (Pattern, bool) {
+	if filter.Includes(other) {
+		return other, true
+	}
+	if other.Includes(filter) {
+		return filter, true
+	}
+	return nil, false
+}
