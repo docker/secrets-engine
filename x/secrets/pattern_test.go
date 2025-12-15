@@ -90,3 +90,54 @@ func TestPatternIncludes(t *testing.T) {
 		})
 	}
 }
+
+func Test_Filter(t *testing.T) {
+	tests := []struct {
+		filter string
+		other  string
+		result string
+	}{
+		{
+			filter: "docker/mcp/auth/**",
+			other:  "**",
+			result: "docker/mcp/auth/**",
+		},
+		{
+			filter: "**",
+			other:  "**",
+			result: "**",
+		},
+		{
+			filter: "docker/mcp/auth/**",
+			other:  "docker/mcp/auth/foo/bar/*",
+			result: "docker/mcp/auth/foo/bar/*",
+		},
+		{
+			filter: "**/mcp/auth/**",
+			other:  "docker/*/auth/foo/bar/*",
+			result: "docker/*/auth/foo/bar/*",
+		},
+		{
+			filter: "**/mcp/auth/**",
+			other:  "*/*/auth/foo/bar/*",
+			result: "*/*/auth/foo/bar/*",
+		},
+		{
+			filter: "docker/mcp/auth/**",
+			other:  "foo/bar",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("f: %s in: %s", tc.filter, tc.other), func(t *testing.T) {
+			filter := MustParsePattern(tc.filter)
+			other := MustParsePattern(tc.other)
+			result, ok := Filter(filter, other)
+			if tc.result == "" {
+				assert.False(t, ok)
+				return
+			}
+			require.True(t, ok)
+			assert.Equal(t, tc.result, result.String())
+		})
+	}
+}
