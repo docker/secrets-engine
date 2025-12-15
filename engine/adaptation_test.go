@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -268,6 +269,10 @@ func filterYamuxErrors(err error) error {
 		return nil
 	}
 	if errors.Is(err, yamux.ErrRemoteGoAway) {
+		return nil
+	}
+	// yamux: Failed to write header: write unix ->: write: broken pipe
+	if errors.Is(err, syscall.EPIPE) {
 		return nil
 	}
 	return err
