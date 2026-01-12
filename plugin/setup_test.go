@@ -40,7 +40,7 @@ func Test_setup(t *testing.T) {
 		a, b := net.Pipe()
 		httpMux := http.NewServeMux()
 		mRegister := &mockRegistrationHandler{}
-		httpMux.Handle(resolverv1connect.NewEngineServiceHandler(mRegister))
+		httpMux.Handle(resolverv1connect.NewRegisterServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
 		_, client, err := ipc.NewServerIPC(testhelper.TestLogger(t), a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)

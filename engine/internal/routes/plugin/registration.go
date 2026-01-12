@@ -14,7 +14,7 @@ func init() {
 
 func registrationHandler(c routes.PluginConfig) (routes.Path, http.Handler, error) {
 	registrator := plugin.NewRegistrationLogic(c.ConfigValidator(), c.RegistrationChannel())
-	path, h := resolverv1connect.NewEngineServiceHandler(&plugin.RegisterService{
+	path, h := resolverv1connect.NewRegisterServiceHandler(&plugin.RegisterService{
 		Logger:            c.Logger(),
 		PluginRegistrator: registrator,
 	})
