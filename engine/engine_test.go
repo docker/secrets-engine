@@ -21,7 +21,6 @@ import (
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	et "github.com/docker/secrets-engine/engine/internal/testhelper"
 	"github.com/docker/secrets-engine/x/api"
-	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -106,11 +105,6 @@ func (m *mockRegistry) Register(plugin plugin.Runtime) (registry.RemoveFunc, err
 	}, m.err
 }
 
-func testLoggerCtx(t *testing.T) context.Context {
-	t.Helper()
-	return logging.WithLogger(t.Context(), logging.NewDefaultLogger(t.Name()))
-}
-
 func Test_Register(t *testing.T) {
 	t.Parallel()
 	t.Run("nothing gets registered when launch returns an error", func(t *testing.T) {
@@ -119,7 +113,7 @@ func Test_Register(t *testing.T) {
 		l := func() (plugin.Runtime, error) {
 			return nil, launchErr
 		}
-		errCh, err := register(testLoggerCtx(t), reg, l)
+		errCh, err := register(testhelper.TestLoggerCtx(t), reg, l)
 		assert.ErrorIs(t, err, launchErr)
 		assert.Nil(t, errCh)
 	})
@@ -130,7 +124,7 @@ func Test_Register(t *testing.T) {
 		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLoggerCtx(t), reg, l)
+		errCh, err := register(testhelper.TestLoggerCtx(t), reg, l)
 		assert.ErrorIs(t, err, errRegister)
 		assert.Nil(t, errCh)
 		assert.Equal(t, 1, r.CloseCalled)
@@ -141,7 +135,7 @@ func Test_Register(t *testing.T) {
 		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLoggerCtx(t), reg, l)
+		errCh, err := register(testhelper.TestLoggerCtx(t), reg, l)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, reg.removeCalled)
 		close(r.RuntimeClosed)
@@ -155,7 +149,7 @@ func Test_Register(t *testing.T) {
 		l := func() (plugin.Runtime, error) {
 			return r, nil
 		}
-		errCh, err := register(testLoggerCtx(t), reg, l)
+		errCh, err := register(testhelper.TestLoggerCtx(t), reg, l)
 		assert.NoError(t, err)
 		<-reg.removed
 		assert.Equal(t, 1, reg.removeCalled)
@@ -218,7 +212,7 @@ func Test_newEngine(t *testing.T) {
 			et.WithListener(newListener(t, socketPath)),
 		)
 
-		e, err := newEngine(testLoggerCtx(t), cfg)
+		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
@@ -240,7 +234,7 @@ func Test_newEngine(t *testing.T) {
 			et.WithListener(newListener(t, socketPath)),
 			et.WithPluginLaunchMaxRetries(1),
 		)
-		e, err := newEngine(testLoggerCtx(t), cfg)
+		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -279,13 +273,13 @@ func Test_newEngine(t *testing.T) {
 			et.WithListener(newListener(t, socketPath)),
 			et.WithPluginLaunchMaxRetries(1),
 			et.WithPlugins(map[plugin.Metadata]plugin.Plugin{
-				validConfig: &mockInternalPlugin{
-					runExitCh: internalPluginRunExitCh,
-					secrets:   map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
+				validConfig: &mocks.MockInternalPlugin{
+					RunExitCh: internalPluginRunExitCh,
+					Secrets:   map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 				},
 			}),
 		)
-		e, err := newEngine(testLoggerCtx(t), cfg)
+		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -315,7 +309,7 @@ func Test_newEngine(t *testing.T) {
 			et.WithPluginPath(dir),
 			et.WithListener(newListener(t, socketPath)),
 		)
-		e, err := newEngine(testLoggerCtx(t), cfg)
+		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))
@@ -350,15 +344,15 @@ func Test_newEngine(t *testing.T) {
 			et.WithPluginsDisabled(true),
 			et.WithListener(newListener(t, socketPath)),
 			et.WithPlugins(map[plugin.Metadata]plugin.Plugin{
-				validConfig: &mockInternalPlugin{
-					blockRunForever: blockRunCh,
-					runExitCh:       runExitCh,
-					secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
+				validConfig: &mocks.MockInternalPlugin{
+					BlockRunForever: blockRunCh,
+					RunExitCh:       runExitCh,
+					Secrets:         map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"},
 				},
 			}),
 		)
 
-		e, err := newEngine(testLoggerCtx(t), cfg)
+		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
 		c, err := client.New(client.WithSocketPath(socketPath))

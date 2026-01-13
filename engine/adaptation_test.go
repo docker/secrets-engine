@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/engine/internal/mocks"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	p "github.com/docker/secrets-engine/plugin"
@@ -24,9 +25,15 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
+const (
+	mockSecretValue = "mockSecretValue"
+)
+
 var (
-	mockValidVersion = api.MustNewVersion("v7")
-	mockPatternAny   = secrets.MustParsePattern("*")
+	mockValidVersion  = api.MustNewVersion("v7")
+	mockPatternAny    = secrets.MustParsePattern("*")
+	mockSecretIDNew   = secrets.MustParseID("mockSecretID")
+	mockSecretPattern = secrets.MustParsePattern("mockSecretID")
 )
 
 func testEngine(t *testing.T) (secrets.Resolver, string) {
@@ -38,7 +45,7 @@ func testEngine(t *testing.T) (secrets.Resolver, string) {
 		WithSocketPath(socketPath),
 		WithPluginPath(dir),
 		WithPlugins(map[Config]plugin.Plugin{
-			{"my-builtin", mockValidVersion, mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
+			{"my-builtin", mockValidVersion, mockPatternAny}: &mocks.MockInternalPlugin{Secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 		}),
 	)
 	c, err := client.New(client.WithSocketPath(socketPath))
@@ -173,7 +180,7 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				WithPluginPath(dir),
 				WithExternallyLaunchedPluginsDisabled(),
 				WithPlugins(map[Config]plugin.Plugin{
-					{Name: "my-builtin", Version: mockValidVersion, Pattern: mockPatternAny}: &mockInternalPlugin{secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
+					{Name: "my-builtin", Version: mockValidVersion, Pattern: mockPatternAny}: &mocks.MockInternalPlugin{Secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 				}),
 			}
 			if test.extraOption != nil {

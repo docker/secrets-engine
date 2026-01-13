@@ -22,6 +22,7 @@ import (
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/registry"
 	"github.com/docker/secrets-engine/engine/internal/routes"
+	"github.com/docker/secrets-engine/engine/internal/runtime"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
 )
@@ -93,6 +94,16 @@ func (e *engineImpl) Plugins() []string {
 		plugins = append(plugins, plugin.Name().String())
 	}
 	return plugins
+}
+
+func wrapBuiltins(ctx context.Context, cfg config.Engine, shutdownTimeout time.Duration) []launchPlan {
+	var result []launchPlan
+	for c, p := range cfg.Plugins() {
+		l := func() (plugin.Runtime, error) { return runtime.NewInternalRuntime(ctx, p, c, shutdownTimeout) }
+		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
+		cfg.Logger().Printf("discovered builtin plugin: %s", c.Name())
+	}
+	return result
 }
 
 func shutdownManagedPluginsOnce(stopSupervisor func(), reg registry.Registry) func() error {

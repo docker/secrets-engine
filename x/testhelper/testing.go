@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"sync"
@@ -139,4 +140,9 @@ func FilterMetrics(rm metricdata.ResourceMetrics, name string) []metricdata.Metr
 		}
 	}
 	return filtered
+}
+
+func TestLoggerCtx(t *testing.T) context.Context {
+	t.Helper()
+	return logging.WithLogger(t.Context(), logging.NewDefaultLogger(t.Name()))
 }
