@@ -80,6 +80,7 @@ func Test_internalRuntime(t *testing.T) {
 		assert.Equal(t, "foo", r.Name().String())
 		assert.Equal(t, "v5", r.Version().String())
 		assert.Equal(t, "*", r.Pattern().String())
+		assert.Equal(t, plugin.BuiltinPlugin, r.Type())
 		resp, err := r.GetSecrets(t.Context(), mockSecretPattern)
 		require.NoError(t, err)
 		require.NotEmpty(t, resp)

@@ -40,3 +40,7 @@ func (m *MockRuntime) Close() error {
 func (m *MockRuntime) Closed() <-chan struct{} {
 	return m.RuntimeClosed
 }
+
+func (m *MockRuntime) Type() plugin.Type {
+	panic("implement me") // not in use yet in the tests that use MockRuntime
+}

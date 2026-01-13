@@ -75,14 +75,6 @@ func getPluginShutdownTimeout() time.Duration {
 
 var _ secrets.Resolver = &runtimeImpl{}
 
-type pluginType string
-
-const (
-	internalPlugin pluginType = "internal" // launched by the engine
-	externalPlugin pluginType = "external" // launched externally
-	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
-)
-
 type runtimeImpl struct {
 	plugin.Metadata
 	pluginClient   resolverv1connect.PluginServiceClient
@@ -90,8 +82,13 @@ type runtimeImpl struct {
 	close          func() error
 	closed         <-chan struct{}
 	logger         logging.Logger
+	pluginType     plugin.Type
 	// TODO: actually store the PID here (we'll need this for security reasons later anyway)
 	cmd plugin.Watcher
+}
+
+func (r *runtimeImpl) Type() plugin.Type {
+	return r.pluginType
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
@@ -142,9 +139,10 @@ func newLaunchedPlugin(cfg runtimeConfig, cmd *exec.Cmd) (plugin.ExternalRuntime
 		close: func() error {
 			return helper.Shutdown(nil)
 		},
-		closed: helper.Closed(),
-		logger: cfg.Logger(),
-		cmd:    watcher,
+		closed:     helper.Closed(),
+		logger:     cfg.Logger(),
+		cmd:        watcher,
+		pluginType: plugin.InternalPlugin,
 	}, nil
 }
 
@@ -188,8 +186,9 @@ func newExternalPlugin(cfg runtimeConfig, conn io.ReadWriteCloser) (plugin.Runti
 		close: sync.OnceValue(func() error {
 			return errors.Join(callPluginShutdown(c, closed), filterClientAlreadyClosed(r.close()))
 		}),
-		closed: closed,
-		logger: cfg.Logger(),
+		closed:     closed,
+		logger:     cfg.Logger(),
+		pluginType: plugin.ExternalPlugin,
 	}, nil
 }
 

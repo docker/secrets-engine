@@ -79,6 +79,10 @@ func (m *MockResolverRuntime) Closed() <-chan struct{} {
 	panic("implement me")
 }
 
+func (m *MockResolverRuntime) Type() plugin.Type {
+	panic("implement me")
+}
+
 type MockResolverRegistry struct {
 	Resolver []plugin.Runtime
 }

@@ -131,7 +131,7 @@ func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
 	var result []launchPlan
 	for _, p := range discoveredPlugins {
 		name, l := newLauncher(cfg, p)
-		result = append(result, launchPlan{l, internalPlugin, name})
+		result = append(result, launchPlan{l, name})
 		cfg.Logger().Printf("discovered plugin: %s", name)
 	}
 	return result, nil

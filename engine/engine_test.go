@@ -30,6 +30,10 @@ type mockSlowRuntime struct {
 	name api.Name
 }
 
+func (m *mockSlowRuntime) Type() plugin.Type {
+	panic("implement me")
+}
+
 func (m *mockSlowRuntime) Name() api.Name {
 	return m.name
 }

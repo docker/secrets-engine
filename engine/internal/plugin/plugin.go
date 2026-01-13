@@ -10,6 +10,14 @@ import (
 
 type Plugin = plugins.Plugin
 
+type Type string
+
+const (
+	InternalPlugin Type = "internal" // launched by the engine
+	ExternalPlugin Type = "external" // launched externally
+	BuiltinPlugin  Type = "builtin"  // no binary only Go interface
+)
+
 type Metadata interface {
 	Name() api.Name
 	Version() api.Version
@@ -22,6 +30,8 @@ type Runtime interface {
 	io.Closer
 
 	Metadata
+
+	Type() Type
 
 	Closed() <-chan struct{}
 }

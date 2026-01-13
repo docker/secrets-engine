@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -22,7 +21,6 @@ type launcher func() (plugin.Runtime, error)
 
 type launchPlan struct {
 	launcher
-	pluginType
 	name string
 }
 
@@ -35,7 +33,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.R
 	for _, p := range plan {
 		upGroup.Add(1)
 		launchedOnce := sync.OnceFunc(func() { upGroup.Done() })
-		initialProcesses[fmt.Sprintf("[%s] %s", p.pluginType, p.name)] = func(ctx context.Context) error {
+		initialProcesses[p.name] = func(ctx context.Context) error {
 			launcherWithOnce := launcher(func() (plugin.Runtime, error) {
 				defer launchedOnce()
 				return p.launcher()
