@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -15,6 +17,8 @@ import (
 )
 
 type runnable func(ctx context.Context) error
+
+type launcher func() (plugin.Runtime, error)
 
 type launchPlan struct {
 	launcher
@@ -65,4 +69,38 @@ func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.R
 		cancel()
 		downGroup.Wait()
 	})
+}
+
+func retryLoop(ctx context.Context, cfg config.Engine, reg registry.Registry, name string, l launcher) error {
+	cfg.Logger().Printf("registering plugin '%s'...", name)
+
+	exponentialBackOff := backoff.NewExponentialBackOff()
+	exponentialBackOff.InitialInterval = 2 * time.Second
+	opts := []backoff.RetryOption{
+		backoff.WithNotify(func(err error, duration time.Duration) {
+			cfg.Logger().Printf("retry registering plugin '%s' (timeout: %s): %s", name, duration, err)
+		}),
+		backoff.WithMaxTries(cfg.PluginLaunchMaxRetries()),
+		backoff.WithMaxElapsedTime(2 * time.Minute),
+		backoff.WithBackOff(exponentialBackOff),
+	}
+
+	_, err := backoff.Retry(ctx, func() (any, error) {
+		errClosed, err := register(ctx, reg, l)
+		if err != nil {
+			cfg.Logger().Errorf("registering plugin '%s': %v", name, err)
+			return nil, err
+		}
+		exponentialBackOff.Reset()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errClosed:
+			if err != nil {
+				cfg.Logger().Errorf("plugin '%s' terminated: %v", name, err)
+			}
+			return nil, err
+		}
+	}, opts...)
+	return err
 }
