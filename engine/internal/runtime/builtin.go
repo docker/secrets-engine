@@ -1,4 +1,4 @@
-package engine
+package runtime
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -21,7 +20,7 @@ type internalRuntime struct {
 	close  func() error
 }
 
-func newInternalRuntime(ctx context.Context, p plugin.Plugin, c plugin.Metadata, shutdownTimeout time.Duration) (plugin.Runtime, error) {
+func NewInternalRuntime(ctx context.Context, p plugin.Plugin, c plugin.Metadata, shutdownTimeout time.Duration) (plugin.Runtime, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -111,14 +110,4 @@ func (i *internalRuntime) Close() error {
 
 func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
-}
-
-func wrapBuiltins(ctx context.Context, cfg config.Engine, shutdownTimeout time.Duration) []launchPlan {
-	var result []launchPlan
-	for c, p := range cfg.Plugins() {
-		l := func() (plugin.Runtime, error) { return newInternalRuntime(ctx, p, c, shutdownTimeout) }
-		result = append(result, launchPlan{l, builtinPlugin, c.Name().String()})
-		cfg.Logger().Printf("discovered builtin plugin: %s", c.Name())
-	}
-	return result
 }
