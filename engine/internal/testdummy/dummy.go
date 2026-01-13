@@ -38,9 +38,8 @@ var (
 	MockSecretPattern = secrets.MustParsePattern("MockSecretID")
 )
 
-// PluginProcessFromBinaryName configures and runs a dummy plugin process.
-// To be used from TestMain.
-func PluginProcessFromBinaryName(name string) {
+// pluginProcessFromBinaryName configures and runs a dummy plugin process.
+func pluginProcessFromBinaryName(name string) {
 	name = strings.TrimSuffix(name, suffix)
 	if strings.HasPrefix(name, "plugin-") && name != dummyPluginFail {
 		val := strings.TrimPrefix(name, "plugin-")
@@ -106,6 +105,30 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return nil
+}
+
+// TestMain acts as a dispatcher to run as dummy plugin or normal test.
+// Inspired by: https://github.com/golang/go/blob/15d9fe43d648764d41a88c75889c84df5e580930/src/os/exec/exec_test.go#L69-L73
+func TestMain(m *testing.M) {
+	binaryName := getTestBinaryName()
+	if strings.HasPrefix(binaryName, "plugin") {
+		// This allows tests to call the test binary as plugin by creating a symlink prefixed with "plugin-" to it.
+		// We then based on the suffix in dummyPluginProcessFromBinaryName() set the behavior of the plugin.
+		pluginProcessFromBinaryName(binaryName)
+	} else if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
+		// PluginProcess is the equivalent of a main when normally implementing a plugin.
+		// Here, it gets run by TestMain if PluginCommand is used to re-launch the test binary (the binary built by go test).
+		pluginProcess(nil)
+	} else {
+		os.Exit(m.Run())
+	}
+}
+
+func getTestBinaryName() string {
+	if len(os.Args) == 0 {
+		return ""
+	}
+	return filepath.Base(os.Args[0])
 }
 
 // PluginCommand can be called from within tests. The returned *exec.Cmd runs the PluginProcess()
@@ -267,12 +290,6 @@ func (b *bufferLogger) Errorf(format string, v ...interface{}) {
 }
 
 var _ logging.Logger = &bufferLogger{}
-
-// PluginProcess is the equivalent of a main when normally implementing a plugin.
-// Here, it gets run by TestMain if PluginCommand is used to re-launch the test binary (the binary built by go test).
-func PluginProcess() {
-	pluginProcess(nil)
-}
 
 func pluginProcess(cfg *pluginCfgRestored) {
 	var logBuf bytes.Buffer

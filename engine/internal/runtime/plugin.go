@@ -1,4 +1,4 @@
-package engine
+package runtime
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/yamux"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/x/api"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
@@ -54,7 +57,7 @@ func SetPluginRequestTimeout(t time.Duration) {
 	pluginRequestTimeout = t
 }
 
-func getPluginRequestTimeout() time.Duration {
+func GetPluginRequestTimeout() time.Duration {
 	timeoutCfgLock.RLock()
 	defer timeoutCfgLock.RUnlock()
 	return pluginRequestTimeout
@@ -67,21 +70,13 @@ func SetPluginShutdownTimeout(t time.Duration) {
 	pluginShutdownTimeout = t
 }
 
-func getPluginShutdownTimeout() time.Duration {
+func GetPluginShutdownTimeout() time.Duration {
 	timeoutCfgLock.RLock()
 	defer timeoutCfgLock.RUnlock()
 	return pluginShutdownTimeout
 }
 
 var _ secrets.Resolver = &runtimeImpl{}
-
-type pluginType string
-
-const (
-	internalPlugin pluginType = "internal" // launched by the engine
-	externalPlugin pluginType = "external" // launched externally
-	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
-)
 
 type runtimeImpl struct {
 	plugin.Metadata
@@ -95,7 +90,7 @@ type runtimeImpl struct {
 }
 
 // newLaunchedPlugin launches a pre-installed plugin with a pre-connected socket pair.
-func newLaunchedPlugin(cfg runtimeConfig, cmd *exec.Cmd) (plugin.ExternalRuntime, error) {
+func newLaunchedPlugin(cfg Config, cmd *exec.Cmd) (plugin.ExternalRuntime, error) {
 	rwc, fd, err := ipc.NewConnectionPair(cmd)
 	if err != nil {
 		return nil, err
@@ -115,10 +110,10 @@ func newLaunchedPlugin(cfg runtimeConfig, cmd *exec.Cmd) (plugin.ExternalRuntime
 	cmd.Env = append(cmd.Env, api.PluginLaunchedByEngineVar+"="+envCfgStr)
 
 	process := plugin.NewProcess(cmd)
-	watcher := plugin.WatchProcess(cfg.Logger(), cfg.Name(), process, getPluginShutdownTimeout())
+	watcher := plugin.WatchProcess(cfg.Logger(), cfg.Name(), process, GetPluginShutdownTimeout())
 
 	ipcClosed, setIpcClosed := closeOnce()
-	r, err := setup(cfg, rwc, setIpcClosed, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(cfg, rwc, setIpcClosed, ipc.WithShutdownTimeout(GetPluginShutdownTimeout()))
 	if err != nil {
 		rwc.Close()
 		watcher.Close()
@@ -159,7 +154,7 @@ func callPluginShutdown(c resolverv1connect.PluginServiceClient, done <-chan str
 		return nil
 	default:
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), getPluginShutdownTimeout())
+	ctx, cancel := context.WithTimeout(context.Background(), GetPluginShutdownTimeout())
 	defer cancel()
 	_, err := c.Shutdown(ctx, connect.NewRequest(v1.ShutdownRequest_builder{}.Build()))
 	return err
@@ -172,11 +167,11 @@ func filterClientAlreadyClosed(err error) error {
 	return err
 }
 
-// newExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
-func newExternalPlugin(cfg runtimeConfig, conn io.ReadWriteCloser) (plugin.Runtime, error) {
+// NewExternalPlugin creates a plugin (stub) for an accepted external plugin connection.
+func NewExternalPlugin(cfg Config, conn io.ReadWriteCloser) (plugin.Runtime, error) {
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	r, err := setup(cfg, conn, once, ipc.WithShutdownTimeout(getPluginShutdownTimeout()))
+	r, err := setup(cfg, conn, once, ipc.WithShutdownTimeout(GetPluginShutdownTimeout()))
 	if err != nil {
 		return nil, err
 	}
@@ -236,4 +231,24 @@ func (r *runtimeImpl) GetSecrets(ctx context.Context, pattern secrets.Pattern) (
 
 func (r *runtimeImpl) Watcher() plugin.Watcher {
 	return r.cmd
+}
+
+func NewLauncher(cfg config.Engine, pluginFile string) (string, func() (plugin.Runtime, error)) {
+	name := toDisplayName(pluginFile)
+	return name, func() (plugin.Runtime, error) {
+		runtimeConfig := NewRuntimeConfig(
+			name,
+			plugin.ConfigOut{
+				EngineName:     cfg.Name(),
+				EngineVersion:  cfg.Version(),
+				RequestTimeout: GetPluginRequestTimeout(),
+			},
+			cfg,
+		)
+		return newLaunchedPlugin(runtimeConfig, exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)))
+	}
+}
+
+func toDisplayName(filename string) string {
+	return strings.TrimSuffix(filename, ".exe")
 }

@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/docker/secrets-engine/engine/internal/runtime"
+
 	"github.com/docker/secrets-engine/engine/internal/config"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/services/resolver"
@@ -50,6 +52,10 @@ var (
 	DefaultSocketPath = api.DefaultSocketPath
 
 	ErrSecretNotFound = secrets.ErrNotFound
+
+	SetPluginRegistrationTimeout = runtime.SetPluginRegistrationTimeout
+	SetPluginRequestTimeout      = runtime.SetPluginRequestTimeout
+	SetPluginShutdownTimeout     = runtime.SetPluginShutdownTimeout
 )
 
 const (
@@ -302,10 +308,6 @@ func Run(ctx context.Context, name, version string, opts ...Option) error {
 	}
 	span.SetStatus(codes.Ok, "clean shutdown")
 	return nil
-}
-
-func toDisplayName(filename string) string {
-	return strings.TrimSuffix(filename, ".exe")
 }
 
 func tryMaskHomePath(path string) string {

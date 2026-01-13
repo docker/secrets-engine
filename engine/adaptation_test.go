@@ -30,11 +30,14 @@ const (
 )
 
 var (
-	mockValidVersion  = api.MustNewVersion("v7")
-	mockPatternAny    = secrets.MustParsePattern("*")
-	mockSecretIDNew   = secrets.MustParseID("mockSecretID")
-	mockSecretPattern = secrets.MustParsePattern("mockSecretID")
+	mockValidVersion = api.MustNewVersion("v7")
+	mockPatternAny   = secrets.MustParsePattern("*")
+	mockPattern      = secrets.MustParsePattern("mockPattern")
 )
+
+func TestMain(m *testing.M) {
+	testdummy.TestMain(m)
+}
 
 func testEngine(t *testing.T) (secrets.Resolver, string) {
 	t.Helper()
@@ -151,7 +154,7 @@ func TestWithDynamicPluginsDisabled(t *testing.T) {
 
 	conn, err := net.Dial("unix", path)
 	require.NoError(t, err)
-	plugin := newMockedPlugin()
+	plugin := mocks.NewMockedPlugin()
 	_, err = p.New(plugin, p.Config{Version: mockValidVersion, Pattern: secrets.MustParsePattern("*")}, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 	assert.ErrorContains(t, err, "external plugin rejected")
 }
@@ -296,7 +299,7 @@ func launchExternalPlugin(t *testing.T, cfg externalPluginTestConfig) func() {
 	t.Helper()
 	conn, err := net.Dial("unix", cfg.socketPath)
 	require.NoError(t, err)
-	plugin := newMockedPlugin(WithID(cfg.id))
+	plugin := mocks.NewMockedPlugin(mocks.WithID(cfg.id))
 	s, err := p.New(plugin, p.Config{Version: mockValidVersion, Pattern: cfg.pattern, Logger: testhelper.TestLogger(t)}, p.WithPluginName(cfg.name), p.WithConnection(conn))
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
