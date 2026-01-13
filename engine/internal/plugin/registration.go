@@ -63,7 +63,7 @@ func (l *registrationLogic) Register(_ context.Context, cfg Unvalidated) (*Confi
 	return out, err
 }
 
-var _ resolverv1connect.EngineServiceHandler = &RegisterService{}
+var _ resolverv1connect.RegisterServiceHandler = &RegisterService{}
 
 type Registrator interface {
 	Register(ctx context.Context, cfg Unvalidated) (*ConfigOut, error)

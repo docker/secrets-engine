@@ -7,7 +7,7 @@ import "google/protobuf/duration.proto";
 
 option go_package = "github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1";
 
-service EngineService {
+service RegisterService {
   // RegisterPlugin registers the plugin with the engine.
   rpc RegisterPlugin(RegisterPluginRequest) returns (RegisterPluginResponse);
 }
@@ -28,6 +28,28 @@ message RegisterPluginResponse {
   string engine_version = 2;
   // Configured request processing timeout in milliseconds.
   google.protobuf.Duration request_timeout = 3;
+}
+
+service ListService {
+  // ListPlugins returns all plugins registered with the engine.
+  rpc ListPlugins(ListPluginsRequest) returns (ListPluginsResponse);
+}
+
+message Plugin {
+  // Name
+  string name = 1;
+  // Version
+  string version = 2;
+  // Pattern
+  string pattern = 3;
+  // External vs builtin
+  bool external = 4;
+}
+
+message ListPluginsRequest {}
+
+message ListPluginsResponse {
+  repeated Plugin plugins = 1;
 }
 
 service PluginService {

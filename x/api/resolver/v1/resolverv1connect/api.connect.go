@@ -21,8 +21,10 @@ import (
 const _ = connect.IsAtLeastVersion1_13_0
 
 const (
-	// EngineServiceName is the fully-qualified name of the EngineService service.
-	EngineServiceName = "resolver.v1.EngineService"
+	// RegisterServiceName is the fully-qualified name of the RegisterService service.
+	RegisterServiceName = "resolver.v1.RegisterService"
+	// ListServiceName is the fully-qualified name of the ListService service.
+	ListServiceName = "resolver.v1.ListService"
 	// PluginServiceName is the fully-qualified name of the PluginService service.
 	PluginServiceName = "resolver.v1.PluginService"
 	// ResolverServiceName is the fully-qualified name of the ResolverService service.
@@ -37,9 +39,11 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// EngineServiceRegisterPluginProcedure is the fully-qualified name of the EngineService's
+	// RegisterServiceRegisterPluginProcedure is the fully-qualified name of the RegisterService's
 	// RegisterPlugin RPC.
-	EngineServiceRegisterPluginProcedure = "/resolver.v1.EngineService/RegisterPlugin"
+	RegisterServiceRegisterPluginProcedure = "/resolver.v1.RegisterService/RegisterPlugin"
+	// ListServiceListPluginsProcedure is the fully-qualified name of the ListService's ListPlugins RPC.
+	ListServiceListPluginsProcedure = "/resolver.v1.ListService/ListPlugins"
 	// PluginServiceShutdownProcedure is the fully-qualified name of the PluginService's Shutdown RPC.
 	PluginServiceShutdownProcedure = "/resolver.v1.PluginService/Shutdown"
 	// ResolverServiceGetSecretsProcedure is the fully-qualified name of the ResolverService's
@@ -47,76 +51,148 @@ const (
 	ResolverServiceGetSecretsProcedure = "/resolver.v1.ResolverService/GetSecrets"
 )
 
-// EngineServiceClient is a client for the resolver.v1.EngineService service.
-type EngineServiceClient interface {
+// RegisterServiceClient is a client for the resolver.v1.RegisterService service.
+type RegisterServiceClient interface {
 	// RegisterPlugin registers the plugin with the engine.
 	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error)
 }
 
-// NewEngineServiceClient constructs a client for the resolver.v1.EngineService service. By default,
-// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
-// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
-// or connect.WithGRPCWeb() options.
+// NewRegisterServiceClient constructs a client for the resolver.v1.RegisterService service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewEngineServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EngineServiceClient {
+func NewRegisterServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) RegisterServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	engineServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("EngineService").Methods()
-	return &engineServiceClient{
+	registerServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("RegisterService").Methods()
+	return &registerServiceClient{
 		registerPlugin: connect.NewClient[v1.RegisterPluginRequest, v1.RegisterPluginResponse](
 			httpClient,
-			baseURL+EngineServiceRegisterPluginProcedure,
-			connect.WithSchema(engineServiceMethods.ByName("RegisterPlugin")),
+			baseURL+RegisterServiceRegisterPluginProcedure,
+			connect.WithSchema(registerServiceMethods.ByName("RegisterPlugin")),
 			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
-// engineServiceClient implements EngineServiceClient.
-type engineServiceClient struct {
+// registerServiceClient implements RegisterServiceClient.
+type registerServiceClient struct {
 	registerPlugin *connect.Client[v1.RegisterPluginRequest, v1.RegisterPluginResponse]
 }
 
-// RegisterPlugin calls resolver.v1.EngineService.RegisterPlugin.
-func (c *engineServiceClient) RegisterPlugin(ctx context.Context, req *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
+// RegisterPlugin calls resolver.v1.RegisterService.RegisterPlugin.
+func (c *registerServiceClient) RegisterPlugin(ctx context.Context, req *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
 	return c.registerPlugin.CallUnary(ctx, req)
 }
 
-// EngineServiceHandler is an implementation of the resolver.v1.EngineService service.
-type EngineServiceHandler interface {
+// RegisterServiceHandler is an implementation of the resolver.v1.RegisterService service.
+type RegisterServiceHandler interface {
 	// RegisterPlugin registers the plugin with the engine.
 	RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error)
 }
 
-// NewEngineServiceHandler builds an HTTP handler from the service implementation. It returns the
+// NewRegisterServiceHandler builds an HTTP handler from the service implementation. It returns the
 // path on which to mount the handler and the handler itself.
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewEngineServiceHandler(svc EngineServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	engineServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("EngineService").Methods()
-	engineServiceRegisterPluginHandler := connect.NewUnaryHandler(
-		EngineServiceRegisterPluginProcedure,
+func NewRegisterServiceHandler(svc RegisterServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	registerServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("RegisterService").Methods()
+	registerServiceRegisterPluginHandler := connect.NewUnaryHandler(
+		RegisterServiceRegisterPluginProcedure,
 		svc.RegisterPlugin,
-		connect.WithSchema(engineServiceMethods.ByName("RegisterPlugin")),
+		connect.WithSchema(registerServiceMethods.ByName("RegisterPlugin")),
 		connect.WithHandlerOptions(opts...),
 	)
-	return "/resolver.v1.EngineService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return "/resolver.v1.RegisterService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case EngineServiceRegisterPluginProcedure:
-			engineServiceRegisterPluginHandler.ServeHTTP(w, r)
+		case RegisterServiceRegisterPluginProcedure:
+			registerServiceRegisterPluginHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	})
 }
 
-// UnimplementedEngineServiceHandler returns CodeUnimplemented from all methods.
-type UnimplementedEngineServiceHandler struct{}
+// UnimplementedRegisterServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedRegisterServiceHandler struct{}
 
-func (UnimplementedEngineServiceHandler) RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.EngineService.RegisterPlugin is not implemented"))
+func (UnimplementedRegisterServiceHandler) RegisterPlugin(context.Context, *connect.Request[v1.RegisterPluginRequest]) (*connect.Response[v1.RegisterPluginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.RegisterService.RegisterPlugin is not implemented"))
+}
+
+// ListServiceClient is a client for the resolver.v1.ListService service.
+type ListServiceClient interface {
+	// ListPlugins returns all plugins registered with the engine.
+	ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error)
+}
+
+// NewListServiceClient constructs a client for the resolver.v1.ListService service. By default, it
+// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
+// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
+// connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewListServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ListServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	listServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("ListService").Methods()
+	return &listServiceClient{
+		listPlugins: connect.NewClient[v1.ListPluginsRequest, v1.ListPluginsResponse](
+			httpClient,
+			baseURL+ListServiceListPluginsProcedure,
+			connect.WithSchema(listServiceMethods.ByName("ListPlugins")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// listServiceClient implements ListServiceClient.
+type listServiceClient struct {
+	listPlugins *connect.Client[v1.ListPluginsRequest, v1.ListPluginsResponse]
+}
+
+// ListPlugins calls resolver.v1.ListService.ListPlugins.
+func (c *listServiceClient) ListPlugins(ctx context.Context, req *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
+	return c.listPlugins.CallUnary(ctx, req)
+}
+
+// ListServiceHandler is an implementation of the resolver.v1.ListService service.
+type ListServiceHandler interface {
+	// ListPlugins returns all plugins registered with the engine.
+	ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error)
+}
+
+// NewListServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewListServiceHandler(svc ListServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	listServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("ListService").Methods()
+	listServiceListPluginsHandler := connect.NewUnaryHandler(
+		ListServiceListPluginsProcedure,
+		svc.ListPlugins,
+		connect.WithSchema(listServiceMethods.ByName("ListPlugins")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/resolver.v1.ListService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case ListServiceListPluginsProcedure:
+			listServiceListPluginsHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedListServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedListServiceHandler struct{}
+
+func (UnimplementedListServiceHandler) ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ListService.ListPlugins is not implemented"))
 }
 
 // PluginServiceClient is a client for the resolver.v1.PluginService service.

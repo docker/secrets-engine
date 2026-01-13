@@ -14,7 +14,7 @@ import (
 )
 
 type registerClient struct {
-	engineClient resolverv1connect.EngineServiceClient
+	engineClient resolverv1connect.RegisterServiceClient
 	pluginName   string
 	config       Config
 	timeout      time.Duration
@@ -22,7 +22,7 @@ type registerClient struct {
 
 func newRegisterClient(c *http.Client, pluginName string, config Config, timeout time.Duration) *registerClient {
 	return &registerClient{
-		engineClient: resolverv1connect.NewEngineServiceClient(c, "http://unix"),
+		engineClient: resolverv1connect.NewRegisterServiceClient(c, "http://unix"),
 		pluginName:   pluginName,
 		config:       config,
 		timeout:      timeout,
