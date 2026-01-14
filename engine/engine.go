@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -43,7 +42,7 @@ type engineImpl struct {
 }
 
 func newEngine(ctx context.Context, cfg config.Engine) (engine, error) {
-	plan := wrapBuiltins(ctx, cfg, getPluginShutdownTimeout())
+	plan := wrapBuiltins(ctx, cfg, runtime.GetPluginShutdownTimeout())
 	if cfg.LaunchedPluginsEnabled() {
 		morePlugins, err := wrapExternalPlugins(cfg)
 		if err != nil {
@@ -141,27 +140,11 @@ func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
 	}
 	var result []launchPlan
 	for _, p := range discoveredPlugins {
-		name, l := newLauncher(cfg, p)
+		name, l := runtime.NewLauncher(cfg, p)
 		result = append(result, launchPlan{l, internalPlugin, name})
 		cfg.Logger().Printf("discovered plugin: %s", name)
 	}
 	return result, nil
-}
-
-func newLauncher(cfg config.Engine, pluginFile string) (string, launcher) {
-	name := toDisplayName(pluginFile)
-	return name, func() (plugin.Runtime, error) {
-		runtimeConfig := newRuntimeConfig(
-			name,
-			plugin.ConfigOut{
-				EngineName:     cfg.Name(),
-				EngineVersion:  cfg.Version(),
-				RequestTimeout: getPluginRequestTimeout(),
-			},
-			cfg,
-		)
-		return newLaunchedPlugin(runtimeConfig, exec.Command(filepath.Join(cfg.PluginPath(), pluginFile)))
-	}
 }
 
 func register(ctx context.Context, reg registry.Registry, launch launcher) (<-chan error, error) {
@@ -240,13 +223,13 @@ func newServer(cfg config.Engine, reg registry.Registry) (*http.Server, error) {
 		router.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
 			span := trace.SpanFromContext(ctx)
 			launcher := launcher(func() (plugin.Runtime, error) {
-				return newExternalPlugin(
-					newRuntimeConfig(
+				return runtime.NewExternalPlugin(
+					runtime.NewRuntimeConfig(
 						"", // TODO:(@benehiko) might need a name here? original code omitted it
 						plugin.ConfigOut{
 							EngineName:     cfg.Name(),
 							EngineVersion:  cfg.Version(),
-							RequestTimeout: getPluginRequestTimeout(),
+							RequestTimeout: runtime.GetPluginRequestTimeout(),
 						},
 						cfg,
 					),

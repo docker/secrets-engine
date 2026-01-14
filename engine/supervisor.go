@@ -26,6 +26,14 @@ type launchPlan struct {
 	name string
 }
 
+type pluginType string
+
+const (
+	internalPlugin pluginType = "internal" // launched by the engine
+	externalPlugin pluginType = "external" // launched externally
+	builtinPlugin  pluginType = "builtin"  // no binary only Go interface
+)
+
 // Parallelizes the launch of all managed plugins but then still waits for synchronization until
 // all launch functions are at least executed once.
 func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.Registry, plan []launchPlan) func() {

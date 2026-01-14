@@ -1,4 +1,4 @@
-package engine
+package runtime
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/engine/internal/mocks"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	et "github.com/docker/secrets-engine/engine/internal/testhelper"
@@ -32,57 +31,13 @@ const (
 	mockEngineVersion = "mockEngineVersion"
 )
 
-var mockPattern = secrets.MustParsePattern("mockPattern")
+var (
+	mockPattern      = secrets.MustParsePattern("mockPattern")
+	mockValidVersion = api.MustNewVersion("v7")
+)
 
-type mockedPlugin struct {
-	id secrets.ID
-}
-
-type MockedPluginOption func(*mockedPlugin)
-
-func newMockedPlugin(options ...MockedPluginOption) *mockedPlugin {
-	m := &mockedPlugin{
-		id: mockSecretIDNew,
-	}
-	for _, opt := range options {
-		opt(m)
-	}
-	return m
-}
-
-func WithID(id secrets.ID) MockedPluginOption {
-	return func(mp *mockedPlugin) {
-		mp.id = id
-	}
-}
-
-func (m *mockedPlugin) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	if pattern.Match(m.id) {
-		return []secrets.Envelope{{ID: m.id, Value: []byte(mockSecretValue)}}, nil
-	}
-	return nil, secrets.ErrNotFound
-}
-
-func getTestBinaryName() string {
-	if len(os.Args) == 0 {
-		return ""
-	}
-	return filepath.Base(os.Args[0])
-}
-
-// TestMain acts as a dispatcher to run as dummy plugin or normal test.
-// Inspired by: https://github.com/golang/go/blob/15d9fe43d648764d41a88c75889c84df5e580930/src/os/exec/exec_test.go#L69-L73
 func TestMain(m *testing.M) {
-	binaryName := getTestBinaryName()
-	if strings.HasPrefix(binaryName, "plugin") {
-		// This allows tests to call the test binary as plugin by creating a symlink prefixed with "plugin-" to it.
-		// We then based on the suffix in dummyPluginProcessFromBinaryName() set the behavior of the plugin.
-		testdummy.PluginProcessFromBinaryName(binaryName)
-	} else if os.Getenv("RUN_AS_DUMMY_PLUGIN") != "" {
-		testdummy.PluginProcess()
-	} else {
-		os.Exit(m.Run())
-	}
+	testdummy.TestMain(m)
 }
 
 func Test_newPlugin(t *testing.T) {
@@ -104,7 +59,7 @@ func Test_newPlugin(t *testing.T) {
 					},
 				})
 				p, err := newLaunchedPlugin(
-					newRuntimeConfig(
+					NewRuntimeConfig(
 						pluginNameFromTestName(t),
 						plugin.ConfigOut{
 							EngineName:     mockEngineName,
@@ -143,7 +98,7 @@ func Test_newPlugin(t *testing.T) {
 					ErrGetSecret: errGetSecret,
 				})
 				p, err := newLaunchedPlugin(
-					newRuntimeConfig(
+					NewRuntimeConfig(
 						pluginNameFromTestName(t),
 						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
 						et.NewEngineConfig(t),
@@ -171,7 +126,7 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(
-					newRuntimeConfig(
+					NewRuntimeConfig(
 						pluginNameFromTestName(t),
 						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
 						et.NewEngineConfig(t),
@@ -192,7 +147,7 @@ func Test_newPlugin(t *testing.T) {
 					IgnoreSigint: true,
 				})
 				p, err := newLaunchedPlugin(
-					newRuntimeConfig(
+					NewRuntimeConfig(
 						pluginNameFromTestName(t),
 						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
 						et.NewEngineConfig(t),
@@ -216,7 +171,7 @@ func Test_newPlugin(t *testing.T) {
 					Secrets: map[string]string{testdummy.MockSecretID.String(): testdummy.MockSecretValue},
 				})
 				p, err := newLaunchedPlugin(
-					newRuntimeConfig(
+					NewRuntimeConfig(
 						pluginNameFromTestName(t),
 						plugin.ConfigOut{EngineName: mockEngineName, EngineVersion: mockEngineVersion, RequestTimeout: 30 * time.Second},
 						et.NewEngineConfig(t),
@@ -259,7 +214,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				m := newMockExternalRuntime(t, l)
 
 				config := testExternalPluginConfig(t)
-				s, err := p.New(newMockedPlugin(), config, p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(mocks.NewMockedPlugin(), config, p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
@@ -284,7 +239,7 @@ func Test_newExternalPlugin(t *testing.T) {
 			test: func(t *testing.T, l net.Listener, conn net.Conn) {
 				t.Helper()
 				m := newMockExternalRuntime(t, l)
-				s, err := p.New(newMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(mocks.NewMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				runErr := runAsync(t.Context(), s.Run)
 
@@ -306,7 +261,7 @@ func Test_newExternalPlugin(t *testing.T) {
 				t.Helper()
 				m := newMockExternalRuntime(t, l)
 
-				s, err := p.New(newMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
+				s, err := p.New(mocks.NewMockedPlugin(), testExternalPluginConfig(t), p.WithPluginName("my-plugin"), p.WithConnection(conn))
 				require.NoError(t, err)
 				ctx, cancel := context.WithCancel(t.Context())
 				done := make(chan struct{})
@@ -342,7 +297,7 @@ func Test_newExternalPlugin(t *testing.T) {
 					close(doneRuntime)
 				}()
 
-				s, err := p.New(newMockedPlugin(), p.Config{
+				s, err := p.New(mocks.NewMockedPlugin(), p.Config{
 					Version: mockValidVersion,
 					Pattern: &maliciousPattern{},
 					Logger:  testhelper.TestLogger(t),
@@ -433,8 +388,8 @@ func (m *mockExternalRuntime) waitForNextRuntimeWithTimeout() (plugin.Runtime, e
 	if err != nil {
 		return nil, err
 	}
-	r, err := newExternalPlugin(
-		newRuntimeConfig(
+	r, err := NewExternalPlugin(
+		NewRuntimeConfig(
 			"", // TODO:(@benehiko) this needs to be empty otherwise the validation step will compare
 			// the plugin name and will fail "launched plugin name cannot be changed"...
 			plugin.ConfigOut{EngineName: "test-engine", EngineVersion: "v1.0.0", RequestTimeout: 30 * time.Second},

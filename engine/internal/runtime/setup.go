@@ -1,4 +1,4 @@
-package engine
+package runtime
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ type setupResult struct {
 	close  func() error
 }
 
-type runtimeConfig interface {
+type Config interface {
 	plugin.ConfigValidator
 	routes.PluginConfig
 	Name() string
@@ -36,7 +36,7 @@ type runtimeConfigImpl struct {
 	registrationResult chan plugin.RegistrationResult
 }
 
-func newRuntimeConfig(name string, out plugin.ConfigOut, debugging config.Debugging) runtimeConfig {
+func NewRuntimeConfig(name string, out plugin.ConfigOut, debugging config.Debugging) Config {
 	return &runtimeConfigImpl{
 		Debugging:          debugging,
 		name:               name,
@@ -68,7 +68,7 @@ func (p *runtimeConfigImpl) Validate(in plugin.Unvalidated) (plugin.Metadata, *p
 	return data, &p.out, nil
 }
 
-func setup(cfg runtimeConfig, conn io.ReadWriteCloser, cb func(), option ...ipc.Option) (*setupResult, error) {
+func setup(cfg Config, conn io.ReadWriteCloser, cb func(), option ...ipc.Option) (*setupResult, error) {
 	router := chi.NewRouter()
 
 	if err := routes.SetupPlugins(cfg, router); err != nil {
