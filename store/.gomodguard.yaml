@@ -1,0 +1,13 @@
+---
+blocked:
+  modules:
+    - github.com/docker/secrets-engine/client:
+        reason: "Forbidden dependency"
+    - github.com/docker/secrets-engine/engine:
+        reason: "Forbidden dependency"
+    - github.com/docker/secrets-engine/injector:
+        reason: "Forbidden dependency"
+    - github.com/docker/secrets-engine/pass:
+        reason: "Forbidden dependency"
+    - github.com/docker/secrets-engine/plugin:
+        reason: "Forbidden dependency"

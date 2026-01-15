@@ -153,6 +153,10 @@ mod:
 	@go work sync
 	@go work vendor
 
+.PHONY: gomodguard
+gomodguard:
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=do-gomodguard .
+
 define HELP_BUMP
 Usage: make bump MOD=<module>
 
