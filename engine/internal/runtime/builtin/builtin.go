@@ -1,4 +1,4 @@
-package runtime
+package builtin
 
 import (
 	"context"
@@ -110,4 +110,9 @@ func (i *internalRuntime) Close() error {
 
 func (i *internalRuntime) Closed() <-chan struct{} {
 	return i.closed
+}
+
+func IsBuiltin(r plugin.Runtime) bool {
+	_, ok := r.(*internalRuntime)
+	return ok
 }

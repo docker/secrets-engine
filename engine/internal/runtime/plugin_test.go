@@ -29,11 +29,13 @@ import (
 const (
 	mockEngineName    = "mockEngineName"
 	mockEngineVersion = "mockEngineVersion"
+	mockSecretValue   = "mockSecretValue"
 )
 
 var (
-	mockPattern      = secrets.MustParsePattern("mockPattern")
-	mockValidVersion = api.MustNewVersion("v7")
+	mockPattern       = secrets.MustParsePattern("mockPattern")
+	mockValidVersion  = api.MustNewVersion("v7")
+	mockSecretPattern = secrets.MustParsePattern("mockSecretID")
 )
 
 func TestMain(m *testing.M) {
