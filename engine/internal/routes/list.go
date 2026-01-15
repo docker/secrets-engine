@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	registerPrivateRoute(listHandler)
+	registerPublicRoute(listHandler)
 }
 
 func listHandler(c Config) (Path, http.Handler, error) {
