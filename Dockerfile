@@ -85,6 +85,26 @@ RUN --mount=type=bind,target=.,ro \
     golangci-lint run -v $(go list -f '{{.Dir}}/...' -m | xargs)
 EOT
 
+FROM golang AS gomodguard
+ARG GOMODGUARD_VERSION=v1.4.1
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=tmpfs,target=/go/src/ \
+    go install "github.com/ryancurrah/gomodguard/cmd/gomodguard@${GOMODGUARD_VERSION}" \
+    && gomodguard -help
+
+FROM golang AS do-gomodguard
+COPY --link --from=gomodguard /go/bin/gomodguard /go/bin/gomodguard
+WORKDIR /modguard
+ENV PATH=/go/bin:$PATH
+RUN --mount=type=bind,target=.,ro <<EOT
+    set -euo pipefail
+    for dir in $(go list -f '{{.Dir}}' -m); do
+      if [ -f "$dir/.gomodguard.yaml" ]; then
+          (cd "$dir" && gomodguard)
+      fi
+    done
+EOT
 
 FROM golang AS gofumpt
 ARG GOFUMPT_VERSION=v0.8.0

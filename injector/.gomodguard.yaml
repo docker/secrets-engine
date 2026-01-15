@@ -1,0 +1,5 @@
+---
+blocked:
+  modules:
+    - github.com/docker/secrets-engine/store:
+        reason: "Forbidden dependency"
