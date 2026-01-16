@@ -75,9 +75,16 @@ type config struct {
 
 type client struct {
 	resolverClient resolverv1connect.ResolverServiceClient
+	listClient     resolverv1connect.ListServiceClient
 }
 
-func New(options ...Option) (secrets.Resolver, error) {
+type Client interface {
+	secrets.Resolver
+
+	ListPlugins(ctx context.Context) ([]PluginInfo, error)
+}
+
+func New(options ...Option) (Client, error) {
 	cfg := &config{
 		requestTimeout: api.DefaultClientRequestTimeout,
 	}
@@ -112,6 +119,7 @@ func New(options ...Option) (secrets.Resolver, error) {
 	}
 	return &client{
 		resolverClient: resolverv1connect.NewResolverServiceClient(c, "http://unix"),
+		listClient:     resolverv1connect.NewListServiceClient(c, "http://unix"),
 	}, nil
 }
 
@@ -145,6 +153,43 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 		})
 	}
 	return envelopes, nil
+}
+
+func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
+	req := connect.NewRequest(v1.ListPluginsRequest_builder{}.Build())
+	resp, err := c.listClient.ListPlugins(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	var result []PluginInfo
+	for _, item := range resp.Msg.GetPlugins() {
+		name, err := api.NewName(item.GetName())
+		if err != nil {
+			continue
+		}
+		version, err := api.NewVersion(item.GetVersion())
+		if err != nil {
+			continue
+		}
+		pattern, err := secrets.ParsePattern(item.GetPattern())
+		if err != nil {
+			continue
+		}
+		result = append(result, PluginInfo{
+			Name:     name,
+			Version:  version,
+			Pattern:  pattern,
+			External: item.GetExternal(),
+		})
+	}
+	return result, nil
+}
+
+type PluginInfo struct {
+	Name     api.Name
+	Version  api.Version
+	Pattern  secrets.Pattern
+	External bool
 }
 
 func dialFromPath(path string) dial {
