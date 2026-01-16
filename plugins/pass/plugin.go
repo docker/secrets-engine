@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	pass "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/plugin"
+	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/store"
 )
 

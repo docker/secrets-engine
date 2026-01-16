@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	pass "github.com/docker/secrets-engine/pass/store"
+	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
 )
