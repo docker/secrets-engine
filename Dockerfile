@@ -65,17 +65,9 @@ RUN --mount=type=bind,target=.,ro \
         git config --global --add url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
     fi
 
-    (cd client && go mod tidy --diff)
-    (cd cmd/engine && go mod tidy --diff)
-    (cd cmd/nri-plugin && go mod tidy --diff)
-    (cd cmd/pass && go mod tidy --diff)
-    (cd engine && go mod tidy --diff)
-    (cd injector && go mod tidy --diff)
-    (cd pass && go mod tidy --diff)
-    (cd plugin && go mod tidy --diff)
-    (cd plugins/credentialhelper && go mod tidy --diff)
-    (cd store && go mod tidy --diff)
-    (cd x && go mod tidy --diff)
+    for dir in $(go list -f '{{.Dir}}' -m); do
+      (cd "$dir" && go mod tidy --diff)
+    done
 EOT
 RUN --mount=type=bind,target=.,ro \
     --mount=type=cache,target=/root/.cache <<EOT
