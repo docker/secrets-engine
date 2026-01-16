@@ -7,9 +7,9 @@ use (
 	./cmd/pass
 	./engine
 	./injector
-	./pass
 	./plugin
 	./plugins/credentialhelper
+	./plugins/pass
 	./store
 	./x
 )

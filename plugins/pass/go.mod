@@ -2,9 +2,9 @@ module github.com/docker/secrets-engine/pass
 
 go 1.25.0
 
-replace github.com/docker/secrets-engine/store => ../store
+replace github.com/docker/secrets-engine/store => ./../../store
 
-replace github.com/docker/secrets-engine/x => ../x
+replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
 	github.com/docker/secrets-engine/plugin v0.0.19
