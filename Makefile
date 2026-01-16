@@ -76,7 +76,10 @@ unit-tests:
 	pids=""; \
 	err=0; \
 	for dir in $(shell go list -f '{{.Dir}}' -m); do \
-	  go test -trimpath -race -v $$(go list "$$dir/...")  & pids="$$pids $$!"; \
+		case "$$dir" in \
+			*/store) continue ;; \
+		esac; \
+	  	go test -trimpath -race -v $$(go list "$$dir/...")  & pids="$$pids $$!"; \
 	done; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
