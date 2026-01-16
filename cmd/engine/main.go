@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/pass"
-	pstore "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/plugins/credentialhelper"
+	"github.com/docker/secrets-engine/plugins/pass"
+	pstore "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/oshelper"

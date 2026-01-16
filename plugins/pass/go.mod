@@ -1,4 +1,4 @@
-module github.com/docker/secrets-engine/pass
+module github.com/docker/secrets-engine/plugins/pass
 
 go 1.25.0
 

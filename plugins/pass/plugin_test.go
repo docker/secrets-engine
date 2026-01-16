@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	pass "github.com/docker/secrets-engine/pass/store"
-	"github.com/docker/secrets-engine/pass/teststore"
+	pass "github.com/docker/secrets-engine/plugins/pass/store"
+	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
