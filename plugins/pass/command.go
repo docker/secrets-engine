@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
-	"github.com/docker/secrets-engine/pass/commands"
+	"github.com/docker/secrets-engine/plugins/pass/commands"
 	"github.com/docker/secrets-engine/store"
 )
 
@@ -64,8 +64,8 @@ func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.
 }
 
 const (
-	meterName  = "github.com/docker/secrets-engine/pass"
-	tracerName = "github.com/docker/secrets-engine/pass"
+	meterName  = "github.com/docker/secrets-engine/plugins/pass"
+	tracerName = "github.com/docker/secrets-engine/plugins/pass"
 )
 
 func int64counter(counter string, opts ...metric.Int64CounterOption) metric.Int64Counter {

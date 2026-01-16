@@ -11,9 +11,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/docker/secrets-engine/pass/commands"
-	pass "github.com/docker/secrets-engine/pass/store"
-	"github.com/docker/secrets-engine/pass/teststore"
+	"github.com/docker/secrets-engine/plugins/pass/commands"
+	pass "github.com/docker/secrets-engine/plugins/pass/store"
+	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"

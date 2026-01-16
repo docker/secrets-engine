@@ -7,7 +7,7 @@ go 1.25.0
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/engine => ../../engine
 
-replace github.com/docker/secrets-engine/pass => ./../../plugins/pass
+replace github.com/docker/secrets-engine/plugins/pass => ./../../plugins/pass
 
 replace github.com/docker/secrets-engine/store => ../../store
 
@@ -15,7 +15,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/cli v29.0.4+incompatible
-	github.com/docker/secrets-engine/pass v0.0.15
+	github.com/docker/secrets-engine/plugins/pass v0.0.16
 	github.com/docker/secrets-engine/x v0.0.12-do.not.use
 	github.com/spf13/cobra v1.10.1
 	go.opentelemetry.io/otel v1.38.0

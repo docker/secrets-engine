@@ -12,9 +12,9 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/codes"
 
-	"github.com/docker/secrets-engine/pass"
-	"github.com/docker/secrets-engine/pass/commands"
-	"github.com/docker/secrets-engine/pass/store"
+	"github.com/docker/secrets-engine/plugins/pass"
+	"github.com/docker/secrets-engine/plugins/pass/commands"
+	"github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/x/oshelper"
 )
 
