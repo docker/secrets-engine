@@ -7,7 +7,7 @@ go 1.25.0
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/engine => ../../engine
 
-replace github.com/docker/secrets-engine/pass => ../../pass
+replace github.com/docker/secrets-engine/pass => ./../../plugins/pass
 
 replace github.com/docker/secrets-engine/plugins/credentialhelper => ../../plugins/credentialhelper/
 
