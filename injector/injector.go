@@ -76,7 +76,7 @@ func (r *resolver) resolveENV(ctx context.Context, key, value string) (string, e
 	}
 	getSecrets := func(ctx context.Context, pattern secrets.Pattern, src string) ([]secrets.Envelope, error) {
 		result, err := r.resolver.GetSecrets(ctx, pattern)
-		if err == nil {
+		if err == nil && len(result) > 0 {
 			r.tracker.TrackEvent(EventSecretsEngineInjectorEnvResolved{Source: src})
 		}
 		return result, err

@@ -7,15 +7,10 @@ go 1.25.0
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/client => ../client
 
-replace github.com/docker/secrets-engine/engine => ../engine
-
-replace github.com/docker/secrets-engine/plugin => ../plugin
-
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
 	github.com/docker/secrets-engine/client v0.0.16
-	github.com/docker/secrets-engine/engine v0.0.28
 	github.com/docker/secrets-engine/x v0.0.12-do.not.use
 	github.com/moby/moby/api v1.52.0
 	github.com/stretchr/testify v1.11.1
@@ -26,12 +21,10 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
-	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
