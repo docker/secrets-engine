@@ -71,18 +71,16 @@ lint: multiarch-builder ## Lint code
 clean: ## remove built binaries and packages
 	@sh -c "rm -rf bin dist"
 
+.PHONY: unit-tests
 unit-tests:
 	pids=""; \
 	err=0; \
-	go test -trimpath -race -v $(shell go list ./client/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./cmd/engine/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./cmd/pass/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./engine/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./injector/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./pass/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./plugin/...) & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./plugins/credentialhelper/...)      & pids="$$pids $$!"; \
-	go test -trimpath -race -v $(shell go list ./x/...)      & pids="$$pids $$!"; \
+	for dir in $(shell go list -f '{{.Dir}}' -m); do \
+		case "$$dir" in \
+			*/store) continue ;; \
+		esac; \
+	  	go test -trimpath -race -v $$(go list "$$dir/...")  & pids="$$pids $$!"; \
+	done; \
 	for p in $$pids; do \
 		wait $$p || err=$$?; \
 	done; \
@@ -184,4 +182,4 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint proto-lint proto-generate unit-tests clean help keychain-linux-unit-tests keychain-unit-tests pass pass-cross engine engine-cross
+.PHONY: run bin format lint proto-lint proto-generate clean help keychain-linux-unit-tests keychain-unit-tests pass pass-cross engine engine-cross

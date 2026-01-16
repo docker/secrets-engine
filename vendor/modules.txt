@@ -112,7 +112,7 @@ github.com/docker/go-units
 ## explicit; go 1.25
 # github.com/docker/secrets-engine/engine v0.0.28 => ./engine
 ## explicit; go 1.25.0
-# github.com/docker/secrets-engine/pass v0.0.15 => ./pass
+# github.com/docker/secrets-engine/pass v0.0.15 => ./plugins/pass
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.19 => ./plugin
 ## explicit; go 1.25
