@@ -92,9 +92,6 @@ github.com/docker/cli/opts
 github.com/docker/cli/pkg/kvfile
 # github.com/docker/distribution v2.8.3+incompatible
 ## explicit
-# github.com/docker/docker-auth/auth v0.0.1-beta
-## explicit; go 1.24.4
-github.com/docker/docker-auth/auth/authstore
 # github.com/docker/docker-credential-helpers v0.9.4
 ## explicit; go 1.21
 github.com/docker/docker-credential-helpers/client
