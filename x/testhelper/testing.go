@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/docker/secrets-engine/x/logging"
+	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/telemetry"
 )
 
@@ -145,4 +147,30 @@ func FilterMetrics(rm metricdata.ResourceMetrics, name string) []metricdata.Metr
 func TestLoggerCtx(t *testing.T) context.Context {
 	t.Helper()
 	return logging.WithLogger(t.Context(), logging.NewDefaultLogger(t.Name()))
+}
+
+var _ secrets.Resolver = &MockResolver{}
+
+type MockResolver struct {
+	Store map[secrets.ID]string
+}
+
+func (m MockResolver) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	var result []secrets.Envelope
+	for id, v := range m.Store {
+		if pattern.Match(id) {
+			result = append(result, secrets.Envelope{ID: id, Value: []byte(v)})
+		}
+	}
+	slices.SortFunc(result, func(a, b secrets.Envelope) int {
+		switch {
+		case a.ID.String() < b.ID.String():
+			return -1
+		case a.ID.String() > b.ID.String():
+			return 1
+		default:
+			return 0
+		}
+	})
+	return result, nil
 }
