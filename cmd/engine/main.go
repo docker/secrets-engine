@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/docker/secrets-engine/engine"
-	"github.com/docker/secrets-engine/engine/builtins/dockerauth"
 	"github.com/docker/secrets-engine/pass"
 	pstore "github.com/docker/secrets-engine/pass/store"
 	"github.com/docker/secrets-engine/plugins/credentialhelper"
@@ -63,15 +62,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	dockerAuthPlugin, err := dockerauth.NewDockerAuthPlugin(logger)
-	if err != nil {
-		panic(err)
-	}
 
 	matchAllPattern := secrets.MustParsePattern("**")
 
 	plugins[engine.Config{Name: "docker-pass", Version: version, Pattern: matchAllPattern}] = passPlugin
-	plugins[engine.Config{Name: "docker-auth", Version: version, Pattern: matchAllPattern}] = dockerAuthPlugin
 
 	credentialHelperPlugin, err := credentialhelper.New(logger)
 	if err != nil {

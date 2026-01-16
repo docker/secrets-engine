@@ -9,11 +9,8 @@ github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMF
 github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/docker/docker-auth/auth v0.0.1-beta h1:4kygrW5JPaDhcvYNN30pB++8JmulaoeYwCnP+BZadjQ=
-github.com/docker/docker-auth/auth v0.0.1-beta/go.mod h1:kRzMmGlgmGE5J0QtIKsX9Ygdo33OqhAUPAO+fhOvlP8=
 github.com/docker/docker-credential-helpers v0.9.4 h1:76ItO69/AP/V4yT9V4uuuItG0B1N8hvt0T0c0NN/DzI=
 github.com/docker/docker-credential-helpers v0.9.4/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
-github.com/docker/secrets-engine v0.0.7 h1:DVdrx5DLZhTo6ef2vO/ZauBuFbJYClrcp0QOkEyioEA=
 github.com/docker/secrets-engine/client v0.0.16 h1:x6IeuuJXE7E9zfK0ZZzOBTJhtgli/abRX2qWUV6wLDc=
 github.com/docker/secrets-engine/client v0.0.16/go.mod h1:0/DJvZvZKVwxum7gGKbP44v3vHr4y03skTBrD0Asn2k=
 github.com/docker/secrets-engine/plugin v0.0.19 h1:MZpwFIpDJXdlb+jS7GMaH2FUTshxlSQ77XYyu/OVsyc=
