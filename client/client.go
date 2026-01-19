@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/api/resolver"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -74,8 +74,12 @@ type config struct {
 }
 
 type client struct {
-	resolverClient resolverv1connect.ResolverServiceClient
+	resolverClient secrets.Resolver
 	listClient     resolverv1connect.ListServiceClient
+}
+
+func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	return c.resolverClient.GetSecrets(ctx, pattern)
 }
 
 type Client interface {
@@ -118,41 +122,9 @@ func New(options ...Option) (Client, error) {
 		Timeout: cfg.requestTimeout,
 	}
 	return &client{
-		resolverClient: resolverv1connect.NewResolverServiceClient(c, "http://unix"),
+		resolverClient: resolver.NewResolverClient(c),
 		listClient:     resolverv1connect.NewListServiceClient(c, "http://unix"),
 	}, nil
-}
-
-func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	req := connect.NewRequest(v1.GetSecretsRequest_builder{
-		Pattern: proto.String(pattern.String()),
-	}.Build())
-	resp, err := c.resolverClient.GetSecrets(ctx, req)
-	if err != nil {
-		if connect.CodeOf(err) == connect.CodeNotFound {
-			err = secrets.ErrNotFound
-		}
-		return nil, err
-	}
-
-	var envelopes []secrets.Envelope
-	for _, item := range resp.Msg.GetEnvelopes() {
-		id, err := secrets.ParseID(item.GetId())
-		if err != nil {
-			continue
-		}
-		envelopes = append(envelopes, secrets.Envelope{
-			ID:         id,
-			Value:      item.GetValue(),
-			Metadata:   item.GetMetadata(),
-			Provider:   item.GetProvider(),
-			Version:    item.GetVersion(),
-			CreatedAt:  item.GetCreatedAt().AsTime(),
-			ResolvedAt: item.GetResolvedAt().AsTime(),
-			ExpiresAt:  item.GetExpiresAt().AsTime(),
-		})
-	}
-	return envelopes, nil
 }
 
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {

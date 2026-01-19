@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/mocks"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/registry"
@@ -215,8 +214,7 @@ func Test_newEngine(t *testing.T) {
 		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
-		c, err := client.New(client.WithSocketPath(socketPath))
-		require.NoError(t, err)
+		c := newMockClient(socketPath)
 		foo, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		require.NoError(t, err)
 		require.NotEmpty(t, foo)
@@ -240,8 +238,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"plugin-bar"})
 		}, 2*time.Second, 100*time.Millisecond)
-		c, err := client.New(client.WithSocketPath(socketPath))
-		require.NoError(t, err)
+		c := newMockClient(socketPath)
 		bar, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		require.NoError(t, err)
 		require.NotEmpty(t, bar)
@@ -285,8 +282,7 @@ func Test_newEngine(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
 		}, 2*time.Second, 100*time.Millisecond)
-		c, err := client.New(client.WithSocketPath(socketPath))
-		require.NoError(t, err)
+		c := newMockClient(socketPath)
 		mySecret, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("my-secret"))
 		require.NoError(t, err)
 		require.NotEmpty(t, mySecret)
@@ -312,8 +308,7 @@ func Test_newEngine(t *testing.T) {
 		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
-		c, err := client.New(client.WithSocketPath(socketPath))
-		require.NoError(t, err)
+		c := newMockClient(socketPath)
 		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("bar"))
 		require.NoError(t, err)
 		killAllPlugins(t, getRegistry(t, e))
@@ -355,8 +350,7 @@ func Test_newEngine(t *testing.T) {
 		e, err := newEngine(testhelper.TestLoggerCtx(t), cfg)
 		require.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, e.Close()) })
-		c, err := client.New(client.WithSocketPath(socketPath))
-		require.NoError(t, err)
+		c := newMockClient(socketPath)
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			assert.ElementsMatch(collect, e.Plugins(), []string{"my-builtin"})
 		}, 2*time.Second, 100*time.Millisecond)

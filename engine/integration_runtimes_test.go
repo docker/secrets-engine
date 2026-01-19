@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -15,12 +16,12 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/engine/internal/mocks"
 	"github.com/docker/secrets-engine/engine/internal/plugin"
 	"github.com/docker/secrets-engine/engine/internal/testdummy"
 	p "github.com/docker/secrets-engine/plugin"
 	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -51,9 +52,19 @@ func testEngine(t *testing.T) (secrets.Resolver, string) {
 			{"my-builtin", mockValidVersion, mockPatternAny}: &mocks.MockInternalPlugin{Secrets: map[secrets.ID]string{secrets.MustParseID("my-secret"): "some-value"}},
 		}),
 	)
-	c, err := client.New(client.WithSocketPath(socketPath))
-	require.NoError(t, err)
-	return c, socketPath
+	return newMockClient(socketPath), socketPath
+}
+
+func newMockClient(socketPath string) secrets.Resolver {
+	c := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				d := &net.Dialer{}
+				return d.DialContext(ctx, "unix", socketPath)
+			},
+		},
+	}
+	return resolver.NewResolverClient(c)
 }
 
 func Test_SecretsEngine(t *testing.T) {
@@ -190,9 +201,8 @@ func TestWithEnginePluginsDisabled(t *testing.T) {
 				options = append(options, test.extraOption)
 			}
 			runEngineAsync(t, "test-engine", "test-version", options...)
-			c, err := client.New(client.WithSocketPath(socketPath))
-			require.NoError(t, err)
-			_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
+			c := newMockClient(socketPath)
+			_, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 			if test.shouldGetSecretFromExternalPlugin {
 				assert.NoError(t, err)
 			} else {
