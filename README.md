@@ -1,59 +1,28 @@
-# Docker Secrets Engine
+# Secrets Engine SDK
 
 [![build](https://github.com/docker/secrets-engine/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/build.yml)
 [![unit tests](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml)
 [![lint](https://github.com/docker/secrets-engine/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
 
-## Getting Started
+## Quickstart
 
-Run a local engine:
+Secrets Engine and [docker pass](https://docs.docker.com/reference/cli/docker/pass/) are bundled with [Docker Desktop](https://docs.docker.com/desktop/).
 
-```console
-$ make engine
-CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/secrets-engine ./engine/daemon
-$ ./dist/secrets-engine
-2025/08/12 10:20:45 engine: secrets engine starting up... (~/.cache/secrets-engine/engine.sock)
-2025/08/12 10:20:45 engine: discovered builtin plugin: pass
-2025/08/12 10:20:45 engine: registering plugin 'pass'...
-2025/08/12 10:20:45 engine: plugin priority order
-2025/08/12 10:20:45 engine:   #1: pass
-2025/08/12 10:20:45 engine: secrets engine ready
-```
-
-Create secrets in your keychain:
+Let's store a secret using `docker pass` in the OS Keychain and then inject it
+into a running container using Secrets Engine.
 
 ```console
-$ make pass
-CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o ./dist/docker-pass ./pass
-$ ./dist/docker-pass set foo=bar
-$ ./dist/docker-pass set baz=something
-$ ./dist/docker-pass ls
-baz
-foo
+# Store `Foo` in the OS Keychain
+$ docker pass set Foo=bar
+# Tell docker to use the Secrets Engine using the `se://` URI on an environment variable
+$ docker run --rm -e Foo=se://Foo busybox /bin/sh -c "echo \${Foo}"
+$ bar
 ```
 
-Query secrets from the engine:
+# Developer Guides
 
-```console
-$ curl --unix-socket ~/.cache/secrets-engine/engine.sock \
-    -X POST http://localhost/resolver.v1.ResolverService/GetSecrets \
-    -H "Content-Type: application/json" -d '{"pattern": "foo"}'
-{"id":"foo","value":"bar","provider":"docker-pass","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
-```
-
-> [!NOTE]
-> On linux the socket might be on /run/user/1000/secrets-engine/engine.sock
-
-## Integration
-
-There are three ways to integrate with the secrets engine:
-
-- Client integrator: Use the client to query secrets and to build business logic on top that makes use of the engine.
-- Plugin author: Create plugins for an engine.
-- Engine integrator: Build/run an engine yourself.
-
-### Using the client
+## How to query secrets
 
 Use the `client` module in your project:
 
@@ -77,7 +46,9 @@ if err != nil {
 fmt.Println(resp.Value)
 ```
 
-### Writing your own Plugin
+## How to create a plugin
+
+### 1. Implement the plugin interface
 
 Use the `plugin` module in your project:
 
@@ -95,19 +66,21 @@ type myPlugin struct {
 	secrets map[secrets.ID]string
 }
 
-func (p *myPlugin) GetSecret(_ context.Context, request secrets.Request) (secrets.Envelope, error) {
+func (p *myPlugin) GetSecret(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
 	p.m.Lock()
 	defer p.m.Unlock()
+
+	var result []secrets.Envelope
 	for id, value := range p.secrets {
-		if request.ID == id {
-			return secrets.Envelope{
+		if request.Pattern.Match(id) {
+			result = append(result, secrets.Envelope{
 				ID:    id,
 				Value: []byte(value),
 				CreatedAt: time.Now(),
-			}, nil
+			})
 		}
 	}
-	return secrets.EnvelopeErr(request, secrets.ErrNotFound), secrets.ErrNotFound
+	return result, nil
 }
 
 func (p *myPlugin) Config() plugin.Config {
@@ -118,7 +91,9 @@ func (p *myPlugin) Config() plugin.Config {
 }
 ```
 
-Create your plugin binary:
+### 2. Build a plugin binary
+
+Create a Go binary that use your plugin interface implementation and runs it through the plugin SDK:
 
 ```go
 package main
@@ -141,6 +116,17 @@ func main() {
 }
 ```
 
-### Running the Engine
+### 3. Test and verify the plugin:
 
-TODO
+The secrets engine is integrated with Docker Desktop.
+To verify your plugin works, run the binary.
+Using the SDK it will automatically connect to the secrets engine in Docker Desktop.
+Then, you can query secrets, e.g. using curl:
+
+```console
+$ curl --unix-socket ~/Library/Caches/docker-secrets-engine/engine.sock \
+    -X POST http://localhost/resolver.v1.ResolverService/GetSecrets \
+    -H "Content-Type: application/json" -d '{"pattern": "foo"}'
+{"id":"foo","value":"bar","provider":"docker-pass","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
+```
+
