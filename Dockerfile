@@ -153,22 +153,3 @@ EOT
 
 FROM scratch AS proto-generate
 COPY --from=do-proto-generate /generate/out .
-
-FROM gobase AS build-nri-plugin
-ARG TARGETOS
-ARG TARGETARCH
-ARG NRI_PLUGIN_BINARY
-WORKDIR /src
-RUN mkdir /out
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=tmpfs,target=/go/src/ <<EOT
-    set -euo pipefail
-    EXT=""
-    [ "$TARGETOS" = "windows" ] && EXT=".exe"
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o "/out/${NRI_PLUGIN_BINARY}${EXT}" ./cmd/nri-plugin
-EOT
-
-FROM scratch AS package-nri-plugin
-COPY --link --from=build-nri-plugin /out .
