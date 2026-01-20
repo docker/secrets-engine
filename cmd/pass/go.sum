@@ -45,8 +45,8 @@ github.com/docker/go-metrics v0.0.1 h1:AgB/0SvBxihN0X8OR4SjsblXkbMvalQ8cjmtKQ2rQ
 github.com/docker/go-metrics v0.0.1/go.mod h1:cG1hvH2utMXtqgqqYE9plW6lDxS3/5ayHzueweSI3Vw=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/docker/secrets-engine/plugin v0.0.19 h1:MZpwFIpDJXdlb+jS7GMaH2FUTshxlSQ77XYyu/OVsyc=
-github.com/docker/secrets-engine/plugin v0.0.19/go.mod h1:5smOpW84QwwIcuXrIN4IfyI3QJ4T8gDErycstYWjHZE=
+github.com/docker/secrets-engine/plugin v0.0.21 h1:9X4xcFQn3Sn7q1jVw53kiHwGSZ1VSS4zf2vg/a/PE/Q=
+github.com/docker/secrets-engine/plugin v0.0.21/go.mod h1:+3dPUKJ9BkRynLbE1dtr7jtsHC7VZozCcWQW+kqXbhI=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/fvbommel/sortorder v1.1.0 h1:fUmoe+HLsBTctBDoaBwpQo5N+nrCp8g/BjKb/6ZQmYw=

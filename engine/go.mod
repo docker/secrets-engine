@@ -16,7 +16,7 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	connectrpc.com/connect v1.18.1
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/docker/secrets-engine/plugin v0.0.19
+	github.com/docker/secrets-engine/plugin v0.0.21
 	github.com/docker/secrets-engine/x v0.0.13-do.not.use
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/hashicorp/yamux v0.1.2
