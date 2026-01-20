@@ -107,7 +107,7 @@ github.com/docker/go-connections/tlsconfig
 github.com/docker/go-units
 # github.com/docker/secrets-engine/client v0.0.17 => ./client
 ## explicit; go 1.25
-# github.com/docker/secrets-engine/engine v0.0.28 => ./engine
+# github.com/docker/secrets-engine/engine v0.0.29 => ./engine
 ## explicit; go 1.25.0
 # github.com/docker/secrets-engine/plugin v0.0.21 => ./plugin
 ## explicit; go 1.25
