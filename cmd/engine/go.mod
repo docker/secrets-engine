@@ -17,7 +17,7 @@ replace github.com/docker/secrets-engine/x => ../../x
 
 require (
 	github.com/docker/secrets-engine/engine v0.0.28
-	github.com/docker/secrets-engine/plugins/credentialhelper v0.0.4
+	github.com/docker/secrets-engine/plugins/credentialhelper v0.0.21
 	github.com/docker/secrets-engine/plugins/pass v0.0.17
 	github.com/docker/secrets-engine/x v0.0.13-do.not.use
 )
@@ -27,7 +27,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/docker/docker-credential-helpers v0.9.4 // indirect
-	github.com/docker/secrets-engine/plugin v0.0.19 // indirect
+	github.com/docker/secrets-engine/plugin v0.0.21 // indirect
 	github.com/docker/secrets-engine/store v0.0.17 // indirect
 	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
