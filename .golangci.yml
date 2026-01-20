@@ -3,6 +3,7 @@ linters:
   default: none
   enable:
     - errcheck
+    - forbidigo
     - gocyclo
     - govet
     - ineffassign
@@ -16,6 +17,12 @@ linters:
     - unparam
     - unused
   settings:
+    forbidigo:
+      forbid:
+        - pattern: '^os\.MkdirTemp$'
+          msg: "use t.TempDir() instead"
+        - pattern: '^context\.(Background|TODO)$'
+          msg: "use t.Context() instead"
     gocritic:
       disabled-checks:
         - dupArg
@@ -44,6 +51,12 @@ linters:
       - builtin$
       - examples$
       - vendor$
+    rules:
+      # Scope test-specific forbidigo rules to test files only
+      - path-except: '_test\.go$'
+        linters:
+          - forbidigo
+        text: 'use t\.'
 formatters:
   enable:
     - gofumpt
