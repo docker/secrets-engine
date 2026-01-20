@@ -59,3 +59,45 @@ func (r resolverService) GetSecrets(ctx context.Context, c *connect.Request[reso
 		Envelopes: items,
 	}.Build()), nil
 }
+
+var _ secrets.Resolver = &resolverClient{}
+
+type resolverClient struct {
+	resolverClient resolverv1connect.ResolverServiceClient
+}
+
+func NewResolverClient(httpClient connect.HTTPClient) secrets.Resolver {
+	return &resolverClient{resolverClient: resolverv1connect.NewResolverServiceClient(httpClient, "http://unix")}
+}
+
+func (r resolverClient) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	req := connect.NewRequest(resolverv1.GetSecretsRequest_builder{
+		Pattern: proto.String(pattern.String()),
+	}.Build())
+	resp, err := r.resolverClient.GetSecrets(ctx, req)
+	if err != nil {
+		if connect.CodeOf(err) == connect.CodeNotFound {
+			err = secrets.ErrNotFound
+		}
+		return nil, err
+	}
+
+	var envelopes []secrets.Envelope
+	for _, item := range resp.Msg.GetEnvelopes() {
+		id, err := secrets.ParseID(item.GetId())
+		if err != nil {
+			continue
+		}
+		envelopes = append(envelopes, secrets.Envelope{
+			ID:         id,
+			Value:      item.GetValue(),
+			Metadata:   item.GetMetadata(),
+			Provider:   item.GetProvider(),
+			Version:    item.GetVersion(),
+			CreatedAt:  item.GetCreatedAt().AsTime(),
+			ResolvedAt: item.GetResolvedAt().AsTime(),
+			ExpiresAt:  item.GetExpiresAt().AsTime(),
+		})
+	}
+	return envelopes, nil
+}
