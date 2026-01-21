@@ -48,7 +48,7 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 		<-closed
 		ipc.Close()
 	}()
-	config.Logger.Printf("Started plugin (engine: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, config.name)
+	config.Logger.Printf("Started plugin (runtime: %s@%s) %s...", runtimeCfg.Engine, runtimeCfg.Version, config.name)
 	close(setupCompleted)
 	return ipc, nil
 }

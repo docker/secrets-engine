@@ -26,7 +26,7 @@ func (c *PluginConfigFromEngine) ToString() (string, error) {
 func NewPluginConfigFromEngineEnv(in string) (*PluginConfigFromEngine, error) {
 	var result PluginConfigFromEngine
 	if err := json.Unmarshal([]byte(in), &result); err != nil {
-		return nil, fmt.Errorf("failed to decode plugin config from engine %q: %w", api.PluginLaunchedByEngineVar, err)
+		return nil, fmt.Errorf("failed to decode plugin config from runtime %q: %w", api.PluginLaunchedByEngineVar, err)
 	}
 	if result.Name == "" {
 		return nil, errors.New("plugin name is required")

@@ -1,0 +1,39 @@
+name: Runtime (cross platform)
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'runtime/**'
+jobs:
+  tests-windows:
+    permissions:
+      id-token: write
+      contents: read
+    name: WindowsRuntimeTests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
+        with:
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
+      - name: Test runtime
+        run: make runtime-unit-tests
+  tests-macos:
+    permissions:
+      id-token: write
+      contents: read
+    name: MacOSRuntimeTests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/go
+        with:
+          app_id: ${{ vars.DOCKER_READ_APP_ID }}
+          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
+      - name: Test runtime
+        run: CGO_ENABLED=1 make runtime-unit-tests

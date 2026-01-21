@@ -102,7 +102,7 @@ func New(options ...Option) (Client, error) {
 	}
 	c := &http.Client{
 		Transport: &http.Transport{
-			// re-use the same connection to the engine, this speeds up subsequent
+			// re-use the same connection to the runtime, this speeds up subsequent
 			// calls.
 			MaxConnsPerHost:     api.DefaultClientMaxConnsPerHost,
 			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,

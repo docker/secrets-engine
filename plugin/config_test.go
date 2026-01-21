@@ -113,14 +113,14 @@ func Test_restoreConfig(t *testing.T) {
 		test func(t *testing.T)
 	}{
 		{
-			name: "no config from the engine",
+			name: "no config from the runtime",
 			test: func(t *testing.T) {
 				_, err := restoreConfig(&mockPlugin{})
 				assert.ErrorIs(t, err, errPluginNotLaunchedByEngine)
 			},
 		},
 		{
-			name: "invalid config from the engine",
+			name: "invalid config from the runtime",
 			test: func(t *testing.T) {
 				t.Setenv(api.PluginLaunchedByEngineVar, "test-plugin")
 				_, err := restoreConfig(&mockPlugin{})
