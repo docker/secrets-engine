@@ -39,3 +39,11 @@ func DefaultSocketPath() string {
 	}
 	return filepath.Join(os.TempDir(), "docker-secrets-engine", "engine.sock")
 }
+
+func DefaultSecretsEngineDirectory() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "docker-secrets-engine"), nil
+}
