@@ -12,9 +12,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/docker/secrets-engine/runtime/internal/runtime"
-
 	"github.com/docker/secrets-engine/runtime/internal/config"
+	"github.com/docker/secrets-engine/runtime/internal/launcher"
 	"github.com/docker/secrets-engine/runtime/internal/plugin"
 	"github.com/docker/secrets-engine/runtime/internal/services/resolver"
 	"github.com/docker/secrets-engine/x/api"
@@ -53,9 +52,9 @@ var (
 
 	ErrSecretNotFound = secrets.ErrNotFound
 
-	SetPluginRegistrationTimeout = runtime.SetPluginRegistrationTimeout
-	SetPluginRequestTimeout      = runtime.SetPluginRequestTimeout
-	SetPluginShutdownTimeout     = runtime.SetPluginShutdownTimeout
+	SetPluginRegistrationTimeout = launcher.SetPluginRegistrationTimeout
+	SetPluginRequestTimeout      = launcher.SetPluginRequestTimeout
+	SetPluginShutdownTimeout     = launcher.SetPluginShutdownTimeout
 )
 
 const (
