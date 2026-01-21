@@ -17,12 +17,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/docker/secrets-engine/runtime/internal/builtin"
 	"github.com/docker/secrets-engine/runtime/internal/config"
+	"github.com/docker/secrets-engine/runtime/internal/launcher"
 	"github.com/docker/secrets-engine/runtime/internal/plugin"
 	"github.com/docker/secrets-engine/runtime/internal/registry"
 	"github.com/docker/secrets-engine/runtime/internal/routes"
-	"github.com/docker/secrets-engine/runtime/internal/runtime"
-	"github.com/docker/secrets-engine/runtime/internal/runtime/builtin"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/logging"
 )
@@ -43,7 +43,7 @@ type engineImpl struct {
 }
 
 func newEngine(ctx context.Context, cfg config.Engine) (engine, error) {
-	plan := wrapBuiltins(ctx, cfg, runtime.GetPluginShutdownTimeout())
+	plan := wrapBuiltins(ctx, cfg, launcher.GetPluginShutdownTimeout())
 	if cfg.LaunchedPluginsEnabled() {
 		morePlugins, err := wrapExternalPlugins(cfg)
 		if err != nil {
@@ -141,14 +141,14 @@ func wrapExternalPlugins(cfg config.Engine) ([]launchPlan, error) {
 	}
 	var result []launchPlan
 	for _, p := range discoveredPlugins {
-		name, l := runtime.NewLauncher(cfg, p)
+		name, l := launcher.NewLauncher(cfg, p)
 		result = append(result, launchPlan{l, internalPlugin, name})
 		cfg.Logger().Printf("discovered plugin: %s", name)
 	}
 	return result, nil
 }
 
-func register(ctx context.Context, reg registry.Registry, launch launcher) (<-chan error, error) {
+func register(ctx context.Context, reg registry.Registry, launch starter) (<-chan error, error) {
 	logger, err := logging.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -223,21 +223,21 @@ func newServer(cfg config.Engine, reg registry.Registry) (*http.Server, error) {
 	if cfg.DynamicPluginsEnabled() {
 		router.Handle(ipc.NewHijackAcceptor(cfg.Logger(), func(ctx context.Context, conn io.ReadWriteCloser) {
 			span := trace.SpanFromContext(ctx)
-			launcher := launcher(func() (plugin.Runtime, error) {
-				return runtime.NewExternalPlugin(
-					runtime.NewRuntimeConfig(
+			s := starter(func() (plugin.Runtime, error) {
+				return launcher.NewExternalPlugin(
+					launcher.NewRuntimeConfig(
 						"", // TODO:(@benehiko) might need a name here? original code omitted it
 						plugin.ConfigOut{
 							EngineName:     cfg.Name(),
 							EngineVersion:  cfg.Version(),
-							RequestTimeout: runtime.GetPluginRequestTimeout(),
+							RequestTimeout: launcher.GetPluginRequestTimeout(),
 						},
 						cfg,
 					),
 					conn,
 				)
 			})
-			errDone, err := register(logging.WithLogger(ctx, cfg.Logger()), reg, launcher)
+			errDone, err := register(logging.WithLogger(ctx, cfg.Logger()), reg, s)
 			if err != nil {
 				cfg.Logger().Errorf("registering dynamic plugin: %v", err)
 			}

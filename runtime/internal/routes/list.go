@@ -7,8 +7,9 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/runtime/internal/builtin"
+
 	"github.com/docker/secrets-engine/runtime/internal/registry"
-	"github.com/docker/secrets-engine/runtime/internal/runtime/builtin"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 )

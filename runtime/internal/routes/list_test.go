@@ -8,10 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/runtime/internal/builtin"
+
 	"github.com/docker/secrets-engine/runtime/internal/mocks"
 	"github.com/docker/secrets-engine/runtime/internal/plugin"
 	"github.com/docker/secrets-engine/runtime/internal/registry"
-	"github.com/docker/secrets-engine/runtime/internal/runtime/builtin"
 	"github.com/docker/secrets-engine/x/api"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/testhelper"

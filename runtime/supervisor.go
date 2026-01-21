@@ -18,10 +18,10 @@ import (
 
 type runnable func(ctx context.Context) error
 
-type launcher func() (plugin.Runtime, error)
+type starter func() (plugin.Runtime, error)
 
 type launchPlan struct {
-	launcher
+	starter
 	pluginType
 	name string
 }
@@ -44,9 +44,9 @@ func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.R
 		upGroup.Add(1)
 		launchedOnce := sync.OnceFunc(func() { upGroup.Done() })
 		initialProcesses[fmt.Sprintf("[%s] %s", p.pluginType, p.name)] = func(ctx context.Context) error {
-			launcherWithOnce := launcher(func() (plugin.Runtime, error) {
+			launcherWithOnce := starter(func() (plugin.Runtime, error) {
 				defer launchedOnce()
-				return p.launcher()
+				return p.starter()
 			})
 			if err := retryLoop(ctx, cfg, reg, p.name, launcherWithOnce); err != nil && !errors.Is(err, context.Canceled) {
 				cfg.Logger().Errorf("plugin '%s' stopped: %s", p.name, err)
@@ -79,7 +79,7 @@ func syncedParallelLaunch(ctx context.Context, cfg config.Engine, reg registry.R
 	})
 }
 
-func retryLoop(ctx context.Context, cfg config.Engine, reg registry.Registry, name string, l launcher) error {
+func retryLoop(ctx context.Context, cfg config.Engine, reg registry.Registry, name string, l starter) error {
 	cfg.Logger().Printf("registering plugin '%s'...", name)
 
 	exponentialBackOff := backoff.NewExponentialBackOff()
