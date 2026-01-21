@@ -81,8 +81,8 @@ keychain-linux-unit-tests:
 keychain-unit-tests:
 	CGO_ENABLED=1 go test -trimpath -race -v $$(go list ./store/keychain/...)
 
-engine-unit-tests:
-	go test -trimpath -race -v $$(go list ./engine/...)
+runtime-unit-tests:
+	go test -trimpath -race -v $$(go list ./runtime/...)
 
 proto-generate:
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-generate .

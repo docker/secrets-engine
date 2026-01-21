@@ -1,4 +1,4 @@
-name: Engine (cross platform)
+name: Runtime (cross platform)
 on:
   push:
     branches:
@@ -7,13 +7,13 @@ on:
       - 'v*'
   pull_request:
     paths:
-      - 'engine/**'
+      - 'runtime/**'
 jobs:
   tests-windows:
     permissions:
       id-token: write
       contents: read
-    name: WindowsEngineTests
+    name: WindowsRuntimeTests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,13 +21,13 @@ jobs:
         with:
           app_id: ${{ vars.DOCKER_READ_APP_ID }}
           app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
-      - name: Test engine
-        run: make engine-unit-tests
+      - name: Test runtime
+        run: make runtime-unit-tests
   tests-macos:
     permissions:
       id-token: write
       contents: read
-    name: MacOSEngineTests
+    name: MacOSRuntimeTests
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,5 +35,5 @@ jobs:
         with:
           app_id: ${{ vars.DOCKER_READ_APP_ID }}
           app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
-      - name: Test engine
-        run: CGO_ENABLED=1 make engine-unit-tests
+      - name: Test runtime
+        run: CGO_ENABLED=1 make runtime-unit-tests
