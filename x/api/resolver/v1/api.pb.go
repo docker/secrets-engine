@@ -284,7 +284,7 @@ func (x *RegisterPluginResponse) ClearRequestTimeout() {
 type RegisterPluginResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Name of the runtime engine is running in.
+	// Name of the secrets engine is running in.
 	EngineName *string
 	// Version of the runtime engine is running in.
 	EngineVersion *string

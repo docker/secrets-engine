@@ -46,7 +46,7 @@ func (c *Config) Valid() error {
 
 // New creates a stub with the given plugin and options.
 // ManualLaunchOption only apply when the plugin is launched manually.
-// If launched by the secrets engine, they are ignored.
+// If launched by the secrets runtime, they are ignored.
 // If logger is nil, a default logger will be created and used.
 func New(p ExternalPlugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	if err := config.Valid(); err != nil {

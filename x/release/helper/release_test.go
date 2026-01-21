@@ -18,14 +18,14 @@ func Test_bumpIterative(t *testing.T) {
 			"x/v1.0.0-do.not.use",
 			"plugin/v0.1.1",
 			"client/v1.0.3",
-			"engine/v0.2.4",
+			"runtime/v0.2.4",
 		})
 		pluginIdx := getIndex(t, "plugin", m.tagsCreated)
 		clientIdx := getIndex(t, "client", m.tagsCreated)
 		assert.ElementsMatch(t, m.bumps, []bump{
-			{"engine/go.mod", "x", "v1.0.0-do.not.use"},
-			{"engine/go.mod", "plugin", "v0.1.1"},
-			{"engine/go.mod", "client", "v1.0.3"},
+			{"runtime/go.mod", "x", "v1.0.0-do.not.use"},
+			{"runtime/go.mod", "plugin", "v0.1.1"},
+			{"runtime/go.mod", "client", "v1.0.3"},
 			{"client/go.mod", "x", "v1.0.0-do.not.use"},
 			{"plugin/go.mod", "x", "v1.0.0-do.not.use"},
 		})
@@ -40,10 +40,10 @@ func Test_bumpIterative(t *testing.T) {
 		assert.NoError(t, BumpIterative("plugin", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
 			"plugin/v0.1.1",
-			"engine/v0.2.4",
+			"runtime/v0.2.4",
 		})
 		assert.ElementsMatch(t, m.bumps, []bump{
-			{"engine/go.mod", "plugin", "v0.1.1"},
+			{"runtime/go.mod", "plugin", "v0.1.1"},
 		})
 		require.Equal(t, 1, len(m.commits))
 		assert.Equal(t, "chore: bump plugin/v0.1.1", m.commits[0])
@@ -51,9 +51,9 @@ func Test_bumpIterative(t *testing.T) {
 	t.Run("bump module without dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpIterative("engine", Patch, repo, m))
+		assert.NoError(t, BumpIterative("runtime", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
-			"engine/v0.2.4",
+			"runtime/v0.2.4",
 		})
 		assert.Empty(t, m.bumps)
 		assert.Empty(t, m.commits)
@@ -78,7 +78,7 @@ func Test_bumpModule(t *testing.T) {
 		assert.NoError(t, BumpModule("x", Patch, repo["x"], m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{"x/v0.0.4-do.not.use"})
 		assert.ElementsMatch(t, m.bumps, []bump{
-			{"engine/go.mod", "x", "v0.0.4-do.not.use"},
+			{"runtime/go.mod", "x", "v0.0.4-do.not.use"},
 			{"client/go.mod", "x", "v0.0.4-do.not.use"},
 			{"plugin/go.mod", "x", "v0.0.4-do.not.use"},
 		})
@@ -89,8 +89,8 @@ func Test_bumpModule(t *testing.T) {
 	t.Run("bump module without version metadata and no dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpModule("engine", Patch, repo["engine"], m))
-		assert.ElementsMatch(t, m.tagsCreated, []string{"engine/v0.2.4"})
+		assert.NoError(t, BumpModule("runtime", Patch, repo["runtime"], m))
+		assert.ElementsMatch(t, m.tagsCreated, []string{"runtime/v0.2.4"})
 		assert.ElementsMatch(t, m.bumps, []bump{})
 	})
 }
@@ -100,7 +100,7 @@ func newMockRepoData() RepoData {
 	modules.AddMod("x", Version{Current: "v0.0.3-do.not.use", KeepExtra: true}, []string{})
 	modules.AddMod("plugin", Version{Current: "v0.1.0"}, []string{"x"})
 	modules.AddMod("client", Version{Current: "v1.0.2"}, []string{"x"})
-	modules.AddMod("engine", Version{Current: "v0.2.3"}, []string{"client", "plugin", "x"})
+	modules.AddMod("runtime", Version{Current: "v0.2.3"}, []string{"client", "plugin", "x"})
 	return modules
 }
 
