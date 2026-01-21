@@ -3,7 +3,7 @@ blocked:
   modules:
     - github.com/docker/secrets-engine/client:
         reason: "Forbidden dependency"
-    - github.com/docker/secrets-engine/engine:
+    - github.com/docker/secrets-engine/runtime:
         reason: "Forbidden dependency"
     - github.com/docker/secrets-engine/injector:
         reason: "Forbidden dependency"

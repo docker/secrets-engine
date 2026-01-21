@@ -16,7 +16,7 @@ import (
 const hijackTimeout = 2 * time.Second
 
 // ManualLaunchOption to apply to a plugin during its creation
-// when it's manually launched (not by the secrets engine).
+// when it's manually launched (not by the secrets runtime).
 type ManualLaunchOption func(c *cfg) error
 
 // WithPluginName sets the name to use in plugin registration.
@@ -38,7 +38,7 @@ func WithRegistrationTimeout(timeout time.Duration) ManualLaunchOption {
 	}
 }
 
-// WithConnection sets an existing secrets engine connection to use.
+// WithConnection sets an existing secrets runtime connection to use.
 func WithConnection(conn net.Conn) ManualLaunchOption {
 	return func(s *cfg) error {
 		if s.conn != nil {
