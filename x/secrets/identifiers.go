@@ -10,14 +10,14 @@ type ErrInvalidID struct {
 }
 
 func (e ErrInvalidID) Error() string {
-	return fmt.Sprintf("invalid identifier: %q must match [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*?", e.ID)
+	return fmt.Sprintf("invalid identifier: %q must match ^[A-Za-z0-9._:-]+(?:/[A-Za-z0-9._:-]+)*$", e.ID)
 }
 
 // validIdentifier checks if an identifier is valid without using regexp or unicode.
 // Rules:
 // - Components separated by '/'
 // - Each component is non-empty
-// - Only characters A-Z, a-z, 0-9, '.', '_' or '-'
+// - Only characters A-Z, a-z, 0-9, '.', '_', '-' or ':'
 // - No leading, trailing, or double slashes
 func validIdentifier(s string) bool {
 	if len(s) == 0 {
@@ -49,7 +49,7 @@ func isValidRune(c rune) bool {
 	return (c >= 'A' && c <= 'Z') ||
 		(c >= 'a' && c <= 'z') ||
 		(c >= '0' && c <= '9') ||
-		c == '.' || c == '-' || c == '_'
+		c == '.' || c == '-' || c == '_' || c == ':'
 }
 
 func split(s string) []string {
@@ -108,7 +108,7 @@ func valid(id string) error {
 }
 
 // ID contains a secret identifier.
-// Valid secret identifiers must match the format [A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)+?.
+// Valid secret identifiers must match the format ^[A-Za-z0-9._:-]+(?:/[A-Za-z0-9._:-]+)*$.
 //
 // For storage, we don't really differentiate much about the ID format but
 // by convention we do simple, slash-separated management, providing a
@@ -142,7 +142,7 @@ func (i id) String() string {
 // Rules:
 // - Components separated by '/'
 // - Each component is non-empty
-// - Only characters A-Z, a-z, 0-9, '.', '_' or '-'
+// - Only characters A-Z, a-z, 0-9, '.', '_', '-' or ':'
 // - No leading, trailing, or double slashes
 func ParseID(s string) (ID, error) {
 	if err := valid(s); err != nil {
