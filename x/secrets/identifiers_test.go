@@ -16,10 +16,10 @@ func TestParseIDNew(t *testing.T) {
 		{"valid name with dot", "my.secretA9", nil},
 		{"valid name with slash", "my/secret", nil},
 		{"valid name with underscore", "my_secretA9", nil},
+		{"valid name with colon", "127.0.0.1:8080", nil},
 		{"invalid name with trailing slash", "my/secret/", ErrInvalidID{"my/secret/"}},
 		{"invalid name with leading slash", "/my/secret", ErrInvalidID{"/my/secret"}},
 		{"invalid name with empty component", "my//secret", ErrInvalidID{"my//secret"}},
-		{"invalid name with colon", "my:secret", ErrInvalidID{"my:secret"}},
 		{"invalid name with space", "my secret", ErrInvalidID{"my secret"}},
 		{"invalid name with hashtag", "my#secret", ErrInvalidID{"my#secret"}},
 	}
@@ -96,6 +96,11 @@ func TestMatchNew(t *testing.T) {
 		{
 			pattern:  "com.test.test/**",
 			ids:      []string{"com.test.test/test/bob", "com.test.test/test/alice"},
+			expected: true,
+		},
+		{
+			pattern:  "foo/127.0.0.1:8080/**",
+			ids:      []string{"foo/127.0.0.1:8080/bob", "foo/127.0.0.1:8080/jeff/test"},
 			expected: true,
 		},
 	}
