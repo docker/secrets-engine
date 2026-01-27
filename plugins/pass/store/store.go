@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/keychain"
 )
@@ -32,7 +34,7 @@ func PassStore(serviceGroup string, opts ...keychain.Option) (store.Store, error
 	kc, err := keychain.New(
 		serviceGroup,
 		"docker-pass-cli",
-		func() *PassValue {
+		func(_ context.Context, _ store.ID) *PassValue {
 			return &PassValue{}
 		},
 		opts...,

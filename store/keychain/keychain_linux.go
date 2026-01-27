@@ -97,7 +97,7 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service *kc.SecretServ
 type keychainStore[T store.Secret] struct {
 	serviceGroup string
 	serviceName  string
-	factory      func() T
+	factory      store.Factory[T]
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
@@ -143,7 +143,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	return service.DeleteItem(items[0])
 }
 
-func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	if err != nil {
 		return nil, err
 	}
-	secret := k.factory()
+	secret := k.factory(ctx, id)
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		}
 		safelyCleanMetadata(attributes)
 
-		secret := k.factory()
+		secret := k.factory(ctx, secretID)
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 }
 
 //gocyclo:ignore
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
 	if err != nil {
 		return nil, err
@@ -402,7 +402,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		}
 		safelyCleanMetadata(attributes)
 
-		secret := k.factory()
+		secret := k.factory(ctx, secretID)
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}

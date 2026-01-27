@@ -78,4 +78,4 @@ type Store interface {
 	Filter(ctx context.Context, pattern Pattern) (map[ID]Secret, error)
 }
 
-type Factory[T Secret] func() T
+type Factory[T Secret] func(context.Context, ID) T
