@@ -70,7 +70,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		masterKey := uuid.NewString()
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -143,7 +143,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		masterKey := uuid.NewString()
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -182,7 +182,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		masterKey := uuid.NewString()
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -240,7 +240,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		masterKey := uuid.NewString()
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -301,7 +301,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -384,7 +384,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -463,7 +463,7 @@ func TestPOSIXAge(t *testing.T) {
 		})
 
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -530,7 +530,7 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -602,7 +602,7 @@ func TestPOSIXAge(t *testing.T) {
 		})
 
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -651,7 +651,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		encryptError := errors.New("something went wrong inside the encryption callbackFunc")
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),
@@ -684,7 +684,7 @@ func TestPOSIXAge(t *testing.T) {
 
 		decryptError := errors.New("something went wrong inside the decryption callbackFunc")
 		s, err := New(root,
-			func() *mocks.MockCredential {
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
 			},
 			WithLogger(&testLogger{t}),

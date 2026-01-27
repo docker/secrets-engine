@@ -4,6 +4,7 @@ package keychain
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ func TestMacosKeychain(t *testing.T) {
 	keychainStore := keychainStore[*mocks.MockCredential]{
 		serviceGroup: serviceGroup,
 		serviceName:  serviceName,
-		factory: func() *mocks.MockCredential {
+		factory: func(_ context.Context, _ store.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	}
