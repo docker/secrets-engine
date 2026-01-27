@@ -201,7 +201,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 			return err
 		}
 
-		secret := f.factory()
+		secret := f.factory(ctx, id)
 		if err := secret.SetMetadata(metadata); err != nil {
 			return err
 		}
@@ -241,7 +241,7 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 		return nil, err
 	}
 
-	secret := f.factory()
+	secret := f.factory(ctx, id)
 	if err := secret.SetMetadata(metadata); err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 			return err
 		}
 
-		secret := f.factory()
+		secret := f.factory(ctx, id)
 		if err := secret.SetMetadata(metadata); err != nil {
 			return err
 		}

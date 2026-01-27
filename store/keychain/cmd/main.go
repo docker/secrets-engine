@@ -20,7 +20,7 @@ func newCommand() (*cobra.Command, error) {
 	kc, err := keychain.New(
 		"io.docker.Secrets",
 		"docker-example-cli",
-		func() *mocks.MockCredential {
+		func(_ context.Context, _ store.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	)
