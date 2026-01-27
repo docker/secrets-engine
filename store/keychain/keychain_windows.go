@@ -54,7 +54,7 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 type keychainStore[T store.Secret] struct {
 	serviceGroup string
 	serviceName  string
-	factory      func() T
+	factory      store.Factory[T]
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
@@ -66,7 +66,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
 	gc, err := wincred.GetGenericCredential(k.itemLabel(id.String()))
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -75,7 +75,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	attributes := mapFromWindowsAttributes(gc.Attributes)
 	safelyCleanMetadata(attributes)
 
-	secret := k.factory()
+	secret := k.factory(ctx, id)
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string
 	return attributes
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -169,7 +169,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		attributes := mapFromWindowsAttributes(cred.Attributes)
 		safelyCleanMetadata(attributes)
 
-		secret := k.factory()
+		secret := k.factory(ctx, id)
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
@@ -198,7 +198,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapWindowsCredentialError(g.Write())
 }
 
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	// Note: there is no notion of a filter on Windows inside the wincred API.
 	// It has no way to even filter on known attributes.
 	// This means we need to retrieve the entire list of ALL secrets, that
@@ -241,7 +241,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 		gcAttributes := mapFromWindowsAttributes(gc.Attributes)
 		safelyCleanMetadata(gcAttributes)
 
-		secret := k.factory()
+		secret := k.factory(ctx, id)
 		if err := secret.SetMetadata(gcAttributes); err != nil {
 			return nil, err
 		}

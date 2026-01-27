@@ -50,10 +50,10 @@ func (m *mustUnmarshalError) Unmarshal([]byte) error {
 	return errors.New("i am failing on purpose")
 }
 
-func setupKeychain(t *testing.T, secretFactory func() store.Secret) store.Store {
+func setupKeychain(t *testing.T, secretFactory func(context.Context, store.ID) store.Secret) store.Store {
 	t.Helper()
 	if secretFactory == nil {
-		secretFactory = func() store.Secret {
+		secretFactory = func(_ context.Context, _ store.ID) store.Secret {
 			return &mocks.MockCredential{}
 		}
 	}
@@ -266,7 +266,7 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("unmarshal error on get", func(t *testing.T) {
-		kc := setupKeychain(t, func() store.Secret {
+		kc := setupKeychain(t, func(_ context.Context, _ store.ID) store.Secret {
 			return &mustUnmarshalError{}
 		})
 		id, err := store.ParseID("something/will/fail")
@@ -280,7 +280,7 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("set metadata error on getAllMetadata", func(t *testing.T) {
-		kc := setupKeychain(t, func() store.Secret {
+		kc := setupKeychain(t, func(_ context.Context, _ store.ID) store.Secret {
 			return &mustUnmarshalError{}
 		})
 		id, err := store.ParseID("something/will/fail")

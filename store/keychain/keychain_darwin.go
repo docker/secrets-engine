@@ -19,7 +19,7 @@ var (
 type keychainStore[T store.Secret] struct {
 	serviceGroup              string
 	serviceName               string
-	factory                   func() T
+	factory                   store.Factory[T]
 	useDataProtectionKeychain bool
 }
 
@@ -102,7 +102,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
 	result, err := getItemWithData(id.String(), k)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	}
 	safelyCleanMetadata(attributes)
 
-	secret := k.factory()
+	secret := k.factory(ctx, id)
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (k *keychainStore[T]) Get(_ context.Context, id store.ID) (store.Secret, er
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -149,7 +149,7 @@ func (k *keychainStore[T]) GetAllMetadata(context.Context) (map[store.ID]store.S
 		}
 		safelyCleanMetadata(attributes)
 
-		secret := k.factory()
+		secret := k.factory(ctx, id)
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapKeychainError(kc.AddItem(item))
 }
 
-func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	// Note: Filter on macOS cannot filter by generic attributes and thus we
 	// cannot split the ID and store it in the keychain as parts for later
 	// pattern matching.
@@ -242,7 +242,7 @@ func (k *keychainStore[T]) Filter(_ context.Context, pattern store.Pattern) (map
 			return nil, err
 		}
 
-		secret := k.factory()
+		secret := k.factory(ctx, id)
 		if err := secret.SetMetadata(attr); err != nil {
 			return nil, err
 		}
