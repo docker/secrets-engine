@@ -339,6 +339,14 @@ func (m maliciousPattern) String() string {
 	return "a*a"
 }
 
+func (m maliciousPattern) ExpandID(secrets.ID) (secrets.ID, error) {
+	panic("implement me")
+}
+
+func (m maliciousPattern) ExpandPattern(secrets.Pattern) (secrets.Pattern, error) {
+	panic("implement me")
+}
+
 func testExternalPluginConfig(t *testing.T) p.Config {
 	t.Helper()
 	return p.Config{Version: api.MustNewVersion("v4"), Pattern: mockPattern, Logger: testhelper.TestLogger(t)}

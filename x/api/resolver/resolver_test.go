@@ -147,6 +147,14 @@ func (m maliciousPattern) String() string {
 	return "/"
 }
 
+func (m maliciousPattern) ExpandID(secrets.ID) (secrets.ID, error) {
+	panic("implement me")
+}
+
+func (m maliciousPattern) ExpandPattern(secrets.Pattern) (secrets.Pattern, error) {
+	panic("implement me")
+}
+
 func newGetSecretRequest(pattern secrets.Pattern) *connect.Request[resolverv1.GetSecretsRequest] {
 	return connect.NewRequest(resolverv1.GetSecretsRequest_builder{
 		Pattern: proto.String(pattern.String()),
