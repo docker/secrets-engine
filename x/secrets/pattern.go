@@ -2,6 +2,8 @@ package secrets
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var ErrInvalidPattern = errors.New("invalid pattern")
@@ -71,6 +73,9 @@ type Pattern interface {
 	Includes(other Pattern) bool
 	// String formats the [Pattern] as a string
 	String() string
+
+	ExpandID(other ID) (ID, error)
+	ExpandPattern(other Pattern) (Pattern, error)
 }
 
 type pattern string
@@ -118,6 +123,22 @@ func MustParsePattern(s string) Pattern {
 	return pattern(s)
 }
 
+func (p pattern) ExpandID(other ID) (ID, error) {
+	val, err := replace1(string(p), other.String())
+	if err != nil {
+		return nil, err
+	}
+	return id(val), err
+}
+
+func (p pattern) ExpandPattern(other Pattern) (Pattern, error) {
+	val, err := replace1(string(p), other.String())
+	if err != nil {
+		return nil, err
+	}
+	return pattern(val), err
+}
+
 // Filter returns a reduced [Pattern] that is subset equal to [filter].
 // Returns false if there's no overlap between [filter] and [other].
 // Examples:
@@ -133,4 +154,19 @@ func Filter(filter, other Pattern) (Pattern, bool) {
 		return filter, true
 	}
 	return nil, false
+}
+
+func replace1(original, other string) (string, error) {
+	components := split(original)
+	var candidates []int
+	for idx, val := range components {
+		if val == "**" {
+			candidates = append(candidates, idx)
+		}
+	}
+	if len(candidates) != 1 {
+		return "", fmt.Errorf("expand only supports one expansion glob, pattern %s has %d", original, len(candidates))
+	}
+	components[candidates[0]] = other
+	return strings.Join(components, "/"), nil
 }
