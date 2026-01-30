@@ -141,3 +141,72 @@ func Test_Filter(t *testing.T) {
 		})
 	}
 }
+
+func Test_apply(t *testing.T) {
+	type query struct {
+		pattern string
+		result  string
+	}
+	tests := []struct {
+		pattern string
+		queries []query
+	}{
+		{
+			pattern: "foo/bar/**",
+			queries: []query{
+				{
+					pattern: "baz",
+					result:  "foo/bar/baz",
+				},
+				{
+					pattern: "**",
+					result:  "foo/bar/**",
+				},
+				{
+					pattern: "**/*",
+					result:  "foo/bar/**/*",
+				},
+			},
+		},
+		{
+			pattern: "**/*",
+			queries: []query{
+				{
+					pattern: "baz",
+					result:  "baz/*",
+				},
+				{
+					pattern: "bar/baz",
+					result:  "bar/baz/*",
+				},
+				{
+					pattern: "**",
+					result:  "**/*",
+				},
+			},
+		},
+		{
+			pattern: "**/**",
+			queries: []query{
+				{
+					pattern: "**/bar",
+				},
+			},
+		},
+	}
+	for idx, test := range tests {
+		t.Run(fmt.Sprintf("%d - %s", idx, test.pattern), func(t *testing.T) {
+			for inner, query := range test.queries {
+				t.Run(fmt.Sprintf("%d-%d %s %s", idx, inner, test.pattern, query.pattern), func(t *testing.T) {
+					result, err := replace1(test.pattern, query.pattern)
+					if query.result == "" {
+						assert.Error(t, err, fmt.Sprintf("got: %s", result))
+						return
+					}
+					require.NoError(t, err, fmt.Sprintf("query: %s, expected out: %s", query.pattern, query.result))
+					assert.Equal(t, query.result, result)
+				})
+			}
+		})
+	}
+}
