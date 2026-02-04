@@ -102,6 +102,10 @@ mod:
 	@go work sync
 	@go work vendor
 
+.PHONY: govulncheck
+govulncheck:
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=do-govulncheck --platform=linux/arm64,linux/amd64 .
+
 .PHONY: gomodguard
 gomodguard:
 	@docker buildx build $(DOCKER_BUILD_ARGS) --target=do-gomodguard .
