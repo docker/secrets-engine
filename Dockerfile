@@ -77,6 +77,28 @@ RUN --mount=type=bind,target=.,ro \
     golangci-lint run -v $(go list -f '{{.Dir}}/...' -m | xargs)
 EOT
 
+FROM golang AS govulncheck
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=tmpfs,target=/go/src/ \
+    go install "golang.org/x/vuln/cmd/govulncheck@latest" \
+    && govulncheck -version
+
+FROM golang AS do-govulncheck
+ARG TARGETARCH
+ARG GO_VERSION
+COPY --link --from=govulncheck /go/bin/govulncheck /go/bin/govulncheck
+WORKDIR /govulncheck
+ENV GOARCH=${TARGETARCH}
+ENV GOTOOLCHAIN=go${GO_VERSION}
+ENV PATH=/go/bin:$PATH
+RUN --mount=type=bind,target=.,ro <<EOT
+    set -euo pipefail
+    for dir in $(go list -f '{{.Dir}}' -m); do
+      (cd "$dir" && govulncheck -show=verbose ./...)
+    done
+EOT
+
 FROM golang AS gomodguard
 ARG GOMODGUARD_VERSION=v1.4.1
 RUN --mount=type=cache,target=/root/.cache/go-build \
