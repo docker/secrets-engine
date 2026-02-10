@@ -1,0 +1,68 @@
+edition = "2023";
+
+package resolver.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/docker/secrets-engine/x/api/authsecrets/v1;authsecretsv1";
+
+service AuthSecretsService {
+  // Resolve a secret by its ID.
+  rpc GetSecrets(GetAuthSecretRequest) returns (GetAuthSecretResponse);
+  rpc SetSecret(SetAuthSecretRequest) returns (SetAuthSecretResponse);
+  rpc DeleteSecret(DeleteAuthSecretRequest) returns (DeleteAuthSecretResponse);
+}
+
+message DeleteAuthSecretRequest {
+  // ID of the secret
+  string id = 1;
+}
+
+message DeleteAuthSecretResponse {}
+
+message GetAuthSecretRequest {
+  // ID of the secret to resolve.
+  string pattern = 1;
+}
+
+message SetAuthSecretRequest {
+  // ID of the secret
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  // The secret value
+  bytes value = 4;
+  // The public metadata of the secret
+  map<string, string> metadata = 5;
+  google.protobuf.Timestamp expires_at = 10;
+}
+
+message SetAuthSecretResponse {}
+
+message GetAuthSecretResponse {
+  repeated AuthSecret secrets = 1;
+
+  message AuthSecret {
+    // ID of the secret to resolve.
+    string id = 1;
+    // The resolved secret value.
+    bytes value = 2;
+
+    string username = 3;
+
+    string email = 4;
+
+    string provider = 5;
+
+    map<string, string> metadata = 6;
+
+    string version = 7;
+
+    google.protobuf.Timestamp created_at = 8;
+
+    google.protobuf.Timestamp resolved_at = 9;
+
+    google.protobuf.Timestamp expires_at = 10;
+  }
+}
