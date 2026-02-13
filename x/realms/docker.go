@@ -18,3 +18,6 @@ var (
 	DockerRegistryAuthentication        = secrets.MustParsePattern("docker/auth/registry/docker/**")
 	DockerRegistryStagingAuthentication = secrets.MustParsePattern("docker/auth/registry/docker-staging/**")
 )
+
+// DockerHubAuthenticationMetadata is a pointer to the default user signed in to Docker
+var DockerHubAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub/**")
