@@ -19,5 +19,9 @@ var (
 	DockerRegistryStagingAuthentication = secrets.MustParsePattern("docker/auth/registry/docker-staging/**")
 )
 
-// DockerHubAuthenticationMetadata is a pointer to the default user signed in to Docker
-var DockerHubAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub/**")
+var (
+	// DockerHubAuthenticationMetadata is a pointer to the default user signed in to Docker
+	DockerHubAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub/**")
+	// DockerHubStagingAuthenticationMetadata is a pointer to the default staging user signed in to Docker
+	DockerHubStagingAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub-staging/**")
+)
