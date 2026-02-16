@@ -7,7 +7,7 @@ replace github.com/docker/secrets-engine/store => ./../../store
 replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
-	github.com/docker/secrets-engine/plugin v0.0.21
+	github.com/docker/secrets-engine/plugin v0.0.22
 	github.com/docker/secrets-engine/store v0.0.19
 	github.com/docker/secrets-engine/x v0.0.19-do.not.use
 	github.com/spf13/cobra v1.10.1
