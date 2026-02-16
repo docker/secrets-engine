@@ -9,8 +9,8 @@ github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMF
 github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/docker/secrets-engine/plugin v0.0.21 h1:9X4xcFQn3Sn7q1jVw53kiHwGSZ1VSS4zf2vg/a/PE/Q=
-github.com/docker/secrets-engine/plugin v0.0.21/go.mod h1:+3dPUKJ9BkRynLbE1dtr7jtsHC7VZozCcWQW+kqXbhI=
+github.com/docker/secrets-engine/plugin v0.0.22 h1:5hG46cwEjyLcTXI7cTPx5MmBhNcBZBauJLmNufJEZYU=
+github.com/docker/secrets-engine/plugin v0.0.22/go.mod h1:nU+qpott4gDu0OLXmgqfn83zCRguaXhQ+RK/kt3eOc8=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
