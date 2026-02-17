@@ -81,9 +81,6 @@ keychain-linux-unit-tests:
 keychain-unit-tests:
 	CGO_ENABLED=1 go test -trimpath -race -v $$(go list ./store/keychain/...)
 
-runtime-unit-tests:
-	go test -trimpath -race -v $$(go list ./runtime/...)
-
 .PHONY: license-check
 license-check: ## Check that all source files have license headers
 	addlicense -check -c "Docker, Inc." -y "2025-2026" -l apache -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
