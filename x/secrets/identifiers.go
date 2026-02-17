@@ -1,3 +1,17 @@
+// Copyright 2025-2026 Docker, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package secrets
 
 import (
@@ -114,9 +128,9 @@ func valid(id string) error {
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
 type ID interface {
-	// String formats the [IDNew] as a string
+	// String formats the [ID] as a string
 	String() string
-	// Match the [IDNew] against a [PatternNew]
+	// Match the [ID] against a [Pattern]
 	// It checks if a given identifier matches the pattern.
 	// - "*" matches a single component
 	// - "**" matches zero or more components
