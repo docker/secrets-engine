@@ -1,5 +1,19 @@
 #syntax=docker/dockerfile:1
 
+# Copyright 2025-2026 Docker, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 ARG GO_VERSION=latest
 ARG GOLANGCI_LINT_VERSION=v2.2.1
 ARG OSXCROSS_VERSION=15.5
@@ -119,6 +133,19 @@ RUN --mount=type=bind,target=.,ro <<EOT
       fi
     done
 EOT
+
+FROM golang AS addlicense
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=tmpfs,target=/go/src/ \
+    go install "github.com/google/addlicense@latest"
+
+FROM golang AS do-license-check
+COPY --link --from=addlicense /go/bin/addlicense /go/bin/addlicense
+WORKDIR /app
+RUN --mount=type=bind,target=.,ro \
+    addlicense -check -c "Docker, Inc." -y "2025-2026" -l apache \
+    -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
 
 FROM golang AS gofumpt
 ARG GOFUMPT_VERSION=v0.8.0
