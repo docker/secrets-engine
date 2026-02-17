@@ -39,3 +39,13 @@ var (
 	// DockerHubStagingAuthenticationMetadata is a pointer to the default staging user signed in to Docker
 	DockerHubStagingAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub-staging/**")
 )
+
+var (
+	// DockerMCPDefault is the default realm used for MCP related secrets
+	DockerMCPDefault = secrets.MustParsePattern("docker/mcp/**")
+	// DockerMCPOAuth is the realm used for all MCP OAuth credentials retrieved by Docker.
+	DockerMCPOAuth = secrets.MustParsePattern("docker/mcp/oauth/**")
+	// DockerMCPOAuthDCR is the realm used to hold Dynamic Client Registered (DCR)
+	// OAuth configurations for supported MCP servers.
+	DockerMCPOAuthDCR = secrets.MustParsePattern("docker/mcp/oauth-dcr/**")
+)
