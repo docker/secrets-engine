@@ -67,7 +67,7 @@ func isValidPatternRune(c rune) bool {
 // Valid patterns must follow the same validation rules as secret identifiers, with the exception
 // that '*' can be used to match a single component, and '**' can be used to match zero or more components.
 type Pattern interface {
-	// Match the [PatternNew] against an [IDNew]
+	// Match the [Pattern] against an [ID]
 	Match(id ID) bool
 	// Includes returns true if all matches of Pattern [other] are also matches of the current pattern.
 	Includes(other Pattern) bool

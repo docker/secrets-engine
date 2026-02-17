@@ -114,9 +114,9 @@ func valid(id string) error {
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
 type ID interface {
-	// String formats the [IDNew] as a string
+	// String formats the [ID] as a string
 	String() string
-	// Match the [IDNew] against a [PatternNew]
+	// Match the [ID] against a [Pattern]
 	// It checks if a given identifier matches the pattern.
 	// - "*" matches a single component
 	// - "**" matches zero or more components
