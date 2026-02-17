@@ -73,9 +73,36 @@ func WithDialContext(dialContext func(ctx context.Context, network, addr string)
 	}
 }
 
+// WithTimeout overrides the request timeout of the client.
+//
+// It is useful to set if there are hard-limits to when the client must wait
+// for the server to accept the request.
+//
+// A timout of 0 means no request timeout will be applied.
+// Negative durations are not allowed and will result in an error.
 func WithTimeout(timeout time.Duration) Option {
 	return func(s *config) error {
+		if timeout < 0 {
+			return errors.New("request timeout duration cannot be negative")
+		}
 		s.requestTimeout = timeout
+		return nil
+	}
+}
+
+// WithResponseTimeout overrides the response header timeout of the client.
+//
+// It is useful to set if there are long-lived user interactions required
+// when the Secrets Engine requests secrets from a plugin.
+//
+// A responseTimeout of 0 means no response header timeout will be applied.
+// Negative durations are not allowed and will result in an error.
+func WithResponseTimeout(responseTimeout time.Duration) Option {
+	return func(s *config) error {
+		if responseTimeout < 0 {
+			return errors.New("response timeout duration cannot be negative")
+		}
+		s.responseTimeout = responseTimeout
 		return nil
 	}
 }
@@ -83,8 +110,9 @@ func WithTimeout(timeout time.Duration) Option {
 type dial func(ctx context.Context, network, addr string) (net.Conn, error)
 
 type config struct {
-	dialContext    dial
-	requestTimeout time.Duration
+	dialContext     dial
+	requestTimeout  time.Duration
+	responseTimeout time.Duration
 }
 
 type client struct {
@@ -104,7 +132,8 @@ type Client interface {
 
 func New(options ...Option) (Client, error) {
 	cfg := &config{
-		requestTimeout: api.DefaultClientRequestTimeout,
+		requestTimeout:  api.DefaultClientRequestTimeout,
+		responseTimeout: api.DefaultClientResponseHeaderTimeout,
 	}
 	for _, opt := range options {
 		if err := opt(cfg); err != nil {
@@ -122,8 +151,8 @@ func New(options ...Option) (Client, error) {
 			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
 			// keep the connection alive (good for long-lived clients)
 			IdleConnTimeout: api.DefaultClientIdleConnTimeout,
-			// Set short timeouts on headers
-			ResponseHeaderTimeout: api.DefaultClientResponseHeaderTimeout,
+			// By default it is 1 second, but can be overridden with [WithResponseTimeout]
+			ResponseHeaderTimeout: cfg.responseTimeout,
 			TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
 
 			DialContext:        cfg.dialContext,
