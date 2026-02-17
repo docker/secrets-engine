@@ -40,6 +40,13 @@ func DefaultSocketPath() string {
 	return filepath.Join(os.TempDir(), "docker-secrets-engine", "engine.sock")
 }
 
+func DaemonSocketPath() string {
+	if dir, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(dir, "docker-secrets-engine", "daemon.sock")
+	}
+	return filepath.Join(os.TempDir(), "docker-secrets-engine", "daemon.sock")
+}
+
 func DefaultSecretsEngineDirectory() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
