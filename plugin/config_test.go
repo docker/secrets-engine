@@ -43,7 +43,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				})
 				os.Args = []string{"test-plugin"}
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-				socketPath := api.DefaultSocketPath()
+				socketPath := api.DaemonSocketPath()
 				os.Remove(socketPath)
 				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
 				listener, err := net.Listen("unix", socketPath)

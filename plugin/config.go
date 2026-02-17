@@ -81,10 +81,10 @@ func newCfgForManualLaunch(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, 
 		}
 	}
 	if cfg.conn == nil {
-		defaultSocketPath := api.DefaultSocketPath()
-		conn, err := net.Dial("unix", defaultSocketPath)
+		socketPath := api.DaemonSocketPath()
+		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to default socket %q: %w", defaultSocketPath, err)
+			return nil, fmt.Errorf("failed to connect to default socket %q: %w", socketPath, err)
 		}
 		hijackedConn, err := ipc.Hijackify(conn, hijackTimeout)
 		if err != nil {
