@@ -17,7 +17,7 @@ into a running container using Secrets Engine.
 $ docker pass set Foo=bar
 # Tell docker to use the Secrets Engine using the `se://` URI on an environment variable
 $ docker run --rm -e Foo=se://Foo busybox /bin/sh -c "echo \${Foo}"
-$ bar
+bar
 ```
 
 # Developer Guides
@@ -38,12 +38,14 @@ if err != nil {
     log.Fatalf("failed to create secrets engine client: %v", err)
 }
 
-// Fetch a secret from the engine
-resp, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+pattern := client.MustParsePattern("my-secret")
+resp, err := c.GetSecrets(context.Background(), pattern)
 if err != nil {
     log.Fatalf("failed fetching secret: %v", err)
 }
-fmt.Println(resp.Value)
+for _, secret := range resp {
+    fmt.Println(string(secret.Value))
+}
 ```
 
 ## How to create a plugin
@@ -56,38 +58,30 @@ Use the `plugin` module in your project:
 go get github.com/docker/secrets-engine/plugin
 ```
 
-A plugin needs to implement the `Plugin` interface:
+A plugin needs to implement the `ExternalPlugin` interface:
 
 ```go
-var _ plugin.Plugin = &myPlugin{}
+var _ plugin.ExternalPlugin = &myPlugin{}
 
 type myPlugin struct {
-	m      sync.Mutex
-	secrets map[secrets.ID]string
+	m       sync.Mutex
+	secrets map[plugin.ID]string
 }
 
-func (p *myPlugin) GetSecret(_ context.Context, request secrets.Request) ([]secrets.Envelope, error) {
+func (p *myPlugin) GetSecrets(_ context.Context, pattern plugin.Pattern) ([]plugin.Envelope, error) {
 	p.m.Lock()
 	defer p.m.Unlock()
 
-	var result []secrets.Envelope
+	var result []plugin.Envelope
 	for id, value := range p.secrets {
-		if request.Pattern.Match(id) {
-			result = append(result, secrets.Envelope{
+		if pattern.Match(id) {
+			result = append(result, plugin.Envelope{
 				ID:    id,
 				Value: []byte(value),
-				CreatedAt: time.Now(),
 			})
 		}
 	}
 	return result, nil
-}
-
-func (p *myPlugin) Config() plugin.Config {
-	return plugin.Config{
-		Version: "v0.0.1",
-		Pattern: "*",
-	}
 }
 ```
 
@@ -105,11 +99,18 @@ import (
 )
 
 func main() {
-    p, err := plugin.New(&myPlugin{secrets: map[secrets.ID]string{"foo": "bar"}})
+    p, err := plugin.New(
+        &myPlugin{secrets: map[plugin.ID]string{
+            plugin.MustParseID("foo"): "bar",
+        }},
+        plugin.Config{
+            Version: plugin.MustNewVersion("v0.0.1"),
+            Pattern: plugin.MustParsePattern("*"),
+        },
+    )
     if err != nil {
         panic(err)
     }
-	// Run your plugin
     if err := p.Run(context.Background()); err != nil {
         panic(err)
     }
@@ -122,6 +123,10 @@ The secrets engine is integrated with Docker Desktop.
 To verify your plugin works, run the binary.
 Using the SDK it will automatically connect to the secrets engine in Docker Desktop.
 Then, you can query secrets, e.g. using curl:
+
+> **Note:** The socket path is platform-specific. On macOS it is
+> `~/Library/Caches/docker-secrets-engine/engine.sock`; on Linux it is
+> `~/.cache/docker-secrets-engine/engine.sock`.
 
 ```console
 $ curl --unix-socket ~/Library/Caches/docker-secrets-engine/engine.sock \
