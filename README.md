@@ -1,9 +1,8 @@
 # Secrets Engine SDK
 
-[![build](https://github.com/docker/secrets-engine/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/build.yml)
 [![unit tests](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml)
 [![lint](https://github.com/docker/secrets-engine/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/lint.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-purple)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
 
 ## Quickstart
 
@@ -39,9 +38,9 @@ if err != nil {
 }
 
 // Fetch a secret from the engine
-resp, err := c.GetSecret(t.Context(), secrets.Request{ID: "my-secret"})
+resp, err := c.GetSecrets(t.Context(), client.MustParsePattern("my-secret"))
 if err != nil {
-    log.Fatalf("failed fetching secret: %v", err)
+    log.Fatalf("failed fetching secrets: %v", err)
 }
 fmt.Println(resp.Value)
 ```
@@ -129,4 +128,3 @@ $ curl --unix-socket ~/Library/Caches/docker-secrets-engine/engine.sock \
     -H "Content-Type: application/json" -d '{"pattern": "foo"}'
 {"id":"foo","value":"bar","provider":"docker-pass","version":"","error":"","createdAt":"0001-01-01T00:00:00Z","resolvedAt":"2025-08-12T08:25:06.166714Z","expiresAt":"0001-01-01T00:00:00Z"}
 ```
-
