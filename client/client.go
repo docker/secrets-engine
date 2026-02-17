@@ -98,7 +98,7 @@ func New(options ...Option) (Client, error) {
 		}
 	}
 	if cfg.dialContext == nil {
-		cfg.dialContext = dialFromPath(api.DefaultSocketPath())
+		cfg.dialContext = dialFromPath(api.DaemonSocketPath())
 	}
 	c := &http.Client{
 		Transport: &http.Transport{
