@@ -113,24 +113,20 @@ func valid(id string) error {
 // For storage, we don't really differentiate much about the ID format but
 // by convention we do simple, slash-separated management, providing a
 // groupable access control system for management across plugins.
+// Any ID also is a Pattern that matches exactly any other equal ID.
 type ID interface {
 	// String formats the [IDNew] as a string
 	String() string
-	// Match the [IDNew] against a [PatternNew]
-	// It checks if a given identifier matches the pattern.
-	// - "*" matches a single component
-	// - "**" matches zero or more components
-	// - "/" is the separator
-	Match(pattern Pattern) bool
 }
 
 type id string
 
-func (i id) Match(pattern Pattern) bool {
-	pathParts := split(string(i))
-	patternParts := split(pattern.String())
+func (i id) Match(id ID) bool {
+	return id == i
+}
 
-	return match(patternParts, pathParts)
+func (i id) Includes(other Pattern) bool {
+	return i.String() == other.String()
 }
 
 func (i id) String() string {
