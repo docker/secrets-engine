@@ -3,7 +3,7 @@
 [![build](https://github.com/docker/secrets-engine/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/build.yml)
 [![unit tests](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/unittests.yml)
 [![lint](https://github.com/docker/secrets-engine/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/docker/secrets-engine/actions/workflows/lint.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
 
 ## Quickstart
 
