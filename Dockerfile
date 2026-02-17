@@ -147,6 +147,21 @@ RUN --mount=type=bind,target=.,ro \
     addlicense -check -c "Docker, Inc." -y "2025-2026" -l apache \
     -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
 
+FROM golang AS do-license-fix
+COPY --link --from=addlicense /go/bin/addlicense /go/bin/addlicense
+WORKDIR /license-fix
+RUN mkdir -p /license-fix/out
+RUN --mount=type=bind,target=/src,rw <<EOT
+    set -euo pipefail
+    cd /src
+    addlicense -c "Docker, Inc." -y "2025-2026" -l apache \
+        -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
+    ./scripts/copy-only-diff /license-fix/out
+EOT
+
+FROM scratch AS license-fix
+COPY --from=do-license-fix /license-fix/out .
+
 FROM golang AS gofumpt
 ARG GOFUMPT_VERSION=v0.8.0
 RUN --mount=type=cache,target=/root/.cache/go-build \

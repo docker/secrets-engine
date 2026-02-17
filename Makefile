@@ -83,11 +83,11 @@ keychain-unit-tests:
 
 .PHONY: license-check
 license-check: ## Check that all source files have license headers
-	addlicense -check -c "Docker, Inc." -y "2025-2026" -l apache -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
+	@docker buildx build $(DOCKER_BUILD_ARGS) --target=do-license-check .
 
 .PHONY: license-fix
 license-fix: ## Add license headers to source files
-	addlicense -c "Docker, Inc." -y "2025-2026" -l apache -ignore "vendor/**" -ignore "**/*.pb.go" -ignore "**/resolverv1connect/*.go" .
+	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=license-fix .
 
 proto-generate:
 	@docker buildx build $(DOCKER_BUILD_ARGS) -o . --target=proto-generate .
