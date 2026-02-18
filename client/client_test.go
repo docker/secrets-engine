@@ -154,3 +154,23 @@ func Test_ListPlugins(t *testing.T) {
 		}, result)
 	})
 }
+
+func TestSecretsEngineUnavailable(t *testing.T) {
+	socketPath := testhelper.RandomShortSocketName()
+	client, err := New(WithSocketPath(socketPath))
+	require.NoError(t, err)
+	_, err = client.ListPlugins(t.Context())
+	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+}
+
+func TestIsDialError(t *testing.T) {
+	require.True(t, isDialError(&net.OpError{
+		Op: "dial",
+	}))
+	require.True(t, isDialError(&net.OpError{
+		Op: "connect",
+	}))
+	require.False(t, isDialError(nil))
+}
