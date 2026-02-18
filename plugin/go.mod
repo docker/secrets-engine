@@ -8,11 +8,11 @@ go 1.25
 replace github.com/docker/secrets-engine/x => ../x
 
 require (
-	connectrpc.com/connect v1.18.1
+	connectrpc.com/connect v1.19.1
 	github.com/containerd/nri v0.10.0
 	github.com/docker/secrets-engine/x v0.0.20-do.not.use
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.9
 )
 
 require (

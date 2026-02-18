@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/go
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          app_id: ${{ vars.DOCKER_READ_APP_ID }}
-          app_private_key: ${{ secrets.DOCKER_READ_APP_PRIVATE_KEY }}
+          go-version-file: go.work
       - name: Unit Tests
         run: make unit-tests

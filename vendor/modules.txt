@@ -1,6 +1,6 @@
 ## workspace
-# connectrpc.com/connect v1.18.1
-## explicit; go 1.21
+# connectrpc.com/connect v1.19.1
+## explicit; go 1.24.0
 connectrpc.com/connect
 connectrpc.com/connect/internal/gen/connectext/grpc/status/v1
 # filippo.io/age v1.2.1
@@ -275,7 +275,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.36.8
+# google.golang.org/protobuf v1.36.9
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
