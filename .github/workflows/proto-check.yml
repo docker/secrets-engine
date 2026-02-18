@@ -22,8 +22,8 @@ jobs:
       - name: Hub login
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERBUILDBOT_USERNAME }}
-          password: ${{ secrets.DOCKERBUILDBOT_WRITE_PAT }}
+          username: dockerpublicbot
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
 
       - name: Set up Docker Buildx
         id: buildx

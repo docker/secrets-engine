@@ -38,13 +38,11 @@ ENV CXX=o64-clang++
 ARG TARGETOS
 FROM ${TARGETOS}-base AS lint
 ENV CGO_ENABLED=1
-ENV GOPRIVATE=github.com/docker/*
 COPY --link --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
 RUN apk add --no-cache openssh-client
 WORKDIR /app
 RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 RUN --mount=type=bind,target=.,ro \
-    --mount=type=secret,id=GH_TOKEN,env=GH_TOKEN \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=ssh <<EOT
     set -euo pipefail
@@ -54,16 +52,6 @@ RUN --mount=type=bind,target=.,ro \
 
     # If no token, prefer SSH for GitHub; if token exists, we’ll override below
     git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
-
-    # fallback for CI environments without ssh keys
-    if [ -n "$GH_TOKEN" ]; then
-        rm -f ~/.gitconfig
-        git config --global user.email "106345742+cloud-platform-ci[bot]@users.noreply.github.com"
-        git config --global user.name "cloud-platform-ci[bot]"
-        git config --global url."https://x-access-token:${GH_TOKEN}@github.com".insteadOf "https://github.com"
-        git config --global --add url."https://x-access-token:${GH_TOKEN}@github.com".insteadOf "ssh://git@github.com"
-        git config --global --add url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
-    fi
 
     for dir in $(go list -f '{{.Dir}}' -m); do
       (cd "$dir" && go mod tidy --diff)
