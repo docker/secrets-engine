@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -43,7 +44,8 @@ var (
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
 
-	ErrSecretNotFound = secrets.ErrNotFound
+	ErrSecretNotFound            = secrets.ErrNotFound
+	ErrSecretsEngineNotAvailable = errors.New("secrets engine is not available")
 )
 
 var _ secrets.Resolver = &client{}
@@ -121,13 +123,31 @@ type client struct {
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	return c.resolverClient.GetSecrets(ctx, pattern)
+	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
+	if isDialError(err) {
+		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return envelopes, nil
 }
 
 type Client interface {
 	secrets.Resolver
 
 	ListPlugins(ctx context.Context) ([]PluginInfo, error)
+}
+
+func isDialError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var oe *net.OpError
+	if errors.As(err, &oe) && (oe.Op == "dial" || oe.Op == "connect") {
+		return true
+	}
+	return false
 }
 
 func New(options ...Option) (Client, error) {
@@ -173,6 +193,9 @@ func New(options ...Option) (Client, error) {
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 	req := connect.NewRequest(v1.ListPluginsRequest_builder{}.Build())
 	resp, err := c.listClient.ListPlugins(ctx, req)
+	if isDialError(err) {
+		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
 	if err != nil {
 		return nil, err
 	}
