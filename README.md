@@ -241,10 +241,17 @@ The value of a secret is always encoded into base64.
 When using Go's `json.Unmarshal` it will automatically convert it back into
 a slice of bytes `[]byte`.
 
-To manually decode it, you can pipe the value into `base64 --decode -i`.
+To manually decode it, you can pipe the value into `base64`, using the
+flags appropriate for your platform:
 
 ```bash
-echo "<base64 string>" | base64 --decode -i
+# macOS / BSD
+echo "<base64 string>" | base64 -D
+
+# GNU/Linux (coreutils)
+echo "<base64 string>" | base64 --decode
+# or
+echo "<base64 string>" | base64 -d
 ```
 
 ## Legal
