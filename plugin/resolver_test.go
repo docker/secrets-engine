@@ -1,4 +1,7 @@
+//revive:disable:var-naming
 package plugin
+
+//revive:enable:var-naming
 
 import (
 	"context"

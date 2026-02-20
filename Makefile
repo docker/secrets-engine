@@ -17,7 +17,7 @@ else
 endif
 
 # golangci-lint must be pinned - linters can become more strict on upgrade
-GOLANGCI_LINT_VERSION := v2.4.0
+GOLANGCI_LINT_VERSION := v2.10.1
 export GO_VERSION GOPRIVATE GOLANGCI_LINT_VERSION GIT_COMMIT GIT_TAG
 
 BUILDER=buildx-multiarch

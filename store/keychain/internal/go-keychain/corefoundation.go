@@ -103,7 +103,7 @@ func CFDictionaryToMap(cfDict C.CFDictionaryRef) (m map[C.CFTypeRef]C.CFTypeRef)
 			m[keys[i]] = values[i]
 		}
 	}
-	return
+	return m
 }
 
 // Int32ToCFNumber will return a CFNumberRef, must be released with Release(ref).
@@ -173,7 +173,7 @@ func CFArrayToArray(cfArray C.CFArrayRef) (a []C.CFTypeRef) {
 		a = make([]C.CFTypeRef, count)
 		C.CFArrayGetValues(cfArray, C.CFRange{0, count}, (*unsafe.Pointer)(unsafe.Pointer(&a[0])))
 	}
-	return
+	return a
 }
 
 // Convertable knows how to convert an instance to a CFTypeRef.
