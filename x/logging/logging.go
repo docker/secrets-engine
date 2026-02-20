@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -30,16 +31,38 @@ type Logger interface {
 	Errorf(format string, v ...interface{})
 }
 
+type Option func(l *defaultLogger)
+
+func WithOut(out io.Writer) Option {
+	return func(l *defaultLogger) {
+		if out == nil {
+			return
+		}
+		l.logger = newDefaultLogger(out)
+	}
+}
+
 type defaultLogger struct {
 	logger *log.Logger
 	prefix string
 }
 
-func NewDefaultLogger(prefix string) Logger {
+func newDefaultLogger(out io.Writer) *log.Logger {
+	return log.New(out, "", log.LstdFlags)
+}
+
+func NewDefaultLogger(prefix string, options ...Option) Logger {
 	if prefix != "" && !strings.HasSuffix(prefix, ": ") {
 		prefix += ": "
 	}
-	return &defaultLogger{logger: log.New(os.Stderr, "", log.LstdFlags), prefix: prefix}
+	logger := &defaultLogger{prefix: prefix}
+	for _, option := range options {
+		option(logger)
+	}
+	if logger.logger == nil {
+		logger.logger = newDefaultLogger(os.Stderr)
+	}
+	return logger
 }
 
 func (d defaultLogger) Printf(format string, v ...interface{}) {
