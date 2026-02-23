@@ -49,3 +49,11 @@ var (
 	// OAuth configurations for supported MCP servers.
 	DockerMCPOAuthDCR = secrets.MustParsePattern("docker/mcp/oauth-dcr/**")
 )
+
+var (
+	// DockerSandbox is the default realm used for Sandbox related secrets
+	DockerSandbox = secrets.MustParsePattern("docker/sandbox/**")
+	// DockerSandboxOAuth is the realm used for all Sandbox OAuth credentials
+	// such as third-party tokens - this does not store the Docker Auth tokens.
+	DockerSandboxOAuth = secrets.MustParsePattern("docker/sandbox/oauth/**")
+)
