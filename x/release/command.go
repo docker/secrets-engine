@@ -261,7 +261,7 @@ func getLatestVersion(modName string) (string, error) {
 }
 
 func gitTag(tag string) error {
-	cmd := exec.Command("git", "tag", tag)
+	cmd := exec.Command("git", "tag", tag, "-m", tag)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git tag (%s): %s", err, string(out))
 	}
