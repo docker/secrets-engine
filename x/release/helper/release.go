@@ -15,6 +15,7 @@
 package helper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -63,12 +64,12 @@ func AllowedLevels() string {
 	return strings.Join(quoted, ", ")
 }
 
-func BumpIterative(mod string, level Level, repo RepoData, i FS) error {
+func BumpIterative(ctx context.Context, mod string, level Level, repo RepoData, i FS) error {
 	data, ok := repo[mod]
 	if !ok {
 		return fmt.Errorf("module %s not found", mod)
 	}
-	if err := BumpModule(mod, level, data, i); err != nil {
+	if err := BumpModule(ctx, mod, level, data, i); err != nil {
 		return err
 	}
 	queue := data.downstreams
@@ -98,7 +99,7 @@ func BumpIterative(mod string, level Level, repo RepoData, i FS) error {
 		}
 		// We always propagate as patch release. The alternative is to not propagate at all and manually
 		// re-run the release automation with the desired type of version bump on the specific sub module.
-		if err := BumpModule(nextMod, Patch, data, i); err != nil {
+		if err := BumpModule(ctx, nextMod, Patch, data, i); err != nil {
 			return err
 		}
 		repo.RemoveModule(nextMod)
@@ -108,19 +109,19 @@ func BumpIterative(mod string, level Level, repo RepoData, i FS) error {
 }
 
 type FS interface {
-	GitTag(tag string) error
-	GitCommit(msg string) error
+	GitTag(ctx context.Context, tag string) error
+	GitCommit(ctx context.Context, msg string) error
 	BumpModInFile(path, module, version string) (bool, error)
 }
 
-func BumpModule(mod string, level Level, data ModData, i FS) error {
+func BumpModule(ctx context.Context, mod string, level Level, data ModData, i FS) error {
 	release, err := data.GetNextVersion(level)
 	if err != nil {
 		return err
 	}
 
 	tag := mod + "/" + release
-	if err := i.GitTag(tag); err != nil {
+	if err := i.GitTag(ctx, tag); err != nil {
 		return err
 	}
 	needsCommit := false
@@ -136,7 +137,7 @@ func BumpModule(mod string, level Level, data ModData, i FS) error {
 	if !needsCommit {
 		return nil
 	}
-	return i.GitCommit("chore: bump " + tag)
+	return i.GitCommit(ctx, "chore: bump "+tag)
 }
 
 type RepoData map[string]ModData

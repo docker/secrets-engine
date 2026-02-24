@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -13,7 +14,7 @@ func Test_bumpIterative(t *testing.T) {
 	t.Run("bump module with cascading dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpIterative("x", Major, repo, m))
+		assert.NoError(t, BumpIterative(t.Context(), "x", Major, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
 			"x/v1.0.0-do.not.use",
 			"plugin/v0.1.1",
@@ -37,7 +38,7 @@ func Test_bumpIterative(t *testing.T) {
 	t.Run("bump module with direct dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpIterative("plugin", Patch, repo, m))
+		assert.NoError(t, BumpIterative(t.Context(), "plugin", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
 			"plugin/v0.1.1",
 			"runtime/v0.2.4",
@@ -51,7 +52,7 @@ func Test_bumpIterative(t *testing.T) {
 	t.Run("bump module without dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpIterative("runtime", Patch, repo, m))
+		assert.NoError(t, BumpIterative(t.Context(), "runtime", Patch, repo, m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{
 			"runtime/v0.2.4",
 		})
@@ -75,7 +76,7 @@ func Test_bumpModule(t *testing.T) {
 	t.Run("bump module with version metadata and dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpModule("x", Patch, repo["x"], m))
+		assert.NoError(t, BumpModule(t.Context(), "x", Patch, repo["x"], m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{"x/v0.0.4-do.not.use"})
 		assert.ElementsMatch(t, m.bumps, []bump{
 			{"runtime/go.mod", "x", "v0.0.4-do.not.use"},
@@ -89,7 +90,7 @@ func Test_bumpModule(t *testing.T) {
 	t.Run("bump module without version metadata and no dependencies", func(t *testing.T) {
 		repo := newMockRepoData()
 		m := &mockFS{}
-		assert.NoError(t, BumpModule("runtime", Patch, repo["runtime"], m))
+		assert.NoError(t, BumpModule(t.Context(), "runtime", Patch, repo["runtime"], m))
 		assert.ElementsMatch(t, m.tagsCreated, []string{"runtime/v0.2.4"})
 		assert.ElementsMatch(t, m.bumps, []bump{})
 	})
@@ -110,7 +111,7 @@ type mockFS struct {
 	commits     []string
 }
 
-func (m *mockFS) GitCommit(commit string) error {
+func (m *mockFS) GitCommit(_ context.Context, commit string) error {
 	m.commits = append(m.commits, commit)
 	return nil
 }
@@ -121,7 +122,7 @@ type bump struct {
 	version  string
 }
 
-func (m *mockFS) GitTag(tag string) error {
+func (m *mockFS) GitTag(_ context.Context, tag string) error {
 	m.tagsCreated = append(m.tagsCreated, tag)
 	return nil
 }

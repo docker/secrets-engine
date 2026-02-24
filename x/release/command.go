@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -53,7 +54,7 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 	bump := &cobra.Command{
 		Use:  "bump [OPTIONS] <module>",
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			mod := args[0]
 			data, err := newRepoData(cfg.EnableModulesWithPreReleaseVersion)
 			if err != nil {
@@ -67,9 +68,9 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 				if !ok {
 					return fmt.Errorf("module %s not found", mod)
 				}
-				return helper.BumpModule(mod, opts.level, modData, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
+				return helper.BumpModule(cmd.Context(), mod, opts.level, modData, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 			}
-			return helper.BumpIterative(mod, opts.level, data, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
+			return helper.BumpIterative(cmd.Context(), mod, opts.level, data, &projectFS{opts: opts, beforeCommitHook: cfg.BeforeCommitHook, logger: logging.NewDefaultLogger("")})
 		},
 	}
 
@@ -136,7 +137,7 @@ func (m projectFS) BumpModInFile(filename, mod, version string) (bool, error) {
 	return needsAction, os.WriteFile(filename, out, perm)
 }
 
-func (m projectFS) GitTag(tag string) error {
+func (m projectFS) GitTag(ctx context.Context, tag string) error {
 	var prefix string
 	if m.skipGit {
 		prefix = "[skip] "
@@ -145,16 +146,16 @@ func (m projectFS) GitTag(tag string) error {
 	if m.dryRun || m.skipGit {
 		return nil
 	}
-	if err := gitTag(tag); err != nil {
+	if err := gitTag(ctx, tag); err != nil {
 		return err
 	}
 	if !m.noPropagate && !m.dryRun {
-		return gitPushTags()
+		return gitPushTags(ctx)
 	}
 	return nil
 }
 
-func (m projectFS) GitCommit(commit string) error {
+func (m projectFS) GitCommit(ctx context.Context, commit string) error {
 	if !m.dryRun && m.beforeCommitHook != nil {
 		if err := m.beforeCommitHook(); err != nil {
 			return err
@@ -168,7 +169,7 @@ func (m projectFS) GitCommit(commit string) error {
 	if m.dryRun || m.skipGit {
 		return nil
 	}
-	return gitCommit(commit)
+	return gitCommit(ctx, commit)
 }
 
 func newRepoData(versionExtraAllowList []string) (helper.RepoData, error) {
@@ -260,24 +261,24 @@ func getLatestVersion(modName string) (string, error) {
 	return strings.TrimPrefix(latest, prefix), nil
 }
 
-func gitTag(tag string) error {
-	cmd := exec.Command("git", "tag", tag)
+func gitTag(ctx context.Context, tag string) error {
+	cmd := exec.CommandContext(ctx, "git", "tag", tag, "-m", tag)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git tag (%s): %s", err, string(out))
 	}
 	return nil
 }
 
-func gitPushTags() error {
-	cmd := exec.Command("git", "push", "--tags")
+func gitPushTags(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "git", "push", "--tags")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push --tags (%s): %s", err, string(out))
 	}
 	return nil
 }
 
-func gitCommit(commit string) error {
-	cmd := exec.Command("git", "commit", "-am", commit)
+func gitCommit(ctx context.Context, commit string) error {
+	cmd := exec.CommandContext(ctx, "git", "commit", "-am", commit)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit (%s): %s", err, string(out))
 	}
