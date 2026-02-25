@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/x => ../x
 require (
 	connectrpc.com/connect v1.19.1
 	github.com/containerd/nri v0.10.0
-	github.com/docker/secrets-engine/x v0.0.21-do.not.use
+	github.com/docker/secrets-engine/x v0.0.22-do.not.use
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.11
 )
