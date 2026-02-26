@@ -132,4 +132,12 @@ help: ## Show this help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(INFO_COLOR)%-30s$(NO_COLOR) %s\n", $$1, $$2}'
 
-.PHONY: run bin format lint proto-lint proto-generate clean help keychain-linux-unit-tests keychain-unit-tests
+.PHONY: validate-headers
+validate-headers: ## Check license header for all files
+	@docker buildx build --progress=plain --platform=linux/amd64 --target=license-validate .
+
+.PHONY: update-license-headers
+update-license-headers: ## Update license headers for all files
+	@docker buildx build -o . --progress=plain --platform=linux/amd64 --target=license-update .
+
+.PHONY: run bin format lint proto-lint proto-generate clean help keychain-linux-unit-tests keychain-unit-tests validate-headers update-license-headers

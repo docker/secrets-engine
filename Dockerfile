@@ -1,8 +1,13 @@
 #syntax=docker/dockerfile:1
 
+ARG ALPINE_VERSION=3.23.3
 ARG GO_VERSION=latest
 ARG GOLANGCI_LINT_VERSION=v2.2.1
 ARG OSXCROSS_VERSION=15.5
+ARG ADDLICENSE_VERSION=v1.2.0
+ARG LICENSE_ARGS="-c 'Docker, Inc.' -l apache -ignore '**/*.yaml' -ignore '**/*.yml' -ignore '.github/**' -ignore 'store/keychain/internal/go-keychain/**' -ignore 'vendor/**' -ignore '.git/**' ."
+
+FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
 
 FROM --platform=${BUILDPLATFORM} golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS lint-base
 
@@ -12,6 +17,32 @@ FROM --platform=${BUILDPLATFORM} crazymax/osxcross:${OSXCROSS_VERSION}-alpine AS
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS gobase
 RUN apk add --no-cache findutils build-base git
+
+FROM alpine:${ALPINE_VERSION} AS license-validate
+ARG LICENSE_ARGS
+COPY --link --from=addlicense /app/addlicense /usr/bin/addlicense
+WORKDIR /src
+RUN --mount=type=bind,target=.,ro <<EOT
+    set -eu
+    echo "== Checking license headers =="
+    eval "/usr/bin/addlicense -check $LICENSE_ARGS"
+EOT
+
+FROM alpine:${ALPINE_VERSION} AS do-license-update
+ARG LICENSE_ARGS
+COPY --from=addlicense /app/addlicense /usr/bin/addlicense
+RUN mkdir -p /generate/out
+WORKDIR /src
+RUN apk add --no-cache git
+RUN --mount=type=bind,target=.,rw <<EOT
+    set -eu
+    echo "== Checking license headers =="
+    eval "/usr/bin/addlicense -v $LICENSE_ARGS"
+    ./scripts/copy-only-diff /generate/out
+EOT
+
+FROM scratch AS license-update
+COPY --from=do-license-update /generate/out .
 
 FROM gobase AS linux-base
 ARG TARGETARCH
