@@ -4,16 +4,25 @@ on:
     branches:
       - main
   pull_request:
+permissions:
+  contents: read # to fetch code (actions/checkout)
 jobs:
-  lint:
-    name: Lint
+  validate:
+    name: Validate license and lint
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - validate-headers
+          - lint
     permissions:
       id-token: write
       pull-requests: write
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -31,4 +40,4 @@ jobs:
           endpoint: "docker/secrets-engine"
           install: true
       - name: Lint
-        run: make BUILDER=${{ steps.buildx.outputs.name }} lint
+        run: make BUILDER=${{ steps.buildx.outputs.name }} ${{ matrix.target }}
