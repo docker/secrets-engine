@@ -41,7 +41,7 @@ github.com/docker/docker-credential-helpers/client
 github.com/docker/docker-credential-helpers/credentials
 # github.com/docker/secrets-engine/plugin v0.0.22 => ./plugin
 ## explicit; go 1.25
-# github.com/docker/secrets-engine/store v0.0.20 => ./store
+# github.com/docker/secrets-engine/store v0.0.21 => ./store
 ## explicit; go 1.25
 # github.com/docker/secrets-engine/x v0.0.22-do.not.use => ./x
 ## explicit; go 1.25
