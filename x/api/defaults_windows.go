@@ -26,5 +26,5 @@ func DaemonSocketPath() string {
 	if base == "" {
 		base = `C:\ProgramData`
 	}
-	return filepath.Join(base, "Docker", "SecretsEngine", "daemon.sock")
+	return filepath.Join(base, "DockerSecretsEngine", "daemon.sock")
 }
