@@ -17,8 +17,10 @@ package keychain
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/danieljoos/wincred"
@@ -36,6 +38,20 @@ var (
 	ErrNoLogonSession             = errors.New("logon session does not exist or there is no credential set associated with this logon session")
 	sysErrInvalidCredentialFlags  = windows.ERROR_INVALID_FLAGS
 	sysErrNoSuchLogonSession      = windows.ERROR_NO_SUCH_LOGON_SESSION
+)
+
+const (
+	// maxBlobSize is the maximum size of a Windows Credential Manager blob
+	// (CRED_MAX_CREDENTIAL_BLOB_SIZE = 5 * 512 bytes).
+	maxBlobSize = 2560
+
+	// chunkCountKey is stored in the primary credential's attributes when a
+	// secret's encoded blob exceeds maxBlobSize and must be split.
+	chunkCountKey = "chunk:count"
+
+	// chunkIndexKey is stored in each chunk credential's attributes to
+	// identify it as a chunk and record its position.
+	chunkIndexKey = "chunk:index"
 )
 
 // encodeSecret marshals the secret into a slice of bytes in UTF16 format
@@ -65,13 +81,72 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 	return secret.Unmarshal(val)
 }
 
+// chunkBlob splits blob into consecutive slices each at most size bytes long.
+func chunkBlob(blob []byte, size int) [][]byte {
+	var chunks [][]byte
+	for len(blob) > 0 {
+		n := min(size, len(blob))
+		chunks = append(chunks, blob[:n])
+		blob = blob[n:]
+	}
+	return chunks
+}
+
+// isChunkCredential reports whether the given attributes belong to a chunk
+// credential (as opposed to a primary credential).
+func isChunkCredential(attrs []wincred.CredentialAttribute) bool {
+	for _, attr := range attrs {
+		if attr.Keyword == chunkIndexKey {
+			return true
+		}
+	}
+	return false
+}
+
 type keychainStore[T store.Secret] struct {
 	serviceGroup string
 	serviceName  string
 	factory      store.Factory[T]
 }
 
+// itemChunkLabel returns the target name for the i-th chunk of a secret.
+func (k *keychainStore[T]) itemChunkLabel(id store.ID, index int) string {
+	return fmt.Sprintf("%s:chunk:%d", k.itemLabel(id.String()), index)
+}
+
+// readChunks fetches count chunk credentials for id and concatenates their
+// raw CredentialBlob bytes in order.
+func (k *keychainStore[T]) readChunks(id store.ID, count int) ([]byte, error) {
+	var blob []byte
+	for i := range count {
+		gc, err := wincred.GetGenericCredential(k.itemChunkLabel(id, i))
+		if err != nil {
+			return nil, mapWindowsCredentialError(err)
+		}
+		blob = append(blob, gc.CredentialBlob...)
+	}
+	return blob, nil
+}
+
+// deleteChunks removes chunk credentials for id until none remain.
+// It is safe to call when no chunks exist.
+func (k *keychainStore[T]) deleteChunks(id store.ID) error {
+	for i := 0; ; i++ {
+		g := wincred.NewGenericCredential(k.itemChunkLabel(id, i))
+		err := g.Delete()
+		if err != nil {
+			if errors.Is(err, wincred.ErrElementNotFound) {
+				return nil
+			}
+			return mapWindowsCredentialError(err)
+		}
+	}
+}
+
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
+	if err := k.deleteChunks(id); err != nil {
+		return err
+	}
 	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	err := g.Delete()
 	if err != nil && !errors.Is(err, wincred.ErrElementNotFound) {
@@ -87,13 +162,29 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 
 	attributes := mapFromWindowsAttributes(gc.Attributes)
+
+	// Determine the raw UTF-16 blob before safelyCleanMetadata strips chunkCountKey.
+	var rawBlob []byte
+	if countStr, ok := attributes[chunkCountKey]; ok {
+		count, err := strconv.Atoi(countStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid chunk count %q: %w", countStr, err)
+		}
+		rawBlob, err = k.readChunks(id, count)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		rawBlob = gc.CredentialBlob
+	}
+
 	safelyCleanMetadata(attributes)
 
 	secret := k.factory(ctx, id)
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
 	}
-	if err := decodeSecret(gc.CredentialBlob, secret); err != nil {
+	if err := decodeSecret(rawBlob, secret); err != nil {
 		return nil, err
 	}
 	return secret, nil
@@ -126,6 +217,9 @@ func isServiceCredential[T store.Secret](k *keychainStore[T], attrs []wincred.Cr
 func findServiceCredentials[T store.Secret](k *keychainStore[T], pattern store.Pattern, credentials []*wincred.Credential) iter.Seq[*wincred.Credential] {
 	return func(yield func(cred *wincred.Credential) bool) {
 		for _, c := range credentials {
+			if isChunkCredential(c.Attributes) {
+				continue
+			}
 			if !isServiceCredential(k, c.Attributes) {
 				continue
 			}
@@ -204,10 +298,40 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
 	safelySetID(id, attributes)
 
+	// Always remove stale chunk credentials before writing, so that a
+	// previously-chunked secret that now fits in a single blob leaves no
+	// orphaned chunk credentials behind (and vice-versa).
+	if err := k.deleteChunks(id); err != nil {
+		return err
+	}
+
 	g := wincred.NewGenericCredential(k.itemLabel(id.String()))
 	g.UserName = id.String()
-	g.CredentialBlob = blob
 	g.Persist = wincred.PersistLocalMachine
+
+	// the blob is too large, we will chunk it across multiple entries
+	if len(blob) > maxBlobSize {
+		// Write chunk credentials for the oversized blob.
+		chunks := chunkBlob(blob, maxBlobSize)
+		for i, chunk := range chunks {
+			gc := wincred.NewGenericCredential(k.itemChunkLabel(id, i))
+			gc.UserName = id.String()
+			gc.CredentialBlob = chunk
+			gc.Persist = wincred.PersistLocalMachine
+			gc.Attributes = mapToWindowsAttributes(map[string]string{
+				chunkIndexKey: strconv.Itoa(i),
+			})
+			if err := mapWindowsCredentialError(gc.Write()); err != nil {
+				return err
+			}
+		}
+		// Write the primary credential with metadata and the chunk count.
+		// The blob is stored in chunk credentials only.
+		attributes[chunkCountKey] = strconv.Itoa(len(chunks))
+	} else {
+		g.CredentialBlob = blob
+	}
+
 	g.Attributes = mapToWindowsAttributes(attributes)
 	return mapWindowsCredentialError(g.Write())
 }
@@ -246,19 +370,36 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			return nil, mapWindowsCredentialError(err)
 		}
 
-		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-		blob, _, err := transform.Bytes(decoder, gc.CredentialBlob)
-		if err != nil {
-			return nil, err
+		gcAttributes := mapFromWindowsAttributes(gc.Attributes)
+
+		// Determine the raw UTF-16 blob before safelyCleanMetadata strips chunkCountKey.
+		var rawBlob []byte
+		if countStr, ok := gcAttributes[chunkCountKey]; ok {
+			count, err := strconv.Atoi(countStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid chunk count %q: %w", countStr, err)
+			}
+			rawBlob, err = k.readChunks(id, count)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			rawBlob = gc.CredentialBlob
 		}
 
-		gcAttributes := mapFromWindowsAttributes(gc.Attributes)
 		safelyCleanMetadata(gcAttributes)
 
 		secret := k.factory(ctx, id)
 		if err := secret.SetMetadata(gcAttributes); err != nil {
 			return nil, err
 		}
+
+		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+		blob, _, err := transform.Bytes(decoder, rawBlob)
+		if err != nil {
+			return nil, err
+		}
+
 		if err := secret.Unmarshal(blob); err != nil {
 			return nil, err
 		}
