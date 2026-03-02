@@ -15,6 +15,7 @@
 package credentialhelper
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -216,6 +217,32 @@ func TestCredentialHelper(t *testing.T) {
 			Version:    "0.0.1",
 			ResolvedAt: result[0].ResolvedAt,
 		}, result[0])
+	})
+}
+
+func TestRun(t *testing.T) {
+	t.Run("returns context cancelled when context is cancelled", func(t *testing.T) {
+		c, err := New(testhelper.TestLogger(t),
+			WithShellProgramFunc(func(args ...string) client.Program {
+				return &mockCredentialHelper{
+					t:         t,
+					operation: args[0],
+					store:     map[string]credentials.Credentials{},
+				}
+			}),
+		)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+
+		done := make(chan error, 1)
+		go func() {
+			done <- c.Run(ctx)
+		}()
+
+		cancel()
+
+		require.ErrorIs(t, <-done, context.Canceled)
 	})
 }
 

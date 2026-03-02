@@ -129,7 +129,7 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern plugin.Pat
 
 func (s *credentialHelperStore) Run(ctx context.Context) error {
 	<-ctx.Done()
-	return nil
+	return ctx.Err()
 }
 
 var _ plugin.Plugin = &credentialHelperStore{}
