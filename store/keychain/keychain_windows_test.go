@@ -23,6 +23,9 @@ import (
 
 	"github.com/danieljoos/wincred"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/docker/secrets-engine/store/mocks"
 )
 
 func TestChunkBlob(t *testing.T) {
@@ -69,6 +72,81 @@ func TestChunkBlob(t *testing.T) {
 			reassembled = append(reassembled, c...)
 		}
 		assert.Equal(t, blob, reassembled)
+	})
+}
+
+func TestEncodeDecodeSecret(t *testing.T) {
+	t.Run("roundtrip small credential", func(t *testing.T) {
+		cred := &mocks.MockCredential{
+			Username: "bob",
+			Password: "secret",
+		}
+		blob, err := encodeSecret(cred)
+		require.NoError(t, err)
+
+		result := &mocks.MockCredential{}
+		require.NoError(t, decodeSecret(blob, result))
+		assert.Equal(t, cred.Username, result.Username)
+		assert.Equal(t, cred.Password, result.Password)
+	})
+
+	t.Run("roundtrip large JWT credential exceeding maxBlobSize", func(t *testing.T) {
+		// Construct a fake JWT large enough to exceed maxBlobSize (2560 bytes)
+		// when UTF-16 encoded. Each ASCII character becomes 2 bytes in UTF-16,
+		// so the marshaled string must be longer than 1280 characters.
+		largePayload := strings.Repeat("eyJzdWIiOiJ1c2VyMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSIsImlhdCI6MTUxNjIzOTAyMn0", 20)
+		largeJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + largePayload + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+		cred := &mocks.MockCredential{
+			Username: "alice",
+			Password: largeJWT,
+		}
+		blob, err := encodeSecret(cred)
+		require.NoError(t, err)
+		assert.Greater(t, len(blob), maxBlobSize, "JWT credential should exceed maxBlobSize when UTF-16 encoded")
+
+		// Verify that chunkBlob properly splits the oversized blob.
+		chunks := chunkBlob(blob, maxBlobSize)
+		assert.Greater(t, len(chunks), 1)
+
+		// Reassemble chunks and decode back to verify no data is lost.
+		var reassembled []byte
+		for _, chunk := range chunks {
+			reassembled = append(reassembled, chunk...)
+		}
+		result := &mocks.MockCredential{}
+		require.NoError(t, decodeSecret(reassembled, result))
+		assert.Equal(t, cred.Username, result.Username)
+		assert.Equal(t, cred.Password, result.Password)
+	})
+
+	t.Run("roundtrip multiple large JWTs as separate credentials", func(t *testing.T) {
+		largePayload := strings.Repeat("eyJzdWIiOiJ1c2VyMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSIsImlhdCI6MTUxNjIzOTAyMn0", 40)
+		veryLargeJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + largePayload + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+		for _, tc := range []struct {
+			username string
+			password string
+		}{
+			{"user1", veryLargeJWT},
+			{"user2", veryLargeJWT},
+		} {
+			cred := &mocks.MockCredential{Username: tc.username, Password: tc.password}
+			blob, err := encodeSecret(cred)
+			require.NoError(t, err)
+			assert.Greater(t, len(blob), maxBlobSize)
+
+			chunks := chunkBlob(blob, maxBlobSize)
+			var reassembled []byte
+			for _, chunk := range chunks {
+				reassembled = append(reassembled, chunk...)
+			}
+
+			result := &mocks.MockCredential{}
+			require.NoError(t, decodeSecret(reassembled, result))
+			assert.Equal(t, tc.username, result.Username)
+			assert.Equal(t, tc.password, result.Password)
+		}
 	})
 }
 
