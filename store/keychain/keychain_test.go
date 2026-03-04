@@ -17,6 +17,8 @@ package keychain
 import (
 	"context"
 	"errors"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -251,6 +253,77 @@ func TestKeychain(t *testing.T) {
 			_, ok := actual[store.MustParseID("com.test.test/test/pete")]
 			assert.True(t, ok)
 		})
+	})
+
+	t.Run("save and get large JWT credential", func(t *testing.T) {
+		ks := setupKeychain(t, nil)
+		id := store.MustParseID("com.test.test/test/jwt-user")
+
+		// Construct a fake JWT large enough that, when UTF-16 encoded on
+		// Windows, it exceeds the 2560-byte blob limit and must be chunked.
+		// Each ASCII character becomes 2 bytes in UTF-16, so we need the
+		// marshaled string to exceed 1280 characters.
+		largePayload := strings.Repeat("eyJzdWIiOiJ1c2VyMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSIsImlhdCI6MTUxNjIzOTAyMn0", 20)
+		largeJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + largePayload + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+		creds := &mocks.MockCredential{
+			Username: "alice",
+			Password: largeJWT,
+		}
+		t.Cleanup(func() {
+			require.NoError(t, ks.Delete(context.Background(), id))
+		})
+		require.NoError(t, ks.Save(t.Context(), id, creds))
+
+		secret, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+
+		actual, ok := secret.(*mocks.MockCredential)
+		require.True(t, ok)
+		actual.Attributes = nil
+
+		assert.Equal(t, creds.Username, actual.Username)
+		assert.Equal(t, creds.Password, actual.Password)
+	})
+
+	t.Run("overwrite small credential with large JWT credential", func(t *testing.T) {
+		if runtime.GOOS == "darwin" {
+			// macOS AddItem does not update existing items; saving to an
+			// already-occupied key returns a duplicate-item error.
+			t.Skip("macOS does not support overwriting an existing credential")
+		}
+
+		ks := setupKeychain(t, nil)
+		id := store.MustParseID("com.test.test/test/overwrite-user")
+
+		smallCreds := &mocks.MockCredential{
+			Username: "alice",
+			Password: "short",
+		}
+		t.Cleanup(func() {
+			require.NoError(t, ks.Delete(context.Background(), id))
+		})
+		require.NoError(t, ks.Save(t.Context(), id, smallCreds))
+
+		largePayload := strings.Repeat("eyJzdWIiOiJ1c2VyMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSIsImlhdCI6MTUxNjIzOTAyMn0", 20)
+		largeJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + largePayload + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+		largeCreds := &mocks.MockCredential{
+			Username: "alice",
+			Password: largeJWT,
+		}
+
+		// On Linux and Windows the store replaces/clobbers the existing entry.
+		require.NoError(t, ks.Save(t.Context(), id, largeCreds))
+
+		secret, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+
+		actual, ok := secret.(*mocks.MockCredential)
+		require.True(t, ok)
+		actual.Attributes = nil
+
+		assert.Equal(t, largeCreds.Username, actual.Username)
+		assert.Equal(t, largeCreds.Password, actual.Password)
 	})
 
 	t.Run("delete credential", func(t *testing.T) {
