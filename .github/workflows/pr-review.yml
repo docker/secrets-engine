@@ -12,5 +12,5 @@ permissions:
   issues: write
 jobs:
   review:
-    uses: docker/cagent-action/.github/workflows/review-pr.yml@latest
+    uses: docker/cagent-action/.github/workflows/review-pr.yml@6ee4111d1f2b1078cf438d955d1c1c5cc48c36c7 # latest
     secrets: inherit
