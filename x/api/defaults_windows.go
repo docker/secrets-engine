@@ -22,9 +22,9 @@ import (
 )
 
 func DaemonSocketPath() string {
-	base := os.Getenv("ProgramData")
+	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
-		base = `C:\ProgramData`
+		base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
 	}
 	return filepath.Join(base, "DockerSecretsEngine", "service", "daemon.sock")
 }
