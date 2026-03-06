@@ -366,6 +366,52 @@ func TestKeychain(t *testing.T) {
 		require.ErrorContains(t, err, "i am failing on purpose")
 	})
 
+	t.Run("upsert inserts when credential does not exist", func(t *testing.T) {
+		ks := setupKeychain(t, nil)
+		id := store.MustParseID("com.test.test/test/upsert-insert")
+		creds := &mocks.MockCredential{
+			Username: "alice",
+			Password: "alice-password",
+		}
+		t.Cleanup(func() {
+			require.NoError(t, ks.Delete(context.Background(), id))
+		})
+		require.NoError(t, ks.Upsert(t.Context(), id, creds))
+
+		secret, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := secret.(*mocks.MockCredential)
+		actual.Attributes = nil
+		assert.Equal(t, creds.Username, actual.Username)
+		assert.Equal(t, creds.Password, actual.Password)
+	})
+
+	t.Run("upsert overwrites an existing credential", func(t *testing.T) {
+		ks := setupKeychain(t, nil)
+		id := store.MustParseID("com.test.test/test/upsert-overwrite")
+		original := &mocks.MockCredential{
+			Username: "bob",
+			Password: "original-password",
+		}
+		t.Cleanup(func() {
+			require.NoError(t, ks.Delete(context.Background(), id))
+		})
+		require.NoError(t, ks.Save(t.Context(), id, original))
+
+		updated := &mocks.MockCredential{
+			Username: "bob",
+			Password: "updated-password",
+		}
+		require.NoError(t, ks.Upsert(t.Context(), id, updated))
+
+		secret, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := secret.(*mocks.MockCredential)
+		actual.Attributes = nil
+		assert.Equal(t, updated.Username, actual.Username)
+		assert.Equal(t, updated.Password, actual.Password)
+	})
+
 	t.Run("set metadata error on getAllMetadata", func(t *testing.T) {
 		kc := setupKeychain(t, func(_ context.Context, _ store.ID) store.Secret {
 			return &mustUnmarshalError{}

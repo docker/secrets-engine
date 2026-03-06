@@ -33,6 +33,7 @@ type MockStore struct {
 	errDelete error
 	errGet    error
 	errFilter error
+	errUpsert error
 	store     map[store.ID]store.Secret
 }
 
@@ -71,6 +72,12 @@ func WithStoreGetAllErr(err error) Option {
 func WithStoreDeleteErr(err error) Option {
 	return func(m *MockStore) {
 		m.errDelete = err
+	}
+}
+
+func WithStoreUpsertErr(err error) Option {
+	return func(m *MockStore) {
+		m.errUpsert = err
 	}
 }
 
@@ -121,6 +128,17 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	defer m.lock.Unlock()
 	if m.errSave != nil {
 		return m.errSave
+	}
+
+	m.store[id] = secret
+	return nil
+}
+
+func (m *MockStore) Upsert(_ context.Context, id store.ID, secret store.Secret) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if m.errUpsert != nil {
+		return m.errUpsert
 	}
 
 	m.store[id] = secret

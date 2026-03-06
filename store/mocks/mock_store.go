@@ -70,6 +70,10 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	return nil
 }
 
+func (m *MockStore) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+	return m.Save(ctx, id, secret)
+}
+
 func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()

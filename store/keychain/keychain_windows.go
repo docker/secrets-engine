@@ -336,6 +336,10 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapWindowsCredentialError(g.Write())
 }
 
+func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+	return k.Save(ctx, id, secret)
+}
+
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	// Note: there is no notion of a filter on Windows inside the wincred API.
 	// It has no way to even filter on known attributes.

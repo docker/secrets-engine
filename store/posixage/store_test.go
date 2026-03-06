@@ -656,6 +656,80 @@ func TestPOSIXAge(t *testing.T) {
 		assert.Equal(t, secret, storeSecret)
 	})
 
+	t.Run("upsert inserts when credential does not exist", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		masterKey := uuid.NewString()
+		s, err := New(root,
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
+				return &mocks.MockCredential{}
+			},
+			WithLogger(&testLogger{t}),
+			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+		)
+		require.NoError(t, err)
+
+		secret := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: uuid.NewString(),
+		}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Upsert(t.Context(), id, secret))
+
+		storeSecret, err := s.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, secret, storeSecret)
+	})
+
+	t.Run("upsert overwrites an existing credential", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		masterKey := uuid.NewString()
+		s, err := New(root,
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
+				return &mocks.MockCredential{}
+			},
+			WithLogger(&testLogger{t}),
+			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(masterKey), nil
+			}),
+		)
+		require.NoError(t, err)
+
+		original := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: uuid.NewString(),
+		}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, original))
+
+		updated := &mocks.MockCredential{
+			Username: uuid.NewString(),
+			Password: uuid.NewString(),
+		}
+		require.NoError(t, s.Upsert(t.Context(), id, updated))
+
+		storeSecret, err := s.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, updated, storeSecret)
+	})
+
 	t.Run("an error on encryption callbackFunc is propagated on save", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)

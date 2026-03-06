@@ -376,6 +376,10 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	return secretfile.Persist(id, f.filesystem, metadata, secrets)
 }
 
+func (f *fileStore[T]) Upsert(ctx context.Context, id store.ID, s store.Secret) error {
+	return f.Save(ctx, id, s)
+}
+
 type config struct {
 	logger                    logging.Logger
 	registeredDecryptionFunc  []promptCaller

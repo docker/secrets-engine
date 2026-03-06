@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
+
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
 )
@@ -147,6 +149,82 @@ func TestMacosKeychain(t *testing.T) {
 		assert.Len(t, secrets, 4)
 		_, ok := secrets[id]
 		assert.Truef(t, ok, "returned secret must match original id")
+	})
+}
+
+func TestUpsert(t *testing.T) {
+	var (
+		serviceName  = uuid.NewString()
+		serviceGroup = "com.test.testing"
+	)
+	ks := keychainStore[*mocks.MockCredential]{
+		serviceGroup: serviceGroup,
+		serviceName:  serviceName,
+		factory: func(_ context.Context, _ store.ID) *mocks.MockCredential {
+			return &mocks.MockCredential{}
+		},
+	}
+
+	t.Run("inserts when credential does not exist", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, ks.Delete(t.Context(), id))
+		})
+
+		secret := &mocks.MockCredential{
+			Username: "alice",
+			Password: "alice-password",
+		}
+		require.NoError(t, ks.Upsert(t.Context(), id, secret))
+
+		got, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := got.(*mocks.MockCredential)
+		actual.Attributes = nil
+		assert.Equal(t, secret.Username, actual.Username)
+		assert.Equal(t, secret.Password, actual.Password)
+	})
+
+	t.Run("overwrites an existing credential", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, ks.Delete(t.Context(), id))
+		})
+
+		original := &mocks.MockCredential{
+			Username: "bob",
+			Password: "original-password",
+		}
+		require.NoError(t, ks.Save(t.Context(), id, original))
+
+		updated := &mocks.MockCredential{
+			Username: "bob",
+			Password: "updated-password",
+		}
+		require.NoError(t, ks.Upsert(t.Context(), id, updated))
+
+		got, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := got.(*mocks.MockCredential)
+		actual.Attributes = nil
+		assert.Equal(t, updated.Username, actual.Username)
+		assert.Equal(t, updated.Password, actual.Password)
+	})
+
+	t.Run("save returns duplicate item error when credential already exists", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, ks.Delete(t.Context(), id))
+		})
+
+		secret := &mocks.MockCredential{
+			Username: "charlie",
+			Password: "charlie-password",
+		}
+		require.NoError(t, ks.Save(t.Context(), id, secret))
+
+		err := ks.Save(t.Context(), id, secret)
+		require.ErrorIs(t, err, kc.ErrorDuplicateItem)
 	})
 }
 
