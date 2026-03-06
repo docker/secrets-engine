@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"sync"
 
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 
@@ -31,6 +32,7 @@ var (
 )
 
 type keychainStore[T store.Secret] struct {
+	mu                        sync.Mutex
 	serviceGroup              string
 	serviceName               string
 	factory                   store.Factory[T]
@@ -196,6 +198,21 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	item.SetGenericMetadata(metadataAny)
 
 	return mapKeychainError(kc.AddItem(item))
+}
+
+// Upsert atomically replaces a credential in the macOS Keychain.
+//
+// The macOS Keychain does not allow overwriting an existing item via AddItem,
+// so Upsert holds a mutex and performs a Delete followed by a Save to ensure
+// no concurrent Upsert can interleave between the two operations.
+func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+
+	if err := k.Delete(ctx, id); err != nil {
+		return err
+	}
+	return k.Save(ctx, id, secret)
 }
 
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {

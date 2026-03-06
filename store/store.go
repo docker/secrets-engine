@@ -84,6 +84,11 @@ type Store interface {
 	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
+	// Upsert atomically replaces an existing credential or inserts a new one.
+	// On stores that do not support overwriting (e.g. macOS Keychain), it
+	// deletes the existing credential and then saves the new one under a mutex
+	// to ensure the two operations are not interleaved.
+	Upsert(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
 	//
 	// Secrets returned will have both [Secret.SetMetadata] and [Secret.Unmarshal]

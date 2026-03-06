@@ -339,6 +339,10 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return nil
 }
 
+func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+	return k.Save(ctx, id, secret)
+}
+
 //gocyclo:ignore
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
