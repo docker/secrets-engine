@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/plugins/credentialhelper
 
-go 1.25.0
+go 1.25.8
 
 // This `replace` is only for CI to function.
 // The correct version will get resolved from below when this module is
