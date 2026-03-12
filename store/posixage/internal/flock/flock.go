@@ -89,7 +89,8 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 		return nil, err
 	}
 	// recovery was successful. Let's try get another lock one last time.
-	if err := retryLock(ctx, fl, exclusive); err != nil {
+	err = retryLock(ctx, fl, exclusive)
+	if err != nil {
 		return nil, err
 	}
 
