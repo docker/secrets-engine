@@ -138,28 +138,34 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encryptedSecrets []sec
 		if err != nil {
 			return nil, err
 		}
-		defer clear(decryptionKey)
 
-		identity, err := secretfile.GetIdentity(keyType, string(decryptionKey))
-		if err != nil {
-			return nil, err
-		}
-
-		r, err := age.Decrypt(bytes.NewReader(encryptedSecrets[index].EncryptedData), identity)
+		plaintext, err := f.tryDecrypt(keyType, decryptionKey, encryptedSecrets[index].EncryptedData)
 		if err != nil {
 			f.logger.Errorf("failed to decrypt secret of type :%s", keyType)
 			continue
 		}
-
-		decryptedSecret, err := io.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-
-		return decryptedSecret, nil
+		return plaintext, nil
 	}
 
 	return nil, errors.New("could not decrypt secret with provided decryption keys")
+}
+
+// tryDecrypt uses decryptionKey to decrypt encryptedData, zeroing the key after
+// use regardless of outcome.
+func (f *fileStore[T]) tryDecrypt(keyType secretfile.KeyType, decryptionKey, encryptedData []byte) ([]byte, error) {
+	defer clear(decryptionKey)
+
+	identity, err := secretfile.GetIdentity(keyType, string(decryptionKey))
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := age.Decrypt(bytes.NewReader(encryptedData), identity)
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(r)
 }
 
 func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {

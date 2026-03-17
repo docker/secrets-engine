@@ -77,6 +77,7 @@ func secretMappingFromSTDIN(ctx context.Context, reader io.Reader, id string) (*
 	if err != nil {
 		return nil, err
 	}
+	defer clear(data)
 
 	return &secret{
 		id:  id,

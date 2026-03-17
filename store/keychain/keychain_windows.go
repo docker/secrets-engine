@@ -176,6 +176,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		if err != nil {
 			return nil, err
 		}
+		defer clear(rawBlob)
 	} else {
 		rawBlob = gc.CredentialBlob
 	}
@@ -377,45 +378,58 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			return nil, mapWindowsCredentialError(err)
 		}
 
-		gcAttributes := mapFromWindowsAttributes(gc.Attributes)
-
-		// Determine the raw UTF-16 blob before safelyCleanMetadata strips chunkCountKey.
-		var rawBlob []byte
-		if countStr, ok := gcAttributes[chunkCountKey]; ok {
-			count, err := strconv.Atoi(countStr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid chunk count %q: %w", countStr, err)
-			}
-			rawBlob, err = k.readChunks(id, count)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			rawBlob = gc.CredentialBlob
-		}
-
-		safelyCleanMetadata(gcAttributes)
-
-		secret := k.factory(ctx, id)
-		if err := secret.SetMetadata(gcAttributes); err != nil {
-			return nil, err
-		}
-
-		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-		blob, _, err := transform.Bytes(decoder, rawBlob)
+		secret, err := k.loadSecret(ctx, id, gc)
 		if err != nil {
 			return nil, err
 		}
-
-		if err := secret.Unmarshal(blob); err != nil {
-			clear(blob)
-			return nil, err
-		}
-		clear(blob)
 		secrets[id] = secret
 	}
 
 	return secrets, nil
+}
+
+// loadSecret fetches, decodes, and zeroes the raw blob for id, then
+// returns a fully populated Secret. rawBlob is zeroed only when it was
+// allocated by readChunks (chunked path); gc.CredentialBlob is not ours.
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, gc *wincred.GenericCredential) (store.Secret, error) {
+	gcAttributes := mapFromWindowsAttributes(gc.Attributes)
+
+	var (
+		rawBlob []byte
+		chunked bool
+	)
+	if countStr, ok := gcAttributes[chunkCountKey]; ok {
+		count, err := strconv.Atoi(countStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid chunk count %q: %w", countStr, err)
+		}
+		rawBlob, err = k.readChunks(id, count)
+		if err != nil {
+			return nil, err
+		}
+		chunked = true
+	} else {
+		rawBlob = gc.CredentialBlob
+	}
+	if chunked {
+		defer clear(rawBlob)
+	}
+
+	safelyCleanMetadata(gcAttributes)
+
+	secret := k.factory(ctx, id)
+	if err := secret.SetMetadata(gcAttributes); err != nil {
+		return nil, err
+	}
+
+	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
+	blob, _, err := transform.Bytes(decoder, rawBlob)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(blob)
+
+	return secret, secret.Unmarshal(blob)
 }
 
 func mapWindowsCredentialError(err error) error {
