@@ -152,7 +152,7 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encryptedSecrets []sec
 
 // tryDecrypt uses decryptionKey to decrypt encryptedData, zeroing the key after
 // use regardless of outcome.
-func (f *fileStore[T]) tryDecrypt(keyType secretfile.KeyType, decryptionKey []byte, encryptedData []byte) ([]byte, error) {
+func (f *fileStore[T]) tryDecrypt(keyType secretfile.KeyType, decryptionKey, encryptedData []byte) ([]byte, error) {
 	defer clear(decryptionKey)
 
 	identity, err := secretfile.GetIdentity(keyType, string(decryptionKey))
