@@ -207,6 +207,8 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	if err != nil {
 		return nil, err
 	}
+	defer clear(value)
+
 	secret := k.factory(ctx, id)
 	if err := secret.SetMetadata(attributes); err != nil {
 		return nil, err
@@ -317,6 +319,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	if err != nil {
 		return err
 	}
+	defer clear(value)
 
 	sessSecret, err := session.NewSecret(value)
 	if err != nil {
@@ -422,11 +425,14 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 
 		secret := k.factory(ctx, secretID)
 		if err := secret.SetMetadata(attributes); err != nil {
+			clear(value)
 			return nil, err
 		}
 		if err := secret.Unmarshal(value); err != nil {
+			clear(value)
 			return nil, err
 		}
+		clear(value)
 
 		credentials[secretID] = secret
 	}
