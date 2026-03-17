@@ -60,6 +60,7 @@ func encodeSecret(secret store.Secret) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clear(data)
 
 	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
 	blob, _, err := transform.Bytes(encoder, data)
@@ -77,6 +78,7 @@ func decodeSecret(blob []byte, secret store.Secret) error {
 	if err != nil {
 		return err
 	}
+	defer clear(val)
 
 	return secret.Unmarshal(val)
 }
@@ -292,6 +294,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	if err != nil {
 		return err
 	}
+	defer clear(blob)
 
 	attributes := make(map[string]string)
 	maps.Copy(attributes, secret.Metadata())
@@ -405,8 +408,10 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		}
 
 		if err := secret.Unmarshal(blob); err != nil {
+			clear(blob)
 			return nil, err
 		}
+		clear(blob)
 		secrets[id] = secret
 	}
 

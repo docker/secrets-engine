@@ -67,6 +67,7 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([
 		return nil, err
 	}
 	sharedSecretBytes := sharedSecret.Bytes()
+	defer clear(sharedSecretBytes)
 
 	r := hkdf.New(sha256.New, sharedSecretBytes, nil, nil)
 
@@ -81,6 +82,7 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([
 
 func unauthenticatedAESCBCEncrypt(unpaddedPlaintext, key []byte) (iv, ciphertext []byte, err error) {
 	paddedPlaintext := padPKCS7(unpaddedPlaintext, aes.BlockSize)
+	defer clear(paddedPlaintext)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, nil, err
