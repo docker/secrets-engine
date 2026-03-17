@@ -138,6 +138,7 @@ func (f *fileStore[T]) decryptSecret(ctx context.Context, encryptedSecrets []sec
 		if err != nil {
 			return nil, err
 		}
+		defer clear(decryptionKey)
 
 		identity, err := secretfile.GetIdentity(keyType, string(decryptionKey))
 		if err != nil {
@@ -214,6 +215,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 		if err != nil {
 			return err
 		}
+		defer clear(decryptedSecret)
 
 		secret := f.factory(ctx, id)
 		if err := secret.SetMetadata(metadata); err != nil {
@@ -254,6 +256,7 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 	if err != nil {
 		return nil, err
 	}
+	defer clear(decryptedSecret)
 
 	secret := f.factory(ctx, id)
 	if err := secret.SetMetadata(metadata); err != nil {
@@ -339,6 +342,7 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	if err != nil {
 		return err
 	}
+	defer clear(secret)
 	metadata := s.Metadata()
 
 	var secrets []secretfile.EncryptedSecret
