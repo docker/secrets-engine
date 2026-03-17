@@ -105,6 +105,7 @@ func promptForEncryptionKeys(ctx context.Context, funcs []promptCaller) (map[sec
 			return nil, err
 		}
 		raw = bytes.TrimSpace(raw)
+		defer clear(raw)
 		if len(raw) == 0 {
 			return nil, errors.New("empty key provided on registered callback function")
 		}
