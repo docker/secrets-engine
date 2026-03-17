@@ -123,6 +123,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	if err != nil {
 		return nil, err
 	}
+	defer clear(result.Data)
 
 	attributes, err := convertAttributes(result.Attributes)
 	if err != nil {
@@ -179,6 +180,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	if err != nil {
 		return err
 	}
+	defer clear(data)
 	item := newKeychainItem(id.String(), k)
 	item.SetData(data)
 	// only creation of a secret needs the label attribute.
@@ -268,22 +270,30 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		}
 		safelyCleanMetadata(attr)
 
-		i, err := getItemWithData(id.String(), k)
+		secret, err := k.loadSecret(ctx, id, attr)
 		if err != nil {
-			return nil, err
-		}
-
-		secret := k.factory(ctx, id)
-		if err := secret.SetMetadata(attr); err != nil {
-			return nil, err
-		}
-		if err := secret.Unmarshal(i.Data); err != nil {
 			return nil, err
 		}
 		creds[id] = secret
 	}
 
 	return creds, nil
+}
+
+// loadSecret fetches the raw keychain data for id, zeroes it after use,
+// and returns a fully populated Secret.
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, attr map[string]string) (store.Secret, error) {
+	i, err := getItemWithData(id.String(), k)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(i.Data)
+
+	secret := k.factory(ctx, id)
+	if err := secret.SetMetadata(attr); err != nil {
+		return nil, err
+	}
+	return secret, secret.Unmarshal(i.Data)
 }
 
 func mapKeychainError(err error) error {

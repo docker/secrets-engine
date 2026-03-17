@@ -346,6 +346,24 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 	return k.Save(ctx, id, secret)
 }
 
+// loadSecret fetches the raw secret value for itemPath, zeroes it after use,
+// and returns a fully populated Secret.
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc *kc.SecretService, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
+	value, err := svc.GetSecret(itemPath, *session)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(value)
+
+	safelyCleanMetadata(attributes)
+
+	secret := k.factory(ctx, id)
+	if err := secret.SetMetadata(attributes); err != nil {
+		return nil, err
+	}
+	return secret, secret.Unmarshal(value)
+}
+
 //gocyclo:ignore
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
 	service, err := kc.NewService()
@@ -417,23 +435,10 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			continue
 		}
 
-		value, err := service.GetSecret(itemPath, *session)
+		secret, err := k.loadSecret(ctx, secretID, service, itemPath, session, attributes)
 		if err != nil {
 			return nil, err
 		}
-		safelyCleanMetadata(attributes)
-
-		secret := k.factory(ctx, secretID)
-		if err := secret.SetMetadata(attributes); err != nil {
-			clear(value)
-			return nil, err
-		}
-		if err := secret.Unmarshal(value); err != nil {
-			clear(value)
-			return nil, err
-		}
-		clear(value)
-
 		credentials[secretID] = secret
 	}
 
