@@ -39,11 +39,11 @@ func Test_hijacking(t *testing.T) {
 	t.Cleanup(func() { l.Close() })
 
 	httpMux := http.NewServeMux()
-	ch := make(chan io.ReadWriteCloser)
+	ch := make(chan io.ReadWriter)
 	wait := make(chan struct{})
 	once := sync.OnceFunc(func() { close(wait) })
 	defer once()
-	httpMux.Handle(NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, closer io.ReadWriteCloser) {
+	httpMux.Handle(NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, closer io.ReadWriter) {
 		ch <- closer
 		<-wait
 	}))
@@ -68,7 +68,6 @@ func Test_hijacking(t *testing.T) {
 	assert.Equal(t, "ping", readLine(connServer))
 	assert.NoError(t, writeLine(connServer, "pong"))
 	assert.Equal(t, "pong", readLine(connHijacked))
-	assert.NoError(t, connServer.Close())
 	assert.NoError(t, connHijacked.Close())
 	once()
 
@@ -93,7 +92,7 @@ func TestHijackify_hijackRequest_timeout(t *testing.T) {
 	assert.ErrorContains(t, err, "i/o timeout")
 }
 
-func readLine(conn io.ReadWriteCloser) string {
+func readLine(conn io.Reader) string {
 	r := bufio.NewReader(conn)
 	line, err := r.ReadString('\n')
 	if err != nil {
@@ -102,7 +101,7 @@ func readLine(conn io.ReadWriteCloser) string {
 	return strings.TrimRight(line, "\r\n ")
 }
 
-func writeLine(conn io.ReadWriteCloser, line string) error {
+func writeLine(conn io.Writer, line string) error {
 	_, err := conn.Write([]byte(line + "\r\n"))
 	return err
 }
