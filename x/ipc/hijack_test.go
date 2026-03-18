@@ -43,7 +43,7 @@ func Test_hijacking(t *testing.T) {
 	wait := make(chan struct{})
 	once := sync.OnceFunc(func() { close(wait) })
 	defer once()
-	httpMux.Handle(NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, closer io.ReadWriter) {
+	httpMux.Handle(NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, closer io.ReadWriteCloser) {
 		ch <- closer
 		<-wait
 	}))

@@ -95,7 +95,7 @@ type CloseWriter interface {
 }
 
 type hijackHandler struct {
-	cb         func(ctx context.Context, rw io.ReadWriter)
+	cb         func(ctx context.Context, conn io.ReadWriteCloser)
 	ackTimeout time.Duration
 	logger     logging.Logger
 }
@@ -131,7 +131,7 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer conn.Close()
+	defer func() { _ = conn.Close() }() // Might have already been called inside the callback -> ignore double close error
 
 	done := make(chan struct{})
 	go func() {
@@ -153,7 +153,8 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Important: The server still owns net.Conn! When this handler returns, conn gets closed.
+		// The server still owns net.Conn. When this handler returns, conn gets closed.
+		// However, the callback might have to call Close() to abort/unblock any pending/blocking Read().
 		h.cb(r.Context(), conn)
 	}()
 
@@ -163,6 +164,6 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriter)) (string, http.Handler) {
+func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
 	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }
