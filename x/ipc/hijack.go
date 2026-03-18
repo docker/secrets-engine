@@ -95,7 +95,7 @@ type CloseWriter interface {
 }
 
 type hijackHandler struct {
-	cb         func(ctx context.Context, closer io.ReadWriteCloser)
+	cb         func(ctx context.Context, rw io.ReadWriter)
 	ackTimeout time.Duration
 	logger     logging.Logger
 }
@@ -163,6 +163,6 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
+func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriter)) (string, http.Handler) {
 	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }
