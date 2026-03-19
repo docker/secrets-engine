@@ -114,7 +114,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 // as in the context of where this function is used we don't care.
 func runUncheckedDummyAcceptor(logger logging.Logger, listener net.Listener) {
 	httpMux := http.NewServeMux()
-	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(context.Context, io.ReadWriter) {}))
+	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(context.Context, io.ReadWriteCloser) {}))
 	server := &http.Server{Handler: httpMux}
 	go func() {
 		_ = server.Serve(listener)
