@@ -56,7 +56,9 @@ func Test_rootCommand(t *testing.T) {
 			require.NoError(t, err)
 			impl, ok := s.(*pass.PassValue)
 			require.True(t, ok)
-			assert.Equal(t, "bar=bar=bar", string(impl.Value))
+			v, err := impl.Marshal()
+			require.NoError(t, err)
+			assert.Equal(t, "bar=bar=bar", string(v))
 		})
 		t.Run("from STDIN", func(t *testing.T) {
 			mock := teststore.NewMockStore()
@@ -67,7 +69,56 @@ func Test_rootCommand(t *testing.T) {
 			require.NoError(t, err)
 			impl, ok := s.(*pass.PassValue)
 			require.True(t, ok)
-			assert.Equal(t, "my\nmultiline\nvalue", string(impl.Value))
+			v, err := impl.Marshal()
+			require.NoError(t, err)
+			assert.Equal(t, "my\nmultiline\nvalue", string(v))
+		})
+		t.Run("with --metadata flag", func(t *testing.T) {
+			mock := teststore.NewMockStore()
+			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar", "--metadata", "name=bob", "--metadata", "expiry=2027-03-01")
+			assert.NoError(t, err)
+			assert.Empty(t, out)
+			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
+			require.NoError(t, err)
+			impl, ok := s.(*pass.PassValue)
+			require.True(t, ok)
+			v, err := impl.Marshal()
+			require.NoError(t, err)
+			assert.Equal(t, "bar", string(v))
+			assert.Equal(t, map[string]string{"name": "bob", "expiry": "2027-03-01"}, impl.Metadata())
+		})
+		t.Run("from STDIN JSON with value and metadata", func(t *testing.T) {
+			mock := teststore.NewMockStore()
+			out, err := executeCommandWithStdin(Root(t.Context(), mock, mockInfo), `{"secret":"bar","metadata":{"name":"bob"}}`, "set", "foo")
+			assert.NoError(t, err)
+			assert.Empty(t, out)
+			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
+			require.NoError(t, err)
+			impl, ok := s.(*pass.PassValue)
+			require.True(t, ok)
+			v, err := impl.Marshal()
+			require.NoError(t, err)
+			assert.Equal(t, "bar", string(v))
+			assert.Equal(t, map[string]string{"name": "bob"}, impl.Metadata())
+		})
+		t.Run("from STDIN JSON merged with --metadata flag wins on collision", func(t *testing.T) {
+			mock := teststore.NewMockStore()
+			out, err := executeCommandWithStdin(Root(t.Context(), mock, mockInfo), `{"secret":"bar","metadata":{"name":"bob","extra":"thing"}}`, "set", "foo", "--metadata", "name=alice")
+			assert.NoError(t, err)
+			assert.Empty(t, out)
+			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
+			require.NoError(t, err)
+			impl, ok := s.(*pass.PassValue)
+			require.True(t, ok)
+			v, err := impl.Marshal()
+			require.NoError(t, err)
+			assert.Equal(t, "bar", string(v))
+			assert.Equal(t, map[string]string{"name": "alice", "extra": "thing"}, impl.Metadata())
+		})
+		t.Run("invalid --metadata flag (no =)", func(t *testing.T) {
+			mock := teststore.NewMockStore()
+			_, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar", "--metadata", "invalid")
+			assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
 		})
 		t.Run("store error", func(t *testing.T) {
 			errSave := errors.New("save error")
@@ -88,8 +139,8 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("list", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
+				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
 			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "list")
 			assert.NoError(t, err)
@@ -106,8 +157,8 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("rm", func(t *testing.T) {
 		t.Run("ok (two secrets)", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
+				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
 			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "foo", "baz")
 			assert.NoError(t, err)
@@ -118,8 +169,8 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("--all", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
-				store.MustParseID("baz"): &pass.PassValue{Value: []byte("0")},
+				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
 			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "--all")
 			assert.NoError(t, err)
@@ -158,7 +209,7 @@ func Test_rootCommand(t *testing.T) {
 	t.Run("get", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
+				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 			}))
 			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "get", "foo")
 			assert.NoError(t, err)
@@ -200,7 +251,7 @@ func Test_rootCommandTelemetry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			spanRecorder, metricReader := testhelper.SetupTelemetry(t)
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("baz"): &pass.PassValue{Value: []byte("bar")},
+				store.MustParseID("baz"): pass.NewPassValue([]byte("bar")),
 			}))
 			_, err := executeCommand(Root(t.Context(), mock, mockInfo), tc.args...)
 			assert.NoError(t, err)

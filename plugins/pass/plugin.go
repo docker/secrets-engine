@@ -60,9 +60,13 @@ func unpackValue(id store.ID, secret store.Secret) (*plugin.Envelope, error) {
 	if !ok {
 		return nil, errUnknownSecretType
 	}
+	value, err := impl.Marshal()
+	if err != nil {
+		return nil, err
+	}
 	return &plugin.Envelope{
 		ID:    id,
-		Value: impl.Value,
+		Value: value,
 	}, nil
 }
 
