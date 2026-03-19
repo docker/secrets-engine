@@ -95,7 +95,10 @@ func SetCommand(kc store.Store) *cobra.Command {
 				merged[k] = v
 			}
 
-			pv := &pass.PassValue{Value: []byte(s.val)}
+			pv := &pass.PassValue{}
+			if err := pv.Unmarshal([]byte(s.val)); err != nil {
+				return err
+			}
 			if len(merged) > 0 {
 				if err := pv.SetMetadata(merged); err != nil {
 					return err

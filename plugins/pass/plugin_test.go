@@ -34,7 +34,7 @@ func Test_passPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): &pass.PassValue{Value: []byte("bar")},
+			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
 		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
