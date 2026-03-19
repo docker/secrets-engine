@@ -24,7 +24,8 @@ import (
 var _ store.Secret = &PassValue{}
 
 type PassValue struct {
-	Value []byte `json:"value"`
+	Value    []byte            `json:"value"`
+	metadata map[string]string // not exported; populated via SetMetadata
 }
 
 func (m *PassValue) Marshal() ([]byte, error) {
@@ -37,10 +38,11 @@ func (m *PassValue) Unmarshal(data []byte) error {
 }
 
 func (m *PassValue) Metadata() map[string]string {
-	return nil
+	return m.metadata
 }
 
-func (m *PassValue) SetMetadata(map[string]string) error {
+func (m *PassValue) SetMetadata(md map[string]string) error {
+	m.metadata = md
 	return nil
 }
 
