@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("secret not found")
-	ErrAccessDenied = errors.New("access denied") // nuh, uh, uh!
+	ErrNotFound      = errors.New("secret not found")
+	ErrAccessDenied  = errors.New("access denied") // nuh, uh, uh!
+	ErrAlreadyExists = errors.New("secret already exists")
 )
 
 type Envelope struct {
@@ -45,4 +46,9 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 
 type Resolver interface {
 	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
+}
+
+// Writer allows callers to store secrets in the engine.
+type Writer interface {
+	SaveSecret(ctx context.Context, id ID, value []byte, metadata map[string]string, overwrite bool) error
 }
