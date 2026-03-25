@@ -28,6 +28,7 @@ import (
 	"github.com/docker/secrets-engine/x/api/resolver"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	apistore "github.com/docker/secrets-engine/x/api/store"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
@@ -45,10 +46,14 @@ var (
 	MustParsePattern = secrets.MustParsePattern
 
 	ErrSecretNotFound            = secrets.ErrNotFound
+	ErrSecretAlreadyExists       = secrets.ErrAlreadyExists
 	ErrSecretsEngineNotAvailable = errors.New("secrets engine is not available")
 )
 
-var _ secrets.Resolver = &client{}
+var (
+	_ secrets.Resolver = &client{}
+	_ secrets.Writer   = &client{}
+)
 
 type Option func(c *config) error
 
@@ -120,6 +125,7 @@ type config struct {
 type client struct {
 	resolverClient secrets.Resolver
 	listClient     resolverv1connect.ListServiceClient
+	storeClient    secrets.Writer
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -133,8 +139,17 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 	return envelopes, nil
 }
 
+func (c client) SaveSecret(ctx context.Context, id secrets.ID, value []byte, metadata map[string]string, overwrite bool) error {
+	err := c.storeClient.SaveSecret(ctx, id, value, metadata, overwrite)
+	if isDialError(err) {
+		return fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	return err
+}
+
 type Client interface {
 	secrets.Resolver
+	secrets.Writer
 
 	ListPlugins(ctx context.Context) ([]PluginInfo, error)
 }
@@ -187,6 +202,7 @@ func New(options ...Option) (Client, error) {
 	return &client{
 		resolverClient: resolver.NewResolverClient(c),
 		listClient:     resolverv1connect.NewListServiceClient(c, "http://unix"),
+		storeClient:    apistore.NewStoreClient(c),
 	}, nil
 }
 
