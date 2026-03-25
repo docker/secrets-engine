@@ -59,6 +59,13 @@ func MustNewVersion(s string) Version {
 	return v
 }
 
+// Compare returns an integer comparing two versions according to semantic versioning.
+// The result will be 0 if a == b, -1 if a < b, or +1 if a > b.
+// An invalid semver string is considered less than a valid one.
+func Compare(a, b Version) int {
+	return semver.Compare(a.String(), b.String())
+}
+
 func valid(s string) error {
 	if len(s) > 0 && s[0] != 'v' {
 		return ErrVPrefix

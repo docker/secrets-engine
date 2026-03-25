@@ -25,6 +25,8 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/docker/secrets-engine/x/api"
+	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
+	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	"github.com/docker/secrets-engine/x/api/resolver"
 	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
@@ -32,9 +34,10 @@ import (
 )
 
 type (
-	Envelope = secrets.Envelope
-	ID       = secrets.ID
-	Pattern  = secrets.Pattern
+	Envelope      = secrets.Envelope
+	ID            = secrets.ID
+	Pattern       = secrets.Pattern
+	DaemonVersion = api.DaemonVersion
 )
 
 var (
@@ -120,6 +123,7 @@ type config struct {
 type client struct {
 	resolverClient secrets.Resolver
 	listClient     resolverv1connect.ListServiceClient
+	versionClient  healthv1connect.VersionServiceClient
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -133,8 +137,27 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 	return envelopes, nil
 }
 
+func (c client) Version(ctx context.Context) (DaemonVersion, error) {
+	resp, err := c.versionClient.GetVersion(ctx, connect.NewRequest(healthv1.GetVersionRequest_builder{}.Build()))
+	if isDialError(err) {
+		return DaemonVersion{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	if err != nil {
+		return DaemonVersion{}, err
+	}
+	ver, err := api.NewVersion(resp.Msg.GetVersion())
+	if err != nil {
+		return DaemonVersion{}, fmt.Errorf("parsing daemon version %q: %w", resp.Msg.GetVersion(), err)
+	}
+	return DaemonVersion{Version: ver, Date: resp.Msg.GetDate(), CommitHash: resp.Msg.GetCommitHash()}, nil
+}
+
+// Client is the interface for interacting with the secrets engine daemon.
 type Client interface {
 	secrets.Resolver
+
+	// Version returns the name and version reported by the daemon.
+	Version(ctx context.Context) (DaemonVersion, error)
 
 	ListPlugins(ctx context.Context) ([]PluginInfo, error)
 }
@@ -187,6 +210,7 @@ func New(options ...Option) (Client, error) {
 	return &client{
 		resolverClient: resolver.NewResolverClient(c),
 		listClient:     resolverv1connect.NewListServiceClient(c, "http://unix"),
+		versionClient:  healthv1connect.NewVersionServiceClient(c, "http://unix"),
 	}, nil
 }
 

@@ -21,9 +21,17 @@ if [ ! -d .git ]; then
     exit 1
 fi
 
-if ! git diff --quiet; then
+modified=$(git diff --name-only --diff-filter=d)
+untracked=$(git ls-files --others --exclude-standard)
+
+if [ -n "$modified" ] || [ -n "$untracked" ]; then
     echo "Detected modified files:"
-    git diff --name-only | xargs -I{} cp --parents {} "$1"
+    if [ -n "$modified" ]; then
+        echo "$modified" | xargs -I{} cp --parents {} "$1"
+    fi
+    if [ -n "$untracked" ]; then
+        echo "$untracked" | xargs -I{} cp --parents {} "$1"
+    fi
 else
     echo "No changes detected"
 fi
