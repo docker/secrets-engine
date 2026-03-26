@@ -29,11 +29,36 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/docker/secrets-engine/x/api"
+	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
+	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
+
+var _ healthv1connect.VersionServiceHandler = &mockVersionService{}
+
+type mockVersionService struct {
+	version    string
+	date       string
+	commitHash string
+}
+
+func (m mockVersionService) GetVersion(_ context.Context, _ *connect.Request[healthv1.GetVersionRequest]) (*connect.Response[healthv1.GetVersionResponse], error) {
+	return connect.NewResponse(healthv1.GetVersionResponse_builder{
+		Version:    proto.String(m.version),
+		Date:       proto.String(m.date),
+		CommitHash: proto.String(m.commitHash),
+	}.Build()), nil
+}
+
+func mockVersionEngine(t *testing.T, version, date, commitHash string) string {
+	t.Helper()
+	socketPath := testhelper.RandomShortSocketName()
+	muxServer(t, socketPath, []handler{wrapHandler(healthv1connect.NewVersionServiceHandler(&mockVersionService{version: version, date: date, commitHash: commitHash}))})
+	return socketPath
+}
 
 var _ resolverv1connect.ListServiceHandler = &mockPluginsList{}
 
@@ -166,6 +191,27 @@ func Test_ListPlugins(t *testing.T) {
 				Pattern: secrets.MustParsePattern("**"),
 			},
 		}, result)
+	})
+}
+
+func Test_Version(t *testing.T) {
+	t.Parallel()
+	t.Run("returns version info", func(t *testing.T) {
+		socket := mockVersionEngine(t, "v1.2.3", "2026-03-26", "abc1234")
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+		dv, err := c.Version(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "v1.2.3", dv.Version.String())
+		assert.Equal(t, "2026-03-26", dv.Date)
+		assert.Equal(t, "abc1234", dv.CommitHash)
+	})
+	t.Run("unavailable daemon", func(t *testing.T) {
+		socketPath := testhelper.RandomShortSocketName()
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.Version(t.Context())
+		require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	})
 }
 
