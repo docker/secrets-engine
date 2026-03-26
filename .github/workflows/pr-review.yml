@@ -1,16 +1,26 @@
 name: PR Review
 on:
-  issue_comment:
+  issue_comment: # Enables /review command in PR comments
     types: [created]
-  pull_request_review_comment:
+  pull_request_review_comment: # Captures feedback on review comments for learning
     types: [created]
-  pull_request_target:
+  pull_request: # Triggers auto-review on PR open (same-repo branches only; fork PRs use /review)
     types: [ready_for_review, opened]
+
 permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+  contents: read # Required at top level so `GITHUB_TOKEN` for `issue_comment` events can read repository contents.
+
 jobs:
   review:
-    uses: docker/cagent-action/.github/workflows/review-pr.yml@6ee4111d1f2b1078cf438d955d1c1c5cc48c36c7 # latest
-    secrets: inherit
+    uses: docker/cagent-action/.github/workflows/review-pr.yml@b4ccf4cc94f5b34d1760709012c40975f6def2d1 # v1.3.2
+    # Scoped to the job so other jobs in this workflow aren't over-permissioned
+    permissions:
+      contents: read # Required for issue_comment events to read repository files and PR diffs
+      pull-requests: write # Post review comments and approve/request changes
+      issues: write # Create security incident issues if secrets are detected in output
+      checks: write # (Optional) Show review progress as a check run on the PR
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CAGENT_ORG_MEMBERSHIP_TOKEN: ${{ secrets.CAGENT_ORG_MEMBERSHIP_TOKEN }} # PAT with read:org scope; gates auto-reviews to org members only
+      CAGENT_REVIEWER_APP_ID: ${{ secrets.CAGENT_REVIEWER_APP_ID }} # GitHub App ID; reviews appear as your app instead of github-actions[bot]
+      CAGENT_REVIEWER_APP_PRIVATE_KEY: ${{ secrets.CAGENT_REVIEWER_APP_PRIVATE_KEY }} # GitHub App private key; paired with App ID above
