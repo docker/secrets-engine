@@ -141,10 +141,10 @@ var _ plugin.Plugin = &credentialHelperStore{}
 // https://github.com/docker/cli/blob/master/cli/config/config.go#L24
 const envOverrideConfigDir = "DOCKER_CONFIG"
 
-func getConfigPath() string {
+func getConfigPath() (string,error) {
 	configDir := os.Getenv(envOverrideConfigDir)
 	if configDir != "" {
-		return configDir
+		return configDir,nil
 	}
 
 	// continue with normal config resolution
@@ -155,6 +155,10 @@ func getConfigPath() string {
 			home = u.HomeDir
 		}
 	}
+
+	if home == "" {
+        return "", fmt.Errorf("cannot determine home directory")
+    }
 
 	// there might be a case here where a system does not report a home
 	// directory based on the above steps taken from the CLI.
