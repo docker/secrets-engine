@@ -58,6 +58,8 @@ message Plugin {
   string pattern = 3;
   // External vs builtin
   bool external = 4;
+  // Configurable
+  bool configurable = 5;
 }
 
 message ListPluginsRequest {}

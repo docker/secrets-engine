@@ -309,15 +309,16 @@ func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
 }
 
 type Plugin struct {
-	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Name        *string                `protobuf:"bytes,1,opt,name=name"`
-	xxx_hidden_Version     *string                `protobuf:"bytes,2,opt,name=version"`
-	xxx_hidden_Pattern     *string                `protobuf:"bytes,3,opt,name=pattern"`
-	xxx_hidden_External    bool                   `protobuf:"varint,4,opt,name=external"`
-	XXX_raceDetectHookData protoimpl.RaceDetectHookData
-	XXX_presence           [1]uint32
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Name         *string                `protobuf:"bytes,1,opt,name=name"`
+	xxx_hidden_Version      *string                `protobuf:"bytes,2,opt,name=version"`
+	xxx_hidden_Pattern      *string                `protobuf:"bytes,3,opt,name=pattern"`
+	xxx_hidden_External     bool                   `protobuf:"varint,4,opt,name=external"`
+	xxx_hidden_Configurable bool                   `protobuf:"varint,5,opt,name=configurable"`
+	XXX_raceDetectHookData  protoimpl.RaceDetectHookData
+	XXX_presence            [1]uint32
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Plugin) Reset() {
@@ -382,24 +383,36 @@ func (x *Plugin) GetExternal() bool {
 	return false
 }
 
+func (x *Plugin) GetConfigurable() bool {
+	if x != nil {
+		return x.xxx_hidden_Configurable
+	}
+	return false
+}
+
 func (x *Plugin) SetName(v string) {
 	x.xxx_hidden_Name = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 5)
 }
 
 func (x *Plugin) SetVersion(v string) {
 	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 5)
 }
 
 func (x *Plugin) SetPattern(v string) {
 	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 5)
 }
 
 func (x *Plugin) SetExternal(v bool) {
 	x.xxx_hidden_External = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 5)
+}
+
+func (x *Plugin) SetConfigurable(v bool) {
+	x.xxx_hidden_Configurable = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 5)
 }
 
 func (x *Plugin) HasName() bool {
@@ -430,6 +443,13 @@ func (x *Plugin) HasExternal() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
+func (x *Plugin) HasConfigurable() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
+}
+
 func (x *Plugin) ClearName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_Name = nil
@@ -450,6 +470,11 @@ func (x *Plugin) ClearExternal() {
 	x.xxx_hidden_External = false
 }
 
+func (x *Plugin) ClearConfigurable() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
+	x.xxx_hidden_Configurable = false
+}
+
 type Plugin_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
@@ -461,6 +486,8 @@ type Plugin_builder struct {
 	Pattern *string
 	// External vs builtin
 	External *bool
+	// Configurable
+	Configurable *bool
 }
 
 func (b0 Plugin_builder) Build() *Plugin {
@@ -468,20 +495,24 @@ func (b0 Plugin_builder) Build() *Plugin {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Name != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 5)
 		x.xxx_hidden_Name = b.Name
 	}
 	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 5)
 		x.xxx_hidden_Version = b.Version
 	}
 	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 5)
 		x.xxx_hidden_Pattern = b.Pattern
 	}
 	if b.External != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 5)
 		x.xxx_hidden_External = *b.External
+	}
+	if b.Configurable != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 5)
+		x.xxx_hidden_Configurable = *b.Configurable
 	}
 	return m0
 }
@@ -1093,12 +1124,13 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\vengine_name\x18\x01 \x01(\tR\n" +
 	"engineName\x12%\n" +
 	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12B\n" +
-	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"l\n" +
+	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"\x90\x01\n" +
 	"\x06Plugin\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
 	"\apattern\x18\x03 \x01(\tR\apattern\x12\x1a\n" +
-	"\bexternal\x18\x04 \x01(\bR\bexternal\"\x14\n" +
+	"\bexternal\x18\x04 \x01(\bR\bexternal\x12\"\n" +
+	"\fconfigurable\x18\x05 \x01(\bR\fconfigurable\"\x14\n" +
 	"\x12ListPluginsRequest\"D\n" +
 	"\x13ListPluginsResponse\x12-\n" +
 	"\aplugins\x18\x01 \x03(\v2\x13.resolver.v1.PluginR\aplugins\"\x11\n" +
