@@ -82,10 +82,11 @@ func (m mockPluginsList) ListPlugins(context.Context, *connect.Request[resolverv
 			pattern = plugin.Pattern.String()
 		}
 		plugins = append(plugins, resolverv1.Plugin_builder{
-			Name:     proto.String(name),
-			Version:  proto.String(version),
-			Pattern:  proto.String(pattern),
-			External: proto.Bool(plugin.External),
+			Name:         proto.String(name),
+			Version:      proto.String(version),
+			Pattern:      proto.String(pattern),
+			External:     proto.Bool(plugin.External),
+			Configurable: proto.Bool(plugin.Configurable),
 		}.Build())
 	}
 	return connect.NewResponse(resolverv1.ListPluginsResponse_builder{
@@ -138,12 +139,13 @@ func mockListPluginsEngine(t *testing.T, plugins []PluginInfo) string {
 
 func Test_ListPlugins(t *testing.T) {
 	t.Parallel()
-	t.Run("external and internal plugins", func(t *testing.T) {
+	t.Run("external and internal configurable plugins", func(t *testing.T) {
 		plugins := []PluginInfo{
 			{
-				Name:    api.MustNewName("foo"),
-				Version: api.MustNewVersion("v1"),
-				Pattern: secrets.MustParsePattern("**"),
+				Name:         api.MustNewName("foo"),
+				Version:      api.MustNewVersion("v1"),
+				Pattern:      secrets.MustParsePattern("**"),
+				Configurable: true,
 			},
 			{
 				Name:     api.MustNewName("bar"),

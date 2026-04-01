@@ -238,20 +238,22 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 			continue
 		}
 		result = append(result, PluginInfo{
-			Name:     name,
-			Version:  version,
-			Pattern:  pattern,
-			External: item.GetExternal(),
+			Name:         name,
+			Version:      version,
+			Pattern:      pattern,
+			External:     item.GetExternal(),
+			Configurable: item.GetConfigurable(),
 		})
 	}
 	return result, nil
 }
 
 type PluginInfo struct {
-	Name     api.Name
-	Version  api.Version
-	Pattern  secrets.Pattern
-	External bool
+	Name         api.Name
+	Version      api.Version
+	Pattern      secrets.Pattern
+	External     bool
+	Configurable bool
 }
 
 func dialFromPath(path string) dial {
