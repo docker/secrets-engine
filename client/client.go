@@ -27,9 +27,9 @@ import (
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	"github.com/docker/secrets-engine/x/api/resolver"
-	v1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
@@ -83,7 +83,7 @@ func WithDialContext(dialContext func(ctx context.Context, network, addr string)
 // It is useful to set if there are hard-limits to when the client must wait
 // for the server to accept the request.
 //
-// A timout of 0 means no request timeout will be applied.
+// A timeout of 0 means no request timeout will be applied.
 // Negative durations are not allowed and will result in an error.
 func WithTimeout(timeout time.Duration) Option {
 	return func(s *config) error {
@@ -120,9 +120,14 @@ type config struct {
 	responseTimeout time.Duration
 }
 
+var (
+	_ Client           = &client{}
+	_ PluginManagement = &client{}
+)
+
 type client struct {
 	resolverClient secrets.Resolver
-	listClient     resolverv1connect.ListServiceClient
+	engineClient   pluginsv1connect.PluginManagementServiceClient
 	versionClient  healthv1connect.VersionServiceClient
 }
 
@@ -158,8 +163,20 @@ type Client interface {
 
 	// Version returns the name and version reported by the daemon.
 	Version(ctx context.Context) (DaemonVersion, error)
+}
 
+type PluginManagement interface {
 	ListPlugins(ctx context.Context) ([]PluginInfo, error)
+	EnablePlugin(ctx context.Context, name string) error
+	DisablePlugin(ctx context.Context, name string) error
+}
+
+func PluginManagementFromClient(c Client) (PluginManagement, error) {
+	m, ok := c.(PluginManagement)
+	if !ok {
+		return nil, errors.New("client does not implement PluginManagement")
+	}
+	return m, nil
 }
 
 func isDialError(err error) bool {
@@ -209,14 +226,14 @@ func New(options ...Option) (Client, error) {
 	}
 	return &client{
 		resolverClient: resolver.NewResolverClient(c),
-		listClient:     resolverv1connect.NewListServiceClient(c, "http://unix"),
+		engineClient:   pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
 		versionClient:  healthv1connect.NewVersionServiceClient(c, "http://unix"),
 	}, nil
 }
 
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
-	req := connect.NewRequest(v1.ListPluginsRequest_builder{}.Build())
-	resp, err := c.listClient.ListPlugins(ctx, req)
+	req := connect.NewRequest(pluginsv1.ListPluginsRequest_builder{}.Build())
+	resp, err := c.engineClient.ListPlugins(ctx, req)
 	if isDialError(err) {
 		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
 	}
@@ -233,27 +250,56 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 		if err != nil {
 			continue
 		}
-		pattern, err := secrets.ParsePattern(item.GetPattern())
-		if err != nil {
-			continue
-		}
-		result = append(result, PluginInfo{
+		info := PluginInfo{
 			Name:         name,
 			Version:      version,
-			Pattern:      pattern,
+			Disabled:     item.GetDisabled(),
 			External:     item.GetExternal(),
 			Configurable: item.GetConfigurable(),
-		})
+		}
+		if sp := item.GetSecretsProvider(); sp != nil {
+			pattern, err := secrets.ParsePattern(sp.GetPattern())
+			if err != nil {
+				continue
+			}
+			info.SecretsProvider = &SecretsProviderMetadata{Pattern: pattern}
+		}
+		result = append(result, info)
 	}
 	return result, nil
 }
 
+func (c client) EnablePlugin(ctx context.Context, name string) error {
+	r := pluginsv1.EnablePluginRequest_builder{}.Build()
+	r.SetName(name)
+	_, err := c.engineClient.EnablePlugin(ctx, connect.NewRequest(r))
+	if isDialError(err) {
+		return fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	return err
+}
+
+func (c client) DisablePlugin(ctx context.Context, name string) error {
+	r := pluginsv1.DisablePluginRequest_builder{}.Build()
+	r.SetName(name)
+	_, err := c.engineClient.DisablePlugin(ctx, connect.NewRequest(r))
+	if isDialError(err) {
+		return fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	return err
+}
+
 type PluginInfo struct {
-	Name         api.Name
-	Version      api.Version
-	Pattern      secrets.Pattern
-	External     bool
-	Configurable bool
+	Name            api.Name
+	Version         api.Version
+	Disabled        bool
+	External        bool
+	Configurable    bool
+	SecretsProvider *SecretsProviderMetadata
+}
+
+type SecretsProviderMetadata struct {
+	Pattern secrets.Pattern
 }
 
 func dialFromPath(path string) dial {

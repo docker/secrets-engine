@@ -31,8 +31,8 @@ import (
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -60,14 +60,14 @@ func mockVersionEngine(t *testing.T, version, date, commitHash string) string {
 	return socketPath
 }
 
-var _ resolverv1connect.ListServiceHandler = &mockPluginsList{}
+var _ pluginsv1connect.PluginManagementServiceHandler = &mockPluginsList{}
 
 type mockPluginsList struct {
 	list []PluginInfo
 }
 
-func (m mockPluginsList) ListPlugins(context.Context, *connect.Request[resolverv1.ListPluginsRequest]) (*connect.Response[resolverv1.ListPluginsResponse], error) {
-	var plugins []*resolverv1.Plugin
+func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[pluginsv1.ListPluginsRequest]) (*connect.Response[pluginsv1.ListPluginsResponse], error) {
+	var plugins []*pluginsv1.Plugin
 	for _, plugin := range m.list {
 		var name string
 		if plugin.Name != nil {
@@ -77,21 +77,31 @@ func (m mockPluginsList) ListPlugins(context.Context, *connect.Request[resolverv
 		if plugin.Version != nil {
 			version = plugin.Version.String()
 		}
-		var pattern string
-		if plugin.Pattern != nil {
-			pattern = plugin.Pattern.String()
-		}
-		plugins = append(plugins, resolverv1.Plugin_builder{
+		b := pluginsv1.Plugin_builder{
 			Name:         proto.String(name),
 			Version:      proto.String(version),
-			Pattern:      proto.String(pattern),
+			Disabled:     proto.Bool(plugin.Disabled),
 			External:     proto.Bool(plugin.External),
 			Configurable: proto.Bool(plugin.Configurable),
-		}.Build())
+		}
+		if plugin.SecretsProvider != nil {
+			b.SecretsProvider = pluginsv1.SecretsProvider_builder{
+				Pattern: proto.String(plugin.SecretsProvider.Pattern.String()),
+			}.Build()
+		}
+		plugins = append(plugins, b.Build())
 	}
-	return connect.NewResponse(resolverv1.ListPluginsResponse_builder{
+	return connect.NewResponse(pluginsv1.ListPluginsResponse_builder{
 		Plugins: plugins,
 	}.Build()), nil
+}
+
+func (m mockPluginsList) EnablePlugin(_ context.Context, _ *connect.Request[pluginsv1.EnablePluginRequest]) (*connect.Response[pluginsv1.EnablePluginResponse], error) {
+	return connect.NewResponse(pluginsv1.EnablePluginResponse_builder{}.Build()), nil
+}
+
+func (m mockPluginsList) DisablePlugin(_ context.Context, _ *connect.Request[pluginsv1.DisablePluginRequest]) (*connect.Response[pluginsv1.DisablePluginResponse], error) {
+	return connect.NewResponse(pluginsv1.DisablePluginResponse_builder{}.Build()), nil
 }
 
 type handler struct {
@@ -133,7 +143,7 @@ func wrapHandler(pattern string, h http.Handler) handler {
 func mockListPluginsEngine(t *testing.T, plugins []PluginInfo) string {
 	t.Helper()
 	socketPath := testhelper.RandomShortSocketName()
-	muxServer(t, socketPath, []handler{wrapHandler(resolverv1connect.NewListServiceHandler(&mockPluginsList{list: plugins}))})
+	muxServer(t, socketPath, []handler{wrapHandler(pluginsv1connect.NewPluginManagementServiceHandler(&mockPluginsList{list: plugins}))})
 	return socketPath
 }
 
@@ -142,22 +152,25 @@ func Test_ListPlugins(t *testing.T) {
 	t.Run("external and internal configurable plugins", func(t *testing.T) {
 		plugins := []PluginInfo{
 			{
-				Name:         api.MustNewName("foo"),
-				Version:      api.MustNewVersion("v1"),
-				Pattern:      secrets.MustParsePattern("**"),
-				Configurable: true,
+				Name:            api.MustNewName("foo"),
+				Version:         api.MustNewVersion("v1"),
+				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
+				Configurable:    true,
+				Disabled:        true,
 			},
 			{
-				Name:     api.MustNewName("bar"),
-				Version:  api.MustNewVersion("v1"),
-				Pattern:  secrets.MustParsePattern("**"),
-				External: true,
+				Name:            api.MustNewName("bar"),
+				Version:         api.MustNewVersion("v1"),
+				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
+				External:        true,
 			},
 		}
 		socket := mockListPluginsEngine(t, plugins)
 		client, err := New(WithSocketPath(socket))
 		require.NoError(t, err)
-		result, err := client.ListPlugins(t.Context())
+		m, err := PluginManagementFromClient(client)
+		require.NoError(t, err)
+		result, err := m.ListPlugins(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, plugins, result)
 	})
@@ -166,7 +179,9 @@ func Test_ListPlugins(t *testing.T) {
 		socket := mockListPluginsEngine(t, plugins)
 		client, err := New(WithSocketPath(socket))
 		require.NoError(t, err)
-		result, err := client.ListPlugins(t.Context())
+		m, err := PluginManagementFromClient(client)
+		require.NoError(t, err)
+		result, err := m.ListPlugins(t.Context())
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
@@ -176,21 +191,24 @@ func Test_ListPlugins(t *testing.T) {
 				Name: api.MustNewName("foo"),
 			},
 			{
-				Name:    api.MustNewName("bar"),
-				Version: api.MustNewVersion("v1"),
-				Pattern: secrets.MustParsePattern("**"),
+				Name:            api.MustNewName("bar"),
+				Version:         api.MustNewVersion("v1"),
+				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
 		}
 		socket := mockListPluginsEngine(t, plugins)
 		client, err := New(WithSocketPath(socket))
 		require.NoError(t, err)
-		result, err := client.ListPlugins(t.Context())
+		m, err := PluginManagementFromClient(client)
 		require.NoError(t, err)
+		result, err := m.ListPlugins(t.Context())
+		require.NoError(t, err)
+
 		assert.Equal(t, []PluginInfo{
 			{
-				Name:    api.MustNewName("bar"),
-				Version: api.MustNewVersion("v1"),
-				Pattern: secrets.MustParsePattern("**"),
+				Name:            api.MustNewName("bar"),
+				Version:         api.MustNewVersion("v1"),
+				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
 		}, result)
 	})
@@ -221,7 +239,9 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 	socketPath := testhelper.RandomShortSocketName()
 	client, err := New(WithSocketPath(socketPath))
 	require.NoError(t, err)
-	_, err = client.ListPlugins(t.Context())
+	m, err := PluginManagementFromClient(client)
+	require.NoError(t, err)
+	_, err = m.ListPlugins(t.Context())
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
