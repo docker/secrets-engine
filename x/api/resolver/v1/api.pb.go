@@ -308,317 +308,6 @@ func (b0 RegisterPluginResponse_builder) Build() *RegisterPluginResponse {
 	return m0
 }
 
-type Plugin struct {
-	state                   protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Name         *string                `protobuf:"bytes,1,opt,name=name"`
-	xxx_hidden_Version      *string                `protobuf:"bytes,2,opt,name=version"`
-	xxx_hidden_Pattern      *string                `protobuf:"bytes,3,opt,name=pattern"`
-	xxx_hidden_External     bool                   `protobuf:"varint,4,opt,name=external"`
-	xxx_hidden_Configurable bool                   `protobuf:"varint,5,opt,name=configurable"`
-	XXX_raceDetectHookData  protoimpl.RaceDetectHookData
-	XXX_presence            [1]uint32
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
-}
-
-func (x *Plugin) Reset() {
-	*x = Plugin{}
-	mi := &file_resolver_v1_api_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Plugin) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Plugin) ProtoMessage() {}
-
-func (x *Plugin) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-func (x *Plugin) GetName() string {
-	if x != nil {
-		if x.xxx_hidden_Name != nil {
-			return *x.xxx_hidden_Name
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *Plugin) GetVersion() string {
-	if x != nil {
-		if x.xxx_hidden_Version != nil {
-			return *x.xxx_hidden_Version
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *Plugin) GetPattern() string {
-	if x != nil {
-		if x.xxx_hidden_Pattern != nil {
-			return *x.xxx_hidden_Pattern
-		}
-		return ""
-	}
-	return ""
-}
-
-func (x *Plugin) GetExternal() bool {
-	if x != nil {
-		return x.xxx_hidden_External
-	}
-	return false
-}
-
-func (x *Plugin) GetConfigurable() bool {
-	if x != nil {
-		return x.xxx_hidden_Configurable
-	}
-	return false
-}
-
-func (x *Plugin) SetName(v string) {
-	x.xxx_hidden_Name = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 5)
-}
-
-func (x *Plugin) SetVersion(v string) {
-	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 5)
-}
-
-func (x *Plugin) SetPattern(v string) {
-	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 5)
-}
-
-func (x *Plugin) SetExternal(v bool) {
-	x.xxx_hidden_External = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 5)
-}
-
-func (x *Plugin) SetConfigurable(v bool) {
-	x.xxx_hidden_Configurable = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 5)
-}
-
-func (x *Plugin) HasName() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
-}
-
-func (x *Plugin) HasVersion() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
-}
-
-func (x *Plugin) HasPattern() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
-}
-
-func (x *Plugin) HasExternal() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
-}
-
-func (x *Plugin) HasConfigurable() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
-}
-
-func (x *Plugin) ClearName() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_Name = nil
-}
-
-func (x *Plugin) ClearVersion() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_Version = nil
-}
-
-func (x *Plugin) ClearPattern() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
-	x.xxx_hidden_Pattern = nil
-}
-
-func (x *Plugin) ClearExternal() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
-	x.xxx_hidden_External = false
-}
-
-func (x *Plugin) ClearConfigurable() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
-	x.xxx_hidden_Configurable = false
-}
-
-type Plugin_builder struct {
-	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
-
-	// Name
-	Name *string
-	// Version
-	Version *string
-	// Pattern
-	Pattern *string
-	// External vs builtin
-	External *bool
-	// Configurable
-	Configurable *bool
-}
-
-func (b0 Plugin_builder) Build() *Plugin {
-	m0 := &Plugin{}
-	b, x := &b0, m0
-	_, _ = b, x
-	if b.Name != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 5)
-		x.xxx_hidden_Name = b.Name
-	}
-	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 5)
-		x.xxx_hidden_Version = b.Version
-	}
-	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 5)
-		x.xxx_hidden_Pattern = b.Pattern
-	}
-	if b.External != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 5)
-		x.xxx_hidden_External = *b.External
-	}
-	if b.Configurable != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 5)
-		x.xxx_hidden_Configurable = *b.Configurable
-	}
-	return m0
-}
-
-type ListPluginsRequest struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListPluginsRequest) Reset() {
-	*x = ListPluginsRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListPluginsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListPluginsRequest) ProtoMessage() {}
-
-func (x *ListPluginsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-type ListPluginsRequest_builder struct {
-	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
-
-}
-
-func (b0 ListPluginsRequest_builder) Build() *ListPluginsRequest {
-	m0 := &ListPluginsRequest{}
-	b, x := &b0, m0
-	_, _ = b, x
-	return m0
-}
-
-type ListPluginsResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Plugins *[]*Plugin             `protobuf:"bytes,1,rep,name=plugins"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
-}
-
-func (x *ListPluginsResponse) Reset() {
-	*x = ListPluginsResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListPluginsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListPluginsResponse) ProtoMessage() {}
-
-func (x *ListPluginsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-func (x *ListPluginsResponse) GetPlugins() []*Plugin {
-	if x != nil {
-		if x.xxx_hidden_Plugins != nil {
-			return *x.xxx_hidden_Plugins
-		}
-	}
-	return nil
-}
-
-func (x *ListPluginsResponse) SetPlugins(v []*Plugin) {
-	x.xxx_hidden_Plugins = &v
-}
-
-type ListPluginsResponse_builder struct {
-	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
-
-	Plugins []*Plugin
-}
-
-func (b0 ListPluginsResponse_builder) Build() *ListPluginsResponse {
-	m0 := &ListPluginsResponse{}
-	b, x := &b0, m0
-	_, _ = b, x
-	x.xxx_hidden_Plugins = &b.Plugins
-	return m0
-}
-
 type ShutdownRequest struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -627,7 +316,7 @@ type ShutdownRequest struct {
 
 func (x *ShutdownRequest) Reset() {
 	*x = ShutdownRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[5]
+	mi := &file_resolver_v1_api_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -639,7 +328,7 @@ func (x *ShutdownRequest) String() string {
 func (*ShutdownRequest) ProtoMessage() {}
 
 func (x *ShutdownRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[5]
+	mi := &file_resolver_v1_api_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -670,7 +359,7 @@ type ShutdownResponse struct {
 
 func (x *ShutdownResponse) Reset() {
 	*x = ShutdownResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +371,7 @@ func (x *ShutdownResponse) String() string {
 func (*ShutdownResponse) ProtoMessage() {}
 
 func (x *ShutdownResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[6]
+	mi := &file_resolver_v1_api_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +405,7 @@ type GetSecretsRequest struct {
 
 func (x *GetSecretsRequest) Reset() {
 	*x = GetSecretsRequest{}
-	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	mi := &file_resolver_v1_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +417,7 @@ func (x *GetSecretsRequest) String() string {
 func (*GetSecretsRequest) ProtoMessage() {}
 
 func (x *GetSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[7]
+	mi := &file_resolver_v1_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -793,7 +482,7 @@ type GetSecretsResponse struct {
 
 func (x *GetSecretsResponse) Reset() {
 	*x = GetSecretsResponse{}
-	mi := &file_resolver_v1_api_proto_msgTypes[8]
+	mi := &file_resolver_v1_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -805,7 +494,7 @@ func (x *GetSecretsResponse) String() string {
 func (*GetSecretsResponse) ProtoMessage() {}
 
 func (x *GetSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[8]
+	mi := &file_resolver_v1_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +550,7 @@ type GetSecretsResponse_Envelope struct {
 
 func (x *GetSecretsResponse_Envelope) Reset() {
 	*x = GetSecretsResponse_Envelope{}
-	mi := &file_resolver_v1_api_proto_msgTypes[9]
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +562,7 @@ func (x *GetSecretsResponse_Envelope) String() string {
 func (*GetSecretsResponse_Envelope) ProtoMessage() {}
 
 func (x *GetSecretsResponse_Envelope) ProtoReflect() protoreflect.Message {
-	mi := &file_resolver_v1_api_proto_msgTypes[9]
+	mi := &file_resolver_v1_api_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,16 +813,7 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\vengine_name\x18\x01 \x01(\tR\n" +
 	"engineName\x12%\n" +
 	"\x0eengine_version\x18\x02 \x01(\tR\rengineVersion\x12B\n" +
-	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"\x90\x01\n" +
-	"\x06Plugin\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12\x18\n" +
-	"\apattern\x18\x03 \x01(\tR\apattern\x12\x1a\n" +
-	"\bexternal\x18\x04 \x01(\bR\bexternal\x12\"\n" +
-	"\fconfigurable\x18\x05 \x01(\bR\fconfigurable\"\x14\n" +
-	"\x12ListPluginsRequest\"D\n" +
-	"\x13ListPluginsResponse\x12-\n" +
-	"\aplugins\x18\x01 \x03(\v2\x13.resolver.v1.PluginR\aplugins\"\x11\n" +
+	"\x0frequest_timeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x0erequestTimeout\"\x11\n" +
 	"\x0fShutdownRequest\"\x12\n" +
 	"\x10ShutdownResponse\"-\n" +
 	"\x11GetSecretsRequest\x12\x18\n" +
@@ -1156,9 +836,7 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012l\n" +
 	"\x0fRegisterService\x12Y\n" +
-	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2_\n" +
-	"\vListService\x12P\n" +
-	"\vListPlugins\x12\x1f.resolver.v1.ListPluginsRequest\x1a .resolver.v1.ListPluginsResponse2X\n" +
+	"\x0eRegisterPlugin\x12\".resolver.v1.RegisterPluginRequest\x1a#.resolver.v1.RegisterPluginResponse2X\n" +
 	"\rPluginService\x12G\n" +
 	"\bShutdown\x12\x1c.resolver.v1.ShutdownRequest\x1a\x1d.resolver.v1.ShutdownResponse2`\n" +
 	"\x0fResolverService\x12M\n" +
@@ -1166,43 +844,37 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponseB\xa7\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z=github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
-var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_resolver_v1_api_proto_goTypes = []any{
 	(*RegisterPluginRequest)(nil),       // 0: resolver.v1.RegisterPluginRequest
 	(*RegisterPluginResponse)(nil),      // 1: resolver.v1.RegisterPluginResponse
-	(*Plugin)(nil),                      // 2: resolver.v1.Plugin
-	(*ListPluginsRequest)(nil),          // 3: resolver.v1.ListPluginsRequest
-	(*ListPluginsResponse)(nil),         // 4: resolver.v1.ListPluginsResponse
-	(*ShutdownRequest)(nil),             // 5: resolver.v1.ShutdownRequest
-	(*ShutdownResponse)(nil),            // 6: resolver.v1.ShutdownResponse
-	(*GetSecretsRequest)(nil),           // 7: resolver.v1.GetSecretsRequest
-	(*GetSecretsResponse)(nil),          // 8: resolver.v1.GetSecretsResponse
-	(*GetSecretsResponse_Envelope)(nil), // 9: resolver.v1.GetSecretsResponse.Envelope
-	nil,                                 // 10: resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
-	(*durationpb.Duration)(nil),         // 11: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
+	(*ShutdownRequest)(nil),             // 2: resolver.v1.ShutdownRequest
+	(*ShutdownResponse)(nil),            // 3: resolver.v1.ShutdownResponse
+	(*GetSecretsRequest)(nil),           // 4: resolver.v1.GetSecretsRequest
+	(*GetSecretsResponse)(nil),          // 5: resolver.v1.GetSecretsResponse
+	(*GetSecretsResponse_Envelope)(nil), // 6: resolver.v1.GetSecretsResponse.Envelope
+	nil,                                 // 7: resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	(*durationpb.Duration)(nil),         // 8: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),       // 9: google.protobuf.Timestamp
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	11, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
-	2,  // 1: resolver.v1.ListPluginsResponse.plugins:type_name -> resolver.v1.Plugin
-	9,  // 2: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
-	12, // 3: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
-	12, // 4: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
-	12, // 5: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
-	10, // 6: resolver.v1.GetSecretsResponse.Envelope.metadata:type_name -> resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
-	0,  // 7: resolver.v1.RegisterService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
-	3,  // 8: resolver.v1.ListService.ListPlugins:input_type -> resolver.v1.ListPluginsRequest
-	5,  // 9: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
-	7,  // 10: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
-	1,  // 11: resolver.v1.RegisterService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
-	4,  // 12: resolver.v1.ListService.ListPlugins:output_type -> resolver.v1.ListPluginsResponse
-	6,  // 13: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
-	8,  // 14: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	8, // 0: resolver.v1.RegisterPluginResponse.request_timeout:type_name -> google.protobuf.Duration
+	6, // 1: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
+	9, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
+	9, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
+	9, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
+	7, // 5: resolver.v1.GetSecretsResponse.Envelope.metadata:type_name -> resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	0, // 6: resolver.v1.RegisterService.RegisterPlugin:input_type -> resolver.v1.RegisterPluginRequest
+	2, // 7: resolver.v1.PluginService.Shutdown:input_type -> resolver.v1.ShutdownRequest
+	4, // 8: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
+	1, // 9: resolver.v1.RegisterService.RegisterPlugin:output_type -> resolver.v1.RegisterPluginResponse
+	3, // 10: resolver.v1.PluginService.Shutdown:output_type -> resolver.v1.ShutdownResponse
+	5, // 11: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
+	9, // [9:12] is the sub-list for method output_type
+	6, // [6:9] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }
@@ -1216,9 +888,9 @@ func file_resolver_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   4,
+			NumServices:   3,
 		},
 		GoTypes:           file_resolver_v1_api_proto_goTypes,
 		DependencyIndexes: file_resolver_v1_api_proto_depIdxs,

@@ -44,30 +44,6 @@ message RegisterPluginResponse {
   google.protobuf.Duration request_timeout = 3;
 }
 
-service ListService {
-  // ListPlugins returns all plugins registered with the engine.
-  rpc ListPlugins(ListPluginsRequest) returns (ListPluginsResponse);
-}
-
-message Plugin {
-  // Name
-  string name = 1;
-  // Version
-  string version = 2;
-  // Pattern
-  string pattern = 3;
-  // External vs builtin
-  bool external = 4;
-  // Configurable
-  bool configurable = 5;
-}
-
-message ListPluginsRequest {}
-
-message ListPluginsResponse {
-  repeated Plugin plugins = 1;
-}
-
 service PluginService {
   // Shutdown a plugin (let it know the runtime is going down).
   rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
