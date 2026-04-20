@@ -20,6 +20,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type RunStatus int32
+
+const (
+	RunStatus_RUN_STATUS_UNSPECIFIED      RunStatus = 0
+	RunStatus_RUN_STATUS_RUNNING          RunStatus = 1
+	RunStatus_RUN_STATUS_STOPPED          RunStatus = 2
+	RunStatus_RUN_STATUS_CRASHED          RunStatus = 3
+	RunStatus_RUN_STATUS_RETRIES_EXCEEDED RunStatus = 4
+)
+
+// Enum value maps for RunStatus.
+var (
+	RunStatus_name = map[int32]string{
+		0: "RUN_STATUS_UNSPECIFIED",
+		1: "RUN_STATUS_RUNNING",
+		2: "RUN_STATUS_STOPPED",
+		3: "RUN_STATUS_CRASHED",
+		4: "RUN_STATUS_RETRIES_EXCEEDED",
+	}
+	RunStatus_value = map[string]int32{
+		"RUN_STATUS_UNSPECIFIED":      0,
+		"RUN_STATUS_RUNNING":          1,
+		"RUN_STATUS_STOPPED":          2,
+		"RUN_STATUS_CRASHED":          3,
+		"RUN_STATUS_RETRIES_EXCEEDED": 4,
+	}
+)
+
+func (x RunStatus) Enum() *RunStatus {
+	p := new(RunStatus)
+	*p = x
+	return p
+}
+
+func (x RunStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugins_v1_api_proto_enumTypes[0].Descriptor()
+}
+
+func (RunStatus) Type() protoreflect.EnumType {
+	return &file_plugins_v1_api_proto_enumTypes[0]
+}
+
+func (x RunStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
 type Plugin struct {
 	state                   protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Name         *string                `protobuf:"bytes,1,opt,name=name"`
@@ -27,6 +77,7 @@ type Plugin struct {
 	xxx_hidden_Disabled     bool                   `protobuf:"varint,3,opt,name=disabled"`
 	xxx_hidden_External     bool                   `protobuf:"varint,4,opt,name=external"`
 	xxx_hidden_Configurable bool                   `protobuf:"varint,5,opt,name=configurable"`
+	xxx_hidden_RunStatus    RunStatus              `protobuf:"varint,6,opt,name=run_status,json=runStatus,enum=plugins.v1.RunStatus"`
 	xxx_hidden_Metadata     isPlugin_Metadata      `protobuf_oneof:"metadata"`
 	XXX_raceDetectHookData  protoimpl.RaceDetectHookData
 	XXX_presence            [1]uint32
@@ -100,6 +151,15 @@ func (x *Plugin) GetConfigurable() bool {
 	return false
 }
 
+func (x *Plugin) GetRunStatus() RunStatus {
+	if x != nil {
+		if protoimpl.X.Present(&(x.XXX_presence[0]), 5) {
+			return x.xxx_hidden_RunStatus
+		}
+	}
+	return RunStatus_RUN_STATUS_UNSPECIFIED
+}
+
 func (x *Plugin) GetSecretsProvider() *SecretsProvider {
 	if x != nil {
 		if x, ok := x.xxx_hidden_Metadata.(*plugin_SecretsProvider); ok {
@@ -111,27 +171,32 @@ func (x *Plugin) GetSecretsProvider() *SecretsProvider {
 
 func (x *Plugin) SetName(v string) {
 	x.xxx_hidden_Name = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 6)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 7)
 }
 
 func (x *Plugin) SetVersion(v string) {
 	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 6)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 7)
 }
 
 func (x *Plugin) SetDisabled(v bool) {
 	x.xxx_hidden_Disabled = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 6)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 7)
 }
 
 func (x *Plugin) SetExternal(v bool) {
 	x.xxx_hidden_External = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 6)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 7)
 }
 
 func (x *Plugin) SetConfigurable(v bool) {
 	x.xxx_hidden_Configurable = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 6)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 7)
+}
+
+func (x *Plugin) SetRunStatus(v RunStatus) {
+	x.xxx_hidden_RunStatus = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 7)
 }
 
 func (x *Plugin) SetSecretsProvider(v *SecretsProvider) {
@@ -177,6 +242,13 @@ func (x *Plugin) HasConfigurable() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
 }
 
+func (x *Plugin) HasRunStatus() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 5)
+}
+
 func (x *Plugin) HasMetadata() bool {
 	if x == nil {
 		return false
@@ -217,6 +289,11 @@ func (x *Plugin) ClearConfigurable() {
 	x.xxx_hidden_Configurable = false
 }
 
+func (x *Plugin) ClearRunStatus() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 5)
+	x.xxx_hidden_RunStatus = RunStatus_RUN_STATUS_UNSPECIFIED
+}
+
 func (x *Plugin) ClearMetadata() {
 	x.xxx_hidden_Metadata = nil
 }
@@ -228,7 +305,7 @@ func (x *Plugin) ClearSecretsProvider() {
 }
 
 const Plugin_Metadata_not_set_case case_Plugin_Metadata = 0
-const Plugin_SecretsProvider_case case_Plugin_Metadata = 6
+const Plugin_SecretsProvider_case case_Plugin_Metadata = 7
 
 func (x *Plugin) WhichMetadata() case_Plugin_Metadata {
 	if x == nil {
@@ -255,6 +332,8 @@ type Plugin_builder struct {
 	External *bool
 	// Configurable
 	Configurable *bool
+	// Run status
+	RunStatus *RunStatus
 	// Type-specific fields
 
 	// Fields of oneof xxx_hidden_Metadata:
@@ -267,24 +346,28 @@ func (b0 Plugin_builder) Build() *Plugin {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Name != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 6)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 7)
 		x.xxx_hidden_Name = b.Name
 	}
 	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 6)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 7)
 		x.xxx_hidden_Version = b.Version
 	}
 	if b.Disabled != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 6)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 7)
 		x.xxx_hidden_Disabled = *b.Disabled
 	}
 	if b.External != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 6)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 7)
 		x.xxx_hidden_External = *b.External
 	}
 	if b.Configurable != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 6)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 7)
 		x.xxx_hidden_Configurable = *b.Configurable
+	}
+	if b.RunStatus != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 7)
+		x.xxx_hidden_RunStatus = *b.RunStatus
 	}
 	if b.SecretsProvider != nil {
 		x.xxx_hidden_Metadata = &plugin_SecretsProvider{b.SecretsProvider}
@@ -307,7 +390,7 @@ type isPlugin_Metadata interface {
 }
 
 type plugin_SecretsProvider struct {
-	SecretsProvider *SecretsProvider `protobuf:"bytes,6,opt,name=secrets_provider,json=secretsProvider,oneof"`
+	SecretsProvider *SecretsProvider `protobuf:"bytes,7,opt,name=secrets_provider,json=secretsProvider,oneof"`
 }
 
 func (*plugin_SecretsProvider) isPlugin_Metadata() {}
@@ -740,14 +823,16 @@ var File_plugins_v1_api_proto protoreflect.FileDescriptor
 const file_plugins_v1_api_proto_rawDesc = "" +
 	"\n" +
 	"\x14plugins/v1/api.proto\x12\n" +
-	"plugins.v1\"\xe8\x01\n" +
+	"plugins.v1\"\x9e\x02\n" +
 	"\x06Plugin\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
 	"\bdisabled\x18\x03 \x01(\bR\bdisabled\x12\x1a\n" +
 	"\bexternal\x18\x04 \x01(\bR\bexternal\x12\"\n" +
-	"\fconfigurable\x18\x05 \x01(\bR\fconfigurable\x12H\n" +
-	"\x10secrets_provider\x18\x06 \x01(\v2\x1b.plugins.v1.SecretsProviderH\x00R\x0fsecretsProviderB\n" +
+	"\fconfigurable\x18\x05 \x01(\bR\fconfigurable\x124\n" +
+	"\n" +
+	"run_status\x18\x06 \x01(\x0e2\x15.plugins.v1.RunStatusR\trunStatus\x12H\n" +
+	"\x10secrets_provider\x18\a \x01(\v2\x1b.plugins.v1.SecretsProviderH\x00R\x0fsecretsProviderB\n" +
 	"\n" +
 	"\bmetadata\"+\n" +
 	"\x0fSecretsProvider\x12\x18\n" +
@@ -760,7 +845,13 @@ const file_plugins_v1_api_proto_rawDesc = "" +
 	"\x14EnablePluginResponse\"*\n" +
 	"\x14DisablePluginRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"\x17\n" +
-	"\x15DisablePluginResponse2\x92\x02\n" +
+	"\x15DisablePluginResponse*\x90\x01\n" +
+	"\tRunStatus\x12\x1a\n" +
+	"\x16RUN_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12RUN_STATUS_RUNNING\x10\x01\x12\x16\n" +
+	"\x12RUN_STATUS_STOPPED\x10\x02\x12\x16\n" +
+	"\x12RUN_STATUS_CRASHED\x10\x03\x12\x1f\n" +
+	"\x1bRUN_STATUS_RETRIES_EXCEEDED\x10\x042\x92\x02\n" +
 	"\x17PluginManagementService\x12N\n" +
 	"\vListPlugins\x12\x1e.plugins.v1.ListPluginsRequest\x1a\x1f.plugins.v1.ListPluginsResponse\x12Q\n" +
 	"\fEnablePlugin\x12\x1f.plugins.v1.EnablePluginRequest\x1a .plugins.v1.EnablePluginResponse\x12T\n" +
@@ -769,31 +860,34 @@ const file_plugins_v1_api_proto_rawDesc = "" +
 	"Plugins.V1\xca\x02\n" +
 	"Plugins\\V1\xe2\x02\x16Plugins\\V1\\GPBMetadata\xea\x02\vPlugins::V1b\beditionsp\xe8\a"
 
+var file_plugins_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_plugins_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_plugins_v1_api_proto_goTypes = []any{
-	(*Plugin)(nil),                // 0: plugins.v1.Plugin
-	(*SecretsProvider)(nil),       // 1: plugins.v1.SecretsProvider
-	(*ListPluginsRequest)(nil),    // 2: plugins.v1.ListPluginsRequest
-	(*ListPluginsResponse)(nil),   // 3: plugins.v1.ListPluginsResponse
-	(*EnablePluginRequest)(nil),   // 4: plugins.v1.EnablePluginRequest
-	(*EnablePluginResponse)(nil),  // 5: plugins.v1.EnablePluginResponse
-	(*DisablePluginRequest)(nil),  // 6: plugins.v1.DisablePluginRequest
-	(*DisablePluginResponse)(nil), // 7: plugins.v1.DisablePluginResponse
+	(RunStatus)(0),                // 0: plugins.v1.RunStatus
+	(*Plugin)(nil),                // 1: plugins.v1.Plugin
+	(*SecretsProvider)(nil),       // 2: plugins.v1.SecretsProvider
+	(*ListPluginsRequest)(nil),    // 3: plugins.v1.ListPluginsRequest
+	(*ListPluginsResponse)(nil),   // 4: plugins.v1.ListPluginsResponse
+	(*EnablePluginRequest)(nil),   // 5: plugins.v1.EnablePluginRequest
+	(*EnablePluginResponse)(nil),  // 6: plugins.v1.EnablePluginResponse
+	(*DisablePluginRequest)(nil),  // 7: plugins.v1.DisablePluginRequest
+	(*DisablePluginResponse)(nil), // 8: plugins.v1.DisablePluginResponse
 }
 var file_plugins_v1_api_proto_depIdxs = []int32{
-	1, // 0: plugins.v1.Plugin.secrets_provider:type_name -> plugins.v1.SecretsProvider
-	0, // 1: plugins.v1.ListPluginsResponse.plugins:type_name -> plugins.v1.Plugin
-	2, // 2: plugins.v1.PluginManagementService.ListPlugins:input_type -> plugins.v1.ListPluginsRequest
-	4, // 3: plugins.v1.PluginManagementService.EnablePlugin:input_type -> plugins.v1.EnablePluginRequest
-	6, // 4: plugins.v1.PluginManagementService.DisablePlugin:input_type -> plugins.v1.DisablePluginRequest
-	3, // 5: plugins.v1.PluginManagementService.ListPlugins:output_type -> plugins.v1.ListPluginsResponse
-	5, // 6: plugins.v1.PluginManagementService.EnablePlugin:output_type -> plugins.v1.EnablePluginResponse
-	7, // 7: plugins.v1.PluginManagementService.DisablePlugin:output_type -> plugins.v1.DisablePluginResponse
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: plugins.v1.Plugin.run_status:type_name -> plugins.v1.RunStatus
+	2, // 1: plugins.v1.Plugin.secrets_provider:type_name -> plugins.v1.SecretsProvider
+	1, // 2: plugins.v1.ListPluginsResponse.plugins:type_name -> plugins.v1.Plugin
+	3, // 3: plugins.v1.PluginManagementService.ListPlugins:input_type -> plugins.v1.ListPluginsRequest
+	5, // 4: plugins.v1.PluginManagementService.EnablePlugin:input_type -> plugins.v1.EnablePluginRequest
+	7, // 5: plugins.v1.PluginManagementService.DisablePlugin:input_type -> plugins.v1.DisablePluginRequest
+	4, // 6: plugins.v1.PluginManagementService.ListPlugins:output_type -> plugins.v1.ListPluginsResponse
+	6, // 7: plugins.v1.PluginManagementService.EnablePlugin:output_type -> plugins.v1.EnablePluginResponse
+	8, // 8: plugins.v1.PluginManagementService.DisablePlugin:output_type -> plugins.v1.DisablePluginResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_plugins_v1_api_proto_init() }
@@ -809,13 +903,14 @@ func file_plugins_v1_api_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugins_v1_api_proto_rawDesc), len(file_plugins_v1_api_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_plugins_v1_api_proto_goTypes,
 		DependencyIndexes: file_plugins_v1_api_proto_depIdxs,
+		EnumInfos:         file_plugins_v1_api_proto_enumTypes,
 		MessageInfos:      file_plugins_v1_api_proto_msgTypes,
 	}.Build()
 	File_plugins_v1_api_proto = out.File

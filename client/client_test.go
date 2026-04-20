@@ -83,6 +83,7 @@ func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[plugi
 			Disabled:     proto.Bool(plugin.Disabled),
 			External:     proto.Bool(plugin.External),
 			Configurable: proto.Bool(plugin.Configurable),
+			RunStatus:    plugin.RunStatus.Enum(),
 		}
 		if plugin.SecretsProvider != nil {
 			b.SecretsProvider = pluginsv1.SecretsProvider_builder{
@@ -163,6 +164,7 @@ func Test_ListPlugins(t *testing.T) {
 				Version:         api.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				External:        true,
+				RunStatus:       pluginsv1.RunStatus_RUN_STATUS_CRASHED,
 			},
 		}
 		socket := mockListPluginsEngine(t, plugins)
