@@ -29,6 +29,14 @@ service PluginManagementService {
   rpc DisablePlugin(DisablePluginRequest) returns (DisablePluginResponse);
 }
 
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED      = 0;
+  RUN_STATUS_RUNNING          = 1;
+  RUN_STATUS_STOPPED          = 2;
+  RUN_STATUS_CRASHED          = 3;
+  RUN_STATUS_RETRIES_EXCEEDED = 4;
+}
+
 message Plugin {
   // Name
   string name = 1;
@@ -40,9 +48,11 @@ message Plugin {
   bool external = 4;
   // Configurable
   bool configurable = 5;
+  // Run status
+  RunStatus run_status = 6;
   // Type-specific fields
   oneof metadata {
-    SecretsProvider secrets_provider = 6;
+    SecretsProvider secrets_provider = 7;
   }
 }
 

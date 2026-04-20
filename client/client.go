@@ -256,6 +256,7 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 			Disabled:     item.GetDisabled(),
 			External:     item.GetExternal(),
 			Configurable: item.GetConfigurable(),
+			RunStatus:    item.GetRunStatus(),
 		}
 		if sp := item.GetSecretsProvider(); sp != nil {
 			pattern, err := secrets.ParsePattern(sp.GetPattern())
@@ -295,6 +296,7 @@ type PluginInfo struct {
 	Disabled        bool
 	External        bool
 	Configurable    bool
+	RunStatus       pluginsv1.RunStatus
 	SecretsProvider *SecretsProviderMetadata
 }
 

@@ -26,8 +26,8 @@ github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/containerd/nri v0.10.0
-## explicit; go 1.24.3
+# github.com/containerd/nri v0.11.0
+## explicit; go 1.24.0
 github.com/containerd/nri/pkg/net
 # github.com/danieljoos/wincred v1.2.3
 ## explicit; go 1.18
