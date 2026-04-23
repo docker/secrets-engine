@@ -27,6 +27,7 @@ func ListCommand(kc store.Store) *cobra.Command {
 		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List all secrets from local keychain.",
+		Long:    "Lists the names of all secrets stored in the local OS keychain.",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			l, err := kc.GetAllMetadata(cmd.Context())

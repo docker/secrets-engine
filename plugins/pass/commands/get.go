@@ -28,6 +28,7 @@ func GetCommand(kc store.Store) *cobra.Command {
 		Use:   "get",
 		Args:  cobra.ExactArgs(1),
 		Short: "Get a secret from a keystore.",
+		Long:  "Retrieves a named secret from the local OS keychain. The secret value is masked in output.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := store.ParseID(args[0])
 			if err != nil {
