@@ -116,9 +116,8 @@ func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.
 	cmd := &cobra.Command{
 		Use:   "pass set|get|ls|rm",
 		Short: "Manage your local OS keychain secrets.",
-		Long: `Docker Pass is an experimental utility for managing secrets in your
-local OS keychain. Secrets are stored using platform-specific credential
-storage:
+		Long: `Docker Pass is a helper for securely storing secrets in your local OS keychain and injecting them into containers when needed. 
+It uses platform-specific credential storage:
 
   - Windows: Windows Credential Manager API
   - macOS:   Keychain services API
