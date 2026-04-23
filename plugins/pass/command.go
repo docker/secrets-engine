@@ -17,6 +17,7 @@ package pass
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
@@ -47,10 +48,73 @@ Examples:
 {{.Example}}{{end}}
 `
 
+const rootExample = `
+### Using keychain secrets in containers
+
+Create a secret:
+
+` + "```" + `console
+$ docker pass set GH_TOKEN=123456789
+` + "```" + `
+
+Create a secret from STDIN:
+
+` + "```" + `console
+echo "my_val" | docker pass set GH_TOKEN
+` + "```" + `
+
+Run a container that uses the secret:
+
+` + "```" + `console
+$ docker run -e GH_TOKEN= -dt --name demo busybox
+` + "```" + `
+
+Inspect the secret from inside the container:
+
+` + "```" + `console
+$ docker exec demo sh -c 'echo $GH_TOKEN'
+123456789
+` + "```" + `
+
+Explicitly assign a secret to a different environment variable:
+
+` + "```" + `console
+$ docker run -e GITHUB_TOKEN=se://GH_TOKEN -dt --name demo busybox
+` + "```" + `
+
+### Using keychain secrets in Compose
+
+Store the secrets:
+
+` + "```" + `console
+$ docker pass set myapp/anthropic/api-key=sk-ant-...
+$ docker pass set myapp/postgres/password=s3cr3t
+` + "```" + `
+
+` + "```" + `yaml
+services:
+  api:
+    image: service1
+    environment:
+      - ANTHROPIC_API_KEY=se://myapp/anthropic/api-key
+      - POSTGRES_PASSWORD=se://myapp/postgres/password
+
+  worker:
+    image: service2
+    command: worker
+    environment:
+      - ANTHROPIC_API_KEY=se://myapp/anthropic/api-key
+
+  db:
+    image: postgres:17
+    environment:
+      - POSTGRES_PASSWORD=se://myapp/postgres/password
+` + "```"
+
 // Root returns the root command for the docker-pass CLI plugin
 func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "pass [OPTIONS]",
+		Use:   "pass set|get|ls|rm",
 		Short: "Manage your local OS keychain secrets.",
 		Long: `Docker Pass is an experimental utility for managing secrets in your
 local OS keychain. Secrets are stored using platform-specific credential
@@ -61,6 +125,7 @@ storage:
   - Linux:   org.freedesktop.secrets API (requires DBus + gnome-keyring or kdewallet)
 
 Secrets can be injected into running containers at runtime using the se:// URI scheme.`,
+		Example:          strings.TrimSpace(rootExample),
 		SilenceUsage:     true,
 		TraverseChildren: true,
 		CompletionOptions: cobra.CompletionOptions{

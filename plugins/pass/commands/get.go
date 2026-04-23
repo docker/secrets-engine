@@ -25,7 +25,7 @@ import (
 
 func GetCommand(kc store.Store) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get",
+		Use:   "get NAME",
 		Args:  cobra.ExactArgs(1),
 		Short: "Get a secret from a keystore.",
 		Long:  "Retrieves a named secret from the local OS keychain. The secret value is masked in output.",
