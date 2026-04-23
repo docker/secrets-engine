@@ -30,17 +30,17 @@ import (
 )
 
 const setExample = `
-# Set a secret:
+### Set a secret:
 docker pass set POSTGRES_PASSWORD=my-secret-password
 
-# Or pass the secret via STDIN:
+### Or pass the secret via STDIN:
 echo my-secret-password > pwd.txt
 cat pwd.txt | docker pass set POSTGRES_PASSWORD
 
-# Set a secret with metadata:
+### Set a secret with metadata:
 docker pass set POSTGRES_PASSWORD=my-secret-password --metadata owner=alice --metadata expiry=2027-03-01
 
-# Or pass a JSON payload with secret and metadata via STDIN:
+### Or pass a JSON payload with secret and metadata via STDIN:
 echo '{"secret":"my-secret-password","metadata":{"owner":"alice"}}' | docker pass set POSTGRES_PASSWORD
 `
 
