@@ -50,7 +50,17 @@ Examples:
 // Root returns the root command for the docker-pass CLI plugin
 func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:              "pass [OPTIONS]",
+		Use:   "pass [OPTIONS]",
+		Short: "Manage your local OS keychain secrets.",
+		Long: `Docker Pass is an experimental utility for managing secrets in your
+local OS keychain. Secrets are stored using platform-specific credential
+storage:
+
+  - Windows: Windows Credential Manager API
+  - macOS:   Keychain services API
+  - Linux:   org.freedesktop.secrets API (requires DBus + gnome-keyring or kdewallet)
+
+Secrets can be injected into running containers at runtime using the se:// URI scheme.`,
 		SilenceUsage:     true,
 		TraverseChildren: true,
 		CompletionOptions: cobra.CompletionOptions{

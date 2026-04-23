@@ -59,6 +59,8 @@ func SetCommand(kc store.Store) *cobra.Command {
 		Use:     "set id[=value]",
 		Aliases: []string{"store", "save"},
 		Short:   "Set a secret",
+		Long: `Stores a secret in the local OS keychain. The secret value can be
+provided inline (NAME=VALUE) or piped via STDIN.`,
 		Example: strings.Trim(setExample, "\n"),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
