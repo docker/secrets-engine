@@ -251,12 +251,13 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 			continue
 		}
 		info := PluginInfo{
-			Name:         name,
-			Version:      version,
-			Disabled:     item.GetDisabled(),
-			External:     item.GetExternal(),
-			Configurable: item.GetConfigurable(),
-			RunStatus:    item.GetRunStatus(),
+			Name:          name,
+			Version:       version,
+			Disabled:      item.GetDisabled(),
+			External:      item.GetExternal(),
+			Configurable:  item.GetConfigurable(),
+			RunStatus:     item.GetRunStatus(),
+			StatusMessage: item.GetStatusMessage(),
 		}
 		if sp := item.GetSecretsProvider(); sp != nil {
 			pattern, err := secrets.ParsePattern(sp.GetPattern())
@@ -297,6 +298,7 @@ type PluginInfo struct {
 	External        bool
 	Configurable    bool
 	RunStatus       pluginsv1.RunStatus
+	StatusMessage   string
 	SecretsProvider *SecretsProviderMetadata
 }
 

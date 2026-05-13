@@ -50,9 +50,13 @@ message Plugin {
   bool configurable = 5;
   // Run status
   RunStatus run_status = 6;
+  // Human-readable detail for the current run_status. Populated for
+  // terminal/error statuses (CRASHED, RETRIES_EXCEEDED); typically empty
+  // otherwise. Not machine-parseable — intended for display only.
+  string status_message = 7;
   // Type-specific fields
   oneof metadata {
-    SecretsProvider secrets_provider = 7;
+    SecretsProvider secrets_provider = 8;
   }
 }
 

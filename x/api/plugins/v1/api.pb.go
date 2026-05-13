@@ -71,18 +71,19 @@ func (x RunStatus) Number() protoreflect.EnumNumber {
 }
 
 type Plugin struct {
-	state                   protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Name         *string                `protobuf:"bytes,1,opt,name=name"`
-	xxx_hidden_Version      *string                `protobuf:"bytes,2,opt,name=version"`
-	xxx_hidden_Disabled     bool                   `protobuf:"varint,3,opt,name=disabled"`
-	xxx_hidden_External     bool                   `protobuf:"varint,4,opt,name=external"`
-	xxx_hidden_Configurable bool                   `protobuf:"varint,5,opt,name=configurable"`
-	xxx_hidden_RunStatus    RunStatus              `protobuf:"varint,6,opt,name=run_status,json=runStatus,enum=plugins.v1.RunStatus"`
-	xxx_hidden_Metadata     isPlugin_Metadata      `protobuf_oneof:"metadata"`
-	XXX_raceDetectHookData  protoimpl.RaceDetectHookData
-	XXX_presence            [1]uint32
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Name          *string                `protobuf:"bytes,1,opt,name=name"`
+	xxx_hidden_Version       *string                `protobuf:"bytes,2,opt,name=version"`
+	xxx_hidden_Disabled      bool                   `protobuf:"varint,3,opt,name=disabled"`
+	xxx_hidden_External      bool                   `protobuf:"varint,4,opt,name=external"`
+	xxx_hidden_Configurable  bool                   `protobuf:"varint,5,opt,name=configurable"`
+	xxx_hidden_RunStatus     RunStatus              `protobuf:"varint,6,opt,name=run_status,json=runStatus,enum=plugins.v1.RunStatus"`
+	xxx_hidden_StatusMessage *string                `protobuf:"bytes,7,opt,name=status_message,json=statusMessage"`
+	xxx_hidden_Metadata      isPlugin_Metadata      `protobuf_oneof:"metadata"`
+	XXX_raceDetectHookData   protoimpl.RaceDetectHookData
+	XXX_presence             [1]uint32
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *Plugin) Reset() {
@@ -160,6 +161,16 @@ func (x *Plugin) GetRunStatus() RunStatus {
 	return RunStatus_RUN_STATUS_UNSPECIFIED
 }
 
+func (x *Plugin) GetStatusMessage() string {
+	if x != nil {
+		if x.xxx_hidden_StatusMessage != nil {
+			return *x.xxx_hidden_StatusMessage
+		}
+		return ""
+	}
+	return ""
+}
+
 func (x *Plugin) GetSecretsProvider() *SecretsProvider {
 	if x != nil {
 		if x, ok := x.xxx_hidden_Metadata.(*plugin_SecretsProvider); ok {
@@ -171,32 +182,37 @@ func (x *Plugin) GetSecretsProvider() *SecretsProvider {
 
 func (x *Plugin) SetName(v string) {
 	x.xxx_hidden_Name = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 8)
 }
 
 func (x *Plugin) SetVersion(v string) {
 	x.xxx_hidden_Version = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 8)
 }
 
 func (x *Plugin) SetDisabled(v bool) {
 	x.xxx_hidden_Disabled = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 8)
 }
 
 func (x *Plugin) SetExternal(v bool) {
 	x.xxx_hidden_External = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 8)
 }
 
 func (x *Plugin) SetConfigurable(v bool) {
 	x.xxx_hidden_Configurable = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 8)
 }
 
 func (x *Plugin) SetRunStatus(v RunStatus) {
 	x.xxx_hidden_RunStatus = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 8)
+}
+
+func (x *Plugin) SetStatusMessage(v string) {
+	x.xxx_hidden_StatusMessage = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 6, 8)
 }
 
 func (x *Plugin) SetSecretsProvider(v *SecretsProvider) {
@@ -249,6 +265,13 @@ func (x *Plugin) HasRunStatus() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 5)
 }
 
+func (x *Plugin) HasStatusMessage() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 6)
+}
+
 func (x *Plugin) HasMetadata() bool {
 	if x == nil {
 		return false
@@ -294,6 +317,11 @@ func (x *Plugin) ClearRunStatus() {
 	x.xxx_hidden_RunStatus = RunStatus_RUN_STATUS_UNSPECIFIED
 }
 
+func (x *Plugin) ClearStatusMessage() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 6)
+	x.xxx_hidden_StatusMessage = nil
+}
+
 func (x *Plugin) ClearMetadata() {
 	x.xxx_hidden_Metadata = nil
 }
@@ -305,7 +333,7 @@ func (x *Plugin) ClearSecretsProvider() {
 }
 
 const Plugin_Metadata_not_set_case case_Plugin_Metadata = 0
-const Plugin_SecretsProvider_case case_Plugin_Metadata = 7
+const Plugin_SecretsProvider_case case_Plugin_Metadata = 8
 
 func (x *Plugin) WhichMetadata() case_Plugin_Metadata {
 	if x == nil {
@@ -334,6 +362,10 @@ type Plugin_builder struct {
 	Configurable *bool
 	// Run status
 	RunStatus *RunStatus
+	// Human-readable detail for the current run_status. Populated for
+	// terminal/error statuses (CRASHED, RETRIES_EXCEEDED); typically empty
+	// otherwise. Not machine-parseable — intended for display only.
+	StatusMessage *string
 	// Type-specific fields
 
 	// Fields of oneof xxx_hidden_Metadata:
@@ -346,28 +378,32 @@ func (b0 Plugin_builder) Build() *Plugin {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Name != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 8)
 		x.xxx_hidden_Name = b.Name
 	}
 	if b.Version != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 8)
 		x.xxx_hidden_Version = b.Version
 	}
 	if b.Disabled != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 8)
 		x.xxx_hidden_Disabled = *b.Disabled
 	}
 	if b.External != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 8)
 		x.xxx_hidden_External = *b.External
 	}
 	if b.Configurable != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 8)
 		x.xxx_hidden_Configurable = *b.Configurable
 	}
 	if b.RunStatus != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 8)
 		x.xxx_hidden_RunStatus = *b.RunStatus
+	}
+	if b.StatusMessage != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 6, 8)
+		x.xxx_hidden_StatusMessage = b.StatusMessage
 	}
 	if b.SecretsProvider != nil {
 		x.xxx_hidden_Metadata = &plugin_SecretsProvider{b.SecretsProvider}
@@ -390,7 +426,7 @@ type isPlugin_Metadata interface {
 }
 
 type plugin_SecretsProvider struct {
-	SecretsProvider *SecretsProvider `protobuf:"bytes,7,opt,name=secrets_provider,json=secretsProvider,oneof"`
+	SecretsProvider *SecretsProvider `protobuf:"bytes,8,opt,name=secrets_provider,json=secretsProvider,oneof"`
 }
 
 func (*plugin_SecretsProvider) isPlugin_Metadata() {}
@@ -823,7 +859,7 @@ var File_plugins_v1_api_proto protoreflect.FileDescriptor
 const file_plugins_v1_api_proto_rawDesc = "" +
 	"\n" +
 	"\x14plugins/v1/api.proto\x12\n" +
-	"plugins.v1\"\x9e\x02\n" +
+	"plugins.v1\"\xc5\x02\n" +
 	"\x06Plugin\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
@@ -831,8 +867,9 @@ const file_plugins_v1_api_proto_rawDesc = "" +
 	"\bexternal\x18\x04 \x01(\bR\bexternal\x12\"\n" +
 	"\fconfigurable\x18\x05 \x01(\bR\fconfigurable\x124\n" +
 	"\n" +
-	"run_status\x18\x06 \x01(\x0e2\x15.plugins.v1.RunStatusR\trunStatus\x12H\n" +
-	"\x10secrets_provider\x18\a \x01(\v2\x1b.plugins.v1.SecretsProviderH\x00R\x0fsecretsProviderB\n" +
+	"run_status\x18\x06 \x01(\x0e2\x15.plugins.v1.RunStatusR\trunStatus\x12%\n" +
+	"\x0estatus_message\x18\a \x01(\tR\rstatusMessage\x12H\n" +
+	"\x10secrets_provider\x18\b \x01(\v2\x1b.plugins.v1.SecretsProviderH\x00R\x0fsecretsProviderB\n" +
 	"\n" +
 	"\bmetadata\"+\n" +
 	"\x0fSecretsProvider\x12\x18\n" +

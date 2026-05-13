@@ -78,12 +78,13 @@ func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[plugi
 			version = plugin.Version.String()
 		}
 		b := pluginsv1.Plugin_builder{
-			Name:         proto.String(name),
-			Version:      proto.String(version),
-			Disabled:     proto.Bool(plugin.Disabled),
-			External:     proto.Bool(plugin.External),
-			Configurable: proto.Bool(plugin.Configurable),
-			RunStatus:    plugin.RunStatus.Enum(),
+			Name:          proto.String(name),
+			Version:       proto.String(version),
+			Disabled:      proto.Bool(plugin.Disabled),
+			External:      proto.Bool(plugin.External),
+			Configurable:  proto.Bool(plugin.Configurable),
+			RunStatus:     plugin.RunStatus.Enum(),
+			StatusMessage: proto.String(plugin.StatusMessage),
 		}
 		if plugin.SecretsProvider != nil {
 			b.SecretsProvider = pluginsv1.SecretsProvider_builder{
@@ -165,6 +166,7 @@ func Test_ListPlugins(t *testing.T) {
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				External:        true,
 				RunStatus:       pluginsv1.RunStatus_RUN_STATUS_CRASHED,
+				StatusMessage:   "exit status 1: connection refused",
 			},
 		}
 		socket := mockListPluginsEngine(t, plugins)
