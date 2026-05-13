@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/plugins/pass
 
-go 1.25.8
+go 1.25.10
 
 replace github.com/docker/secrets-engine/store => ./../../store
 
