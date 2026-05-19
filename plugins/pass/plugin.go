@@ -21,6 +21,7 @@ import (
 	"github.com/docker/secrets-engine/plugin"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/realms"
 )
 
 var _ plugin.Plugin = &passPlugin{}
@@ -40,6 +41,10 @@ func (m *passPlugin) GetSecrets(ctx context.Context, pattern plugin.Pattern) ([]
 
 	var result []plugin.Envelope
 	for id, value := range list {
+		// Skip secrets-engine's own secrets so plugin callers never see internal state.
+		if realms.SecretsEngine.Match(id) {
+			continue
+		}
 		s, err := unpackValue(id, value)
 		if err != nil {
 			m.logger.Errorf("unwrapping secret '%s': %s", id, err)

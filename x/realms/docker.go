@@ -57,3 +57,10 @@ var (
 	// such as third-party tokens - this does not store the Docker Auth tokens.
 	DockerSandboxOAuth = secrets.MustParsePattern("docker/sandbox/oauth/**")
 )
+
+var (
+	// SecretsEngine is the default realm used for secrets-engine related secrets.
+	SecretsEngine = secrets.MustParsePattern("docker/secrets-engine/**")
+	// SecretsEnginePlugins is the realm used to store credentials and configuration for secrets-engine plugins.
+	SecretsEnginePlugins = secrets.MustParsePattern("docker/secrets-engine/plugins/**")
+)
