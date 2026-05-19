@@ -10,8 +10,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/docker/docker-credential-helpers v0.9.4 h1:76ItO69/AP/V4yT9V4uuuItG0B1N8hvt0T0c0NN/DzI=
 github.com/docker/docker-credential-helpers v0.9.4/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
-github.com/docker/secrets-engine/x v0.0.31-do.not.use h1:tQaKgf6c6Ad7wa9n4aT1uvOheG9Qra8QSa6nFMMZLBo=
-github.com/docker/secrets-engine/x v0.0.31-do.not.use/go.mod h1:hBrA0SZBNoa/VR58bwKUg9N/HRDVjO5SYcd5IjdB8zk=
+github.com/docker/secrets-engine/x v0.0.32-do.not.use h1:Q+RjHA+w6Yoot2N2iNdq5U1eE/bahzkSSz2i6txae/o=
+github.com/docker/secrets-engine/x v0.0.32-do.not.use/go.mod h1:hBrA0SZBNoa/VR58bwKUg9N/HRDVjO5SYcd5IjdB8zk=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
