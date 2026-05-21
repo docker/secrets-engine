@@ -114,7 +114,7 @@ services:
 // Root returns the root command for the docker-pass CLI plugin
 func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "pass set|get|ls|rm",
+		Use:   "pass set|get|ls|rm|run",
 		Short: "Manage your local OS keychain secrets.",
 		Long: `Docker Pass is a helper for securely storing secrets in your local OS keychain and injecting them into containers when needed. 
 It uses platform-specific credential storage:
@@ -146,6 +146,7 @@ Secrets can be injected into running containers at runtime using the se:// URI s
 	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.RunCommand()))
 	cmd.AddCommand(commands.VersionCommand(info))
 
 	return cmd
