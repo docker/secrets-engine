@@ -15,12 +15,18 @@
 package commands
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +44,7 @@ const (
 	helperWrapperEnv = "GO_PASS_RUN_WRAPPER"
 	helperActiveEnv  = "GO_PASS_RUN_HELPER_ACTIVE"
 	helperExitEnv    = "GO_PASS_RUN_HELPER_EXIT"
+	helperSleepEnv   = "GO_PASS_RUN_HELPER_SLEEP"
 )
 
 func TestMain(m *testing.M) {
@@ -48,6 +55,13 @@ func TestMain(m *testing.M) {
 		return // unreachable; runAsWrapper exits
 	}
 	if os.Getenv(helperActiveEnv) != "" {
+		if os.Getenv(helperSleepEnv) != "" {
+			// Signal-handling test: announce readiness, then block until a
+			// signal kills us with its default disposition (so the wrapper
+			// observes a signaled exit, not a normal one).
+			_, _ = fmt.Fprintln(os.Stderr, "READY")
+			select {}
+		}
 		code := 0
 		if v := os.Getenv(helperExitEnv); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
@@ -192,6 +206,54 @@ func TestRunCommand(t *testing.T) {
 		require.True(t, errors.As(err, &exitErr), "expected ExitError, got %v", err)
 		assert.Equal(t, 42, exitErr.ExitCode())
 	})
+
+	t.Run("forwards SIGINT and exits 130", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("SIGINT cross-process semantics differ on Windows")
+		}
+
+		sub := exec.CommandContext(t.Context(), exe)
+		sub.Env = append(os.Environ(),
+			helperWrapperEnv+"=1",
+			helperActiveEnv+"=1",
+			helperSleepEnv+"=1",
+		)
+		stderr, err := sub.StderrPipe()
+		require.NoError(t, err)
+		require.NoError(t, sub.Start())
+
+		waitForReady(t, stderr)
+
+		require.NoError(t, sub.Process.Signal(syscall.SIGINT))
+
+		err = sub.Wait()
+		var exitErr *exec.ExitError
+		require.True(t, errors.As(err, &exitErr), "expected ExitError, got %v", err)
+		assert.Equal(t, 130, exitErr.ExitCode())
+	})
+}
+
+func waitForReady(t *testing.T, r io.Reader) {
+	t.Helper()
+	scanner := bufio.NewScanner(r)
+	done := make(chan bool, 1)
+	go func() {
+		for scanner.Scan() {
+			if scanner.Text() == "READY" {
+				done <- true
+				return
+			}
+		}
+		done <- false
+	}()
+	select {
+	case ok := <-done:
+		require.True(t, ok, "subprocess closed stderr before printing READY")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for READY from subprocess")
+	}
+	// Drain remaining stderr in the background so the pipe never blocks.
+	go func() { _, _ = io.Copy(io.Discard, r) }()
 }
 
 // testWriter forwards cobra output to t.Log so it does not leak onto stderr.

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -67,18 +68,43 @@ started and exits non-zero.`,
 				return err
 			}
 
-			child := exec.CommandContext(cmd.Context(), args[0], args[1:]...)
+			// No CommandContext: the signal forwarder owns the child's
+			// lifecycle. Tying the child to cmd.Context() would let cobra's
+			// ctx cancellation SIGKILL the child out from under the forwarder.
+			child := exec.Command(args[0], args[1:]...)
 			child.Env = env
 			child.Stdin = os.Stdin
 			child.Stdout = os.Stdout
 			child.Stderr = os.Stderr
 
-			if err := child.Run(); err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					os.Exit(exitErr.ExitCode())
-				}
+			if err := child.Start(); err != nil {
 				return err
+			}
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, forwardableSignals()...)
+			done := make(chan struct{})
+			go func() {
+				for {
+					select {
+					case sig := <-sigCh:
+						_ = child.Process.Signal(sig)
+					case <-done:
+						return
+					}
+				}
+			}()
+
+			waitErr := child.Wait()
+			signal.Stop(sigCh)
+			close(done)
+
+			if waitErr != nil {
+				var exitErr *exec.ExitError
+				if errors.As(waitErr, &exitErr) {
+					os.Exit(childExitCode(exitErr.ProcessState))
+				}
+				return waitErr
 			}
 			return nil
 		},
