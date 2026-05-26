@@ -18,6 +18,7 @@ package commands
 
 import (
 	"os"
+	"os/exec"
 	"syscall"
 )
 
@@ -26,6 +27,15 @@ import (
 // a child process.
 func forwardableSignals() []os.Signal {
 	return []os.Signal{syscall.SIGINT}
+}
+
+// configureChildProcGroup is a no-op on Windows. Windows has no Unix-style
+// process groups; job objects are the rough equivalent but aren't needed for
+// the forwarding contract here.
+func configureChildProcGroup(_ *exec.Cmd) {}
+
+func signalChild(child *exec.Cmd, sig os.Signal) error {
+	return child.Process.Signal(sig)
 }
 
 // Windows does not surface a signaled-process state through ProcessState;

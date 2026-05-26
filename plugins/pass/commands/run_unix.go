@@ -18,11 +18,35 @@ package commands
 
 import (
 	"os"
+	"os/exec"
 	"syscall"
 )
 
 func forwardableSignals() []os.Signal {
 	return []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP}
+}
+
+// configureChildProcGroup puts the child into its own process group. Without
+// this, the TTY driver delivers terminal-generated signals (Ctrl-C → SIGINT,
+// Ctrl-\ → SIGQUIT) to every process in the parent's foreground group,
+// double-delivering them: once by the TTY directly and once by our forwarder.
+// Isolating the child means the forwarder becomes the sole dispatcher.
+func configureChildProcGroup(child *exec.Cmd) {
+	if child.SysProcAttr == nil {
+		child.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	child.SysProcAttr.Setpgid = true
+}
+
+// signalChild delivers sig to the child's whole process group so that any
+// subprocesses the child spawned also receive the signal (e.g. `bash -c
+// "sleep 100"` should interrupt the sleep, not just the shell).
+func signalChild(child *exec.Cmd, sig os.Signal) error {
+	sysSig, ok := sig.(syscall.Signal)
+	if !ok {
+		return child.Process.Signal(sig)
+	}
+	return syscall.Kill(-child.Process.Pid, sysSig)
 }
 
 func childExitCode(state *os.ProcessState) int {

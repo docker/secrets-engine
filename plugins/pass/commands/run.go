@@ -89,6 +89,10 @@ started and exits non-zero.`,
 			child.Stdin = os.Stdin
 			child.Stdout = os.Stdout
 			child.Stderr = os.Stderr
+			// Isolate the child in its own process group so that
+			// terminal-generated signals (Ctrl-C) are delivered to us alone;
+			// the forwarder is then the sole path that reaches the child.
+			configureChildProcGroup(child)
 
 			// Install the signal handler before Start so a signal arriving in
 			// the window between fork and the forwarder goroutine cannot kill
@@ -106,7 +110,7 @@ started and exits non-zero.`,
 				for {
 					select {
 					case sig := <-sigCh:
-						_ = child.Process.Signal(sig)
+						_ = signalChild(child, sig)
 					case <-done:
 						return
 					}
