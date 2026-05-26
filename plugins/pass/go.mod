@@ -2,11 +2,14 @@ module github.com/docker/secrets-engine/plugins/pass
 
 go 1.25.10
 
+replace github.com/docker/secrets-engine/client => ./../../client
+
 replace github.com/docker/secrets-engine/store => ./../../store
 
 replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
+	github.com/docker/secrets-engine/client v0.0.9
 	github.com/docker/secrets-engine/plugin v0.0.22
 	github.com/docker/secrets-engine/store v0.0.23
 	github.com/docker/secrets-engine/x v0.0.32-do.not.use
