@@ -122,7 +122,7 @@ func TestFlock(t *testing.T) {
 		require.NoError(t, unlock())
 	})
 
-	t.Run("caller context can wait past former default timeout", func(t *testing.T) {
+	t.Run("acquires lock when holder releases before ctx deadline", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
 		t.Cleanup(func() {

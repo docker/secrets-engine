@@ -77,20 +77,21 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 	}
 	err = errors.Join(ErrLockUnsuccessful, err)
 
-	if ctx.Err() == nil {
-		if recoverErr := recoverStaleLock(root, fl); recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
-			return nil, errors.Join(err, recoverErr)
-		}
-		fl = nil
-
-		fl, err = openFile(root)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if ctx.Err() != nil {
 		return nil, errors.Join(err, ctx.Err())
+	}
+
+	// recoverStaleLock always closes fl; clear our reference so the deferred
+	// close-on-error cleanup does not double-close it.
+	recoverErr := recoverStaleLock(root, fl)
+	fl = nil
+	if recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
+		return nil, errors.Join(err, recoverErr)
+	}
+
+	fl, err = openFile(root)
+	if err != nil {
+		return nil, err
 	}
 
 	err = retryLock(ctx, fl, exclusive)
