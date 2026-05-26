@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -173,6 +174,63 @@ func TestResolveEnv(t *testing.T) {
 			"B=plain",
 			"C=s3cr3t",
 		}, out)
+	})
+}
+
+func TestMergeEnv(t *testing.T) {
+	t.Parallel()
+
+	writeFile := func(t *testing.T, body string) string {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "env")
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		return path
+	}
+
+	t.Run("no files returns sorted process env", func(t *testing.T) {
+		out, err := mergeEnv([]string{"B=2", "A=1"}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A=1", "B=2"}, out)
+	})
+
+	t.Run("file overrides process env", func(t *testing.T) {
+		f := writeFile(t, "A=from-file\nC=new\n")
+		out, err := mergeEnv([]string{"A=from-process", "B=keep"}, []string{f})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A=from-file", "B=keep", "C=new"}, out)
+	})
+
+	t.Run("later file overrides earlier file", func(t *testing.T) {
+		f1 := writeFile(t, "A=from-file-1\n")
+		f2 := writeFile(t, "A=from-file-2\n")
+		out, err := mergeEnv(nil, []string{f1, f2})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A=from-file-2"}, out)
+	})
+
+	t.Run("comments and quoted values", func(t *testing.T) {
+		f := writeFile(t, "# this is a comment\nGREETING=\"hello world\"\nQUOTED='no $expand'\n")
+		out, err := mergeEnv(nil, []string{f})
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"GREETING=hello world",
+			"QUOTED=no $expand",
+		}, out)
+	})
+
+	t.Run("missing file returns error and does not partially apply", func(t *testing.T) {
+		f := writeFile(t, "A=present\n")
+		out, err := mergeEnv([]string{"B=keep"}, []string{f, "/does/not/exist/.env"})
+		require.Error(t, err)
+		assert.Nil(t, out)
+		assert.Contains(t, err.Error(), "/does/not/exist/.env")
+	})
+
+	t.Run("preserves se:// values for downstream resolveEnv", func(t *testing.T) {
+		f := writeFile(t, "SE_TOKEN=se://gh-token\nPLAIN=v\n")
+		out, err := mergeEnv(nil, []string{f})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"PLAIN=v", "SE_TOKEN=se://gh-token"}, out)
 	})
 }
 

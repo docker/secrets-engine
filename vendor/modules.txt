@@ -71,6 +71,9 @@ github.com/hashicorp/yamux
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
+# github.com/joho/godotenv v1.5.1
+## explicit; go 1.12
+github.com/joho/godotenv
 # github.com/kr/pretty v0.3.1
 ## explicit; go 1.12
 # github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2

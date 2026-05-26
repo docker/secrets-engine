@@ -18,11 +18,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sort"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
@@ -50,19 +53,28 @@ const runExample = `
 SE_TOKEN=se://gh-token docker pass run -- gh repo list
 
 ### Multiple references:
-DB_PASSWORD=se://myapp/postgres/password \
-API_KEY=se://myapp/anthropic/api-key \
-  docker pass run -- ./my-binary
+DB_PASSWORD=se://myapp/postgres/password API_KEY=se://myapp/anthropic/api-key docker pass run -- ./my-binary
+
+### Resolve references from a dotenv file:
+docker pass run --env-file .env -- ./my-binary
+
+### Multiple files (later overrides earlier; files override the process environment):
+docker pass run --env-file .env --env-file .env.local -- ./my-binary
 `
 
+type runOpts struct {
+	envFiles []string
+}
+
 func RunCommand() *cobra.Command {
+	opts := runOpts{}
 	cmd := &cobra.Command{
 		Use:   "run -- CMD [ARGS...]",
 		Short: "Run a command with se:// environment references resolved.",
-		Long: `Scans the current environment for variables whose value is exactly se://NAME.
-Each reference is resolved through the secrets-engine daemon and the resolved
-value is passed to the child process. The child inherits stdin, stdout, and
-stderr.
+		Long: `Scans the current environment (plus any --env-file inputs) for variables
+whose value is exactly se://NAME. Each reference is resolved through the
+secrets-engine daemon and the resolved value is passed to the child process.
+The child inherits stdin, stdout, and stderr.
 
 Requires the secrets-engine daemon (Docker Desktop) to be running.
 
@@ -71,12 +83,17 @@ started and exits non-zero.`,
 		Example: strings.Trim(runExample, "\n"),
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			merged, err := mergeEnv(os.Environ(), opts.envFiles)
+			if err != nil {
+				return err
+			}
+
 			c, err := client.New(client.WithSocketPath(api.DefaultSocketPath()))
 			if err != nil {
 				return err
 			}
 
-			env, err := resolveEnv(cmd.Context(), c, os.Environ())
+			env, err := resolveEnv(cmd.Context(), c, merged)
 			if err != nil {
 				return err
 			}
@@ -130,7 +147,34 @@ started and exits non-zero.`,
 			return nil
 		},
 	}
+	cmd.Flags().StringArrayVar(&opts.envFiles, "env-file", nil,
+		"Read environment variables from a dotenv-formatted file. Repeatable; later files override earlier files and the process environment.")
 	return cmd
+}
+
+// mergeEnv folds the process environment and any --env-file inputs into a
+// single deterministic KEY=VALUE slice. Precedence: process env first, then
+// each file in order; later entries override earlier ones.
+func mergeEnv(processEnv, files []string) ([]string, error) {
+	merged := make(map[string]string, len(processEnv))
+	for _, kv := range processEnv {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			merged[k] = v
+		}
+	}
+	for _, f := range files {
+		parsed, err := godotenv.Read(f)
+		if err != nil {
+			return nil, fmt.Errorf("reading env-file %s: %w", f, err)
+		}
+		maps.Copy(merged, parsed)
+	}
+	out := make([]string, 0, len(merged))
+	for k, v := range merged {
+		out = append(out, k+"="+v)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func resolveEnv(ctx context.Context, r secrets.Resolver, env []string) ([]string, error) {
