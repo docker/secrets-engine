@@ -38,6 +38,16 @@ file, or via an interactive user prompt.
 - Support for multiple encryption functions
 - Support for multiple decryption functions
 
+### Locking
+
+The store uses a process-level lock file to coordinate access across processes.
+Lock acquisition retries until the caller context is canceled or the lock is
+acquired. Use `context.WithTimeout` or `context.WithDeadline` on store
+operations when lock acquisition should be bounded.
+
+The store can recover a stale `.posixage.lock` file when it is older than
+`30s`.
+
 Callbacks are invoked in the order they are registered. For decryption, the
 store tries each callback in sequence, and the first one that successfully
 provides a valid key will return the decrypted secret.

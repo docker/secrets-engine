@@ -30,8 +30,7 @@ var (
 )
 
 const (
-	defaultLockTimeout = time.Millisecond * 100
-	lockFileName       = ".posixage.lock"
+	lockFileName = ".posixage.lock"
 )
 
 // UnlockFunc is the callback function returned by [TryLock] and [TryRLock]
@@ -68,27 +67,32 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 		return nil, err
 	}
 
-	err = retryLock(ctx, fl, exclusive)
-	// lock was successful if error == nil, so let's just return
-	if err == nil {
+	if err = lockFile(fl.Fd(), exclusive); err == nil {
+		// truncate to update the modtime to signal to other processes that the
+		// current lock is valid so they don't attempt a recovery on it.
+		_ = fl.Truncate(0)
 		return sync.OnceValue(func() error {
 			return unlockFile(fl)
 		}), nil
 	}
+	err = errors.Join(ErrLockUnsuccessful, err)
 
-	// lock was unsuccessful so let's retry
-	if recoverErr := recoverStaleLock(root, fl); recoverErr != nil {
-		// return on recovery failed.
-		// perhaps the file is still locked and not older than 30 seconds?
-		// maybe a permission error prevented it from being removed?
-		return nil, errors.Join(err, recoverErr)
+	if ctx.Err() == nil {
+		if recoverErr := recoverStaleLock(root, fl); recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
+			return nil, errors.Join(err, recoverErr)
+		}
+		fl = nil
+
+		fl, err = openFile(root)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	fl, err = openFile(root)
-	if err != nil {
-		return nil, err
+	if ctx.Err() != nil {
+		return nil, errors.Join(err, ctx.Err())
 	}
-	// recovery was successful. Let's try get another lock one last time.
+
 	err = retryLock(ctx, fl, exclusive)
 	if err != nil {
 		return nil, err
@@ -100,8 +104,7 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 }
 
 // retryLock attempts to acquire an advisory lock on the given file
-// using flock, retrying until [defaultLockTimeout] is reached
-// or the context is canceled.
+// using flock, retrying until the context is canceled or the lock is acquired.
 //
 // Retries use exponential backoff with a maximum delay of 100ms
 // between attempts.
@@ -109,18 +112,15 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 // Set exclusive to true for write or delete operations to prevent
 // concurrent reads.
 func retryLock(ctx context.Context, f *os.File, exclusive bool) error {
-	lockCtx, lockCtxCancel := context.WithTimeout(ctx, defaultLockTimeout)
-	defer lockCtxCancel()
-
 	ep := backoff.NewExponentialBackOff()
 	ep.InitialInterval = time.Millisecond * 10
 	ep.MaxInterval = time.Millisecond * 100
-	_, err := backoff.Retry(lockCtx, func() (bool, error) {
+	_, err := backoff.Retry(ctx, func() (bool, error) {
 		if err := lockFile(f.Fd(), exclusive); err != nil {
 			return false, err
 		}
 		return true, nil
-	}, backoff.WithBackOff(ep))
+	}, backoff.WithBackOff(ep), backoff.WithMaxElapsedTime(0))
 	if err != nil {
 		return errors.Join(ErrLockUnsuccessful, err)
 	}
@@ -135,12 +135,13 @@ func retryLock(ctx context.Context, f *os.File, exclusive bool) error {
 // TryLock acquires an exclusive advisory lock on a lock file.
 //
 // If the file does not exist, it is created. If the lock cannot be
-// acquired immediately, the function retries until the default timeout
-// (100ms) is reached.
+// acquired immediately, the function retries until ctx is canceled or the
+// lock is acquired.
 //
 // As a safeguard, the function attempts to recover from stale locks,
-// defined as lock files older than 30 seconds. If recovery fails,
-// manual intervention may be required.
+// defined as lock files older than 30s. Stale lock recovery is skipped when
+// ctx has been canceled. If recovery fails, manual intervention may be
+// required.
 //
 // It returns an unlock function that must be called to release the lock.
 func TryLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {
@@ -150,12 +151,13 @@ func TryLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {
 // TryRLock acquires a non-exclusive advisory lock on a lock file.
 //
 // If the file does not exist, it is created. If the lock cannot be
-// acquired immediately, the function retries until the default timeout
-// (100ms) is reached.
+// acquired immediately, the function retries until ctx is canceled or the
+// lock is acquired.
 //
 // As a safeguard, the function attempts to recover from stale locks,
-// defined as lock files older than 30 seconds. If recovery fails,
-// manual intervention may be required.
+// defined as lock files older than 30s. Stale lock recovery is skipped when
+// ctx has been canceled. If recovery fails, manual intervention may be
+// required.
 //
 // It returns an unlock function that must be called to release the lock.
 func TryRLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {

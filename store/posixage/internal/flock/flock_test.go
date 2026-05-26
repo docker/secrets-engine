@@ -15,6 +15,7 @@
 package flock
 
 import (
+	"context"
 	"os"
 	"runtime"
 	"testing"
@@ -55,11 +56,19 @@ func TestFlock(t *testing.T) {
 			_ = unlock()
 		})
 
-		_, err = tryLock(t.Context(), root, exclusive)
-		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		ctx, cancel := context.WithTimeout(t.Context(), 75*time.Millisecond)
+		defer cancel()
 
-		_, err = tryLock(t.Context(), root, !exclusive)
+		_, err = tryLock(ctx, root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		ctx, cancel = context.WithTimeout(t.Context(), 75*time.Millisecond)
+		defer cancel()
+
+		_, err = tryLock(ctx, root, !exclusive)
+		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
 	t.Run("multiple non-exclusive locks can be held", func(t *testing.T) {
@@ -82,8 +91,12 @@ func TestFlock(t *testing.T) {
 			_ = unlockTwo()
 		})
 
-		_, err = tryLock(t.Context(), root, exclusive)
+		ctx, cancel := context.WithTimeout(t.Context(), 75*time.Millisecond)
+		defer cancel()
+
+		_, err = tryLock(ctx, root, exclusive)
 		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
 	t.Run("can recover from an exclusive lock", func(t *testing.T) {
@@ -107,6 +120,89 @@ func TestFlock(t *testing.T) {
 		unlock, err := tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
 		require.NoError(t, unlock())
+	})
+
+	t.Run("caller context can wait past former default timeout", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		exclusive := true
+		unlock, err := tryLock(t.Context(), root, exclusive)
+		require.NoError(t, err)
+
+		release := make(chan struct{})
+		go func() {
+			defer close(release)
+			time.Sleep(150 * time.Millisecond)
+			assert.NoError(t, unlock())
+		}()
+		t.Cleanup(func() {
+			<-release
+		})
+
+		ctx, cancel := context.WithTimeout(t.Context(), 750*time.Millisecond)
+		defer cancel()
+
+		unlockTwo, err := tryLock(ctx, root, exclusive)
+		require.NoError(t, err)
+		require.NoError(t, unlockTwo())
+	})
+
+	t.Run("caller context deadline bounds lock acquisition", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		exclusive := true
+		unlock, err := tryLock(t.Context(), root, exclusive)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = unlock()
+		})
+
+		ctx, cancel := context.WithTimeout(t.Context(), 75*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		_, err = tryLock(ctx, root, exclusive)
+		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), time.Second)
+	})
+
+	t.Run("stale recovery is skipped after context cancellation", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		exclusive := true
+		unlock, err := tryLock(t.Context(), root, exclusive)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = unlock()
+		})
+
+		if runtime.GOOS != "windows" {
+			fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+			require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
+		}
+
+		ctx, cancel := context.WithTimeout(t.Context(), 75*time.Millisecond)
+		cancel()
+
+		_, err = tryLock(ctx, root, exclusive)
+		require.ErrorIs(t, err, ErrLockUnsuccessful)
+		require.ErrorIs(t, err, context.Canceled)
+
+		_, err = root.Stat(lockFileName)
+		require.NoError(t, err)
 	})
 }
 
