@@ -11,7 +11,7 @@ replace github.com/docker/secrets-engine/x => ./../../x
 require (
 	github.com/docker/secrets-engine/client v0.0.9
 	github.com/docker/secrets-engine/plugin v0.0.22
-	github.com/docker/secrets-engine/store v0.0.23
+	github.com/docker/secrets-engine/store v0.0.24
 	github.com/docker/secrets-engine/x v0.0.32-do.not.use
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.1
