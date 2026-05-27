@@ -88,7 +88,7 @@ func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.
 	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
-	cmd.AddCommand(wrapRunEWithSpan(commands.RunCommand()))
+	cmd.AddCommand(wrapRunEWithSpan(commands.RunCommand(s)))
 	cmd.AddCommand(commands.VersionCommand(info))
 
 	return cmd

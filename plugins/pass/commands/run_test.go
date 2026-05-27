@@ -83,7 +83,7 @@ func runAsWrapper() {
 	if err != nil {
 		os.Exit(2)
 	}
-	cmd := RunCommand()
+	cmd := RunCommand(nil)
 	cmd.SetArgs([]string{exe})
 	cmd.SetContext(context.Background())
 	cmd.SilenceUsage = true
@@ -241,7 +241,7 @@ func TestRunCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("no command given returns arg error", func(t *testing.T) {
-		cmd := RunCommand()
+		cmd := RunCommand(nil)
 		cmd.SetArgs([]string{})
 		cmd.SetContext(t.Context())
 		cmd.SetOut(testWriter{t})

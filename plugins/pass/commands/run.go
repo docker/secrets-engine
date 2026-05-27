@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -52,24 +53,20 @@ func (e *ExitCodeError) Error() string {
 //go:embed run_example.md
 var runExample string
 
+//go:embed run_long.md
+var runLong string
+
 type runOpts struct {
-	envFiles []string
+	envFiles   []string
+	osKeychain bool
 }
 
-func RunCommand() *cobra.Command {
+func RunCommand(s store.Store) *cobra.Command {
 	opts := runOpts{}
 	cmd := &cobra.Command{
-		Use:   "run -- CMD [ARGS...]",
-		Short: "Run a command with `se://` environment references resolved.",
-		Long: "Scans the current environment (plus any `--env-file` inputs) for variables\n" +
-			"whose value is exactly `se://<ID|pattern>`. Each reference is resolved through the\n" +
-			"secrets-engine daemon and the resolved value is passed to the child process.\n" +
-			"The child inherits stdin, stdout, and stderr.\n" +
-			"\n" +
-			"Requires the secrets-engine daemon (Docker Desktop) to be running.\n" +
-			"\n" +
-			"If any reference cannot be resolved, the command fails before the child is\n" +
-			"started and exits non-zero.",
+		Use:     "run -- CMD [ARGS...]",
+		Short:   "Run a command with `se://` environment references resolved.",
+		Long:    strings.Trim(runLong, "\n"),
 		Example: strings.Trim(runExample, "\n"),
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,12 +75,18 @@ func RunCommand() *cobra.Command {
 				return err
 			}
 
-			c, err := client.New(client.WithSocketPath(api.DefaultSocketPath()))
-			if err != nil {
-				return err
+			var r secrets.Resolver
+			if opts.osKeychain {
+				r = &storeResolver{s: s}
+			} else {
+				c, err := client.New(client.WithSocketPath(api.DefaultSocketPath()))
+				if err != nil {
+					return err
+				}
+				r = c
 			}
 
-			env, err := resolveEnv(cmd.Context(), c, merged)
+			env, err := resolveEnv(cmd.Context(), r, merged)
 			if err != nil {
 				return err
 			}
@@ -139,7 +142,33 @@ func RunCommand() *cobra.Command {
 	}
 	cmd.Flags().StringArrayVar(&opts.envFiles, "env-file", nil,
 		"Read environment variables from a dotenv-formatted file. Repeatable; later files override earlier files and the process environment.")
+	cmd.Flags().BoolVar(&opts.osKeychain, "os-keychain", false,
+		"Resolve `se://` references directly from the local OS keychain instead of the secrets-engine daemon.")
 	return cmd
+}
+
+type storeResolver struct {
+	s store.Store
+}
+
+func (r *storeResolver) GetSecrets(ctx context.Context, p secrets.Pattern) ([]secrets.Envelope, error) {
+	m, err := r.s.Filter(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]secrets.Envelope, 0, len(m))
+	for id, sec := range m {
+		val, err := sec.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, secrets.Envelope{
+			ID:       id,
+			Value:    val,
+			Metadata: sec.Metadata(),
+		})
+	}
+	return out, nil
 }
 
 // mergeEnv folds the process environment and any --env-file inputs into a
