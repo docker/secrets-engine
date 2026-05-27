@@ -216,8 +216,9 @@ func TestRecoverLock(t *testing.T) {
 
 		f, err := root.Create(lockFileName)
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = f.Close() })
 
-		require.ErrorIs(t, recoverStaleLock(root, f), errRecoverLock)
+		require.ErrorIs(t, recoverStaleLock(root), errRecoverLock)
 	})
 
 	t.Run("recoverLock removes the file if it is older than 30 seconds", func(t *testing.T) {
@@ -229,11 +230,12 @@ func TestRecoverLock(t *testing.T) {
 
 		f, err := root.Create(lockFileName)
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = f.Close() })
 		// change the lock file modification time
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, root.Chtimes(lockFileName, fakeModTime, fakeModTime))
 
-		require.NoError(t, recoverStaleLock(root, f))
+		require.NoError(t, recoverStaleLock(root))
 		_, err = root.Stat(lockFileName)
 		require.ErrorIs(t, err, os.ErrNotExist)
 	})

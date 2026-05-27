@@ -17,6 +17,7 @@ package flock
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"sync"
 	"time"
@@ -27,6 +28,13 @@ import (
 var (
 	ErrLockUnsuccessful   = errors.New("store is locked")
 	ErrUnlockUnsuccessful = errors.New("could not unlock store")
+
+	// errStaleInode indicates that the file we flocked is no longer the
+	// file at the lock-file path. This happens when another caller's
+	// stale-recovery unlinked the file between our open and our flock.
+	// Locking an unlinked inode would leave us holding a "ghost" lock
+	// that no other caller can observe.
+	errStaleInode = errors.New("lock file inode changed under us")
 )
 
 const (
@@ -49,88 +57,108 @@ func openFile(root *os.Root) (*os.File, error) {
 	return fl, nil
 }
 
-func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, error) {
-	var (
-		err error
-		fl  *os.File
-	)
-
-	defer func() {
-		// we must always close the file on any error returned
-		if err != nil && fl != nil {
-			_ = fl.Close()
-		}
-	}()
-
-	fl, err = openFile(root)
+// acquireOnce performs a single lock acquisition attempt and verifies the
+// resulting lock is on the file currently at the lock-file path.
+//
+// The sequence is open -> flock -> compare-inodes -> truncate. If any step
+// fails the function releases the flock (when held) and closes the fd
+// before returning. The returned [os.File] is the locked descriptor; the
+// caller is responsible for unlocking and closing it.
+//
+// The inode check is what prevents the "ghost lock" race: when a
+// concurrent stale-recovery unlinks the file between our [openFile] and
+// our [lockFile] call, [lockFile] will succeed on the unlinked inode but
+// the path will resolve to a brand-new inode. Treating that as a failure
+// forces the caller to drop the bad lock and try again with a fresh fd.
+func acquireOnce(root *os.Root, exclusive bool) (*os.File, error) {
+	fl, err := openFile(root)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = lockFile(fl.Fd(), exclusive); err == nil {
-		// truncate to update the modtime to signal to other processes that the
-		// current lock is valid so they don't attempt a recovery on it.
-		_ = fl.Truncate(0)
+	if err := lockFile(fl.Fd(), exclusive); err != nil {
+		_ = fl.Close()
+		return nil, err
+	}
+
+	same, err := isCurrentLockFile(fl, root)
+	if err != nil {
+		_ = releaseLock(fl)
+		_ = fl.Close()
+		return nil, err
+	}
+	if !same {
+		_ = releaseLock(fl)
+		_ = fl.Close()
+		return nil, errStaleInode
+	}
+
+	// truncate to update the modtime to signal to other processes that the
+	// current lock is valid so they don't attempt a recovery on it.
+	_ = fl.Truncate(0)
+	return fl, nil
+}
+
+// isCurrentLockFile reports whether the locked descriptor [fl] still refers
+// to the file at the lock-file path. It returns false when the path no
+// longer exists or has been replaced by a different inode.
+func isCurrentLockFile(fl *os.File, root *os.Root) (bool, error) {
+	fdInfo, err := fl.Stat()
+	if err != nil {
+		return false, err
+	}
+	pathInfo, err := root.Stat(lockFileName)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	return os.SameFile(fdInfo, pathInfo), nil
+}
+
+func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, error) {
+	fl, err := acquireOnce(root, exclusive)
+	if err == nil {
 		return sync.OnceValue(func() error {
 			return unlockFile(fl)
 		}), nil
 	}
-	err = errors.Join(ErrLockUnsuccessful, err)
+	firstErr := errors.Join(ErrLockUnsuccessful, err)
 
-	if ctx.Err() != nil {
-		return nil, errors.Join(err, ctx.Err())
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, errors.Join(firstErr, ctxErr)
 	}
 
-	// recoverStaleLock always closes fl; clear our reference so the deferred
-	// close-on-error cleanup does not double-close it.
-	recoverErr := recoverStaleLock(root, fl)
-	fl = nil
-	if recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
-		return nil, errors.Join(err, recoverErr)
+	if recoverErr := recoverStaleLock(root); recoverErr != nil && !errors.Is(recoverErr, errRecoverLock) {
+		return nil, errors.Join(firstErr, recoverErr)
 	}
 
-	fl, err = openFile(root)
+	fl, err = retryLock(ctx, root, exclusive)
 	if err != nil {
 		return nil, err
 	}
-
-	err = retryLock(ctx, fl, exclusive)
-	if err != nil {
-		return nil, err
-	}
-
 	return sync.OnceValue(func() error {
 		return unlockFile(fl)
 	}), nil
 }
 
-// retryLock attempts to acquire an advisory lock on the given file
-// using flock, retrying until the context is canceled or the lock is acquired.
-//
-// Retries use exponential backoff with a maximum delay of 100ms
-// between attempts.
-//
-// Set exclusive to true for write or delete operations to prevent
-// concurrent reads.
-func retryLock(ctx context.Context, f *os.File, exclusive bool) error {
+// retryLock loops [acquireOnce] with exponential backoff until ctx is
+// canceled or a verified lock is obtained. Each iteration opens a fresh
+// fd, so a [errStaleInode] result simply causes the next attempt to start
+// over against whatever file is currently at the path.
+func retryLock(ctx context.Context, root *os.Root, exclusive bool) (*os.File, error) {
 	ep := backoff.NewExponentialBackOff()
 	ep.InitialInterval = time.Millisecond * 10
 	ep.MaxInterval = time.Millisecond * 100
-	_, err := backoff.Retry(ctx, func() (bool, error) {
-		if err := lockFile(f.Fd(), exclusive); err != nil {
-			return false, err
-		}
-		return true, nil
+
+	fl, err := backoff.Retry(ctx, func() (*os.File, error) {
+		return acquireOnce(root, exclusive)
 	}, backoff.WithBackOff(ep), backoff.WithMaxElapsedTime(0))
 	if err != nil {
-		return errors.Join(ErrLockUnsuccessful, err)
+		return nil, errors.Join(ErrLockUnsuccessful, err)
 	}
-
-	// truncate to update the modtime to signal to other processes that the
-	// current lock is valid so they don't attempt a recovery on it.
-	_ = f.Truncate(0)
-
-	return nil
+	return fl, nil
 }
 
 // TryLock acquires an exclusive advisory lock on a lock file.
