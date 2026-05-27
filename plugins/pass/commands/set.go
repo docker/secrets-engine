@@ -16,6 +16,7 @@ package commands
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,23 +30,8 @@ import (
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
-const setExample = `
-### Set a secret:
-docker pass set POSTGRES_PASSWORD=my-secret-password
-
-### Or pass the secret via STDIN:
-echo my-secret-password > pwd.txt
-cat pwd.txt | docker pass set POSTGRES_PASSWORD
-
-### Set a secret with metadata:
-docker pass set POSTGRES_PASSWORD=my-secret-password --metadata owner=alice --metadata expiry=2027-03-01
-
-### Or pass a JSON payload with secret and metadata via STDIN:
-echo '{"secret":"my-secret-password","metadata":{"owner":"alice"}}' | docker pass set POSTGRES_PASSWORD
-
-### Overwrite an existing secret:
-docker pass set POSTGRES_PASSWORD=new-secret-password --force
-`
+//go:embed set_example.md
+var setExample string
 
 type setOpts struct {
 	metadata []string // raw "key=value" strings from --metadata flag
@@ -63,16 +49,16 @@ func SetCommand(kc store.Store) *cobra.Command {
 		Use:     "set id[=value]",
 		Aliases: []string{"store", "save"},
 		Short:   "Set a secret",
-		Long: `Stores a secret in the local OS keychain. The secret value can be provided inline (NAME=VALUE) or piped via STDIN.
-
-Behavior when a secret with the same id already exists is platform-dependent:
-  - macOS (Keychain): the command fails with a duplicate-item error.
-  - Linux (Secret Service) and Windows (Credential Manager): the existing
-    value is silently overwritten.
-
-Pass --force to overwrite an existing secret. On Linux and Windows the
-replacement is performed atomically. On macOS the Keychain API requires
-a delete-then-add sequence.`,
+		Long: "Stores a secret in the local OS keychain. The secret value can be provided inline (`NAME=VALUE`) or piped via STDIN.\n" +
+			"\n" +
+			"Behavior when a secret with the same id already exists is platform-dependent:\n" +
+			"  - macOS (Keychain): the command fails with a duplicate-item error.\n" +
+			"  - Linux (Secret Service) and Windows (Credential Manager): the existing\n" +
+			"    value is silently overwritten.\n" +
+			"\n" +
+			"Pass `--force` to overwrite an existing secret. On Linux and Windows the\n" +
+			"replacement is performed atomically. On macOS the Keychain API requires\n" +
+			"a delete-then-add sequence.",
 		Example: strings.Trim(setExample, "\n"),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

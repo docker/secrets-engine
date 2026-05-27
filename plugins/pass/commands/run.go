@@ -16,6 +16,7 @@ package commands
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"maps"
@@ -48,19 +49,8 @@ func (e *ExitCodeError) Error() string {
 	return fmt.Sprintf("child exited with code %d", e.Code)
 }
 
-const runExample = `
-### Run a command with one secret in its environment:
-SE_TOKEN=se://gh-token docker pass run -- gh repo list
-
-### Multiple references:
-DB_PASSWORD=se://myapp/postgres/password API_KEY=se://myapp/anthropic/api-key docker pass run -- ./my-binary
-
-### Resolve references from a dotenv file:
-docker pass run --env-file .env -- ./my-binary
-
-### Multiple files (later overrides earlier; files override the process environment):
-docker pass run --env-file .env --env-file .env.local -- ./my-binary
-`
+//go:embed run_example.md
+var runExample string
 
 type runOpts struct {
 	envFiles []string
@@ -70,16 +60,16 @@ func RunCommand() *cobra.Command {
 	opts := runOpts{}
 	cmd := &cobra.Command{
 		Use:   "run -- CMD [ARGS...]",
-		Short: "Run a command with se:// environment references resolved.",
-		Long: `Scans the current environment (plus any --env-file inputs) for variables
-whose value is exactly se://NAME. Each reference is resolved through the
-secrets-engine daemon and the resolved value is passed to the child process.
-The child inherits stdin, stdout, and stderr.
-
-Requires the secrets-engine daemon (Docker Desktop) to be running.
-
-If any reference cannot be resolved, the command fails before the child is
-started and exits non-zero.`,
+		Short: "Run a command with `se://` environment references resolved.",
+		Long: "Scans the current environment (plus any `--env-file` inputs) for variables\n" +
+			"whose value is exactly `se://<ID|pattern>`. Each reference is resolved through the\n" +
+			"secrets-engine daemon and the resolved value is passed to the child process.\n" +
+			"The child inherits stdin, stdout, and stderr.\n" +
+			"\n" +
+			"Requires the secrets-engine daemon (Docker Desktop) to be running.\n" +
+			"\n" +
+			"If any reference cannot be resolved, the command fails before the child is\n" +
+			"started and exits non-zero.",
 		Example: strings.Trim(runExample, "\n"),
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

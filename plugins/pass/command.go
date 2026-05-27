@@ -58,14 +58,14 @@ func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.
 	cmd := &cobra.Command{
 		Use:   "pass set|get|ls|rm|run",
 		Short: "Manage your local OS keychain secrets.",
-		Long: `Docker Pass is a helper for securely storing secrets in your local OS keychain and injecting them into containers when needed. 
-It uses platform-specific credential storage:
-
-  - Windows: Windows Credential Manager API
-  - macOS:   Keychain services API
-  - Linux:   org.freedesktop.secrets API (requires DBus + gnome-keyring or kdewallet)
-
-Secrets can be injected into running containers at runtime using the se:// URI scheme.`,
+		Long: "Docker Pass is a helper for securely storing secrets in your local OS keychain and injecting them into containers when needed.\n" +
+			"It uses platform-specific credential storage:\n" +
+			"\n" +
+			"  - Windows: Windows Credential Manager API\n" +
+			"  - macOS:   Keychain services API\n" +
+			"  - Linux:   `org.freedesktop.secrets` API (requires DBus + `gnome-keyring` or `kdewallet`)\n" +
+			"\n" +
+			"Secrets can be injected into running containers at runtime using the `se://` URI scheme.",
 		Example:          strings.TrimSpace(rootExample),
 		SilenceUsage:     true,
 		TraverseChildren: true,

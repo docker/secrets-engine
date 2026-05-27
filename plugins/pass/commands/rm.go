@@ -16,6 +16,7 @@ package commands
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,9 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
+//go:embed rm_example.md
+var rmExample string
+
 type rmOpts struct {
 	All bool
 }
@@ -37,15 +41,8 @@ func RmCommand(kc store.Store) *cobra.Command {
 		Use:     "rm name1 name2 ...",
 		Aliases: []string{"delete", "erase", "remove"},
 		Short:   "Remove secrets from local keychain.",
-		Long:    "Removes one or more named secrets from the local OS keychain.\nUse --all to remove every stored secret at once.",
-		Example: `### Remove a specific secret:
-docker pass rm GH_TOKEN
-
-### Remove multiple secrets:
-docker pass rm GH_TOKEN NPM_TOKEN
-
-### Remove all secrets:
-docker pass rm --all`,
+		Long:    "Removes one or more named secrets from the local OS keychain. Use `--all` to remove every stored secret at once.",
+		Example: strings.Trim(rmExample, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			idList, err := validateArgs(args, opts)
 			if err != nil {
