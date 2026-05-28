@@ -63,7 +63,7 @@ var _ store.Store = &fileStore[store.Secret]{}
 func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 	f.l.Lock()
 
-	unlock, err := flock.TryLock(ctx, f.filesystem)
+	unlock, err := flock.TryLock(logging.WithLogger(ctx, f.logger), f.filesystem)
 	if err != nil {
 		f.l.Unlock()
 		return nil, err
@@ -89,7 +89,7 @@ func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 	f.l.RLock()
 
-	unlock, err := flock.TryRLock(ctx, f.filesystem)
+	unlock, err := flock.TryRLock(logging.WithLogger(ctx, f.logger), f.filesystem)
 	if err != nil {
 		f.l.RUnlock()
 		return nil, err

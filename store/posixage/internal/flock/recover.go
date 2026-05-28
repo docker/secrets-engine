@@ -16,42 +16,57 @@ package flock
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"time"
 )
 
 var errRecoverLock = errors.New("recovery failed. lock file is not older than 30 seconds")
 
-// recoverStaleLock attempts to clear a stale lock file.
+// staleThreshold is the modtime age past which a lock file is considered
+// abandoned. A holder refreshes the modtime at acquisition and again on
+// every [heartbeatInterval] tick via [heartbeat], so a still-held lock
+// will not be misidentified as stale unless the holder is genuinely
+// stuck (no scheduler progress) for longer than this window.
 //
-// A lock is considered stale if:
-//   - the process that created it failed to remove the file, and
-//   - the file’s modification time is at least 30 seconds old.
-//
-// On Unix systems, the stale lock file is deleted to allow recovery.
-// This is not possible on Windows, since locked files cannot be removed.
-//
-// The file is always closed before the function returns, regardless of
-// whether recovery succeeds.
-//
-// It returns nil if the lock file was successfully removed, or
-// [errRecoverLock] if the lock was not considered stale.
-func recoverStaleLock(root *os.Root, fl *os.File) error {
-	defer func() { _ = fl.Close() }()
+// Exposed as a var rather than a const so tests can shorten it.
+var staleThreshold = 30 * time.Second
 
-	info, err := fl.Stat()
+// recoverStaleLock attempts to clear a stale lock file at the configured
+// lock-file path.
+//
+// A lock is considered stale if its modification time is at least
+// [staleThreshold] old. On Unix the stale lock file is unlinked; on
+// Windows this typically fails while another process has the file open.
+//
+// The function tolerates concurrent removers: if the file disappears
+// between the modtime check and the unlink, nil is returned. Callers
+// using [acquireOnce] are still protected by the inode verification it
+// performs after [lockFile], so a missed recovery cannot let two callers
+// hold the same name.
+//
+// It returns nil when the lock file was removed (or already gone) and
+// [errRecoverLock] when the lock was not considered stale.
+func recoverStaleLock(root *os.Root) error {
+	info, err := root.Stat(lockFileName)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			// nothing to recover; subsequent open will create a fresh file
+			return nil
+		}
 		return err
 	}
 
-	// the lock file should not have existed for such a long time
-	// it is possible that the application might have crashed before
-	// let's try recover from that so that we don't lock indefinitely.
-	if time.Since(info.ModTime()).Seconds() >= 30 {
-		if err := root.Remove(lockFileName); err != nil {
-			return err
-		}
-		return nil
+	if time.Since(info.ModTime()) < staleThreshold {
+		return errRecoverLock
 	}
-	return errRecoverLock
+
+	if err := root.Remove(lockFileName); err != nil {
+		// another caller raced us to the unlink — recovery still succeeded
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }

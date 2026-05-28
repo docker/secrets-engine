@@ -41,12 +41,9 @@ func lockFile(fd uintptr, exclusive bool) error {
 	return nil
 }
 
-// unlockFile releases an advisory lock held on the given file using UnlockFileEx.
-//
-// The file is always closed before the function returns.
-func unlockFile(f *os.File) error {
-	defer func() { _ = f.Close() }()
-
+// releaseLock releases an advisory lock held on the given file using UnlockFileEx.
+// The file is not closed.
+func releaseLock(f *os.File) error {
 	var ov windows.Overlapped // zero offset => start at 0
 	h := windows.Handle(f.Fd())
 	err := windows.UnlockFileEx(h, 0, maxBytes, maxBytes, &ov)
@@ -54,4 +51,12 @@ func unlockFile(f *os.File) error {
 		return errors.Join(ErrUnlockUnsuccessful, err)
 	}
 	return nil
+}
+
+// unlockFile releases an advisory lock held on the given file using UnlockFileEx.
+//
+// The file is always closed before the function returns.
+func unlockFile(f *os.File) error {
+	defer func() { _ = f.Close() }()
+	return releaseLock(f)
 }

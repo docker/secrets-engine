@@ -33,13 +33,19 @@ func lockFile(fd uintptr, exclusive bool) error {
 	return unix.Flock(int(fd), flag)
 }
 
+// releaseLock releases an advisory lock held on the given file using flock.
+// The file is not closed.
+func releaseLock(f *os.File) error {
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_UN); err != nil {
+		return errors.Join(ErrUnlockUnsuccessful, err)
+	}
+	return nil
+}
+
 // unlockFile releases an advisory lock held on the given file using flock.
 //
 // The file is always closed before the function returns.
 func unlockFile(f *os.File) error {
 	defer func() { _ = f.Close() }()
-	if err := unix.Flock(int(f.Fd()), unix.LOCK_UN); err != nil {
-		return errors.Join(ErrUnlockUnsuccessful, err)
-	}
-	return nil
+	return releaseLock(f)
 }
