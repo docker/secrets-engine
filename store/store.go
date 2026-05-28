@@ -59,7 +59,9 @@ var (
 type Secret interface {
 	// Marshal the secret into a slice of bytes
 	Marshal() ([]byte, error)
-	// Unmarshal the secret from a slice of bytes into its structured format
+	// Unmarshal the secret from a slice of bytes into its structured format.
+	// Implementations must copy any bytes they retain: store backends zero
+	// the source buffer after Unmarshal returns to avoid leaking plaintext.
 	Unmarshal(data []byte) error
 	// Metadata returns a key-value pair of non-sensitive data about the secret
 	Metadata() map[string]string

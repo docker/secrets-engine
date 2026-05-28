@@ -37,7 +37,9 @@ func (m *PassValue) Marshal() ([]byte, error) {
 }
 
 func (m *PassValue) Unmarshal(data []byte) error {
-	m.value = data
+	// Copy: store backends zero the source buffer after Unmarshal returns
+	// (see store/keychain and store/posixage), so we must not alias it.
+	m.value = append([]byte(nil), data...)
 	return nil
 }
 
