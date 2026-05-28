@@ -95,6 +95,9 @@ docker/
 > [!TIP]
 > Treat realms like paths - predictable structure makes automation and access control much easier.
 
+> [!NOTE]
+> **Missing a plugin?** Help us pick the next provider — vote 👍 for your favorite (or request one) on the [plugin backends epic](https://github.com/docker/secrets-engine/issues/534).
+
 # Developer Guides
 
 ## How to query secrets
