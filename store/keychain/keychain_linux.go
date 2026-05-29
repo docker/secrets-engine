@@ -38,6 +38,14 @@ const (
 	// NOTE: do not use this directly, always call [getDefaultCollection]
 	loginKeychainObjectPath = dbus.ObjectPath("/org/freedesktop/secrets/collection/login")
 
+	// the null/root object path returned by the secret service when an alias is
+	// not assigned to any collection. It is syntactically valid (so
+	// [dbus.ObjectPath.IsValid] returns true) but does not point at a real
+	// collection, so it must be rejected explicitly.
+	//
+	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html#org.freedesktop.Secret.Service.ReadAlias
+	nullObjectPath = dbus.ObjectPath("/")
+
 	// used to list all available collections on the secret service API
 	//
 	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html
@@ -53,6 +61,12 @@ const (
 	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Collection.html
 	secretServiceIsCollectionLockedProperty = "org.freedesktop.Secret.Collection.Locked"
 )
+
+// errNoDefaultCollection is returned when the secret service has no usable
+// default collection (no 'login' collection and no collection assigned to the
+// 'default' alias). This typically happens on headless hosts where the keyring
+// has not been initialized.
+var errNoDefaultCollection = errors.New("no default keychain collection available")
 
 // getDefaultCollection gets the secret service collection dbus object path.
 //
@@ -84,11 +98,34 @@ func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
 		return "", err
 	}
 
-	if !defaultKeychainObjectPath.IsValid() {
+	return resolveDefaultCollection(collections, defaultKeychainObjectPath)
+}
+
+// resolveDefaultCollection selects the collection to use given the available
+// collections and the object path returned by the 'default' alias lookup.
+//
+// It is split out from [getDefaultCollection] so the selection logic can be
+// unit tested without a live secret service over dbus.
+func resolveDefaultCollection(collections []dbus.ObjectPath, aliasPath dbus.ObjectPath) (dbus.ObjectPath, error) {
+	// choose the 'login' collection if it exists
+	if slices.Contains(collections, loginKeychainObjectPath) {
+		return loginKeychainObjectPath, nil
+	}
+
+	if !aliasPath.IsValid() {
 		return "", errors.New("the default collection object path is invalid")
 	}
 
-	return defaultKeychainObjectPath, nil
+	// the secret service returns the null path '/' when no collection is
+	// assigned to the 'default' alias. This is common on headless hosts where
+	// neither the 'login' collection nor a 'default' alias has been set up.
+	// The null path is syntactically valid (so IsValid above returns true) but
+	// does not point at a real collection, so it must be rejected explicitly.
+	if aliasPath == nullObjectPath {
+		return "", errNoDefaultCollection
+	}
+
+	return aliasPath, nil
 }
 
 var errCollectionLocked = errors.New("collection is locked")
