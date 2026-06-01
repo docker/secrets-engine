@@ -62,12 +62,6 @@ const (
 	secretServiceIsCollectionLockedProperty = "org.freedesktop.Secret.Collection.Locked"
 )
 
-// errNoDefaultCollection is returned when the secret service has no usable
-// default collection (no 'login' collection and no collection assigned to the
-// 'default' alias). This typically happens on headless hosts where the keyring
-// has not been initialized.
-var errNoDefaultCollection = errors.New("no default keychain collection available")
-
 // getDefaultCollection gets the secret service collection dbus object path.
 //
 // It prefers the loginKeychainObjectPath, since most users on X11 would have
@@ -122,7 +116,7 @@ func resolveDefaultCollection(collections []dbus.ObjectPath, aliasPath dbus.Obje
 	// The null path is syntactically valid (so IsValid above returns true) but
 	// does not point at a real collection, so it must be rejected explicitly.
 	if aliasPath == nullObjectPath {
-		return "", errNoDefaultCollection
+		return "", ErrNoDefaultCollection
 	}
 
 	return aliasPath, nil

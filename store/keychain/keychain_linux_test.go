@@ -53,7 +53,7 @@ func TestResolveDefaultCollection(t *testing.T) {
 			// ReadAlias returns the null object path "/"
 			collections: []dbus.ObjectPath{},
 			aliasPath:   nullObjectPath,
-			wantErr:     errNoDefaultCollection,
+			wantErr:     ErrNoDefaultCollection,
 		},
 		{
 			name:        "rejects syntactically invalid alias path",
