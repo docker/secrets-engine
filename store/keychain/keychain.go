@@ -30,11 +30,17 @@ var _ store.Store = &keychainStore[store.Secret]{}
 // 'default' alias). This typically happens on headless hosts where the keyring
 // has not been initialized.
 //
+// NOTE: this condition is currently specific to the Linux keyring (the
+// freedesktop Secret Service). macOS and Windows have no equivalent "default
+// collection" concept, so the keychain store never returns this error on those
+// platforms. The sentinel is nonetheless declared here, in the cross-platform
+// file (rather than the Linux-specific one), so that platform-agnostic callers
+// can reference it on every platform without build tags. On non-Linux platforms
+// it simply never matches.
+//
 // It is exported so callers can use [errors.Is] to detect the absence of usable
 // keychain infrastructure and fall back gracefully, rather than relying on
-// fragile error message comparisons. This condition is only produced on Linux,
-// but the sentinel is declared here (rather than in the Linux-specific file) so
-// that cross-platform callers can reference it on every platform.
+// fragile error message comparisons.
 var ErrNoDefaultCollection = errors.New("no default keychain collection available")
 
 type (
