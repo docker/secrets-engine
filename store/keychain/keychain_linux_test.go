@@ -22,7 +22,95 @@ import (
 	dbus "github.com/godbus/dbus/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/docker/secrets-engine/store"
+	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain/secretservice"
 )
+
+// fakeService is a pure in-memory [secretService]. It never talks to a real
+// secret service over dbus, so tests that drive the store through it are
+// deterministic and need no keyring on the host.
+//
+// It records how many connections were opened and closed so a test can assert
+// the store balances every open with a Close.
+type fakeService struct {
+	// items is returned verbatim by SearchCollection; leave empty to drive the
+	// "credential not found" path.
+	items []dbus.ObjectPath
+
+	opened int
+	closed int
+}
+
+func (f *fakeService) Collections() ([]dbus.ObjectPath, error) {
+	return []dbus.ObjectPath{loginKeychainObjectPath}, nil
+}
+func (f *fakeService) ReadAlias(string) (dbus.ObjectPath, error) { return loginKeychainObjectPath, nil }
+func (f *fakeService) IsLocked(dbus.ObjectPath) (bool, error)    { return false, nil }
+func (f *fakeService) OpenSession(kc.AuthenticationMode) (*kc.Session, error) {
+	return &kc.Session{}, nil
+}
+func (f *fakeService) CloseSession(*kc.Session)       {}
+func (f *fakeService) Unlock([]dbus.ObjectPath) error { return nil }
+func (f *fakeService) SearchCollection(dbus.ObjectPath, kc.Attributes) ([]dbus.ObjectPath, error) {
+	return f.items, nil
+}
+func (f *fakeService) CreateItem(dbus.ObjectPath, map[string]dbus.Variant, kc.Secret, kc.ReplaceBehavior) (dbus.ObjectPath, error) {
+	return "", nil
+}
+func (f *fakeService) DeleteItem(dbus.ObjectPath) error                      { return nil }
+func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error)  { return nil, nil }
+func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) { return nil, nil }
+func (f *fakeService) Close() error {
+	f.closed++
+	return nil
+}
+
+// withFakeService swaps the package newService seam for one that hands out the
+// given fake (counting each open) and restores the original on cleanup.
+func withFakeService(t *testing.T, fake *fakeService) {
+	t.Helper()
+	orig := newService
+	t.Cleanup(func() { newService = orig })
+	newService = func() (secretService, error) {
+		fake.opened++
+		return fake, nil
+	}
+}
+
+// TestKeychainGetNotFound exercises the full Get path against the fake — open,
+// resolve collection, search — and asserts an empty search maps to
+// ErrCredentialNotFound, all without a live keyring.
+func TestKeychainGetNotFound(t *testing.T) {
+	fake := &fakeService{} // no items -> not found
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	_, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/missing"))
+	assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+}
+
+// TestKeychainClosesEveryConnection is a deterministic regression test for the
+// D-Bus connection leak: each keychain operation dials a fresh connection via
+// newService and must Close it. Driving the store through a fake lets us assert
+// the contract directly — every opened connection is closed — instead of
+// counting host file descriptors.
+func TestKeychainClosesEveryConnection(t *testing.T) {
+	fake := &fakeService{} // no items -> Get returns ErrCredentialNotFound
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	missing := store.MustParseID("com.test.test/test/missing")
+
+	const iterations = 30
+	for range iterations {
+		_, err := ks.Get(t.Context(), missing)
+		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+	}
+
+	require.Equal(t, iterations, fake.opened)
+	assert.Equal(t, fake.opened, fake.closed, "every opened connection must be closed")
+}
 
 func TestResolveDefaultCollection(t *testing.T) {
 	const customCollection = dbus.ObjectPath("/org/freedesktop/secrets/collection/custom")

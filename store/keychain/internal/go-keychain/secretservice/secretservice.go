@@ -107,6 +107,53 @@ func (s *SecretService) Obj(path dbus.ObjectPath) dbus.BusObject {
 	return s.conn.Object(SecretServiceInterface, path)
 }
 
+// dbus interface members used by the high-level helpers below.
+//
+// https://specifications.freedesktop.org/secret-service-spec/latest/index.html
+const (
+	collectionsProperty  = "org.freedesktop.Secret.Service.Collections"
+	readAliasMethod      = "org.freedesktop.Secret.Service.ReadAlias"
+	collectionLockedProp = "org.freedesktop.Secret.Collection.Locked"
+)
+
+// Collections returns the object paths of every collection known to the secret
+// service.
+func (s *SecretService) Collections() ([]dbus.ObjectPath, error) {
+	variant, err := s.ServiceObj().GetProperty(collectionsProperty)
+	if err != nil {
+		return nil, err
+	}
+	collections, ok := variant.Value().([]dbus.ObjectPath)
+	if !ok {
+		return nil, errors.New("could not list keychain collections")
+	}
+	return collections, nil
+}
+
+// ReadAlias resolves an alias (e.g. "default") to the collection object path it
+// points at. The secret service returns the null path "/" when the alias is not
+// assigned to any collection.
+func (s *SecretService) ReadAlias(alias string) (dbus.ObjectPath, error) {
+	var path dbus.ObjectPath
+	if err := s.ServiceObj().Call(readAliasMethod, NilFlags, alias).Store(&path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// IsLocked reports whether the given collection is currently locked.
+func (s *SecretService) IsLocked(collection dbus.ObjectPath) (bool, error) {
+	variant, err := s.Obj(collection).GetProperty(collectionLockedProp)
+	if err != nil {
+		return false, err
+	}
+	locked, ok := variant.Value().(bool)
+	if !ok {
+		return false, errors.New("unexpected type for collection locked property")
+	}
+	return locked, nil
+}
+
 type sessionOpenResponse struct {
 	algorithmOutput dbus.Variant
 	path            dbus.ObjectPath

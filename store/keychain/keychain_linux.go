@@ -45,22 +45,35 @@ const (
 	//
 	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html#org.freedesktop.Secret.Service.ReadAlias
 	nullObjectPath = dbus.ObjectPath("/")
-
-	// used to list all available collections on the secret service API
-	//
-	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html
-	secretServiceCollectionProperty = "org.freedesktop.Secret.Service.Collections"
-
-	// used to get the dbus object path of an aliased collection
-	// An common alias would be 'default'
-	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Service.html
-	secretServiceGetAliasObjectPath = "org.freedesktop.Secret.Service.ReadAlias"
-
-	// used to check if the collection is locked
-	//
-	// https://specifications.freedesktop.org/secret-service-spec/latest/org.freedesktop.Secret.Collection.html
-	secretServiceIsCollectionLockedProperty = "org.freedesktop.Secret.Collection.Locked"
 )
+
+// secretService is the subset of [kc.SecretService] the keychain store depends
+// on. It exists so the store can be unit tested against a fake implementation
+// without a live secret service over dbus — see the fake in the linux tests.
+//
+// Every method maps to a method on [kc.SecretService]; none expose a
+// dbus.BusObject, so a fake never needs to talk to the bus.
+type secretService interface {
+	Collections() ([]dbus.ObjectPath, error)
+	ReadAlias(alias string) (dbus.ObjectPath, error)
+	IsLocked(collection dbus.ObjectPath) (bool, error)
+	OpenSession(mode kc.AuthenticationMode) (*kc.Session, error)
+	CloseSession(session *kc.Session)
+	Unlock(items []dbus.ObjectPath) error
+	SearchCollection(collection dbus.ObjectPath, attributes kc.Attributes) ([]dbus.ObjectPath, error)
+	CreateItem(collection dbus.ObjectPath, properties map[string]dbus.Variant, secret kc.Secret, replaceBehavior kc.ReplaceBehavior) (dbus.ObjectPath, error)
+	DeleteItem(item dbus.ObjectPath) error
+	GetAttributes(item dbus.ObjectPath) (kc.Attributes, error)
+	GetSecret(item dbus.ObjectPath, session kc.Session) ([]byte, error)
+	Close() error
+}
+
+// the concrete secret service must satisfy the interface the store depends on.
+var _ secretService = (*kc.SecretService)(nil)
+
+// newService dials a fresh secret service. It is a package var so tests can
+// substitute a fake; production always returns a real [kc.SecretService].
+var newService = func() (secretService, error) { return kc.NewService() }
 
 // getDefaultCollection gets the secret service collection dbus object path.
 //
@@ -70,24 +83,17 @@ const (
 // As a fallback it queries the secret service for the default collection.
 // It is possible that the host does not have a collection set up, in that case
 // the only option is to error.
-func getDefaultCollection(service *kc.SecretService) (dbus.ObjectPath, error) {
-	variant, err := service.ServiceObj().GetProperty(secretServiceCollectionProperty)
+func getDefaultCollection(service secretService) (dbus.ObjectPath, error) {
+	collections, err := service.Collections()
 	if err != nil {
 		return "", err
-	}
-	collections, ok := variant.Value().([]dbus.ObjectPath)
-	if !ok {
-		return "", errors.New("could not list keychain collections")
 	}
 	// choose the 'login' collection if it exists
 	if slices.Contains(collections, loginKeychainObjectPath) {
 		return loginKeychainObjectPath, nil
 	}
 	// we need to fallback to the default collection
-	var defaultKeychainObjectPath dbus.ObjectPath
-	err = service.ServiceObj().
-		Call(secretServiceGetAliasObjectPath, 0, "default").
-		Store(&defaultKeychainObjectPath)
+	defaultKeychainObjectPath, err := service.ReadAlias("default")
 	if err != nil {
 		return "", err
 	}
@@ -128,12 +134,12 @@ var errCollectionLocked = errors.New("collection is locked")
 //
 // It returns the errCollectionLocked error by default if the collection is locked.
 // On any other error, it returns the underlying error instead.
-func isCollectionUnlocked(collectionPath dbus.ObjectPath, service *kc.SecretService) error {
-	variant, err := service.Obj(collectionPath).GetProperty(secretServiceIsCollectionLockedProperty)
+func isCollectionUnlocked(collectionPath dbus.ObjectPath, service secretService) error {
+	locked, err := service.IsLocked(collectionPath)
 	if err != nil {
 		return err
 	}
-	if locked, ok := variant.Value().(bool); ok && !locked {
+	if !locked {
 		return nil
 	}
 	return errCollectionLocked
@@ -146,7 +152,7 @@ type keychainStore[T store.Secret] struct {
 }
 
 func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	service, err := kc.NewService()
+	service, err := newService()
 	if err != nil {
 		return err
 	}
@@ -193,7 +199,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	service, err := kc.NewService()
+	service, err := newService()
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +266,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 }
 
 func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
-	service, err := kc.NewService()
+	service, err := newService()
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +338,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 }
 
 func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	service, err := kc.NewService()
+	service, err := newService()
 	if err != nil {
 		return err
 	}
@@ -395,7 +401,7 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 
 // loadSecret fetches the raw secret value for itemPath, zeroes it after use,
 // and returns a fully populated Secret.
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc *kc.SecretService, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc secretService, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
 	value, err := svc.GetSecret(itemPath, *session)
 	if err != nil {
 		return nil, err
@@ -413,7 +419,7 @@ func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc *kc.
 
 //gocyclo:ignore
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
-	service, err := kc.NewService()
+	service, err := newService()
 	if err != nil {
 		return nil, err
 	}
