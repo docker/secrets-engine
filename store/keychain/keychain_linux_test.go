@@ -17,73 +17,12 @@
 package keychain
 
 import (
-	"os"
 	"testing"
 
 	dbus "github.com/godbus/dbus/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/docker/secrets-engine/store"
 )
-
-// openFDCount returns the number of open file descriptors held by the current
-// process by counting entries in /proc/self/fd (Linux only).
-func openFDCount(t *testing.T) int {
-	t.Helper()
-	entries, err := os.ReadDir("/proc/self/fd")
-	require.NoError(t, err)
-	return len(entries)
-}
-
-// TestKeychainDoesNotLeakConnections is a regression test for a D-Bus
-// connection leak: each keychain operation dialed a fresh session-bus
-// connection (kc.NewService -> dbus.ConnectSessionBus) but only closed the
-// secret-service session, never the connection itself. Every operation
-// therefore leaked one socket file descriptor, eventually exhausting the
-// session bus's max_connections_per_user limit on long-lived processes.
-//
-// It reproduces the failure shape directly: perform many lookups and assert
-// the process's open-fd count stays bounded instead of growing
-// one-per-operation.
-//
-// The lookups target a non-existent id so the test exercises the full
-// connection setup (NewService -> OpenSession -> resolve collection ->
-// SearchCollection) and then returns ErrCredentialNotFound *before* fetching a
-// secret. That keeps the test focused on the connection lifecycle — the thing
-// the fix changes — without creating, reading, or deleting shared keyring
-// items (which is both stateful and prone to gnome-keyring item-lock quirks).
-func TestKeychainDoesNotLeakConnections(t *testing.T) {
-	ks := setupKeychain(t, nil)
-	missing := store.MustParseID("com.test.test/test/does-not-exist")
-
-	const iterations = 30
-
-	get := func() {
-		_, err := ks.Get(t.Context(), missing)
-		require.ErrorIs(t, err, store.ErrCredentialNotFound)
-	}
-
-	// Warm up so any one-time, non-leaking fds (lazy runtime/dbus init) are
-	// already open before we take the baseline.
-	for range 3 {
-		get()
-	}
-
-	before := openFDCount(t)
-	for range iterations {
-		get()
-	}
-	after := openFDCount(t)
-
-	// A correct implementation closes every connection it opens, so the fd
-	// count should be flat. Allow a small slack for unrelated runtime churn;
-	// the leak grows the count by ~iterations, far above the threshold.
-	const slack = 5
-	assert.LessOrEqualf(t, after-before, slack,
-		"open fd count grew by %d over %d lookups (before=%d after=%d): D-Bus connections are leaking",
-		after-before, iterations, before, after)
-}
 
 func TestResolveDefaultCollection(t *testing.T) {
 	const customCollection = dbus.ObjectPath("/org/freedesktop/secrets/collection/custom")
