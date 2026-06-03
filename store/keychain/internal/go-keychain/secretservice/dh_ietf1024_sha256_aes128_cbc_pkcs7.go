@@ -66,7 +66,17 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([
 	if err != nil {
 		return nil, err
 	}
-	sharedSecretBytes := sharedSecret.Bytes()
+	// The Secret Service peer derives the key over the shared secret encoded as
+	// a fixed-length big-endian value matching the group prime size (128 bytes
+	// for the 1024-bit Second Oakley Group). big.Int.Bytes() returns the
+	// minimal encoding and strips leading zero bytes, so when the shared secret
+	// happens to have one or more leading zero bytes (~1/256 of sessions per
+	// byte) the HKDF input would be shorter than the peer's, deriving a
+	// different AES key. That mismatch makes the keyring reject the item with
+	// "the secret was transferred or encrypted in an invalid way". FillBytes
+	// left-pads with zeros so both sides agree on the input.
+	sharedSecretBytes := make([]byte, (group.p.BitLen()+7)/8)
+	sharedSecret.FillBytes(sharedSecretBytes)
 	defer clear(sharedSecretBytes)
 
 	r := hkdf.New(sha256.New, sharedSecretBytes, nil, nil)

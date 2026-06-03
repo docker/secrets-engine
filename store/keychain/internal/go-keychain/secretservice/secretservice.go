@@ -343,7 +343,7 @@ func (s *SecretService) GetSecret(item dbus.ObjectPath, session Session) (secret
 	case AuthenticationDHAES:
 		plaintext, err := unauthenticatedAESCBCDecrypt(secret.Parameters, secret.Value, session.AESKey)
 		if err != nil {
-			return nil, nil
+			return nil, fmt.Errorf("failed to decrypt secret: %w", err)
 		}
 		secretPlaintext = plaintext
 	default:
