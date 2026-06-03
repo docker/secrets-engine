@@ -53,6 +53,7 @@ func (f optionFunc[K]) apply(s K) error { return f(s) }
 
 type darwinOptions interface {
 	setUseDataProtectionKeychain(bool)
+	setBiometricAuth(prompt string)
 }
 
 type DarwinOptions optionFunc[darwinOptions]
@@ -74,6 +75,24 @@ func WithDarwinOptions(opt DarwinOptions) Option {
 func WithUseDataProtectionKeychain() DarwinOptions {
 	return func(do darwinOptions) error {
 		do.setUseDataProtectionKeychain(true)
+		return nil
+	}
+}
+
+// WithBiometricAuth makes every secret created by the store require a
+// Touch ID, Face ID, or device-passcode prompt on read. The prompt argument
+// customises the message shown in the system dialog; an empty string falls
+// back to the macOS default. On non-Darwin platforms this option is a
+// no-op (the keychain store ignores it).
+//
+// IMPORTANT: items already present in the keychain when the option is
+// enabled keep their original access-control policy. Only secrets *written*
+// after the store is constructed with this option pick up biometric ACLs.
+// Callers that want every existing secret to be protected need to delete
+// and re-save them after migrating.
+func WithBiometricAuth(prompt string) DarwinOptions {
+	return func(do darwinOptions) error {
+		do.setBiometricAuth(prompt)
 		return nil
 	}
 }

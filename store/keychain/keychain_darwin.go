@@ -37,10 +37,17 @@ type keychainStore[T store.Secret] struct {
 	serviceName               string
 	factory                   store.Factory[T]
 	useDataProtectionKeychain bool
+	useBiometricAuth          bool
+	biometricPrompt           string
 }
 
 func (k *keychainStore[T]) setUseDataProtectionKeychain(v bool) {
 	k.useDataProtectionKeychain = v
+}
+
+func (k *keychainStore[T]) setBiometricAuth(prompt string) {
+	k.useBiometricAuth = true
+	k.biometricPrompt = prompt
 }
 
 // newKeychainItem creates a new keychain item with valid default parameters.
@@ -51,6 +58,12 @@ func (k *keychainStore[T]) setUseDataProtectionKeychain(v bool) {
 //
 // The id parameter can be empty, in which case the item will search based on
 // the service name and group, but not the item label or account.
+//
+// When biometric auth is enabled on the store, query-time items carry the
+// custom operation prompt so the Touch ID / Face ID dialog shows it; the
+// access-control policy itself is applied only on Save (see saveItem). At
+// query time we deliberately do NOT set kSecAttrAccessControl because that
+// would filter matches by ACL, not configure them.
 func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 	item := kc.NewItem()
 	// generic password is used here as we don't know what we are storing
@@ -68,12 +81,35 @@ func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 	if k.useDataProtectionKeychain {
 		item.SetUseDataProtectionKeychain(kc.UseDataProtectionKeychainYes)
 	}
+	if k.useBiometricAuth {
+		// Surface the caller-supplied message in the system prompt.
+		// Empty string keeps macOS's default ("<app> wants to use your
+		// confidential information stored in <item> in your keychain").
+		item.SetUseOperationPrompt(k.biometricPrompt)
+	}
 
 	if id != "" {
 		item.SetAccount(id)
 	}
 
 	return item
+}
+
+// applyBiometricACL replaces the item's Accessible policy with a
+// kSecAccessControl that requires Touch ID, Face ID, or the device passcode
+// as a fallback. It must be called before AddItem; it is a no-op when the
+// store was constructed without WithBiometricAuth.
+//
+// We use AccessControlUserPresence (any enrolled biometric OR passcode)
+// rather than BiometryCurrentSet so adding a new fingerprint or re-enrolling
+// Face ID doesn't invalidate the stored secrets — silently losing access on
+// a hardware change is a worse user experience than the small risk delta
+// between "current set only" and "any enrolled factor".
+func applyBiometricACL[T store.Secret](item *kc.Item, k *keychainStore[T]) {
+	if !k.useBiometricAuth {
+		return
+	}
+	item.SetAccessControl(kc.AccessibleAfterFirstUnlock, kc.AccessControlUserPresence)
 }
 
 // getItemWithData retrieves a keychain item with its data.
@@ -182,6 +218,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	}
 	defer clear(data)
 	item := newKeychainItem(id.String(), k)
+	applyBiometricACL(&item, k)
 	item.SetData(data)
 	// only creation of a secret needs the label attribute.
 	// it is a user-friendly name for the item, which is displayed in the keychain UI.
