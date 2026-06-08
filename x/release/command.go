@@ -56,6 +56,11 @@ func ReleaseCommand(cfg Config) (*cobra.Command, error) {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mod := args[0]
+			if !opts.dryRun && !opts.skipGit {
+				if err := verifyReleaseRef(cmd.Context()); err != nil {
+					return err
+				}
+			}
 			data, err := newRepoData(cfg.EnableModulesWithPreReleaseVersion)
 			if err != nil {
 				return err
@@ -283,4 +288,62 @@ func gitCommit(ctx context.Context, commit string) error {
 		return fmt.Errorf("git commit (%s): %s", err, string(out))
 	}
 	return nil
+}
+
+// verifyReleaseRef ensures HEAD is exactly the tip of the remote default branch
+// before any tags are created.
+//
+// The tool tags the current HEAD and pushes the tag immediately, but the
+// downstream "chore: bump" commit it creates afterwards is only committed
+// locally — gitPushTags pushes tags, never the branch. If the tool is re-run
+// while HEAD sits on such a local-only bump commit, the new tag lands on a
+// commit that is not on the remote default branch. That is how store/v0.0.28
+// ended up pinned to a "chore: bump store/v0.0.27" commit that predated later
+// fixes merged via PRs. Refuse to tag unless HEAD matches the fetched remote
+// default branch tip.
+func verifyReleaseRef(ctx context.Context) error {
+	branch := remoteDefaultBranch(ctx)
+	if out, err := runGit(ctx, "fetch", "origin", branch); err != nil {
+		return fmt.Errorf("git fetch origin %s (%s): %s", branch, err, out)
+	}
+	head, err := revParse(ctx, "HEAD")
+	if err != nil {
+		return err
+	}
+	remote, err := revParse(ctx, "refs/remotes/origin/"+branch)
+	if err != nil {
+		return err
+	}
+	if head != remote {
+		return fmt.Errorf("refusing to tag: HEAD (%s) is not at the tip of origin/%s (%s); "+
+			"merge/pull the remote default branch and ensure any local 'chore: bump' commit is pushed before releasing",
+			head, branch, remote)
+	}
+	return nil
+}
+
+// remoteDefaultBranch resolves origin's default branch, falling back to "main"
+// when origin/HEAD is not configured locally.
+func remoteDefaultBranch(ctx context.Context) string {
+	out, err := runGit(ctx, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"warning: origin/HEAD is not set; assuming default branch is %q — "+
+				"run 'git remote set-head origin -a' if the real default differs\n", "main")
+		return "main"
+	}
+	return strings.TrimPrefix(strings.TrimSpace(out), "origin/")
+}
+
+func revParse(ctx context.Context, ref string) (string, error) {
+	out, err := runGit(ctx, "rev-parse", ref)
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse %s (%s): %s", ref, err, out)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func runGit(ctx context.Context, args ...string) (string, error) {
+	out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput()
+	return string(out), err
 }
