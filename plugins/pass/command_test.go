@@ -38,18 +38,22 @@ var mockInfo = commands.VersionInfo{
 	Commit:  "abc",
 }
 
+func staticFactory(s store.Store) StoreFactory {
+	return func() (store.Store, error) { return s, nil }
+}
+
 func Test_rootCommand(t *testing.T) {
 	t.Parallel()
 	t.Run("version", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := executeCommand(Root(t.Context(), mock, mockInfo), "version")
+		out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "version")
 		assert.NoError(t, err)
 		assert.Equal(t, "Version: v88\nCommit: abc\n", out)
 	})
 	t.Run("set", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar=bar=bar")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=bar=bar=bar")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -62,7 +66,7 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("from STDIN", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommandWithStdin(Root(t.Context(), mock, mockInfo), "my\nmultiline\nvalue", "set", "foo")
+			out, err := executeCommandWithStdin(Root(t.Context(), staticFactory(mock), mockInfo), "my\nmultiline\nvalue", "set", "foo")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -75,7 +79,7 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("with --metadata flag", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar", "--metadata", "name=bob", "--metadata", "expiry=2027-03-01")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=bar", "--metadata", "name=bob", "--metadata", "expiry=2027-03-01")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -89,7 +93,7 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("from STDIN JSON with value and metadata", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommandWithStdin(Root(t.Context(), mock, mockInfo), `{"secret":"bar","metadata":{"name":"bob"}}`, "set", "foo")
+			out, err := executeCommandWithStdin(Root(t.Context(), staticFactory(mock), mockInfo), `{"secret":"bar","metadata":{"name":"bob"}}`, "set", "foo")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -103,7 +107,7 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("from STDIN JSON merged with --metadata flag wins on collision", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommandWithStdin(Root(t.Context(), mock, mockInfo), `{"secret":"bar","metadata":{"name":"bob","extra":"thing"}}`, "set", "foo", "--metadata", "name=alice")
+			out, err := executeCommandWithStdin(Root(t.Context(), staticFactory(mock), mockInfo), `{"secret":"bar","metadata":{"name":"bob","extra":"thing"}}`, "set", "foo", "--metadata", "name=alice")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -117,20 +121,20 @@ func Test_rootCommand(t *testing.T) {
 		})
 		t.Run("invalid --metadata flag (no =)", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			_, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar", "--metadata", "invalid")
+			_, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=bar", "--metadata", "invalid")
 			assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
 		})
 		t.Run("store error", func(t *testing.T) {
 			errSave := errors.New("save error")
 			mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errSave))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=bar")
 			assert.ErrorIs(t, errSave, err)
 			assert.Equal(t, "Error: "+errSave.Error()+"\n", out)
 		})
 		t.Run("invalid id", func(t *testing.T) {
 			errSave := errors.New("save error")
 			mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errSave))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "/foo=bar")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "/foo=bar")
 			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 			assert.ErrorIs(t, err, errInvalidID)
 			assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
@@ -144,7 +148,7 @@ func Test_rootCommand(t *testing.T) {
 				}),
 				teststore.WithStoreSaveErr(errors.New("save should not be called when --force is set")),
 			)
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=new", "--force")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=new", "--force")
 			assert.NoError(t, err)
 			assert.Empty(t, out)
 			s, err := mock.Get(t.Context(), secrets.MustParseID("foo"))
@@ -158,7 +162,7 @@ func Test_rootCommand(t *testing.T) {
 		t.Run("--force surfaces upsert error", func(t *testing.T) {
 			errUpsert := errors.New("upsert error")
 			mock := teststore.NewMockStore(teststore.WithStoreUpsertErr(errUpsert))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "set", "foo=bar", "--force")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "set", "foo=bar", "--force")
 			assert.ErrorIs(t, errUpsert, err)
 			assert.Equal(t, "Error: "+errUpsert.Error()+"\n", out)
 		})
@@ -169,14 +173,14 @@ func Test_rootCommand(t *testing.T) {
 				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "list")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "list")
 			assert.NoError(t, err)
 			assert.Equal(t, "baz\nfoo\n", out)
 		})
 		t.Run("store error", func(t *testing.T) {
 			errGetAll := errors.New("get error")
 			mock := teststore.NewMockStore(teststore.WithStoreGetAllErr(errGetAll))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "list")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "list")
 			assert.ErrorIs(t, errGetAll, err)
 			assert.Equal(t, "Error: "+errGetAll.Error()+"\n", out)
 		})
@@ -187,7 +191,7 @@ func Test_rootCommand(t *testing.T) {
 				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "foo", "baz")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm", "foo", "baz")
 			assert.NoError(t, err)
 			assert.Equal(t, "RM: baz\nRM: foo\n", out)
 			l, err := mock.GetAllMetadata(t.Context())
@@ -199,7 +203,7 @@ func Test_rootCommand(t *testing.T) {
 				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 				store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 			}))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "--all")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm", "--all")
 			assert.NoError(t, err)
 			assert.Equal(t, "RM: baz\nRM: foo\n", out)
 			l, err := mock.GetAllMetadata(t.Context())
@@ -209,26 +213,26 @@ func Test_rootCommand(t *testing.T) {
 		t.Run("store error", func(t *testing.T) {
 			errRemove := errors.New("remove error")
 			mock := teststore.NewMockStore(teststore.WithStoreDeleteErr(errRemove))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "foo")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm", "foo")
 			assert.ErrorIs(t, err, errRemove)
 			assert.Equal(t, "ERR: foo: remove error\nError: "+errRemove.Error()+"\n", out)
 		})
 		t.Run("invalid id", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "/foo")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm", "/foo")
 			errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 			assert.ErrorIs(t, err, errInvalidID)
 			assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
 		})
 		t.Run("cannot mix --all with explicit list", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm", "--all", "foo")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm", "--all", "foo")
 			assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
 			assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
 		})
 		t.Run("no args or --all", func(t *testing.T) {
 			mock := teststore.NewMockStore()
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "rm")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "rm")
 			assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
 			assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
 		})
@@ -238,14 +242,14 @@ func Test_rootCommand(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 			}))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "get", "foo")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "get", "foo")
 			assert.NoError(t, err)
 			assert.Equal(t, "ID: foo\nValue: **********\n", out)
 		})
 		t.Run("store error", func(t *testing.T) {
 			errGet := errors.New("get error")
 			mock := teststore.NewMockStore(teststore.WithStoreGetErr(errGet))
-			out, err := executeCommand(Root(t.Context(), mock, mockInfo), "get", "foo")
+			out, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), "get", "foo")
 			assert.ErrorIs(t, err, errGet)
 			assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
 		})
@@ -280,7 +284,7 @@ func Test_rootCommandTelemetry(t *testing.T) {
 			mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 				store.MustParseID("baz"): pass.NewPassValue([]byte("bar")),
 			}))
-			_, err := executeCommand(Root(t.Context(), mock, mockInfo), tc.args...)
+			_, err := executeCommand(Root(t.Context(), staticFactory(mock), mockInfo), tc.args...)
 			assert.NoError(t, err)
 
 			var rm metricdata.ResourceMetrics

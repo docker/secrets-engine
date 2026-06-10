@@ -46,7 +46,7 @@ type stdinPayload struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-func SetCommand(kc store.Store) *cobra.Command {
+func SetCommand(newStore func() (store.Store, error)) *cobra.Command {
 	opts := setOpts{}
 	cmd := &cobra.Command{
 		Use:     "set id[=value]",
@@ -97,6 +97,11 @@ func SetCommand(kc store.Store) *cobra.Command {
 				if err := pv.SetMetadata(merged); err != nil {
 					return err
 				}
+			}
+
+			kc, err := newStore()
+			if err != nil {
+				return err
 			}
 			if opts.force {
 				return kc.Upsert(cmd.Context(), id, pv)

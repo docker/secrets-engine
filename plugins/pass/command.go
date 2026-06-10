@@ -34,6 +34,12 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
+// StoreFactory opens the backing keychain store on demand. Subcommands invoke
+// it from their RunE so that commands which never touch the store (version,
+// help, completion) do not pay the keychain-init cost — and do not hang in
+// headless environments where no D-Bus session bus is reachable.
+type StoreFactory func() (store.Store, error)
+
 // Note: We use a custom help template to make it more brief.
 const helpTemplate = `Docker Pass CLI - Manage your local secrets.
 {{if .UseLine}}
@@ -56,8 +62,13 @@ var rootExample string
 //go:embed long.md
 var rootLong string
 
-// Root returns the root command for the docker-pass CLI plugin
-func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.Command {
+// Root returns the root command for the docker-pass CLI plugin.
+//
+// newStore is invoked lazily by subcommands that need keychain access. Commands
+// that do not touch the store (version, help, completion) never call it, so the
+// binary stays usable in headless environments where opening the keychain would
+// hang on a missing D-Bus session bus.
+func Root(ctx context.Context, newStore StoreFactory, info commands.VersionInfo) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "pass set|get|ls|rm|run",
 		Short:            "Manage your local OS keychain secrets.",
@@ -80,10 +91,10 @@ func Root(ctx context.Context, s store.Store, info commands.VersionInfo) *cobra.
 		return []string{"--help"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	cmd.AddCommand(wrapRunEWithSpan(commands.SetCommand(s)))
-	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(s)))
-	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(s)))
-	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(s)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.SetCommand(newStore)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.ListCommand(newStore)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.RmCommand(newStore)))
+	cmd.AddCommand(wrapRunEWithSpan(commands.GetCommand(newStore)))
 	cmd.AddCommand(wrapRunEWithSpan(commands.RunCommand()))
 	cmd.AddCommand(commands.VersionCommand(info))
 

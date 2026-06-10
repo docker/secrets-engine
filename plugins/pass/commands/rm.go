@@ -35,7 +35,7 @@ type rmOpts struct {
 	All bool
 }
 
-func RmCommand(kc store.Store) *cobra.Command {
+func RmCommand(newStore func() (store.Store, error)) *cobra.Command {
 	opts := rmOpts{}
 	cmd := &cobra.Command{
 		Use:     "rm name1 name2 ...",
@@ -45,6 +45,10 @@ func RmCommand(kc store.Store) *cobra.Command {
 		Example: strings.Trim(rmExample, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			idList, err := validateArgs(args, opts)
+			if err != nil {
+				return err
+			}
+			kc, err := newStore()
 			if err != nil {
 				return err
 			}

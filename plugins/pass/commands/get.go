@@ -23,7 +23,7 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
-func GetCommand(kc store.Store) *cobra.Command {
+func GetCommand(newStore func() (store.Store, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get NAME",
 		Args:  cobra.ExactArgs(1),
@@ -31,6 +31,10 @@ func GetCommand(kc store.Store) *cobra.Command {
 		Long:  "Retrieves a named secret from the local OS keychain. The secret value is masked in output.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := store.ParseID(args[0])
+			if err != nil {
+				return err
+			}
+			kc, err := newStore()
 			if err != nil {
 				return err
 			}
