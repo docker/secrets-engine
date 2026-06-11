@@ -95,7 +95,11 @@ This means you don’t need:
 Store the secret in your OS keychain:
 
 ```bash
-docker pass set foo=bar
+# reads the secret from stdin, to avoid exposure in cmdline (e.g. in htop) and shell history (recommended)
+docker pass set foo
+
+# passing directly supported as well
+docker pass set foo=secret
 ```
 
 Run a container using a secret reference (the value se://foo is not the secret itself):
