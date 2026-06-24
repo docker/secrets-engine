@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
 	dbus "github.com/godbus/dbus/v5"
 
@@ -65,6 +66,9 @@ type secretService interface {
 	DeleteItem(item dbus.ObjectPath) error
 	GetAttributes(item dbus.ObjectPath) (kc.Attributes, error)
 	GetSecret(item dbus.ObjectPath, session kc.Session) ([]byte, error)
+	SetItemSecret(item dbus.ObjectPath, secret kc.Secret) error
+	SetItemAttributes(item dbus.ObjectPath, attributes kc.Attributes) error
+	SetItemLabel(item dbus.ObjectPath, label string) error
 	Close() error
 }
 
@@ -145,6 +149,81 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service secretService)
 	return errCollectionLocked
 }
 
+// secretServiceIsLockedError is the D-Bus error name the secret service returns
+// when a mutating call (e.g. CreateItem) targets a locked collection.
+//
+// https://specifications.freedesktop.org/secret-service-spec/latest/errors.html
+const secretServiceIsLockedError = "org.freedesktop.Secret.Error.IsLocked"
+
+// isLockedDBusError reports whether err is the secret service's "collection is
+// locked" D-Bus error. The lock state is matched on the structured D-Bus error
+// name rather than the human-readable message so it is stable across backends
+// and locales.
+func isLockedDBusError(err error) bool {
+	var dbusErr dbus.Error
+	return errors.As(err, &dbusErr) && dbusErr.Name == secretServiceIsLockedError
+}
+
+// Relock retry tuning. An operation that hits a relocked collection is retried
+// with exponential backoff: the relock is a brief race that settles on its own,
+// and spacing the attempts out avoids hammering the secret service (or, on a
+// password-protected keyring, re-issuing Unlock fast enough to spam the user
+// with authentication prompts).
+//
+// relockRetryMaxDelay caps the backoff growth; with the current
+// maxRelockRetries the slept delays are 20,40,80,160,320ms (the cap only takes
+// effect once maxRelockRetries reaches 6, where the sixth delay would otherwise
+// be 640ms).
+const (
+	maxRelockRetries     = 5
+	relockRetryBaseDelay = 20 * time.Millisecond
+	relockRetryMaxDelay  = 500 * time.Millisecond
+)
+
+// sleepFn is the sleep seam used by the relock backoff so tests can exercise the
+// retry loop without real delays. It is a package-level var with no
+// synchronisation, so tests that swap it must not run in parallel.
+var sleepFn = time.Sleep
+
+// withRelockRetry runs a collection operation, retrying it with exponential
+// backoff when the secret service rejects it because the collection is locked.
+//
+// The store dials a fresh D-Bus connection for every operation and closes it on
+// return. gnome-keyring scopes an unlock to the session that performed it, so
+// when a previous operation's connection closes the daemon relocks the
+// collection — and that relock can land asynchronously in the middle of a later
+// operation, after we have already observed the collection as unlocked but
+// before the call against the collection runs. The result is an intermittent
+// "Cannot create an item in a locked collection" error even though we unlocked
+// moments earlier. IsLocked cannot guard against this because the state changes
+// between the check and the call, so we react to the authoritative signal — the
+// operation's own locked error — by unlocking again and retrying.
+//
+// In the common case this is the passwordless auto-unlock path (e.g. the
+// PAM-unlocked login keyring), where Unlock returns the null prompt and asks
+// the user for nothing. withRelockRetry cannot itself prove the keyring is
+// passwordless, so on a password-protected keyring a retry could surface an
+// authentication prompt; the bounded retry count and backoff keep that to a
+// handful of spaced-out prompts at worst, and a dismissed prompt makes Unlock
+// return an error that aborts the loop immediately rather than re-prompting.
+func withRelockRetry(service secretService, collectionPath dbus.ObjectPath, op func() error) error {
+	err := op()
+	delay := relockRetryBaseDelay
+	for attempt := 0; attempt < maxRelockRetries && isLockedDBusError(err); attempt++ {
+		sleepFn(delay)
+		delay = min(delay*2, relockRetryMaxDelay)
+		if unlockErr := service.Unlock([]dbus.ObjectPath{collectionPath}); unlockErr != nil {
+			// Surface why the retry stopped while preserving errors.Is on the
+			// underlying Unlock error (e.g. a dismissed prompt). The original
+			// locked error is intentionally dropped: the failed unlock is the
+			// actionable cause once we have decided to stop retrying.
+			return fmt.Errorf("unlock after relock: %w", unlockErr)
+		}
+		err = op()
+	}
+	return err
+}
+
 type keychainStore[T store.Secret] struct {
 	serviceGroup string
 	serviceName  string
@@ -195,7 +274,9 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 		return nil
 	}
 
-	return service.DeleteItem(items[0])
+	return withRelockRetry(service, objectPath, func() error {
+		return service.DeleteItem(items[0])
+	})
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
@@ -385,11 +466,50 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	safelySetID(id, attributes)
 
 	label := k.itemLabel(id.String())
-	properties := kc.NewSecretProperties(label, attributes)
 
-	_, err = service.CreateItem(objectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
+	// Find existing items for this identity by the stable triple only
+	// {service:group, service:name, id}, never the volatile metadata, so a
+	// changed metadata value can never hide a previously-stored item. This is
+	// what makes the in-place update below reliable and stops the duplicate
+	// accumulation described in issue #446.
+	ident := make(map[string]string)
+	safelySetMetadata(k.serviceGroup, k.serviceName, ident)
+	safelySetID(id, ident)
+
+	items, err := service.SearchCollection(objectPath, ident)
 	if err != nil {
 		return err
+	}
+
+	// Nothing stored yet: create a fresh item.
+	if len(items) == 0 {
+		properties := kc.NewSecretProperties(label, attributes)
+		return withRelockRetry(service, objectPath, func() error {
+			_, createErr := service.CreateItem(objectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
+			return createErr
+		})
+	}
+
+	// Update the first match in place. Its object path is preserved, so the
+	// secret is never momentarily absent and no duplicate is minted. Writing the
+	// secret value IS the operation, so only its failure fails Save; refreshing
+	// the attributes and label and collapsing any pre-existing duplicates are
+	// best-effort (the secret is already stored) and must not flip the result.
+	primary := items[0]
+	if err := withRelockRetry(service, objectPath, func() error {
+		return service.SetItemSecret(primary, sessSecret)
+	}); err != nil {
+		return err
+	}
+	_ = service.SetItemAttributes(primary, attributes)
+	_ = service.SetItemLabel(primary, label)
+	for _, dup := range items[1:] {
+		// Best-effort, but still relock-aware: a collection that relocks
+		// mid-collapse would otherwise leave the duplicates the whole feature
+		// exists to drain (see withRelockRetry and issue #446).
+		_ = withRelockRetry(service, objectPath, func() error {
+			return service.DeleteItem(dup)
+		})
 	}
 
 	return nil

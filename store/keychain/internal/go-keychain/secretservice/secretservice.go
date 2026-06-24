@@ -436,6 +436,40 @@ func (s *SecretService) PromptAndWait(prompt dbus.ObjectPath) (paths *dbus.Varia
 	}
 }
 
+// SetItemSecret replaces an existing item's secret value in place via
+// org.freedesktop.Secret.Item.SetSecret. The secret must already be encoded for
+// the session it references (see [Session.NewSecret]). SetSecret takes a single
+// Secret argument (D-Bus signature (oayays)) and returns no values, so there is
+// no prompt path: the item's collection must be unlocked first (use [Unlock]),
+// otherwise the call fails.
+func (s *SecretService) SetItemSecret(item dbus.ObjectPath, secret Secret) error {
+	if err := s.Obj(item).Call("org.freedesktop.Secret.Item.SetSecret", NilFlags, secret).Store(); err != nil {
+		return fmt.Errorf("failed to set item secret: %w", err)
+	}
+	return nil
+}
+
+// SetItemAttributes replaces an existing item's lookup attributes in place by
+// setting the read-write org.freedesktop.Secret.Item.Attributes property
+// (type a{ss}) through org.freedesktop.DBus.Properties.Set. The collection must
+// be unlocked.
+func (s *SecretService) SetItemAttributes(item dbus.ObjectPath, attributes Attributes) error {
+	if err := s.Obj(item).SetProperty("org.freedesktop.Secret.Item.Attributes", dbus.MakeVariant(map[string]string(attributes))); err != nil {
+		return fmt.Errorf("failed to set item attributes: %w", err)
+	}
+	return nil
+}
+
+// SetItemLabel replaces an existing item's displayable label in place by setting
+// the read-write org.freedesktop.Secret.Item.Label property (type s) through
+// org.freedesktop.DBus.Properties.Set. The collection must be unlocked.
+func (s *SecretService) SetItemLabel(item dbus.ObjectPath, label string) error {
+	if err := s.Obj(item).SetProperty("org.freedesktop.Secret.Item.Label", dbus.MakeVariant(label)); err != nil {
+		return fmt.Errorf("failed to set item label: %w", err)
+	}
+	return nil
+}
+
 // NewSecretProperties
 func NewSecretProperties(label string, attributes map[string]string) map[string]dbus.Variant {
 	return map[string]dbus.Variant{
