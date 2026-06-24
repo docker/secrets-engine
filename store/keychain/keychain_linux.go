@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
 	dbus "github.com/godbus/dbus/v5"
 
@@ -145,6 +146,91 @@ func isCollectionUnlocked(collectionPath dbus.ObjectPath, service secretService)
 	return errCollectionLocked
 }
 
+// ensureUnlocked unlocks the collection if it currently reports as locked. It is
+// the cheap, best-effort preamble run before any collection operation; the
+// authoritative guard against a collection that relocks underneath us is
+// [withRelockRetry], since the lock state can change between this check and the
+// operation itself (see that function for why).
+func ensureUnlocked(collectionPath dbus.ObjectPath, service secretService) error {
+	err := isCollectionUnlocked(collectionPath, service)
+	if err != nil && !errors.Is(err, errCollectionLocked) {
+		return err
+	}
+	if errors.Is(err, errCollectionLocked) {
+		return service.Unlock([]dbus.ObjectPath{collectionPath})
+	}
+	return nil
+}
+
+// secretServiceIsLockedError is the D-Bus error name the secret service returns
+// when a mutating call (e.g. CreateItem) targets a locked collection.
+//
+// https://specifications.freedesktop.org/secret-service-spec/latest/errors.html
+const secretServiceIsLockedError = "org.freedesktop.Secret.Error.IsLocked"
+
+// isLockedDBusError reports whether err is the secret service's "collection is
+// locked" D-Bus error. The lock state is matched on the structured D-Bus error
+// name rather than the human-readable message so it is stable across backends
+// and locales.
+func isLockedDBusError(err error) bool {
+	var dbusErr dbus.Error
+	return errors.As(err, &dbusErr) && dbusErr.Name == secretServiceIsLockedError
+}
+
+// Relock retry tuning. An operation that hits a relocked collection is retried
+// with exponential backoff: the relock is a brief race that settles on its own,
+// and spacing the attempts out avoids hammering the secret service (or, on a
+// password-protected keyring, re-issuing Unlock fast enough to spam the user
+// with authentication prompts).
+//
+// relockRetryMaxDelay caps the backoff growth; with the current
+// maxRelockRetries the slept delays are 20,40,80,160,320ms (the cap only takes
+// effect if maxRelockRetries is raised past 6).
+const (
+	maxRelockRetries     = 5
+	relockRetryBaseDelay = 20 * time.Millisecond
+	relockRetryMaxDelay  = 500 * time.Millisecond
+)
+
+// sleepFn is the sleep seam used by the relock backoff so tests can exercise the
+// retry loop without real delays.
+var sleepFn = time.Sleep
+
+// withRelockRetry runs a collection operation, retrying it with exponential
+// backoff when the secret service rejects it because the collection is locked.
+//
+// The store dials a fresh D-Bus connection for every operation and closes it on
+// return. gnome-keyring scopes an unlock to the session that performed it, so
+// when a previous operation's connection closes the daemon relocks the
+// collection — and that relock can land asynchronously in the middle of a later
+// operation, after we have already observed the collection as unlocked but
+// before the call against the collection runs. The result is an intermittent
+// "Cannot create an item in a locked collection" error even though we unlocked
+// moments earlier. IsLocked cannot guard against this because the state changes
+// between the check and the call, so we react to the authoritative signal — the
+// operation's own locked error — by unlocking again and retrying.
+//
+// In the common case this is the passwordless auto-unlock path (e.g. the
+// PAM-unlocked login keyring), where Unlock returns the null prompt and asks
+// the user for nothing. withRelockRetry cannot itself prove the keyring is
+// passwordless, so on a password-protected keyring a retry could surface an
+// authentication prompt; the bounded retry count and backoff keep that to a
+// handful of spaced-out prompts at worst, and a dismissed prompt makes Unlock
+// return an error that aborts the loop immediately rather than re-prompting.
+func withRelockRetry(service secretService, collectionPath dbus.ObjectPath, op func() error) error {
+	err := op()
+	delay := relockRetryBaseDelay
+	for attempt := 0; attempt < maxRelockRetries && isLockedDBusError(err); attempt++ {
+		sleepFn(delay)
+		delay = min(delay*2, relockRetryMaxDelay)
+		if unlockErr := service.Unlock([]dbus.ObjectPath{collectionPath}); unlockErr != nil {
+			return unlockErr
+		}
+		err = op()
+	}
+	return err
+}
+
 type keychainStore[T store.Secret] struct {
 	serviceGroup string
 	serviceName  string
@@ -172,14 +258,8 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 		return err
 	}
 
-	err = isCollectionUnlocked(objectPath, service)
-	if err != nil && !errors.Is(err, errCollectionLocked) {
+	if err := ensureUnlocked(objectPath, service); err != nil {
 		return err
-	}
-	if errors.Is(err, errCollectionLocked) {
-		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
-			return err
-		}
 	}
 
 	attributes := make(map[string]string)
@@ -195,7 +275,9 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 		return nil
 	}
 
-	return service.DeleteItem(items[0])
+	return withRelockRetry(service, objectPath, func() error {
+		return service.DeleteItem(items[0])
+	})
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
@@ -219,14 +301,8 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, err
 	}
 
-	err = isCollectionUnlocked(objectPath, service)
-	if err != nil && !errors.Is(err, errCollectionLocked) {
+	if err := ensureUnlocked(objectPath, service); err != nil {
 		return nil, err
-	}
-	if errors.Is(err, errCollectionLocked) {
-		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
-			return nil, err
-		}
 	}
 
 	searchMetadata := make(map[string]string)
@@ -248,7 +324,12 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 	safelyCleanMetadata(attributes)
 
-	value, err := service.GetSecret(items[0], *session)
+	var value []byte
+	err = withRelockRetry(service, objectPath, func() error {
+		var getErr error
+		value, getErr = service.GetSecret(items[0], *session)
+		return getErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -286,14 +367,8 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 		return nil, err
 	}
 
-	err = isCollectionUnlocked(objectPath, service)
-	if err != nil && !errors.Is(err, errCollectionLocked) {
+	if err := ensureUnlocked(objectPath, service); err != nil {
 		return nil, err
-	}
-	if errors.Is(err, errCollectionLocked) {
-		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
-			return nil, err
-		}
 	}
 
 	searchMetadata := make(map[string]string)
@@ -358,14 +433,8 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 		return err
 	}
 
-	err = isCollectionUnlocked(objectPath, service)
-	if err != nil && !errors.Is(err, errCollectionLocked) {
+	if err := ensureUnlocked(objectPath, service); err != nil {
 		return err
-	}
-	if errors.Is(err, errCollectionLocked) {
-		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
-			return err
-		}
 	}
 
 	value, err := secret.Marshal()
@@ -387,7 +456,10 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	label := k.itemLabel(id.String())
 	properties := kc.NewSecretProperties(label, attributes)
 
-	_, err = service.CreateItem(objectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
+	err = withRelockRetry(service, objectPath, func() error {
+		_, createErr := service.CreateItem(objectPath, properties, sessSecret, kc.ReplaceBehaviorReplace)
+		return createErr
+	})
 	if err != nil {
 		return err
 	}
@@ -400,9 +472,15 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 }
 
 // loadSecret fetches the raw secret value for itemPath, zeroes it after use,
-// and returns a fully populated Secret.
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc secretService, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
-	value, err := svc.GetSecret(itemPath, *session)
+// and returns a fully populated Secret. collectionPath is the enclosing
+// collection, used to re-unlock if it relocks mid-read (see withRelockRetry).
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc secretService, collectionPath, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
+	var value []byte
+	err := withRelockRetry(svc, collectionPath, func() error {
+		var getErr error
+		value, getErr = svc.GetSecret(itemPath, *session)
+		return getErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -439,14 +517,8 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		return nil, err
 	}
 
-	err = isCollectionUnlocked(objectPath, service)
-	if err != nil && !errors.Is(err, errCollectionLocked) {
+	if err := ensureUnlocked(objectPath, service); err != nil {
 		return nil, err
-	}
-	if errors.Is(err, errCollectionLocked) {
-		if err := service.Unlock([]dbus.ObjectPath{objectPath}); err != nil {
-			return nil, err
-		}
 	}
 
 	attributes := make(map[string]string)
@@ -492,7 +564,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			continue
 		}
 
-		secret, err := k.loadSecret(ctx, secretID, service, itemPath, session, attributes)
+		secret, err := k.loadSecret(ctx, secretID, service, objectPath, itemPath, session, attributes)
 		if err != nil {
 			return nil, err
 		}
