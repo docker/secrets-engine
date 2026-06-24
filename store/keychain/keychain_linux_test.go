@@ -44,6 +44,11 @@ type fakeService struct {
 	// "credential not found" path.
 	items []dbus.ObjectPath
 
+	// attributes is returned verbatim by GetAttributes. Filter only descends into
+	// loadSecret (and therefore the wrapped GetSecret) for items whose attributes
+	// carry a parseable "id"; leave nil for paths that do not inspect attributes.
+	attributes kc.Attributes
+
 	opened atomic.Int64
 	closed atomic.Int64
 
@@ -105,7 +110,11 @@ func (f *fakeService) DeleteItem(dbus.ObjectPath) error {
 	}
 	return nil
 }
-func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error) { return nil, nil }
+
+func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error) {
+	return f.attributes, nil
+}
+
 func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) {
 	if f.getSecretCalls.Add(1) <= f.getSecretLockedErrs.Load() {
 		return nil, lockedErr("get secret")
@@ -121,7 +130,9 @@ func (f *fakeService) Close() error {
 }
 
 // withFakeService swaps the package newService seam for one that hands out the
-// given fake (counting each open) and restores the original on cleanup.
+// given fake (counting each open) and restores the original on cleanup. It
+// mutates the package-level newService var, so tests using it must not run in
+// parallel.
 func withFakeService(t *testing.T, fake *fakeService) {
 	t.Helper()
 	orig := newService
@@ -133,12 +144,27 @@ func withFakeService(t *testing.T, fake *fakeService) {
 }
 
 // stubRelockSleep replaces the relock backoff sleep with a no-op so retry tests
-// run without real delays, restoring it on cleanup.
+// run without real delays, restoring it on cleanup. It mutates the package-level
+// sleepFn var, so tests using it must not run in parallel.
 func stubRelockSleep(t *testing.T) {
 	t.Helper()
 	orig := sleepFn
 	t.Cleanup(func() { sleepFn = orig })
 	sleepFn = func(time.Duration) {}
+}
+
+// recordRelockSleep replaces the relock backoff sleep with a recorder that
+// captures each requested delay (without actually sleeping) and restores the
+// original on cleanup. It pins the documented backoff schedule. Like
+// stubRelockSleep it mutates the package-level sleepFn var, so tests using it
+// must not run in parallel.
+func recordRelockSleep(t *testing.T) *[]time.Duration {
+	t.Helper()
+	orig := sleepFn
+	t.Cleanup(func() { sleepFn = orig })
+	slept := &[]time.Duration{}
+	sleepFn = func(d time.Duration) { *slept = append(*slept, d) }
+	return slept
 }
 
 // TestKeychainGetNotFound exercises the full Get path against the fake — open,
@@ -274,6 +300,56 @@ func TestGetRetriesWhenCollectionRelocks(t *testing.T) {
 
 	assert.Equal(t, int64(3), fake.getSecretCalls.Load(), "two locked failures then one success")
 	assert.Equal(t, int64(2), fake.unlockCalls.Load(), "exactly one Unlock per relock retry")
+}
+
+// TestFilterRetriesWhenCollectionRelocks covers the read path reached through
+// Filter, which loads each matched secret via loadSecret. That GetSecret is
+// wrapped in withRelockRetry just like Get's, so a collection that relocks
+// mid-read must be unlocked and retried rather than failing the whole Filter.
+func TestFilterRetriesWhenCollectionRelocks(t *testing.T) {
+	stubRelockSleep(t)
+	fake := &fakeService{
+		items: []dbus.ObjectPath{"/org/freedesktop/secrets/collection/login/1"},
+		// Filter only descends into loadSecret for items whose attributes carry a
+		// parseable id; without it the item is skipped and GetSecret never runs.
+		attributes: kc.Attributes{"id": "com.test.test/test/bob"},
+	}
+	fake.getSecretLockedErrs.Store(2)
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	creds, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+	require.NoError(t, err)
+	require.Len(t, creds, 1)
+
+	assert.Equal(t, int64(3), fake.getSecretCalls.Load(), "two locked failures then one success")
+	assert.Equal(t, int64(2), fake.unlockCalls.Load(), "exactly one Unlock per relock retry")
+}
+
+// TestRelockBackoffSchedule pins the documented exponential backoff. A
+// persistently relocked collection exhausts every retry, so the recorded delays
+// are the full schedule: 20,40,80,160,320ms (the 500ms cap only takes effect
+// once maxRelockRetries reaches 6).
+func TestRelockBackoffSchedule(t *testing.T) {
+	slept := recordRelockSleep(t)
+	fake := &fakeService{}
+	fake.createItemLockedErrs.Store(1 << 30) // never recovers, so all retries run
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	err := ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"), &mocks.MockCredential{
+		Username: "bob",
+		Password: "bob-password",
+	})
+	require.Error(t, err)
+
+	assert.Equal(t, []time.Duration{
+		20 * time.Millisecond,
+		40 * time.Millisecond,
+		80 * time.Millisecond,
+		160 * time.Millisecond,
+		320 * time.Millisecond,
+	}, *slept, "documented relock backoff schedule")
 }
 
 // TestIsLockedDBusError pins the central contract the retry depends on:

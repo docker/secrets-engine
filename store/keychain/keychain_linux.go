@@ -185,7 +185,8 @@ func isLockedDBusError(err error) bool {
 //
 // relockRetryMaxDelay caps the backoff growth; with the current
 // maxRelockRetries the slept delays are 20,40,80,160,320ms (the cap only takes
-// effect if maxRelockRetries is raised past 6).
+// effect once maxRelockRetries reaches 6, where the sixth delay would otherwise
+// be 640ms).
 const (
 	maxRelockRetries     = 5
 	relockRetryBaseDelay = 20 * time.Millisecond
@@ -193,7 +194,8 @@ const (
 )
 
 // sleepFn is the sleep seam used by the relock backoff so tests can exercise the
-// retry loop without real delays.
+// retry loop without real delays. It is a package-level var with no
+// synchronisation, so tests that swap it must not run in parallel.
 var sleepFn = time.Sleep
 
 // withRelockRetry runs a collection operation, retrying it with exponential
@@ -224,7 +226,11 @@ func withRelockRetry(service secretService, collectionPath dbus.ObjectPath, op f
 		sleepFn(delay)
 		delay = min(delay*2, relockRetryMaxDelay)
 		if unlockErr := service.Unlock([]dbus.ObjectPath{collectionPath}); unlockErr != nil {
-			return unlockErr
+			// Surface why the retry stopped while preserving errors.Is on the
+			// underlying Unlock error (e.g. a dismissed prompt). The original
+			// locked error is intentionally dropped: the failed unlock is the
+			// actionable cause once we have decided to stop retrying.
+			return fmt.Errorf("unlock after relock: %w", unlockErr)
 		}
 		err = op()
 	}
@@ -474,7 +480,14 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 // loadSecret fetches the raw secret value for itemPath, zeroes it after use,
 // and returns a fully populated Secret. collectionPath is the enclosing
 // collection, used to re-unlock if it relocks mid-read (see withRelockRetry).
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc secretService, collectionPath, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
+func (k *keychainStore[T]) loadSecret(
+	ctx context.Context,
+	id store.ID,
+	svc secretService,
+	collectionPath, itemPath dbus.ObjectPath,
+	session *kc.Session,
+	attributes map[string]string,
+) (store.Secret, error) {
 	var value []byte
 	err := withRelockRetry(svc, collectionPath, func() error {
 		var getErr error
