@@ -44,12 +44,18 @@ type fakeService struct {
 	// "credential not found" path.
 	items []dbus.ObjectPath
 
+	// attributes is returned verbatim by GetAttributes. Filter only descends into
+	// loadSecret (and therefore the wrapped GetSecret) for items whose attributes
+	// carry a parseable "id"; leave nil for paths that do not inspect attributes.
+	attributes kc.Attributes
+
 	// recorded write operations, for assertions in the Save tests. Not
 	// concurrency-safe: the tests that read them drive a single sequential
 	// operation through the fake.
 	createCalls    int
 	setSecretCalls int
 	deleteCalls    int
+	getSecretCalls int
 	setSecretItems []dbus.ObjectPath
 	deletedItems   []dbus.ObjectPath
 
@@ -63,6 +69,7 @@ type fakeService struct {
 	createItemLockedErrs int
 	setSecretLockedErrs  int
 	deleteItemLockedErrs int
+	getSecretLockedErrs  int
 	unlockCalls          int
 	unlockErr            error
 
@@ -112,8 +119,21 @@ func (f *fakeService) DeleteItem(item dbus.ObjectPath) error {
 	f.deletedItems = append(f.deletedItems, item)
 	return nil
 }
-func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error)  { return nil, nil }
-func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) { return nil, nil }
+
+func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error) {
+	return f.attributes, nil
+}
+
+func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) {
+	f.getSecretCalls++
+	if f.getSecretCalls <= f.getSecretLockedErrs {
+		return nil, lockedErr("get secret")
+	}
+	// A value MockCredential.Unmarshal can parse ("username:password"), so the
+	// Get/Filter read path completes once the simulated relock clears.
+	return []byte("bob:bob-password"), nil
+}
+
 func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
 	f.setSecretCalls++
 	if f.setSecretCalls <= f.setSecretLockedErrs {
@@ -297,6 +317,48 @@ func TestKeychainSaveStopsRetryingAfterMaxRelocks(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, isLockedDBusError(err), "the persistent locked error must reach the caller")
 	assert.Equal(t, maxRelockRetries+1, fake.createCalls, "initial attempt plus the bounded retries")
+}
+
+// TestKeychainGetRetriesWhenCollectionRelocks covers the read path: GetSecret can
+// hit org.freedesktop.Secret.Error.IsLocked if the collection relocks between the
+// unlock and the read, so Get wraps it in withRelockRetry too.
+func TestKeychainGetRetriesWhenCollectionRelocks(t *testing.T) {
+	stubRelockSleep(t)
+	fake := &fakeService{items: []dbus.ObjectPath{"/org/freedesktop/secrets/collection/login/1"}}
+	fake.getSecretLockedErrs = 2
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	secret, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/bob"))
+	require.NoError(t, err)
+	require.NotNil(t, secret)
+
+	assert.Equal(t, 3, fake.getSecretCalls, "two locked failures then one success")
+	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
+}
+
+// TestKeychainFilterRetriesWhenCollectionRelocks covers the read path reached
+// through Filter, which loads each matched secret via loadSecret. That GetSecret
+// is wrapped in withRelockRetry too, so a collection that relocks mid-read must be
+// unlocked and retried rather than failing the whole Filter.
+func TestKeychainFilterRetriesWhenCollectionRelocks(t *testing.T) {
+	stubRelockSleep(t)
+	fake := &fakeService{
+		items: []dbus.ObjectPath{"/org/freedesktop/secrets/collection/login/1"},
+		// Filter only descends into loadSecret for items whose attributes carry a
+		// parseable id; without it the item is skipped and GetSecret never runs.
+		attributes: kc.Attributes{"id": "com.test.test/test/bob"},
+	}
+	fake.getSecretLockedErrs = 2
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	creds, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+	require.NoError(t, err)
+	require.Len(t, creds, 1)
+
+	assert.Equal(t, 3, fake.getSecretCalls, "two locked failures then one success")
+	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
 }
 
 // The real-keychain dedup tests use their own service group/name so their items
