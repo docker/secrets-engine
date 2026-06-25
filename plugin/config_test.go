@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	nriNet "github.com/containerd/nri/pkg/net"
@@ -58,8 +59,13 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				os.Args = []string{"test-plugin"}
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
 				socketPath := api.DaemonSocketPath()
-				os.Remove(socketPath)
-				require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
+				// Abstract sockets (leading "@", Linux) live in the abstract
+				// namespace, not on the filesystem, so they need no directory
+				// and leave nothing to clean up.
+				if !strings.HasPrefix(socketPath, "@") {
+					os.Remove(socketPath)
+					require.NoError(t, os.MkdirAll(filepath.Dir(socketPath), 0o755))
+				}
 				listener, err := net.Listen("unix", socketPath)
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
