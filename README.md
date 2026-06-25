@@ -6,10 +6,40 @@
 
 Secrets Engine and [docker pass](https://docs.docker.com/reference/cli/docker/pass/)
 are bundled with [Docker Desktop](https://docs.docker.com/desktop/).
-A standalone version can also be installed from the [releases](https://github.com/docker/secrets-engine/releases).
 
-> [!NOTE]
-> Secret injection in Docker CE is on our roadmap.
+## Docker CE (experimental / early access)
+
+Runtime secret injection is now available in Docker CE as an **experimental,
+early-access** feature. It requires Docker Engine (`dockerd`) **29.2.0 or
+higher**.
+
+### Install
+
+Download the latest packages for your Linux distribution from the
+[releases](https://github.com/docker/secrets-engine/releases), then install them:
+```shell
+# Replace with the files you downloaded (matching your distro and arch).
+sudo apt install ./DockerSecretsEngine-linux-amd64-ubuntu2404.deb \
+                 ./DockerSecretsEnginePlugins-linux-ubuntu2404.deb
+systemctl --user daemon-reload
+systemctl --user enable --now docker-secrets-engine.service
+```
+
+Recommended:
+- `dbus` — required for the keyring backends.
+- `gnome-keyring` or `kwallet` — secret storage backend.
+
+### Uninstall
+
+```shell
+systemctl --user disable --now docker-secrets-engine.service
+sudo apt remove docker-secrets-engine-plugins docker-secrets-engine
+```
+
+> [!WARNING]
+> Docker CE support is experimental and may change between releases. Do not
+> rely on it for production workloads yet. Also see
+> [known limitations](#known-limitations).
 
 ## Runtime secret injection (no plaintext in your CLI or Compose)
 
@@ -256,6 +286,25 @@ echo "<base64 string>" | base64 --decode
 # or
 echo "<base64 string>" | base64 -d
 ```
+
+## Known limitations and issues
+
+These apply to the experimental Docker CE integration described above. We are
+actively working to address them.
+
+- **No multi-user support.** A single Docker Engine is shared by every user on
+  the host, but Secrets Engine runs as a per-user daemon. When multiple users
+  are logged in and using the same engine in parallel, the engine cannot
+  reliably route a resolution request to the right user's daemon.
+- **Requires a keyring backend.** The daemon depends on D-Bus together with a
+  Secret Service provider (GNOME Keyring or KWallet). On hosts where these are
+  missing — typically headless or server installs — the daemon currently crashes
+  instead of degrading gracefully. We are working on a fix; in the meantime, the
+  workaround is to install and set up D-Bus and either GNOME Keyring or KWallet.
+- **No automatic restart after a `dockerd` restart.** When the Docker Engine is
+  restarted, the Secrets Engine daemon must be restarted manually
+  (`systemctl --user restart docker-secrets-engine`) for injection to keep
+  working.
 
 ## Legal
 
