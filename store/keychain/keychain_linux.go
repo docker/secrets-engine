@@ -329,7 +329,12 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 	safelyCleanMetadata(attributes)
 
-	value, err := service.GetSecret(items[0], *session)
+	var value []byte
+	err = withRelockRetry(service, objectPath, func() error {
+		var getErr error
+		value, getErr = service.GetSecret(items[0], *session)
+		return getErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -520,9 +525,22 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 }
 
 // loadSecret fetches the raw secret value for itemPath, zeroes it after use,
-// and returns a fully populated Secret.
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, svc secretService, itemPath dbus.ObjectPath, session *kc.Session, attributes map[string]string) (store.Secret, error) {
-	value, err := svc.GetSecret(itemPath, *session)
+// and returns a fully populated Secret. collectionPath is the enclosing
+// collection, used to re-unlock if it relocks mid-read (see withRelockRetry).
+func (k *keychainStore[T]) loadSecret(
+	ctx context.Context,
+	id store.ID,
+	svc secretService,
+	collectionPath, itemPath dbus.ObjectPath,
+	session *kc.Session,
+	attributes map[string]string,
+) (store.Secret, error) {
+	var value []byte
+	err := withRelockRetry(svc, collectionPath, func() error {
+		var getErr error
+		value, getErr = svc.GetSecret(itemPath, *session)
+		return getErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -612,7 +630,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			continue
 		}
 
-		secret, err := k.loadSecret(ctx, secretID, service, itemPath, session, attributes)
+		secret, err := k.loadSecret(ctx, secretID, service, objectPath, itemPath, session, attributes)
 		if err != nil {
 			return nil, err
 		}
