@@ -295,16 +295,18 @@ actively working to address them.
 - **No multi-user support.** A single Docker Engine is shared by every user on
   the host, but Secrets Engine runs as a per-user daemon. When multiple users
   are logged in and using the same engine in parallel, the engine cannot
-  reliably route a resolution request to the right user's daemon.
+  reliably route a resolution request to the right user's daemon. As a
+  consequence, the user the daemon talks to is fixed at install time: the
+  package's post-install script records the installing user's UID (resolved from
+  `$SUDO_UID`, i.e. the user who ran `sudo apt install` / `sudo dnf install`)
+  into `/etc/docker/nri/conf.d/10-secrets-engine.conf`. If the UID
+  cannot be determined at install time, the config is left unset and the integration stays inert until it is
+  configured manually.
 - **Requires a keyring backend.** The daemon depends on D-Bus together with a
   Secret Service provider (GNOME Keyring or KWallet). On hosts where these are
   missing — typically headless or server installs — the daemon currently crashes
   instead of degrading gracefully. We are working on a fix; in the meantime, the
   workaround is to install and set up D-Bus and either GNOME Keyring or KWallet.
-- **No automatic restart after a `dockerd` restart.** When the Docker Engine is
-  restarted, the Secrets Engine daemon must be restarted manually
-  (`systemctl --user restart docker-secrets-engine`) for injection to keep
-  working.
 
 ## Legal
 
