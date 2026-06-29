@@ -183,6 +183,22 @@ func TestKeychainGetNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, store.ErrCredentialNotFound)
 }
 
+// TestKeychainGetAllMetadataEmpty is a regression test for `docker pass ls`
+// against an empty keychain: listing all is a valid empty result, not a miss,
+// so GetAllMetadata must return an empty (non-nil) map with a nil error rather
+// than ErrCredentialNotFound. This keeps the Linux backend consistent with
+// macOS and Windows, where `ls` on an empty store exits 0.
+func TestKeychainGetAllMetadataEmpty(t *testing.T) {
+	fake := &fakeService{} // no items -> empty collection
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	secrets, err := ks.GetAllMetadata(t.Context())
+	require.NoError(t, err)
+	assert.NotNil(t, secrets)
+	assert.Empty(t, secrets)
+}
+
 // TestKeychainClosesEveryConnection is a deterministic regression test for the
 // D-Bus connection leak: each keychain operation dials a fresh connection via
 // newService and must Close it. Driving the store through a fake lets us assert

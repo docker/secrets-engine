@@ -390,10 +390,9 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
 
-	if len(itemPaths) == 0 {
-		return nil, store.ErrCredentialNotFound
-	}
-
+	// An empty collection is a valid empty result for "list all", not a miss:
+	// return an empty (non-nil) map with a nil error. This matches the macOS and Windows backends, which
+	// have no empty-as-error guard.
 	credentials := make(map[store.ID]store.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(itemPath)
