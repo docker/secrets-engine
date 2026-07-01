@@ -23,12 +23,12 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 )
 
 type registerClient struct {
-	engineClient resolverv1connect.RegisterServiceClient
+	engineClient pluginsv1connect.RegisterServiceClient
 	pluginName   string
 	config       Config
 	timeout      time.Duration
@@ -36,7 +36,7 @@ type registerClient struct {
 
 func newRegisterClient(c *http.Client, pluginName string, config Config, timeout time.Duration) *registerClient {
 	return &registerClient{
-		engineClient: resolverv1connect.NewRegisterServiceClient(c, "http://unix"),
+		engineClient: pluginsv1connect.NewRegisterServiceClient(c, "http://unix"),
 		pluginName:   pluginName,
 		config:       config,
 		timeout:      timeout,
@@ -47,10 +47,12 @@ func (c *registerClient) register(ctx context.Context) (*runtimeConfig, error) {
 	c.config.Logger.Printf("Registering plugin %s...", c.pluginName)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	req := connect.NewRequest(resolverv1.RegisterPluginRequest_builder{
+	req := connect.NewRequest(pluginsv1.RegisterPluginRequest_builder{
 		Name:    proto.String(c.pluginName),
 		Version: proto.String(c.config.Version.String()),
-		Pattern: proto.String(c.config.Pattern.String()),
+		SecretsProvider: pluginsv1.SecretsProvider_builder{
+			Pattern: proto.String(c.config.Pattern.String()),
+		}.Build(),
 	}.Build())
 	resp, err := c.engineClient.RegisterPlugin(ctx, req)
 	if err != nil {
