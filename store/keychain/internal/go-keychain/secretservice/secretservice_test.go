@@ -23,7 +23,7 @@ func TestKeyringDH(t *testing.T) {
 }
 
 func testKeyring(t *testing.T, mode AuthenticationMode) {
-	srv, err := NewService()
+	srv, err := NewService(t.Context())
 	require.NoError(t, err)
 	session, err := srv.OpenSession(mode)
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func testKeyring(t *testing.T, mode AuthenticationMode) {
 }
 
 func TestGetAll(t *testing.T) {
-	srv, err := NewService()
+	srv, err := NewService(t.Context())
 	require.NoError(t, err)
 	session, err := srv.OpenSession(AuthenticationDHAES)
 	require.NoError(t, err)

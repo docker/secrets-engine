@@ -82,6 +82,13 @@ type fakeService struct {
 	availableErr   error
 	availableCalls int
 
+	// availableCtxDeadline / availableCtxHasDeadline record the deadline of the
+	// context the eager probe passed to Available, so a test can assert New's
+	// default-timeout behavior: a bounded probe when the caller sets no deadline,
+	// and the caller's own deadline preserved when they do.
+	availableCtxDeadline    time.Time
+	availableCtxHasDeadline bool
+
 	opened atomic.Int64
 	closed atomic.Int64
 }
@@ -155,6 +162,7 @@ func (f *fakeService) SetItemAttributes(dbus.ObjectPath, kc.Attributes) error { 
 func (f *fakeService) SetItemLabel(dbus.ObjectPath, string) error             { return nil }
 func (f *fakeService) Available(ctx context.Context) error {
 	f.availableCalls++
+	f.availableCtxDeadline, f.availableCtxHasDeadline = ctx.Deadline()
 	// Honor the caller's context so tests can assert it flows through New into
 	// the probe. A live SecretService.Available surfaces ctx cancellation the
 	// same way (via the CallWithContext round-trip).
@@ -175,7 +183,7 @@ func withFakeService(t *testing.T, fake *fakeService) {
 	t.Helper()
 	orig := newService
 	t.Cleanup(func() { newService = orig })
-	newService = func() (secretService, error) {
+	newService = func(context.Context) (secretService, error) {
 		fake.opened.Add(1)
 		return fake, nil
 	}
@@ -232,8 +240,11 @@ func TestKeychainClosesEveryConnection(t *testing.T) {
 	missing := store.MustParseID("com.test.test/test/missing")
 
 	// New eagerly probes the backend in ensureAvailable, which dials and closes
-	// one connection through the same seam. Reset the counters so the loop below
-	// measures only the per-operation connections.
+	// one connection through the same seam. Assert it dialed exactly one and
+	// balanced it (a plain opened==closed check would also pass if the probe
+	// never dialed at all), then reset the counters so the loop below measures
+	// only the per-operation connections.
+	require.Equal(t, int64(1), fake.opened.Load(), "the eager probe must dial exactly one connection")
 	require.Equal(t, fake.opened.Load(), fake.closed.Load(), "the eager probe must close its own connection")
 	fake.opened.Store(0)
 	fake.closed.Store(0)
@@ -441,7 +452,7 @@ func ensureUnlocked(t *testing.T, svc *kc.SecretService, collection dbus.ObjectP
 // [require.Eventually] condition, which runs on a separate goroutine where the
 // require.* helpers must not be used.
 func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.ObjectPath, error) {
-	svc, err := kc.NewService()
+	svc, err := kc.NewService(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +499,7 @@ func requireItemCount(t *testing.T, serviceGroup, serviceName string, id store.I
 // differing volatile attributes, so every save mints a fresh item.
 func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store.ID, n int) {
 	t.Helper()
-	svc, err := kc.NewService()
+	svc, err := kc.NewService(t.Context())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
@@ -535,7 +546,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 // cleanup failure surfaces as a leak rather than corrupting a later test.
 func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) {
 	t.Helper()
-	svc, err := kc.NewService()
+	svc, err := kc.NewService(t.Context())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
@@ -662,7 +673,7 @@ func TestNewProbeNoSessionBus(t *testing.T) {
 	orig := newService
 	t.Cleanup(func() { newService = orig })
 	dialErr := errors.New("dbus: dial failed")
-	newService = func() (secretService, error) { return nil, dialErr }
+	newService = func(context.Context) (secretService, error) { return nil, dialErr }
 
 	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
@@ -741,6 +752,52 @@ func TestNewProbeContextCanceled(t *testing.T) {
 	assert.ErrorIs(t, err, ErrKeychainUnavailable)
 	assert.ErrorIs(t, err, context.Canceled, "the caller's context cancellation must surface")
 	assert.NotErrorIs(t, err, errNoSecretServiceOwner, "cancellation must not be labeled as no-owner")
+}
+
+// TestNewProbeAppliesDefaultTimeout asserts that when the caller passes a
+// context with no deadline (e.g. context.Background()), New still bounds the
+// probe with defaultProbeTimeout so construction cannot hang indefinitely on an
+// unresponsive backend.
+func TestNewProbeAppliesDefaultTimeout(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	before := time.Now()
+	_, err := New(context.Background(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.True(t, fake.availableCtxHasDeadline,
+		"the probe context must carry the default deadline when the caller sets none")
+	// And it must be the *default* deadline, not some other (e.g. much larger)
+	// value — otherwise "stays responsive on an unreachable host" is not upheld.
+	// The probe runs against a fake in well under the tolerance, so the observed
+	// deadline sits within [before+default, before+default+tolerance].
+	assert.WithinDuration(t, before.Add(defaultProbeTimeout), fake.availableCtxDeadline, time.Second,
+		"the probe deadline must be defaultProbeTimeout out, not an arbitrary value")
+}
+
+// TestNewProbeRespectsCallerDeadline asserts a caller-supplied deadline takes
+// precedence over the internal default: New must not replace a deadline the
+// caller already set.
+func TestNewProbeRespectsCallerDeadline(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	// A deadline far longer than defaultProbeTimeout: if New wrongly imposed its
+	// own default, the observed deadline would be ~defaultProbeTimeout out, not
+	// this one.
+	deadline := time.Now().Add(time.Hour)
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
+
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.True(t, fake.availableCtxHasDeadline)
+	assert.WithinDuration(t, deadline, fake.availableCtxDeadline, time.Second,
+		"the caller's deadline must reach the probe unchanged")
 }
 
 func TestResolveDefaultCollection(t *testing.T) {

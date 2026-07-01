@@ -87,3 +87,41 @@ the eager availability probe used internally.
   reflect it. In-repo callers updated: `PassStore`, `store/keychain/cmd`.
 
 ---
+
+2026-07-01 ctx-aware, no-autolaunch dial + short default probe timeout
+
+Follow-up to the two entries above, making the probe fast and the dial honor the
+context. These changes touch the shared `newService`/`kc.NewService` path, so
+every store operation (not only the probe) benefits.
+
+- **No autolaunch.** `kc.NewService` now dials with
+  `dbus.SessionBusPrivateNoAutoStartup` instead of `dbus.ConnectSessionBus`.
+  `ConnectSessionBus` resolves the address with `autolaunch=true`, which on a
+  host with no `DBUS_SESSION_BUS_ADDRESS` (exactly the WSL/headless target case)
+  execs `dbus-launch` — slow, and a side effect (it spawns a bus). The probe's
+  whole point is to *detect* an absent bus, so launching one is wrong. With
+  no-autostartup the missing-bus case now fails fast with `ErrNoSessionBus`.
+  `NewService` performs the `Auth`+`Hello` handshake itself, which
+  `ConnectSessionBus` previously did.
+- **Socket pre-check.** Before dialing, `NewService` resolves the
+  `unix:path=` endpoint from `DBUS_SESSION_BUS_ADDRESS` and `os.Stat`s it,
+  returning `ErrNoSessionBus` immediately if it is missing (abstract/tcp
+  addresses and an unset address fall through to a normal dial). This is a fast
+  path with a clearer error; the unix dial would also have failed fast.
+- **ctx-aware dial.** `newService` takes a `context.Context` threaded from `New`
+  (probe) and from each store operation. It is passed to godbus via
+  `dbus.WithContext`, so cancelling `ctx` tears the connection down and bounds
+  `Auth`/`Hello`/`NameHasOwner`. The raw socket dial inside godbus is still not
+  ctx-aware, but a unix dial fails immediately when the socket is missing or
+  unaccepting, and the pre-dial stat covers the stale-address case.
+- **Short default probe timeout, reinstated.** The internal cap removed in the
+  entry above is back as `defaultProbeTimeout` (2s, down from the original 5s),
+  but applied **only when the caller's `ctx` has no deadline**. A caller-supplied
+  deadline always wins, so this keeps `New` responsive for callers passing
+  `context.Background()` (e.g. `store/keychain/cmd`) without taking ownership of
+  cancellation away from callers who want it. This supersedes the "no internal
+  timeout" decision above.
+- `Delete` and `Save`, which previously ignored their `context.Context`, now
+  thread it into the dial like the other operations.
+
+---

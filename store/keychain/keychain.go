@@ -131,10 +131,13 @@ func WithUseDataProtectionKeychain() DarwinOptions {
 // [Factory] is a function used to instantiate new secrets of type T.
 //
 // ctx bounds the eager backend-availability probe New performs before returning
-// (see [ErrKeychainUnavailable]). On Linux the probe issues a single D-Bus
-// round-trip, so a caller that wants to bound or cancel it should pass a context
-// with a deadline; on macOS/Windows the probe is a no-op and ctx is unused. New
-// does not retain ctx: it governs construction only, not later store operations.
+// (see [ErrKeychainUnavailable]). On Linux it bounds the probe's D-Bus
+// connection handshake and its NameHasOwner round-trip, and lets the caller
+// cancel construction; if ctx carries no deadline, New applies a short internal
+// default so construction stays responsive on an unreachable host, and a
+// caller-supplied deadline always takes precedence. On macOS/Windows the probe
+// is a no-op and ctx is unused. New does not retain ctx: it governs construction
+// only, not later store operations.
 func New[T store.Secret](ctx context.Context, serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")

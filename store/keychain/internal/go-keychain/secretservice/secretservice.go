@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"strings"
 	"time"
 
 	dbus "github.com/godbus/dbus/v5"
@@ -67,11 +69,44 @@ type Session struct {
 // DefaultSessionOpenTimeout
 const DefaultSessionOpenTimeout = 10 * time.Second
 
-// NewService
-func NewService() (*SecretService, error) {
-	conn, err := dbus.ConnectSessionBus()
+// ErrNoSessionBus is returned by [NewService] when no D-Bus session bus can be
+// reached: either DBUS_SESSION_BUS_ADDRESS names a unix socket that does not
+// exist, or no session bus address can be determined without launching one. The
+// keychain package wraps it under its ErrKeychainUnavailable sentinel.
+var ErrNoSessionBus = errors.New("no D-Bus session bus available")
+
+// NewService dials a fresh private connection to the D-Bus session bus and
+// returns a [SecretService] bound to it. Every call dials its own connection, so
+// the caller MUST Close the returned service (see [SecretService.Close]).
+//
+// ctx bounds the connection's Auth and Hello handshake and every subsequent
+// D-Bus call issued on it: cancelling ctx tears the connection down (godbus
+// closes it when ctx is done). NewService never autolaunches a session bus — it
+// uses [dbus.SessionBusPrivateNoAutoStartup] rather than dbus.ConnectSessionBus,
+// so on a host with no running bus (WSL, headless) it fails fast with
+// [ErrNoSessionBus] instead of spawning dbus-launch. As a further fast path it
+// stats the session bus unix socket before dialing and returns [ErrNoSessionBus]
+// if that socket is missing.
+//
+// NOTE: the raw socket dial itself is performed by godbus and is not ctx-aware;
+// ctx bounds everything after the connection is established. In practice a unix
+// socket dial fails immediately when the socket is missing or unaccepting, and
+// the pre-dial stat covers the common stale-address case.
+func NewService(ctx context.Context) (*SecretService, error) {
+	if paths, missing := sessionBusMissingSocket(); missing {
+		return nil, fmt.Errorf("%w: no session bus socket exists (%s)", ErrNoSessionBus, paths)
+	}
+	conn, err := dbus.SessionBusPrivateNoAutoStartup(dbus.WithContext(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("failed to open dbus connection: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrNoSessionBus, err)
+	}
+	if err := conn.Auth(nil); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to authenticate to dbus session bus: %w", err)
+	}
+	if err := conn.Hello(); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to complete dbus Hello handshake: %w", err)
 	}
 	signalCh := make(chan *dbus.Signal, 16)
 	conn.Signal(signalCh)
@@ -79,13 +114,73 @@ func NewService() (*SecretService, error) {
 	return &SecretService{conn: conn, signalCh: signalCh, sessionOpenTimeout: DefaultSessionOpenTimeout}, nil
 }
 
+// sessionBusMissingSocket reports whether DBUS_SESSION_BUS_ADDRESS names one or
+// more session bus endpoints and *every* one is a unix socket path that does not
+// exist — the only case where dialing is guaranteed to fail, so NewService can
+// fail fast without paying for a dial. The returned string lists the missing
+// paths for the error message.
+//
+// It returns ("", false) — "cannot rule the bus out, dial normally" — whenever
+// the address is unset or "autolaunch:", OR any endpoint is not a stat-able unix
+// path (an abstract socket, a tcp endpoint, or an unparseable entry), OR any unix
+// path's socket exists. This deliberately mirrors godbus, which tries each
+// ';'-separated endpoint in turn and uses the first that connects: we only
+// short-circuit when no endpoint could possibly connect.
+func sessionBusMissingSocket() (string, bool) {
+	addr := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
+	if addr == "" || addr == "autolaunch:" {
+		return "", false
+	}
+	var missing []string
+	for entry := range strings.SplitSeq(addr, ";") {
+		if entry == "" {
+			continue
+		}
+		path, ok := unixSocketPath(entry)
+		if !ok {
+			// Not a stat-able unix path (abstract, tcp, unparseable): this
+			// endpoint might connect, so let godbus dial rather than guess.
+			return "", false
+		}
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			// Socket exists, or stat failed for another reason (e.g. a
+			// permission quirk): this endpoint might connect, so dial normally.
+			return "", false
+		}
+		missing = append(missing, path)
+	}
+	if len(missing) == 0 {
+		return "", false
+	}
+	return strings.Join(missing, ", "), true
+}
+
+// unixSocketPath returns the filesystem path of a single "transport:key=val,..."
+// address entry, with ok=true, when it is a "unix:...path=" endpoint. It returns
+// ok=false for abstract unix sockets (which have no filesystem path to stat),
+// non-unix transports (tcp, ...), and any entry with no path key.
+func unixSocketPath(entry string) (string, bool) {
+	if !strings.HasPrefix(entry, "unix:") {
+		return "", false
+	}
+	for kv := range strings.SplitSeq(strings.TrimPrefix(entry, "unix:"), ",") {
+		key, value, found := strings.Cut(kv, "=")
+		if found && key == "path" {
+			if unescaped, err := dbus.UnescapeBusAddressValue(value); err == nil {
+				return unescaped, true
+			}
+			return value, true
+		}
+	}
+	return "", false
+}
+
 // Close releases the underlying D-Bus connection and its socket file
-// descriptor. Each [NewService] call dials a private session-bus connection
-// (via dbus.ConnectSessionBus), so every service MUST be closed when it is no
-// longer needed; otherwise the connection — and its fd — leaks for the lifetime
-// of the process. Closing the connection also tears down the signal goroutine
-// that NewService starts. Close is safe to call on a service whose connection
-// is nil.
+// descriptor. Each [NewService] call dials a private session-bus connection, so
+// every service MUST be closed when it is no longer needed; otherwise the
+// connection — and its fd — leaks for the lifetime of the process. Closing the
+// connection also tears down the signal goroutine that NewService starts. Close
+// is safe to call on a service whose connection is nil.
 func (s *SecretService) Close() error {
 	if s == nil || s.conn == nil {
 		return nil
@@ -107,11 +202,14 @@ const nameHasOwnerMethod = "org.freedesktop.DBus.NameHasOwner"
 // activating it or producing any user-facing prompt.
 //
 // It issues a single org.freedesktop.DBus.NameHasOwner query against the bus
-// daemon object ([dbus.Conn.BusObject]), which the daemon answers from its own
-// name registry and never forwards to org.freedesktop.secrets; passing
-// [dbus.FlagNoAutoStart] additionally guarantees the daemon will not spawn the
-// service. It therefore cannot reach any prompt path (see [PromptAndWait]) and
-// cannot mutate the keyring.
+// daemon object ([dbus.Conn.BusObject]). Prompt-safety comes from the nature of
+// that call: NameHasOwner is answered by the bus daemon from its own name
+// registry and is never forwarded to org.freedesktop.secrets, so it cannot reach
+// any prompt path (see [PromptAndWait]) and cannot mutate the keyring.
+// [dbus.FlagNoAutoStart] is passed as defence-in-depth, but note it has no effect
+// on this particular call: the destination is the always-running bus daemon
+// (org.freedesktop.DBus), not an activatable service, so there is nothing for the
+// flag to suppress here.
 //
 // It returns nil when the name is owned, [ErrNoSecretService] when it is not,
 // or the underlying error on a transport failure or a ctx timeout.

@@ -60,19 +60,31 @@ if errors.Is(err, keychain.ErrKeychainUnavailable) {
 }
 ```
 
-`New` takes a `context.Context`. On Linux it bounds (and can cancel) the single
-D-Bus round-trip the probe performs — pass a context with a deadline to cap it;
-on macOS/Windows the probe is a no-op and `ctx` is unused. `New` does not retain
-`ctx`: it governs construction only, not later store operations.
+`New` takes a `context.Context`. On Linux it bounds (and can cancel) the probe's
+D-Bus connection handshake and its `NameHasOwner` round-trip. When `ctx` carries
+no deadline, `New` caps the probe with a short internal default
+(`defaultProbeTimeout`, 2s) so construction stays responsive on an unreachable
+host; a caller-supplied deadline always wins. On macOS/Windows the probe is a
+no-op and `ctx` is unused. `New` does not retain `ctx`: it governs construction
+only, not later store operations.
 
 On Linux the check dials a fresh connection through the same path every
 operation uses and asks the **D-Bus daemon** whether `org.freedesktop.secrets`
-has an owner, via `org.freedesktop.DBus.NameHasOwner` with `FlagNoAutoStart`. It
-is intentionally **prompt-safe and side-effect-free**: the query is answered by
-`dbus-daemon` from its own name registry and is never forwarded to the Secret
-Service backend, so it can never reach a password/unlock prompt, never activates
-the backend, and never touches a collection or item. The probe connection is
-closed immediately, preserving the fresh-connection-per-operation design.
+has an owner, via `org.freedesktop.DBus.NameHasOwner`. It is intentionally
+**prompt-safe and side-effect-free**: the query is answered by `dbus-daemon` from
+its own name registry and is never forwarded to the Secret Service backend, so it
+can never reach a password/unlock prompt, never activates the backend, and never
+touches a collection or item. The probe connection is closed immediately,
+preserving the fresh-connection-per-operation design.
+
+The dial itself never launches a session bus: `NewService` uses
+`dbus.SessionBusPrivateNoAutoStartup` rather than `dbus.ConnectSessionBus`, so on
+a host with no running bus it fails fast instead of spawning `dbus-launch` (which
+would be both slow and a side effect). As an additional fast path the dial stats
+the session bus unix socket first and gives up immediately if it is missing. The
+raw socket dial performed by `godbus` is not itself `ctx`-aware, but a unix
+socket dial fails immediately when the socket is missing or unaccepting, and the
+`ctx` bounds everything from the authentication handshake onward.
 
 `ErrKeychainUnavailable` is the caller's fallback signal and is **distinct from**
 `ErrNoDefaultCollection`: the availability check does not assert that a

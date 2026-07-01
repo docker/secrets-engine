@@ -12,17 +12,28 @@ For more design implementation see [../docs/keychain/design.md](../docs/keychain
 ## Quickstart
 
 ```go
-import "github.com/docker/secrets-engine/store/keychain"
+import (
+	"context"
+
+	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/store/keychain"
+	"github.com/docker/secrets-engine/store/mocks"
+)
 
 func main() {
-    kc, err := keychain.New(
-        ctx,
-        "service-group",
-        "service-name",
-		func() *mocks.MockCredential {
+	ctx := context.Background()
+	kc, err := keychain.New(
+		ctx,
+		"service-group",
+		"service-name",
+		func(_ context.Context, _ store.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
-    )
+	)
+	if err != nil {
+		// handle error (see Availability below for detecting an unusable host)
+	}
+	_ = kc
 }
 ```
 
@@ -42,11 +53,15 @@ if errors.Is(err, keychain.ErrKeychainUnavailable) {
 }
 ```
 
-The `ctx` bounds the availability probe: on Linux it is a single D-Bus
-round-trip, so pass a context with a deadline if you want to cap it. The check
-is prompt-safe and side-effect-free: it asks the D-Bus daemon whether the Secret
-Service is registered and never touches your stored secrets. On macOS and
-Windows the check is a no-op (and `ctx` is unused). See
+The `ctx` bounds the availability probe. On Linux it bounds the probe's D-Bus
+connection handshake and its single `NameHasOwner` round-trip and lets you cancel
+construction; if you pass a context without a deadline, `New` applies a short
+internal default so it stays responsive on an unreachable host, and any deadline
+you set yourself always wins. The probe never launches a session bus
+(`dbus-launch`) and, as a fast path, checks that the session bus socket exists
+before dialing. The check is prompt-safe and side-effect-free: it asks the D-Bus
+daemon whether the Secret Service is registered and never touches your stored
+secrets. On macOS and Windows the check is a no-op (and `ctx` is unused). See
 [../docs/keychain/design.md](../docs/keychain/design.md) for details.
 
 ### Secrets
