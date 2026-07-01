@@ -29,8 +29,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/docker/secrets-engine/x/api"
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
@@ -40,9 +40,9 @@ type mockRegistrationHandler struct {
 	registerRequests int
 }
 
-func (m *mockRegistrationHandler) RegisterPlugin(context.Context, *connect.Request[resolverv1.RegisterPluginRequest]) (*connect.Response[resolverv1.RegisterPluginResponse], error) {
+func (m *mockRegistrationHandler) RegisterPlugin(context.Context, *connect.Request[pluginsv1.RegisterPluginRequest]) (*connect.Response[pluginsv1.RegisterPluginResponse], error) {
 	m.registerRequests++
-	return connect.NewResponse(resolverv1.RegisterPluginResponse_builder{
+	return connect.NewResponse(pluginsv1.RegisterPluginResponse_builder{
 		EngineName:     proto.String("mock"),
 		EngineVersion:  proto.String("v1.0.0"),
 		RequestTimeout: durationpb.New(10 * time.Second),
@@ -54,7 +54,7 @@ func Test_setup(t *testing.T) {
 		a, b := net.Pipe()
 		httpMux := http.NewServeMux()
 		mRegister := &mockRegistrationHandler{}
-		httpMux.Handle(resolverv1connect.NewRegisterServiceHandler(mRegister))
+		httpMux.Handle(pluginsv1connect.NewRegisterServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
 		_, client, err := ipc.NewServerIPC(testhelper.TestLogger(t), a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)
@@ -68,7 +68,7 @@ func Test_setup(t *testing.T) {
 			close(pluginClosed)
 		})
 		require.NoError(t, err)
-		_, err = resolverv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(resolverv1.ShutdownRequest_builder{}.Build()))
+		_, err = pluginsv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(pluginsv1.ShutdownRequest_builder{}.Build()))
 		assert.NoError(t, err)
 		assert.NoError(t, testhelper.WaitForClosedWithTimeout(pluginClosed))
 		assert.NoError(t, closer.Close())

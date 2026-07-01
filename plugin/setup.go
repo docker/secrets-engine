@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -34,7 +35,7 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 	})
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	httpMux.Handle(resolverv1connect.NewPluginServiceHandler(&pluginService{func(context.Context) {
+	httpMux.Handle(pluginsv1connect.NewPluginServiceHandler(&pluginService{func(context.Context) {
 		once()
 	}}))
 	setupCompleted := make(chan struct{})

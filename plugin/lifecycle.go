@@ -19,17 +19,17 @@ import (
 
 	"connectrpc.com/connect"
 
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 )
 
-var _ resolverv1connect.PluginServiceHandler = &pluginService{}
+var _ pluginsv1connect.PluginServiceHandler = &pluginService{}
 
 type pluginService struct {
 	shutdown func(context.Context)
 }
 
-func (s *pluginService) Shutdown(ctx context.Context, _ *connect.Request[resolverv1.ShutdownRequest]) (*connect.Response[resolverv1.ShutdownResponse], error) {
+func (s *pluginService) Shutdown(ctx context.Context, _ *connect.Request[pluginsv1.ShutdownRequest]) (*connect.Response[pluginsv1.ShutdownResponse], error) {
 	s.shutdown(ctx)
-	return connect.NewResponse(&resolverv1.ShutdownResponse{}), nil
+	return connect.NewResponse(&pluginsv1.ShutdownResponse{}), nil
 }
