@@ -18,6 +18,7 @@ package keychain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -72,6 +73,14 @@ type fakeService struct {
 	getSecretLockedErrs  int
 	unlockCalls          int
 	unlockErr            error
+
+	// availableErr, when set, is returned by Available so a test can drive the
+	// eager-probe failure paths in New. The zero value (nil) reports the backend
+	// as available, so every existing test that constructs a store via
+	// setupKeychain keeps passing. availableCalls counts how many times the
+	// eager probe invoked Available.
+	availableErr   error
+	availableCalls int
 
 	opened atomic.Int64
 	closed atomic.Int64
@@ -144,6 +153,11 @@ func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
 }
 func (f *fakeService) SetItemAttributes(dbus.ObjectPath, kc.Attributes) error { return nil }
 func (f *fakeService) SetItemLabel(dbus.ObjectPath, string) error             { return nil }
+func (f *fakeService) Available(context.Context) error {
+	f.availableCalls++
+	return f.availableErr
+}
+
 func (f *fakeService) Close() error {
 	f.closed.Add(1)
 	return nil
@@ -210,6 +224,13 @@ func TestKeychainClosesEveryConnection(t *testing.T) {
 
 	ks := setupKeychain(t, nil)
 	missing := store.MustParseID("com.test.test/test/missing")
+
+	// New eagerly probes the backend in ensureAvailable, which dials and closes
+	// one connection through the same seam. Reset the counters so the loop below
+	// measures only the per-operation connections.
+	require.Equal(t, fake.opened.Load(), fake.closed.Load(), "the eager probe must close its own connection")
+	fake.opened.Store(0)
+	fake.closed.Store(0)
 
 	const iterations = 30
 	for range iterations {
@@ -592,6 +613,109 @@ func TestKeychainSaveDoesNotAccumulate(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("password-%d", saves-1), actual.Password)
 	assert.Equal(t, fmt.Sprintf("%d", saves-1), actual.Attributes["nonce"],
 		"the surviving item's metadata must be refreshed in place")
+}
+
+// TestNewProbeSucceeds asserts the eager availability probe passes for a
+// reachable backend: New returns a usable store, dialing exactly one connection
+// and closing it (honoring the leak contract).
+func TestNewProbeSucceeds(t *testing.T) {
+	fake := &fakeService{} // availableErr nil -> backend reachable
+	withFakeService(t, fake)
+
+	ks, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.NotNil(t, ks)
+	assert.Equal(t, int64(1), fake.opened.Load(), "the probe dials exactly one connection")
+	assert.Equal(t, fake.opened.Load(), fake.closed.Load(), "the probe must close its connection")
+}
+
+// TestNewProbeNoOwner asserts that when the session bus is reachable but no
+// process owns org.freedesktop.secrets, New fails eagerly with
+// ErrKeychainUnavailable wrapping the no-owner cause — and NOT
+// ErrNoDefaultCollection, which is a distinct (reachable-but-uninitialized)
+// condition the probe deliberately does not assert against.
+func TestNewProbeNoOwner(t *testing.T) {
+	fake := &fakeService{availableErr: kc.ErrNoSecretService}
+	withFakeService(t, fake)
+
+	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, errNoSecretServiceOwner)
+	assert.NotErrorIs(t, err, ErrNoDefaultCollection)
+}
+
+// TestNewProbeNoSessionBus asserts that a failure to dial the session bus (the
+// WSL / headless case) surfaces eagerly as ErrKeychainUnavailable wrapping the
+// session-bus cause, preserving the underlying dial error for diagnostics.
+func TestNewProbeNoSessionBus(t *testing.T) {
+	orig := newService
+	t.Cleanup(func() { newService = orig })
+	dialErr := errors.New("dbus: dial failed")
+	newService = func() (secretService, error) { return nil, dialErr }
+
+	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, errSessionBusUnavailable)
+	assert.ErrorIs(t, err, dialErr, "the underlying dial error must be preserved")
+}
+
+// TestNewProbeTransportError asserts that a transport/timeout error from the
+// availability probe (anything other than the no-owner sentinel) is reported
+// under ErrKeychainUnavailable WITHOUT being mislabeled as the no-owner cause.
+func TestNewProbeTransportError(t *testing.T) {
+	transportErr := errors.New("connection reset")
+	fake := &fakeService{availableErr: transportErr}
+	withFakeService(t, fake)
+
+	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, transportErr)
+	assert.NotErrorIs(t, err, errNoSecretServiceOwner, "a transport error must not be labeled as no-owner")
+}
+
+// TestNewProbeShape guards that the eager probe does exactly the work it is
+// supposed to and nothing more: New runs the availability check exactly once,
+// over a single connection it dials and closes, and reaches for no read, write,
+// or unlock operation on the service interface.
+//
+// NOTE: this constrains the *probe's call shape through the secretService seam*;
+// it is NOT the prompt-safety proof. The prompt-safety guarantee — that the
+// query is answered by the D-Bus daemon and never forwarded to
+// org.freedesktop.secrets, so it cannot reach PromptAndWait — lives in the real
+// [kc.SecretService.Available] (NameHasOwner on the bus daemon object with
+// FlagNoAutoStart) and is documented there; the fake bypasses that mechanism.
+func TestNewProbeShape(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+
+	// The probe actually ran (so this test fails if ensureAvailable becomes a
+	// no-op) and balanced its one connection.
+	assert.Equal(t, 1, fake.availableCalls, "the probe must run the availability check exactly once")
+	assert.Equal(t, int64(1), fake.opened.Load(), "the probe dials exactly one connection")
+	assert.Equal(t, fake.opened.Load(), fake.closed.Load(), "the probe must close its connection")
+
+	// It performs no item read/write/unlock through the service interface.
+	assert.Zero(t, fake.unlockCalls, "the probe must not unlock")
+	assert.Zero(t, fake.createCalls, "the probe must not create items")
+	assert.Zero(t, fake.deleteCalls, "the probe must not delete items")
+	assert.Zero(t, fake.setSecretCalls, "the probe must not write secrets")
+	assert.Zero(t, fake.getSecretCalls, "the probe must not read secrets")
 }
 
 func TestResolveDefaultCollection(t *testing.T) {

@@ -43,6 +43,11 @@ func (k *keychainStore[T]) setUseDataProtectionKeychain(v bool) {
 	k.useDataProtectionKeychain = v
 }
 
+// ensureAvailable is the macOS no-op of the per-platform availability hook New
+// calls. The macOS Keychain is always available to a logged-in user, so New
+// never returns ErrKeychainUnavailable here.
+func ensureAvailable() error { return nil }
+
 // newKeychainItem creates a new keychain item with valid default parameters.
 //
 // It uses a generic password class, which is suitable for most use cases.

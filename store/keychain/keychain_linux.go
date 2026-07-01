@@ -69,6 +69,10 @@ type secretService interface {
 	SetItemSecret(item dbus.ObjectPath, secret kc.Secret) error
 	SetItemAttributes(item dbus.ObjectPath, attributes kc.Attributes) error
 	SetItemLabel(item dbus.ObjectPath, label string) error
+	// Available reports whether the secret service backend is reachable,
+	// without activating it or prompting the user. It backs the eager
+	// availability check in New (see ensureAvailable).
+	Available(ctx context.Context) error
 	Close() error
 }
 
@@ -78,6 +82,69 @@ var _ secretService = (*kc.SecretService)(nil)
 // newService dials a fresh secret service. It is a package var so tests can
 // substitute a fake; production always returns a real [kc.SecretService].
 var newService = func() (secretService, error) { return kc.NewService() }
+
+// Causes wrapped under the exported [ErrKeychainUnavailable] sentinel. They are
+// unexported because no caller branches on the specific cause today; they are
+// wrapped (not discarded) so either could be promoted to an exported sentinel
+// with zero behavioral change if a caller ever needs to distinguish the two
+// failure modes via errors.Is.
+var (
+	// errSessionBusUnavailable is wrapped when the D-Bus session bus could not
+	// be dialed (dbus.ConnectSessionBus returned an error). This is the WSL /
+	// headless / DBUS_SESSION_BUS_ADDRESS-unset case where there is no session
+	// bus at all, but it also covers a session bus that exists yet cannot be
+	// connected to or authenticated against. In every case the Secret Service
+	// backend is unreachable, so no keychain operation could succeed.
+	errSessionBusUnavailable = errors.New("D-Bus session bus unavailable")
+
+	// errNoSecretServiceOwner is wrapped when the session bus is reachable but
+	// no process owns the org.freedesktop.secrets name (no gnome-keyring,
+	// kwallet, or other Secret Service daemon is running), detected via
+	// NameHasOwner returning false.
+	errNoSecretServiceOwner = errors.New("no org.freedesktop.secrets owner on the session bus")
+)
+
+// availabilityProbeTimeout bounds the eager availability probe issued by New
+// (via ensureAvailable) so a pathological bus daemon cannot block construction
+// indefinitely. It bounds the NameHasOwner round-trip; the underlying session
+// bus dial inside newService is governed by dbus's own connection handling.
+const availabilityProbeTimeout = 5 * time.Second
+
+// ensureAvailable eagerly checks that the secret service backend is reachable,
+// so New fails at construction time on a host without a usable keyring (for
+// example WSL with no D-Bus session bus, or no gnome-keyring/kwallet running)
+// instead of failing on the first operation.
+//
+// It dials a fresh connection through the newService seam, asks the D-Bus
+// daemon whether org.freedesktop.secrets has an owner, and closes the
+// connection immediately — preserving the fresh-connection-per-operation
+// contract. The probe is prompt-safe and side-effect-free: it never activates
+// the backend, opens a session, or touches any collection or item (see
+// [kc.SecretService.Available]).
+//
+// Every failure is reported under the exported [ErrKeychainUnavailable]
+// sentinel, with a more specific unexported cause wrapped underneath where one
+// is known.
+func ensureAvailable() error {
+	service, err := newService()
+	if err != nil {
+		return fmt.Errorf("%w: %w: %w", ErrKeychainUnavailable, errSessionBusUnavailable, err)
+	}
+	defer func() { _ = service.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), availabilityProbeTimeout)
+	defer cancel()
+
+	if err := service.Available(ctx); err != nil {
+		if errors.Is(err, kc.ErrNoSecretService) {
+			return fmt.Errorf("%w: %w", ErrKeychainUnavailable, errNoSecretServiceOwner)
+		}
+		// Transport failure or timeout talking to the bus daemon: surface it
+		// under the public sentinel without claiming a specific cause.
+		return fmt.Errorf("%w: %w", ErrKeychainUnavailable, err)
+	}
+	return nil
+}
 
 // getDefaultCollection gets the secret service collection dbus object path.
 //

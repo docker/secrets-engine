@@ -45,3 +45,33 @@ it defaults finding the default keyring.
 
 To communicate with the `org.freedesktop.secrets` API, we are using `dbus`.
 It is a convenient way of communicating without needing any direct C library integration.
+
+### Eager availability check
+
+`New` eagerly verifies that the keychain backend is reachable before returning,
+so callers can detect an unusable host (for example WSL or a headless machine
+with no D-Bus session bus, or a desktop with no `gnome-keyring`/`kwallet`
+running) at construction time and fall back gracefully:
+
+```go
+st, err := keychain.New(group, name, factory)
+if errors.Is(err, keychain.ErrKeychainUnavailable) {
+    // backend unreachable on this host — fall back to another store
+}
+```
+
+On Linux the check dials a fresh connection through the same path every
+operation uses and asks the **D-Bus daemon** whether `org.freedesktop.secrets`
+has an owner, via `org.freedesktop.DBus.NameHasOwner` with `FlagNoAutoStart`. It
+is intentionally **prompt-safe and side-effect-free**: the query is answered by
+`dbus-daemon` from its own name registry and is never forwarded to the Secret
+Service backend, so it can never reach a password/unlock prompt, never activates
+the backend, and never touches a collection or item. The probe connection is
+closed immediately, preserving the fresh-connection-per-operation design.
+
+`ErrKeychainUnavailable` is the caller's fallback signal and is **distinct from**
+`ErrNoDefaultCollection`: the availability check does not assert that a
+collection exists, so a reachable-but-uninitialized keyring still passes `New`
+and surfaces `ErrNoDefaultCollection` lazily on the first operation, as before.
+On macOS and Windows the check is a no-op (`New` never returns
+`ErrKeychainUnavailable` there).

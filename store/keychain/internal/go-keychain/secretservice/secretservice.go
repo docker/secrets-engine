@@ -1,6 +1,7 @@
 package secretservice
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -90,6 +91,44 @@ func (s *SecretService) Close() error {
 		return nil
 	}
 	return s.conn.Close()
+}
+
+// ErrNoSecretService is returned by [SecretService.Available] when no process
+// owns the org.freedesktop.secrets name on the session bus, i.e. no Secret
+// Service backend (such as gnome-keyring or kwallet) is currently running. The
+// keychain package wraps it under its ErrKeychainUnavailable sentinel.
+var ErrNoSecretService = errors.New("no org.freedesktop.secrets owner on the session bus")
+
+// nameHasOwnerMethod is the org.freedesktop.DBus daemon method that reports
+// whether a bus name currently has an owner.
+const nameHasOwnerMethod = "org.freedesktop.DBus.NameHasOwner"
+
+// Available reports whether the Secret Service backend is reachable, without
+// activating it or producing any user-facing prompt.
+//
+// It issues a single org.freedesktop.DBus.NameHasOwner query against the bus
+// daemon object ([dbus.Conn.BusObject]), which the daemon answers from its own
+// name registry and never forwards to org.freedesktop.secrets; passing
+// [dbus.FlagNoAutoStart] additionally guarantees the daemon will not spawn the
+// service. It therefore cannot reach any prompt path (see [PromptAndWait]) and
+// cannot mutate the keyring.
+//
+// It returns nil when the name is owned, [ErrNoSecretService] when it is not,
+// or the underlying error on a transport failure or a ctx timeout.
+func (s *SecretService) Available(ctx context.Context) error {
+	if s == nil || s.conn == nil {
+		return errors.New("secret service connection is not open")
+	}
+	var hasOwner bool
+	if err := s.conn.BusObject().
+		CallWithContext(ctx, nameHasOwnerMethod, dbus.FlagNoAutoStart, SecretServiceInterface).
+		Store(&hasOwner); err != nil {
+		return err
+	}
+	if !hasOwner {
+		return ErrNoSecretService
+	}
+	return nil
 }
 
 // SetSessionOpenTimeout
