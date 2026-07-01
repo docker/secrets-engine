@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
 	github.com/docker/secrets-engine/client v0.0.29
-	github.com/docker/secrets-engine/plugin v0.0.22
+	github.com/docker/secrets-engine/plugin v0.1.0
 	github.com/docker/secrets-engine/store v0.1.0
 	github.com/docker/secrets-engine/x v0.1.0-do.not.use
 	github.com/joho/godotenv v1.5.1
@@ -22,7 +22,6 @@ require (
 	connectrpc.com/connect v1.19.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/containerd/nri v0.11.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
