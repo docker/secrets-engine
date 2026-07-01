@@ -153,8 +153,14 @@ func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
 }
 func (f *fakeService) SetItemAttributes(dbus.ObjectPath, kc.Attributes) error { return nil }
 func (f *fakeService) SetItemLabel(dbus.ObjectPath, string) error             { return nil }
-func (f *fakeService) Available(context.Context) error {
+func (f *fakeService) Available(ctx context.Context) error {
 	f.availableCalls++
+	// Honor the caller's context so tests can assert it flows through New into
+	// the probe. A live SecretService.Available surfaces ctx cancellation the
+	// same way (via the CallWithContext round-trip).
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return f.availableErr
 }
 
@@ -561,7 +567,7 @@ func TestKeychainCollapsesExistingDuplicates(t *testing.T) {
 	seedRealDuplicates(t, dedupServiceGroup, dedupServiceName, id, 3)
 	require.Len(t, findRealItems(t, dedupServiceGroup, dedupServiceName, id), 3, "precondition: three duplicates seeded")
 
-	ks, err := New(dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -588,7 +594,7 @@ func TestKeychainSaveDoesNotAccumulate(t *testing.T) {
 	id := store.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/no-accumulate")
 	t.Cleanup(func() { purgeRealItems(t, dedupServiceGroup, dedupServiceName, id) })
 
-	ks, err := New(dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -622,7 +628,7 @@ func TestNewProbeSucceeds(t *testing.T) {
 	fake := &fakeService{} // availableErr nil -> backend reachable
 	withFakeService(t, fake)
 
-	ks, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -640,7 +646,7 @@ func TestNewProbeNoOwner(t *testing.T) {
 	fake := &fakeService{availableErr: kc.ErrNoSecretService}
 	withFakeService(t, fake)
 
-	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -658,7 +664,7 @@ func TestNewProbeNoSessionBus(t *testing.T) {
 	dialErr := errors.New("dbus: dial failed")
 	newService = func() (secretService, error) { return nil, dialErr }
 
-	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -675,7 +681,7 @@ func TestNewProbeTransportError(t *testing.T) {
 	fake := &fakeService{availableErr: transportErr}
 	withFakeService(t, fake)
 
-	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -699,7 +705,7 @@ func TestNewProbeShape(t *testing.T) {
 	fake := &fakeService{}
 	withFakeService(t, fake)
 
-	_, err := New("com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -716,6 +722,25 @@ func TestNewProbeShape(t *testing.T) {
 	assert.Zero(t, fake.deleteCalls, "the probe must not delete items")
 	assert.Zero(t, fake.setSecretCalls, "the probe must not write secrets")
 	assert.Zero(t, fake.getSecretCalls, "the probe must not read secrets")
+}
+
+// TestNewProbeContextCanceled asserts the caller's context reaches the probe:
+// New with an already-canceled context fails with ErrKeychainUnavailable
+// wrapping context.Canceled, rather than ignoring the context.
+func TestNewProbeContextCanceled(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, context.Canceled, "the caller's context cancellation must surface")
+	assert.NotErrorIs(t, err, errNoSecretServiceOwner, "cancellation must not be labeled as no-owner")
 }
 
 func TestResolveDefaultCollection(t *testing.T) {

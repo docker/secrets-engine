@@ -16,6 +16,7 @@ import "github.com/docker/secrets-engine/store/keychain"
 
 func main() {
     kc, err := keychain.New(
+        ctx,
         "service-group",
         "service-name",
 		func() *mocks.MockCredential {
@@ -35,15 +36,17 @@ machine with no D-Bus session bus, or a Linux desktop with no
 time and fall back to another store instead of failing on the first operation:
 
 ```go
-st, err := keychain.New(group, name, factory)
+st, err := keychain.New(ctx, group, name, factory)
 if errors.Is(err, keychain.ErrKeychainUnavailable) {
     // keychain unreachable on this host — use a fallback store
 }
 ```
 
-The Linux check is prompt-safe and side-effect-free: it asks the D-Bus daemon
-whether the Secret Service is registered and never touches your stored secrets.
-On macOS and Windows the check is a no-op. See
+The `ctx` bounds the availability probe: on Linux it is a single D-Bus
+round-trip, so pass a context with a deadline if you want to cap it. The check
+is prompt-safe and side-effect-free: it asks the D-Bus daemon whether the Secret
+Service is registered and never touches your stored secrets. On macOS and
+Windows the check is a no-op (and `ctx` is unused). See
 [../docs/keychain/design.md](../docs/keychain/design.md) for details.
 
 ### Secrets

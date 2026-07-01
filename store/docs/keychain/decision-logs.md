@@ -55,8 +55,7 @@ Decisions:
   operation, exactly as before.
 - The probe runs through the existing `newService` seam and closes its
   connection immediately, preserving the fresh-connection-per-operation contract
-  (`TestKeychainClosesEveryConnection`). The `NameHasOwner` round-trip is bounded
-  by an internal 5s timeout; `New`'s signature is unchanged.
+  (`TestKeychainClosesEveryConnection`).
 - Trade-off: a D-Bus-activatable backend that is installed but not yet running
   registers no owner, so `NameHasOwner` returns false and `New` reports
   `ErrKeychainUnavailable` even though the first real operation would have
@@ -65,5 +64,26 @@ Decisions:
 - Behavioral change: `New` now performs one D-Bus round-trip on Linux where it
   previously did no I/O, and can now fail where it previously deferred the
   failure to the first operation.
+
+---
+
+2026-07-01 New takes a context
+
+`New` (and the `docker-pass` `PassStore` helper that wraps it) now take a
+`context.Context` as their first argument, replacing the `context.Background()`
+the eager availability probe used internally.
+
+- Rationale: the probe issues a D-Bus round-trip; the caller should own its
+  cancellation and deadline rather than the library imposing a fixed internal
+  timeout. The previously added internal 5s cap and the `availabilityProbeTimeout`
+  constant are removed — a caller that wants a hard ceiling on `New` passes a
+  context with a deadline (`context.WithTimeout`). The session bus dial inside
+  `newService` remains non-ctx-aware, so `ctx` bounds the `NameHasOwner` call,
+  not the dial.
+- `ctx` governs construction only; `New` does not retain it for later store
+  operations. On macOS/Windows the probe is a no-op and `ctx` is unused.
+- This is a **breaking API change** (the earlier "signature unchanged" decision
+  above is superseded). It is deliberate; the module version is bumped to
+  reflect it. In-repo callers updated: `PassStore`, `store/keychain/cmd`.
 
 ---

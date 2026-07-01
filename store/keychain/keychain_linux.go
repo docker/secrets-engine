@@ -104,12 +104,6 @@ var (
 	errNoSecretServiceOwner = errors.New("no org.freedesktop.secrets owner on the session bus")
 )
 
-// availabilityProbeTimeout bounds the eager availability probe issued by New
-// (via ensureAvailable) so a pathological bus daemon cannot block construction
-// indefinitely. It bounds the NameHasOwner round-trip; the underlying session
-// bus dial inside newService is governed by dbus's own connection handling.
-const availabilityProbeTimeout = 5 * time.Second
-
 // ensureAvailable eagerly checks that the secret service backend is reachable,
 // so New fails at construction time on a host without a usable keyring (for
 // example WSL with no D-Bus session bus, or no gnome-keyring/kwallet running)
@@ -122,25 +116,28 @@ const availabilityProbeTimeout = 5 * time.Second
 // the backend, opens a session, or touches any collection or item (see
 // [kc.SecretService.Available]).
 //
+// ctx bounds the NameHasOwner round-trip and lets the caller cancel it; the
+// session bus dial inside newService is not ctx-aware and is governed by dbus's
+// own connection handling, so a caller that needs a hard ceiling on New should
+// pass a context with a deadline.
+//
 // Every failure is reported under the exported [ErrKeychainUnavailable]
 // sentinel, with a more specific unexported cause wrapped underneath where one
 // is known.
-func ensureAvailable() error {
+func ensureAvailable(ctx context.Context) error {
 	service, err := newService()
 	if err != nil {
 		return fmt.Errorf("%w: %w: %w", ErrKeychainUnavailable, errSessionBusUnavailable, err)
 	}
 	defer func() { _ = service.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), availabilityProbeTimeout)
-	defer cancel()
-
 	if err := service.Available(ctx); err != nil {
 		if errors.Is(err, kc.ErrNoSecretService) {
 			return fmt.Errorf("%w: %w", ErrKeychainUnavailable, errNoSecretServiceOwner)
 		}
-		// Transport failure or timeout talking to the bus daemon: surface it
-		// under the public sentinel without claiming a specific cause.
+		// Transport failure, cancellation, or deadline talking to the bus
+		// daemon: surface it under the public sentinel without claiming a
+		// specific cause.
 		return fmt.Errorf("%w: %w", ErrKeychainUnavailable, err)
 	}
 	return nil

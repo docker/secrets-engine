@@ -45,8 +45,8 @@ func (k *keychainStore[T]) setUseDataProtectionKeychain(v bool) {
 
 // ensureAvailable is the macOS no-op of the per-platform availability hook New
 // calls. The macOS Keychain is always available to a logged-in user, so New
-// never returns ErrKeychainUnavailable here.
-func ensureAvailable() error { return nil }
+// never returns ErrKeychainUnavailable here. ctx is unused on macOS.
+func ensureAvailable(_ context.Context) error { return nil }
 
 // newKeychainItem creates a new keychain item with valid default parameters.
 //

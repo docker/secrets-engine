@@ -114,8 +114,9 @@ type keychainStore[T store.Secret] struct {
 // ensureAvailable is the Windows no-op of the per-platform availability hook New
 // calls. Windows credential operations fail lazily (ErrNoLogonSession) on first
 // use; eager detection is out of scope for this change and can be added later
-// behind this same hook without touching the cross-platform contract.
-func ensureAvailable() error { return nil }
+// behind this same hook without touching the cross-platform contract. ctx is
+// unused on Windows.
+func ensureAvailable(_ context.Context) error { return nil }
 
 // itemChunkLabel returns the target name for the i-th chunk of a secret.
 func (k *keychainStore[T]) itemChunkLabel(id store.ID, index int) string {

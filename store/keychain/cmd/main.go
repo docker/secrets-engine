@@ -30,8 +30,9 @@ import (
 
 // newCommand creates an example CLI that uses the keychain library
 // It supports windows, linux and macOS.
-func newCommand() (*cobra.Command, error) {
+func newCommand(ctx context.Context) (*cobra.Command, error) {
 	kc, err := keychain.New(
+		ctx,
 		"io.docker.Secrets",
 		"docker-example-cli",
 		func(_ context.Context, _ store.ID) *mocks.MockCredential {
@@ -133,7 +134,7 @@ func newCommand() (*cobra.Command, error) {
 
 func main() {
 	ctx := context.Background()
-	cmd, err := newCommand()
+	cmd, err := newCommand(ctx)
 	if err != nil {
 		log.Fatalf("could not create CLI: %v", err)
 	}

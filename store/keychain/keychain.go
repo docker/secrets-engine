@@ -15,6 +15,7 @@
 package keychain
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"slices"
@@ -128,7 +129,13 @@ func WithUseDataProtectionKeychain() DarwinOptions {
 // Changing the service name can be done, but would require migrating existing credentials.
 //
 // [Factory] is a function used to instantiate new secrets of type T.
-func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
+//
+// ctx bounds the eager backend-availability probe New performs before returning
+// (see [ErrKeychainUnavailable]). On Linux the probe issues a single D-Bus
+// round-trip, so a caller that wants to bound or cancel it should pass a context
+// with a deadline; on macOS/Windows the probe is a no-op and ctx is unused. New
+// does not retain ctx: it governs construction only, not later store operations.
+func New[T store.Secret](ctx context.Context, serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")
 	}
@@ -151,7 +158,7 @@ func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory
 	// time (via errors.Is(err, ErrKeychainUnavailable)) rather than on the first
 	// operation. ensureAvailable is a per-platform hook: it is a no-op on
 	// macOS/Windows and probes the secret service on Linux.
-	if err := ensureAvailable(); err != nil {
+	if err := ensureAvailable(ctx); err != nil {
 		return nil, err
 	}
 	return k, nil

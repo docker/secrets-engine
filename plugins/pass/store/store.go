@@ -52,8 +52,9 @@ func (m *PassValue) SetMetadata(md map[string]string) error {
 	return nil
 }
 
-func PassStore(serviceGroup string, opts ...keychain.Option) (store.Store, error) {
+func PassStore(ctx context.Context, serviceGroup string, opts ...keychain.Option) (store.Store, error) {
 	kc, err := keychain.New(
+		ctx,
 		serviceGroup,
 		"docker-pass-cli",
 		func(_ context.Context, _ store.ID) *PassValue {

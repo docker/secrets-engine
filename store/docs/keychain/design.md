@@ -54,11 +54,16 @@ with no D-Bus session bus, or a desktop with no `gnome-keyring`/`kwallet`
 running) at construction time and fall back gracefully:
 
 ```go
-st, err := keychain.New(group, name, factory)
+st, err := keychain.New(ctx, group, name, factory)
 if errors.Is(err, keychain.ErrKeychainUnavailable) {
     // backend unreachable on this host — fall back to another store
 }
 ```
+
+`New` takes a `context.Context`. On Linux it bounds (and can cancel) the single
+D-Bus round-trip the probe performs — pass a context with a deadline to cap it;
+on macOS/Windows the probe is a no-op and `ctx` is unused. `New` does not retain
+`ctx`: it governs construction only, not later store operations.
 
 On Linux the check dials a fresh connection through the same path every
 operation uses and asks the **D-Bus daemon** whether `org.freedesktop.secrets`
