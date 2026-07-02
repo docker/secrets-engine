@@ -69,15 +69,107 @@ type secretService interface {
 	SetItemSecret(item dbus.ObjectPath, secret kc.Secret) error
 	SetItemAttributes(item dbus.ObjectPath, attributes kc.Attributes) error
 	SetItemLabel(item dbus.ObjectPath, label string) error
+	// Available reports whether the secret service backend is reachable,
+	// without activating it or prompting the user. It backs the eager
+	// availability check in New (see ensureAvailable).
+	Available(ctx context.Context) error
 	Close() error
 }
 
 // the concrete secret service must satisfy the interface the store depends on.
 var _ secretService = (*kc.SecretService)(nil)
 
-// newService dials a fresh secret service. It is a package var so tests can
-// substitute a fake; production always returns a real [kc.SecretService].
-var newService = func() (secretService, error) { return kc.NewService() }
+// newService dials a fresh secret service bound to ctx (see [kc.NewService] for
+// what ctx bounds). It is a package var so tests can substitute a fake;
+// production always returns a real [kc.SecretService].
+var newService = func(ctx context.Context) (secretService, error) { return kc.NewService(ctx) }
+
+// operationService dials a fresh secret service for a store operation. It
+// detaches the connection from ctx's cancellation with [context.WithoutCancel]
+// (values are preserved), so a caller's already-cancelled or expired context —
+// for example one handed to a best-effort cleanup Delete, or Go's t.Context()
+// during test cleanup — does not tear the fresh connection down mid-operation.
+// This matches the macOS/Windows backends, which do not abort an in-flight
+// operation on ctx cancellation, keeping behavior consistent across platforms.
+//
+// The eager availability probe deliberately does NOT use this: it passes its ctx
+// straight to newService so construction stays bounded and cancellable.
+func operationService(ctx context.Context) (secretService, error) {
+	return newService(context.WithoutCancel(ctx))
+}
+
+// Causes wrapped under the exported [ErrKeychainUnavailable] sentinel. They are
+// unexported because no caller branches on the specific cause today; they are
+// wrapped (not discarded) so either could be promoted to an exported sentinel
+// with zero behavioral change if a caller ever needs to distinguish the two
+// failure modes via errors.Is.
+var (
+	// errSessionBusUnavailable is wrapped when the D-Bus session bus could not
+	// be reached (newService returned an error). This is the WSL / headless /
+	// DBUS_SESSION_BUS_ADDRESS-unset case where there is no session bus at all,
+	// but it also covers a session bus that exists yet cannot be connected to or
+	// authenticated against. In every case the Secret Service backend is
+	// unreachable, so no keychain operation could succeed.
+	errSessionBusUnavailable = errors.New("D-Bus session bus unavailable")
+
+	// errNoSecretServiceOwner is wrapped when the session bus is reachable but
+	// no process owns the org.freedesktop.secrets name (no gnome-keyring,
+	// kwallet, or other Secret Service daemon is running), detected via
+	// NameHasOwner returning false.
+	errNoSecretServiceOwner = errors.New("no org.freedesktop.secrets owner on the session bus")
+)
+
+// defaultProbeTimeout bounds the availability probe when the caller's context
+// carries no deadline of its own, so New stays responsive on a host where the
+// backend is unreachable without forcing every caller to set a deadline. A
+// caller-supplied deadline always takes precedence.
+const defaultProbeTimeout = 2 * time.Second
+
+// ensureAvailable eagerly checks that the secret service backend is reachable,
+// so New fails at construction time on a host without a usable keyring (for
+// example WSL with no D-Bus session bus, or no gnome-keyring/kwallet running)
+// instead of failing on the first operation.
+//
+// It dials a fresh connection through the newService seam, asks the D-Bus
+// daemon whether org.freedesktop.secrets has an owner, and closes the
+// connection immediately — preserving the fresh-connection-per-operation
+// contract. The probe is prompt-safe and side-effect-free: it never activates
+// the backend (newService does not autolaunch a bus), opens a session, or
+// touches any collection or item (see [kc.SecretService.Available]).
+//
+// ctx bounds the probe's connection handshake and the NameHasOwner round-trip
+// and lets the caller cancel it (see [kc.NewService] for the one part that is
+// not ctx-aware, the raw socket dial). When ctx carries no deadline, the probe
+// is capped by defaultProbeTimeout so New stays responsive; a caller-supplied
+// deadline always wins.
+//
+// Every failure is reported under the exported [ErrKeychainUnavailable]
+// sentinel, with a more specific unexported cause wrapped underneath where one
+// is known.
+func ensureAvailable(ctx context.Context) error {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultProbeTimeout)
+		defer cancel()
+	}
+
+	service, err := newService(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: %w: %w", ErrKeychainUnavailable, errSessionBusUnavailable, err)
+	}
+	defer func() { _ = service.Close() }()
+
+	if err := service.Available(ctx); err != nil {
+		if errors.Is(err, kc.ErrNoSecretService) {
+			return fmt.Errorf("%w: %w", ErrKeychainUnavailable, errNoSecretServiceOwner)
+		}
+		// Transport failure, cancellation, or deadline talking to the bus
+		// daemon: surface it under the public sentinel without claiming a
+		// specific cause.
+		return fmt.Errorf("%w: %w", ErrKeychainUnavailable, err)
+	}
+	return nil
+}
 
 // getDefaultCollection gets the secret service collection dbus object path.
 //
@@ -230,8 +322,8 @@ type keychainStore[T store.Secret] struct {
 	factory      store.Factory[T]
 }
 
-func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
-	service, err := newService()
+func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+	service, err := operationService(ctx)
 	if err != nil {
 		return err
 	}
@@ -280,7 +372,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	service, err := newService()
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +444,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 }
 
 func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
-	service, err := newService()
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -422,8 +514,8 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	return credentials, nil
 }
 
-func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
-	service, err := newService()
+func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+	service, err := operationService(ctx)
 	if err != nil {
 		return err
 	}
@@ -556,7 +648,7 @@ func (k *keychainStore[T]) loadSecret(
 
 //gocyclo:ignore
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
-	service, err := newService()
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}

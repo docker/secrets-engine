@@ -74,7 +74,7 @@ func setupKeychain(t *testing.T, secretFactory func(context.Context, store.ID) s
 		}
 	}
 
-	ks, err := New("com.test.test", "test", secretFactory)
+	ks, err := New(t.Context(), "com.test.test", "test", secretFactory)
 	require.NoError(t, err)
 	return ks
 }

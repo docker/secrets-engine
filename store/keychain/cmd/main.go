@@ -30,14 +30,22 @@ import (
 
 // newCommand creates an example CLI that uses the keychain library
 // It supports windows, linux and macOS.
-func newCommand() (*cobra.Command, error) {
+func newCommand(ctx context.Context) (*cobra.Command, error) {
 	kc, err := keychain.New(
+		ctx,
 		"io.docker.Secrets",
 		"docker-example-cli",
 		func(_ context.Context, _ store.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	)
+	if errors.Is(err, keychain.ErrKeychainUnavailable) {
+		// The keychain backend is unreachable on this host (for example WSL
+		// with no D-Bus session bus, or no gnome-keyring/kwallet running). A
+		// real application would fall back to another store here; this example
+		// simply reports it.
+		return nil, fmt.Errorf("keychain backend unavailable, no fallback configured: %w", err)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +134,7 @@ func newCommand() (*cobra.Command, error) {
 
 func main() {
 	ctx := context.Background()
-	cmd, err := newCommand()
+	cmd, err := newCommand(ctx)
 	if err != nil {
 		log.Fatalf("could not create CLI: %v", err)
 	}

@@ -15,6 +15,7 @@
 package keychain
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"slices"
@@ -42,6 +43,33 @@ var _ store.Store = &keychainStore[store.Secret]{}
 // keychain infrastructure and fall back gracefully, rather than relying on
 // fragile error message comparisons.
 var ErrNoDefaultCollection = errors.New("no default keychain collection available")
+
+// ErrKeychainUnavailable is returned by New when the keychain backend cannot
+// be reached at construction time, so no keychain operation could ever
+// succeed. Callers can use [errors.Is] to detect this eagerly and fall back to
+// another store instead of discovering the failure deep inside a later Get,
+// Save, Delete, Filter or GetAllMetadata call.
+//
+// On Linux it covers both failure modes of the freedesktop Secret Service:
+//   - there is no D-Bus session bus at all (for example WSL, a headless host,
+//     or DBUS_SESSION_BUS_ADDRESS unset), so the session bus cannot be dialed; or
+//   - the session bus exists but no process owns the org.freedesktop.secrets
+//     name (no gnome-keyring, kwallet or other Secret Service daemon running).
+//
+// NOTE: like ErrNoDefaultCollection this condition is currently specific to the
+// Linux keyring. macOS and Windows have no equivalent unreachable-backend
+// concept, so New never returns this error on those platforms. The sentinel is
+// declared here, in the cross-platform file (rather than the Linux-specific
+// one), so platform-agnostic callers can reference it on every platform without
+// build tags; on non-Linux platforms it simply never matches.
+//
+// It is DISTINCT from ErrNoDefaultCollection: ErrKeychainUnavailable means the
+// backend itself is unreachable, whereas ErrNoDefaultCollection means the
+// backend IS reachable but has no usable default collection. The eager
+// availability check deliberately does not assert that a collection exists, so
+// a reachable-but-uninitialized keyring still passes New and surfaces
+// ErrNoDefaultCollection lazily on the first operation, exactly as before.
+var ErrKeychainUnavailable = errors.New("keychain backend unavailable")
 
 type (
 	Option            interface{ apply(any) error }
@@ -101,7 +129,16 @@ func WithUseDataProtectionKeychain() DarwinOptions {
 // Changing the service name can be done, but would require migrating existing credentials.
 //
 // [Factory] is a function used to instantiate new secrets of type T.
-func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
+//
+// ctx bounds the eager backend-availability probe New performs before returning
+// (see [ErrKeychainUnavailable]). On Linux it bounds the probe's D-Bus
+// connection handshake and its NameHasOwner round-trip, and lets the caller
+// cancel construction; if ctx carries no deadline, New applies a short internal
+// default so construction stays responsive on an unreachable host, and a
+// caller-supplied deadline always takes precedence. On macOS/Windows the probe
+// is a no-op and ctx is unused. New does not retain ctx: it governs construction
+// only, not later store operations.
+func New[T store.Secret](ctx context.Context, serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")
 	}
@@ -119,6 +156,13 @@ func New[T store.Secret](serviceGroup, serviceName string, factory store.Factory
 		if err != nil {
 			return nil, err
 		}
+	}
+	// Eagerly verify the backend is reachable so callers learn at construction
+	// time (via errors.Is(err, ErrKeychainUnavailable)) rather than on the first
+	// operation. ensureAvailable is a per-platform hook: it is a no-op on
+	// macOS/Windows and probes the secret service on Linux.
+	if err := ensureAvailable(ctx); err != nil {
+		return nil, err
 	}
 	return k, nil
 }

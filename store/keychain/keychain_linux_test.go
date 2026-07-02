@@ -18,6 +18,7 @@ package keychain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -72,6 +73,21 @@ type fakeService struct {
 	getSecretLockedErrs  int
 	unlockCalls          int
 	unlockErr            error
+
+	// availableErr, when set, is returned by Available so a test can drive the
+	// eager-probe failure paths in New. The zero value (nil) reports the backend
+	// as available, so every existing test that constructs a store via
+	// setupKeychain keeps passing. availableCalls counts how many times the
+	// eager probe invoked Available.
+	availableErr   error
+	availableCalls int
+
+	// availableCtxDeadline / availableCtxHasDeadline record the deadline of the
+	// context the eager probe passed to Available, so a test can assert New's
+	// default-timeout behavior: a bounded probe when the caller sets no deadline,
+	// and the caller's own deadline preserved when they do.
+	availableCtxDeadline    time.Time
+	availableCtxHasDeadline bool
 
 	opened atomic.Int64
 	closed atomic.Int64
@@ -144,6 +160,18 @@ func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
 }
 func (f *fakeService) SetItemAttributes(dbus.ObjectPath, kc.Attributes) error { return nil }
 func (f *fakeService) SetItemLabel(dbus.ObjectPath, string) error             { return nil }
+func (f *fakeService) Available(ctx context.Context) error {
+	f.availableCalls++
+	f.availableCtxDeadline, f.availableCtxHasDeadline = ctx.Deadline()
+	// Honor the caller's context so tests can assert it flows through New into
+	// the probe. A live SecretService.Available surfaces ctx cancellation the
+	// same way (via the CallWithContext round-trip).
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return f.availableErr
+}
+
 func (f *fakeService) Close() error {
 	f.closed.Add(1)
 	return nil
@@ -155,7 +183,7 @@ func withFakeService(t *testing.T, fake *fakeService) {
 	t.Helper()
 	orig := newService
 	t.Cleanup(func() { newService = orig })
-	newService = func() (secretService, error) {
+	newService = func(context.Context) (secretService, error) {
 		fake.opened.Add(1)
 		return fake, nil
 	}
@@ -210,6 +238,16 @@ func TestKeychainClosesEveryConnection(t *testing.T) {
 
 	ks := setupKeychain(t, nil)
 	missing := store.MustParseID("com.test.test/test/missing")
+
+	// New eagerly probes the backend in ensureAvailable, which dials and closes
+	// one connection through the same seam. Assert it dialed exactly one and
+	// balanced it (a plain opened==closed check would also pass if the probe
+	// never dialed at all), then reset the counters so the loop below measures
+	// only the per-operation connections.
+	require.Equal(t, int64(1), fake.opened.Load(), "the eager probe must dial exactly one connection")
+	require.Equal(t, fake.opened.Load(), fake.closed.Load(), "the eager probe must close its own connection")
+	fake.opened.Store(0)
+	fake.closed.Store(0)
 
 	const iterations = 30
 	for range iterations {
@@ -414,7 +452,7 @@ func ensureUnlocked(t *testing.T, svc *kc.SecretService, collection dbus.ObjectP
 // [require.Eventually] condition, which runs on a separate goroutine where the
 // require.* helpers must not be used.
 func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.ObjectPath, error) {
-	svc, err := kc.NewService()
+	svc, err := kc.NewService(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +499,10 @@ func requireItemCount(t *testing.T, serviceGroup, serviceName string, id store.I
 // differing volatile attributes, so every save mints a fresh item.
 func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store.ID, n int) {
 	t.Helper()
-	svc, err := kc.NewService()
+	// context.Background(), not t.Context(): this direct-daemon helper also runs
+	// from t.Cleanup, where t.Context() is already cancelled, which would tear
+	// the connection down before the Auth handshake completes.
+	svc, err := kc.NewService(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
@@ -508,7 +549,10 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 // cleanup failure surfaces as a leak rather than corrupting a later test.
 func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) {
 	t.Helper()
-	svc, err := kc.NewService()
+	// context.Background(), not t.Context(): purgeRealItems runs from t.Cleanup,
+	// where t.Context() is already cancelled, which would tear the connection
+	// down before the Auth handshake completes.
+	svc, err := kc.NewService(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
@@ -540,7 +584,7 @@ func TestKeychainCollapsesExistingDuplicates(t *testing.T) {
 	seedRealDuplicates(t, dedupServiceGroup, dedupServiceName, id, 3)
 	require.Len(t, findRealItems(t, dedupServiceGroup, dedupServiceName, id), 3, "precondition: three duplicates seeded")
 
-	ks, err := New(dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -567,7 +611,7 @@ func TestKeychainSaveDoesNotAccumulate(t *testing.T) {
 	id := store.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/no-accumulate")
 	t.Cleanup(func() { purgeRealItems(t, dedupServiceGroup, dedupServiceName, id) })
 
-	ks, err := New(dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -592,6 +636,174 @@ func TestKeychainSaveDoesNotAccumulate(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("password-%d", saves-1), actual.Password)
 	assert.Equal(t, fmt.Sprintf("%d", saves-1), actual.Attributes["nonce"],
 		"the surviving item's metadata must be refreshed in place")
+}
+
+// TestNewProbeSucceeds asserts the eager availability probe passes for a
+// reachable backend: New returns a usable store, dialing exactly one connection
+// and closing it (honoring the leak contract).
+func TestNewProbeSucceeds(t *testing.T) {
+	fake := &fakeService{} // availableErr nil -> backend reachable
+	withFakeService(t, fake)
+
+	ks, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.NotNil(t, ks)
+	assert.Equal(t, int64(1), fake.opened.Load(), "the probe dials exactly one connection")
+	assert.Equal(t, fake.opened.Load(), fake.closed.Load(), "the probe must close its connection")
+}
+
+// TestNewProbeNoOwner asserts that when the session bus is reachable but no
+// process owns org.freedesktop.secrets, New fails eagerly with
+// ErrKeychainUnavailable wrapping the no-owner cause — and NOT
+// ErrNoDefaultCollection, which is a distinct (reachable-but-uninitialized)
+// condition the probe deliberately does not assert against.
+func TestNewProbeNoOwner(t *testing.T) {
+	fake := &fakeService{availableErr: kc.ErrNoSecretService}
+	withFakeService(t, fake)
+
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, errNoSecretServiceOwner)
+	assert.NotErrorIs(t, err, ErrNoDefaultCollection)
+}
+
+// TestNewProbeNoSessionBus asserts that a failure to dial the session bus (the
+// WSL / headless case) surfaces eagerly as ErrKeychainUnavailable wrapping the
+// session-bus cause, preserving the underlying dial error for diagnostics.
+func TestNewProbeNoSessionBus(t *testing.T) {
+	orig := newService
+	t.Cleanup(func() { newService = orig })
+	dialErr := errors.New("dbus: dial failed")
+	newService = func(context.Context) (secretService, error) { return nil, dialErr }
+
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, errSessionBusUnavailable)
+	assert.ErrorIs(t, err, dialErr, "the underlying dial error must be preserved")
+}
+
+// TestNewProbeTransportError asserts that a transport/timeout error from the
+// availability probe (anything other than the no-owner sentinel) is reported
+// under ErrKeychainUnavailable WITHOUT being mislabeled as the no-owner cause.
+func TestNewProbeTransportError(t *testing.T) {
+	transportErr := errors.New("connection reset")
+	fake := &fakeService{availableErr: transportErr}
+	withFakeService(t, fake)
+
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, transportErr)
+	assert.NotErrorIs(t, err, errNoSecretServiceOwner, "a transport error must not be labeled as no-owner")
+}
+
+// TestNewProbeShape guards that the eager probe does exactly the work it is
+// supposed to and nothing more: New runs the availability check exactly once,
+// over a single connection it dials and closes, and reaches for no read, write,
+// or unlock operation on the service interface.
+//
+// NOTE: this constrains the *probe's call shape through the secretService seam*;
+// it is NOT the prompt-safety proof. The prompt-safety guarantee — that the
+// query is answered by the D-Bus daemon and never forwarded to
+// org.freedesktop.secrets, so it cannot reach PromptAndWait — lives in the real
+// [kc.SecretService.Available] (NameHasOwner on the bus daemon object with
+// FlagNoAutoStart) and is documented there; the fake bypasses that mechanism.
+func TestNewProbeShape(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+
+	// The probe actually ran (so this test fails if ensureAvailable becomes a
+	// no-op) and balanced its one connection.
+	assert.Equal(t, 1, fake.availableCalls, "the probe must run the availability check exactly once")
+	assert.Equal(t, int64(1), fake.opened.Load(), "the probe dials exactly one connection")
+	assert.Equal(t, fake.opened.Load(), fake.closed.Load(), "the probe must close its connection")
+
+	// It performs no item read/write/unlock through the service interface.
+	assert.Zero(t, fake.unlockCalls, "the probe must not unlock")
+	assert.Zero(t, fake.createCalls, "the probe must not create items")
+	assert.Zero(t, fake.deleteCalls, "the probe must not delete items")
+	assert.Zero(t, fake.setSecretCalls, "the probe must not write secrets")
+	assert.Zero(t, fake.getSecretCalls, "the probe must not read secrets")
+}
+
+// TestNewProbeContextCanceled asserts the caller's context reaches the probe:
+// New with an already-canceled context fails with ErrKeychainUnavailable
+// wrapping context.Canceled, rather than ignoring the context.
+func TestNewProbeContextCanceled(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrKeychainUnavailable)
+	assert.ErrorIs(t, err, context.Canceled, "the caller's context cancellation must surface")
+	assert.NotErrorIs(t, err, errNoSecretServiceOwner, "cancellation must not be labeled as no-owner")
+}
+
+// TestNewProbeAppliesDefaultTimeout asserts that when the caller passes a
+// context with no deadline (e.g. context.Background()), New still bounds the
+// probe with defaultProbeTimeout so construction cannot hang indefinitely on an
+// unresponsive backend.
+func TestNewProbeAppliesDefaultTimeout(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	before := time.Now()
+	_, err := New(context.Background(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.True(t, fake.availableCtxHasDeadline,
+		"the probe context must carry the default deadline when the caller sets none")
+	// And it must be the *default* deadline, not some other (e.g. much larger)
+	// value — otherwise "stays responsive on an unreachable host" is not upheld.
+	// The probe runs against a fake in well under the tolerance, so the observed
+	// deadline sits within [before+default, before+default+tolerance].
+	assert.WithinDuration(t, before.Add(defaultProbeTimeout), fake.availableCtxDeadline, time.Second,
+		"the probe deadline must be defaultProbeTimeout out, not an arbitrary value")
+}
+
+// TestNewProbeRespectsCallerDeadline asserts a caller-supplied deadline takes
+// precedence over the internal default: New must not replace a deadline the
+// caller already set.
+func TestNewProbeRespectsCallerDeadline(t *testing.T) {
+	fake := &fakeService{}
+	withFakeService(t, fake)
+
+	// A deadline far longer than defaultProbeTimeout: if New wrongly imposed its
+	// own default, the observed deadline would be ~defaultProbeTimeout out, not
+	// this one.
+	deadline := time.Now().Add(time.Hour)
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
+
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+		return &mocks.MockCredential{}
+	})
+	require.NoError(t, err)
+	require.True(t, fake.availableCtxHasDeadline)
+	assert.WithinDuration(t, deadline, fake.availableCtxDeadline, time.Second,
+		"the caller's deadline must reach the probe unchanged")
 }
 
 func TestResolveDefaultCollection(t *testing.T) {
