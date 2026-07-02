@@ -65,7 +65,7 @@ This means you don’t need:
 Store the secret in your OS keychain:
 
 ```bash
-docker pass set foo=bar
+read -s -p "Enter the secret:" secret && docker pass set foo=$secret
 ```
 
 Run a container using a secret reference (the value se://foo is not the secret itself):
