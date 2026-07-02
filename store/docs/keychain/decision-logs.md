@@ -108,12 +108,22 @@ every store operation (not only the probe) benefits.
   returning `ErrNoSessionBus` immediately if it is missing (abstract/tcp
   addresses and an unset address fall through to a normal dial). This is a fast
   path with a clearer error; the unix dial would also have failed fast.
-- **ctx-aware dial.** `newService` takes a `context.Context` threaded from `New`
-  (probe) and from each store operation. It is passed to godbus via
-  `dbus.WithContext`, so cancelling `ctx` tears the connection down and bounds
-  `Auth`/`Hello`/`NameHasOwner`. The raw socket dial inside godbus is still not
-  ctx-aware, but a unix dial fails immediately when the socket is missing or
+- **ctx-aware dial.** `newService` takes a `context.Context` passed to godbus via
+  `dbus.WithContext`. godbus closes the connection when that ctx is Done, which
+  bounds `Auth`/`Hello`/`NameHasOwner`. The raw socket dial inside godbus is still
+  not ctx-aware, but a unix dial fails immediately when the socket is missing or
   unaccepting, and the pre-dial stat covers the stale-address case.
+  - The **probe** (via `New`) passes its ctx straight through, so construction is
+    bounded and cancellable — the point of the probe.
+  - **Store operations** dial via `operationService`, which wraps the operation's
+    ctx in `context.WithoutCancel` before handing it to `newService`. Because
+    godbus closes the connection on ctx-Done, binding the connection's lifetime to
+    the operation's ctx would tear a fresh connection down the instant the ctx was
+    cancelled — including the common, legitimate case of a best-effort cleanup
+    `Delete` called with an already-cancelled context (Go's `t.Context()` in test
+    cleanup is exactly this). macOS/Windows do not abort an in-flight operation on
+    ctx cancellation, so detaching cancellation here keeps behavior consistent
+    across platforms. ctx values are preserved.
 - **Short default probe timeout, reinstated.** The internal cap removed in the
   entry above is back as `defaultProbeTimeout` (2s, down from the original 5s),
   but applied **only when the caller's `ctx` has no deadline**. A caller-supplied
@@ -122,6 +132,6 @@ every store operation (not only the probe) benefits.
   cancellation away from callers who want it. This supersedes the "no internal
   timeout" decision above.
 - `Delete` and `Save`, which previously ignored their `context.Context`, now
-  thread it into the dial like the other operations.
+  thread it into the dial (via `operationService`) like the other operations.
 
 ---

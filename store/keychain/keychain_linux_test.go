@@ -499,7 +499,10 @@ func requireItemCount(t *testing.T, serviceGroup, serviceName string, id store.I
 // differing volatile attributes, so every save mints a fresh item.
 func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store.ID, n int) {
 	t.Helper()
-	svc, err := kc.NewService(t.Context())
+	// context.Background(), not t.Context(): this direct-daemon helper also runs
+	// from t.Cleanup, where t.Context() is already cancelled, which would tear
+	// the connection down before the Auth handshake completes.
+	svc, err := kc.NewService(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
@@ -546,7 +549,10 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 // cleanup failure surfaces as a leak rather than corrupting a later test.
 func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) {
 	t.Helper()
-	svc, err := kc.NewService(t.Context())
+	// context.Background(), not t.Context(): purgeRealItems runs from t.Cleanup,
+	// where t.Context() is already cancelled, which would tear the connection
+	// down before the Auth handshake completes.
+	svc, err := kc.NewService(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 

@@ -84,6 +84,20 @@ var _ secretService = (*kc.SecretService)(nil)
 // production always returns a real [kc.SecretService].
 var newService = func(ctx context.Context) (secretService, error) { return kc.NewService(ctx) }
 
+// operationService dials a fresh secret service for a store operation. It
+// detaches the connection from ctx's cancellation with [context.WithoutCancel]
+// (values are preserved), so a caller's already-cancelled or expired context —
+// for example one handed to a best-effort cleanup Delete, or Go's t.Context()
+// during test cleanup — does not tear the fresh connection down mid-operation.
+// This matches the macOS/Windows backends, which do not abort an in-flight
+// operation on ctx cancellation, keeping behavior consistent across platforms.
+//
+// The eager availability probe deliberately does NOT use this: it passes its ctx
+// straight to newService so construction stays bounded and cancellable.
+func operationService(ctx context.Context) (secretService, error) {
+	return newService(context.WithoutCancel(ctx))
+}
+
 // Causes wrapped under the exported [ErrKeychainUnavailable] sentinel. They are
 // unexported because no caller branches on the specific cause today; they are
 // wrapped (not discarded) so either could be promoted to an exported sentinel
@@ -309,7 +323,7 @@ type keychainStore[T store.Secret] struct {
 }
 
 func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
-	service, err := newService(ctx)
+	service, err := operationService(ctx)
 	if err != nil {
 		return err
 	}
@@ -358,7 +372,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
-	service, err := newService(ctx)
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +444,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 }
 
 func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
-	service, err := newService(ctx)
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +515,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 }
 
 func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
-	service, err := newService(ctx)
+	service, err := operationService(ctx)
 	if err != nil {
 		return err
 	}
@@ -634,7 +648,7 @@ func (k *keychainStore[T]) loadSecret(
 
 //gocyclo:ignore
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
-	service, err := newService(ctx)
+	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
 	}
