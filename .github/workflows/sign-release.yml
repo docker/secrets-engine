@@ -1,0 +1,78 @@
+name: Sign release binaries
+
+# Keyless-signs the release's Linux binaries with cosign. Keyless signing
+# records the signer's OIDC identity (repo, workflow path, commit SHA, run id)
+# in the public Rekor transparency log, so signing runs here, in the same
+# repository that owns the release — the recorded identity is this repository.
+#
+# Triggered when a release is published. Because the release is published with
+# a GitHub App installation token (not the default GITHUB_TOKEN, which does not
+# trigger further workflows), this `release` event fires as expected.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write # upload signature bundles back to the release
+  id-token: write # OIDC token for keyless cosign / Fulcio
+
+jobs:
+  sign:
+    name: Sign Linux binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: 'v2.5.3'
+
+      - name: Sign raw Linux binaries (keyless cosign)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          COSIGN_YES: "true"
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+
+          # Download the Linux binary tarballs attached by the upstream release
+          # job. The tarball is the distributed asset, but we sign the raw
+          # binary *inside* it so the signature verifies the extracted (and
+          # installed) binary directly, not just the archive.
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'secrets-engine-linux_*.tar.gz' \
+            --dir .
+
+          shopt -s nullglob
+          signed=0
+          for tarball in secrets-engine-linux_*.tar.gz; do
+            name="${tarball%.tar.gz}"          # e.g. secrets-engine-linux_amd64
+            dir="extract/${name}"
+            mkdir -p "$dir"
+            tar -xzf "$tarball" -C "$dir"
+            bin="${dir}/secrets-engine"
+            [ -f "$bin" ] || { echo "::error::$tarball is missing secrets-engine"; exit 1; }
+            echo "Signing raw binary from $tarball"
+            # Sigstore bundle (protobuf spec) — verifiable by any Sigstore-conformant
+            # tool, not just the cosign CLI. Written as <name>.sigstore.json.
+            cosign sign-blob --yes --new-bundle-format \
+              --bundle "${name}.sigstore.json" "$bin"
+            echo "$(sha256sum "$bin" | cut -d' ' -f1)  secrets-engine" > "${name}.sha256"
+            signed=$((signed + 1))
+          done
+
+          if [ "$signed" -eq 0 ]; then
+            echo "::error::no Linux binary tarballs (secrets-engine-linux_*.tar.gz) found on release $TAG"
+            exit 1
+          fi
+
+          # Upload signature bundles and checksums back onto the release.
+          gh release upload "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            *.sigstore.json \
+            *.sha256
