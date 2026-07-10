@@ -7,20 +7,45 @@
 Secrets Engine and [docker pass](https://docs.docker.com/reference/cli/docker/pass/)
 are bundled with [Docker Desktop](https://docs.docker.com/desktop/).
 
-## Docker CE (experimental / early access)
+## Docker CE (experimental)
 
-Runtime secret injection is now available in Docker CE as an **experimental,
-early-access** feature. It requires Docker Engine (`dockerd`) **29.2.0 or
-higher**.
+Runtime secret injection is available in Docker CE as an **experimental**
+feature, requiring Docker Engine (`dockerd`) **29.2.0 or higher**. Packages are
+published to Docker's official repository at `download.docker.com`, or can be
+downloaded directly from the
+[releases page](https://github.com/docker/secrets-engine/releases).
+
+### Set up Docker's package repository
+
+Skip this step if you already installed Docker Engine from
+`download.docker.com`. Otherwise, add the repository with the official
+convenience script:
+
+```shell
+curl -fsSL https://get.docker.com | sh -s -- --setup-repo
+```
+
+Alternatively, follow the
+[Docker Engine installation instructions](https://docs.docker.com/engine/install/).
 
 ### Install
 
-Download the latest packages for your Linux distribution from the
-[releases](https://github.com/docker/secrets-engine/releases), then install them:
+**apt (Debian/Ubuntu):**
+
 ```shell
-# Replace with the files you downloaded (matching your distro and arch).
-sudo apt install ./DockerSecretsEngine-linux-amd64-ubuntu2404.deb \
-                 ./DockerSecretsEnginePlugins-linux-ubuntu2404.deb
+sudo apt-get update
+sudo apt-get install docker-secrets-engine docker-secrets-engine-plugins
+```
+
+**dnf (Fedora):**
+
+```shell
+sudo dnf install docker-secrets-engine docker-secrets-engine-plugins
+```
+
+Then enable the service for your user:
+
+```shell
 systemctl --user daemon-reload
 systemctl --user enable --now docker-secrets-engine.service
 ```
@@ -33,7 +58,12 @@ Recommended:
 
 ```shell
 systemctl --user disable --now docker-secrets-engine.service
-sudo apt remove docker-secrets-engine-plugins docker-secrets-engine
+
+# apt (Debian/Ubuntu)
+sudo apt-get remove docker-secrets-engine-plugins docker-secrets-engine
+
+# dnf (Fedora)
+sudo dnf remove docker-secrets-engine-plugins docker-secrets-engine
 ```
 
 > [!WARNING]
