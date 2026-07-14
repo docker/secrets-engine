@@ -25,6 +25,8 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"filippo.io/age"
@@ -797,5 +799,153 @@ func TestPOSIXAge(t *testing.T) {
 
 		_, err = s.Get(t.Context(), id)
 		assert.ErrorIs(t, err, decryptError)
+	})
+}
+
+// scryptStanzaWorkFactor extracts the logN work factor recorded in the scrypt
+// stanza of an age file header. The header is ASCII; the scrypt stanza has the
+// form "-> scrypt <base64 salt> <logN>".
+func scryptStanzaWorkFactor(t *testing.T, ageFile []byte) int {
+	t.Helper()
+	for line := range strings.SplitSeq(string(ageFile), "\n") {
+		if !strings.HasPrefix(line, "-> scrypt ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		logN, err := strconv.Atoi(fields[len(fields)-1])
+		require.NoError(t, err)
+		return logN
+	}
+	t.Fatal("no scrypt stanza found in age header")
+	return 0
+}
+
+func TestScryptWorkFactor(t *testing.T) {
+	// Use a low work factor so the KDF stays fast in tests; the default (18) is
+	// tuned to take ~1s per operation.
+	const workFactor = 10
+
+	saveWithPassword := func(t *testing.T, password string, opts ...Options) (store.Store, *os.Root) {
+		t.Helper()
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		base := []Options{
+			WithLogger(&testLogger{t}),
+			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(password), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(password), nil
+			}),
+		}
+		s, err := New(root,
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
+				return &mocks.MockCredential{}
+			},
+			append(base, opts...)...,
+		)
+		require.NoError(t, err)
+		return s, root
+	}
+
+	readPassSecret := func(t *testing.T, root *os.Root, id store.ID) []byte {
+		t.Helper()
+		encodedID := base64.StdEncoding.EncodeToString([]byte(id.String()))
+		secretRoot, err := root.OpenRoot(encodedID)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, secretRoot.Close())
+		})
+		data, err := secretRoot.ReadFile(secretfile.SecretFileName + "pass")
+		require.NoError(t, err)
+		return data
+	}
+
+	t.Run("records the configured work factor in the header", func(t *testing.T) {
+		password := uuid.NewString()
+		s, root := saveWithPassword(t, password, WithScryptWorkFactor(workFactor))
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, secret))
+
+		encryptedFile := readPassSecret(t, root, id)
+		assert.Equal(t, workFactor, scryptStanzaWorkFactor(t, encryptedFile))
+
+		// Round-trips with the same store.
+		got, err := s.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, secret, got)
+	})
+
+	t.Run("defaults to the age work factor when unset", func(t *testing.T) {
+		password := uuid.NewString()
+		s, root := saveWithPassword(t, password)
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, secret))
+
+		encryptedFile := readPassSecret(t, root, id)
+		// age's NewScryptRecipient default is logN=18.
+		assert.Equal(t, 18, scryptStanzaWorkFactor(t, encryptedFile))
+	})
+
+	t.Run("work factor is self-describing across stores", func(t *testing.T) {
+		// A file written with a custom work factor must decrypt on a store that
+		// has no work-factor option configured: the factor is read from the
+		// header, not from store configuration.
+		password := uuid.NewString()
+		writer, root := saveWithPassword(t, password, WithScryptWorkFactor(workFactor))
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, writer.Save(t.Context(), id, secret))
+
+		reader, err := New(root,
+			func(_ context.Context, _ store.ID) *mocks.MockCredential {
+				return &mocks.MockCredential{}
+			},
+			WithLogger(&testLogger{t}),
+			WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(password), nil
+			}),
+			WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+				return []byte(password), nil
+			}),
+		)
+		require.NoError(t, err)
+
+		got, err := reader.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, secret, got)
+	})
+
+	t.Run("rejects out-of-range work factors", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, root.Close())
+		})
+
+		for _, logN := range []int{0, -1, secretfile.MaxScryptWorkFactor + 1} {
+			_, err := New(root,
+				func(_ context.Context, _ store.ID) *mocks.MockCredential {
+					return &mocks.MockCredential{}
+				},
+				WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+					return []byte("a-password"), nil
+				}),
+				WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+					return []byte("a-password"), nil
+				}),
+				WithScryptWorkFactor(logN),
+			)
+			assert.Error(t, err, "logN=%d should be rejected", logN)
+		}
 	})
 }
