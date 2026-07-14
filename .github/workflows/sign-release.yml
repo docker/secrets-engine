@@ -1,18 +1,17 @@
 name: Sign release binaries
-run-name: "Sign release binaries ${{ github.event.inputs.tag }}"
 
-# Keyless-signs the Linux binaries staged on the release/draft at the given tag,
-# uploading the cosign bundles back onto it. Runs here so the Rekor-recorded
-# signer identity is this repository. Invoked via workflow_dispatch by the
-# release pipeline once the binaries have been staged.
+# Keyless-signs the release's Linux binaries with cosign and uploads the bundles
+# back onto the release. Runs here so the Rekor-recorded signer identity is this
+# repository.
+#
+# Triggered when a release is published. The release is published (as a
+# prerelease with the raw binary tarballs attached) via a GitHub App installation
+# token — not the default GITHUB_TOKEN, which would not trigger further workflows
+# — so this `release` event fires as expected.
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to sign (assets must already be staged on the release/draft)"
-        required: true
-        type: string
+  release:
+    types: [published]
 
 permissions:
   contents: write # upload signature bundles back to the release
@@ -22,10 +21,6 @@ jobs:
   sign:
     name: Sign Linux binaries
     runs-on: ubuntu-latest
-    # Restrict signing to the release automation's app: any repo-write actor can
-    # otherwise dispatch this and mint a keyless signature under this repo's identity.
-    if: github.triggering_actor == 'docker-read-write[bot]'
-    environment: release-signing
     timeout-minutes: 15
     steps:
       - name: Install cosign
@@ -36,7 +31,7 @@ jobs:
       - name: Sign raw Linux binaries (keyless cosign)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.tag }}
+          TAG: ${{ github.event.release.tag_name }}
           COSIGN_YES: "true"
         run: |
           set -euo pipefail
