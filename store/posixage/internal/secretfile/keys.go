@@ -59,6 +59,9 @@ type RecipientOption func(*recipientOptions)
 //
 // A zero value leaves the age default in place. Non-zero values are validated
 // by [GetRecipients], which returns an error when logN is outside 1..[MaxScryptWorkFactor].
+//
+// See the posixage.WithScryptWorkFactor option for a cost/security table and
+// guidance on choosing a value.
 func WithScryptWorkFactor(logN int) RecipientOption {
 	return func(o *recipientOptions) {
 		o.scryptWorkFactor = logN
