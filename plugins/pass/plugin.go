@@ -28,6 +28,11 @@ var _ plugin.Plugin = &passPlugin{}
 
 var errUnknownSecretType = errors.New("unknown secret type")
 
+// envelopeSchemaVersion is the semantic version of the secret payload this
+// plugin returns. Bump deliberately when the payload shape changes; it is
+// intentionally independent of the plugin's module version.
+const envelopeSchemaVersion = "0.0.1"
+
 type passPlugin struct {
 	kc     store.Store
 	logger plugin.Logger
@@ -70,8 +75,9 @@ func unpackValue(id store.ID, secret store.Secret) (*plugin.Envelope, error) {
 		return nil, err
 	}
 	return &plugin.Envelope{
-		ID:    id,
-		Value: value,
+		ID:      id,
+		Value:   value,
+		Version: envelopeSchemaVersion,
 	}, nil
 }
 
