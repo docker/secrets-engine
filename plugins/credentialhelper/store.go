@@ -32,6 +32,11 @@ import (
 	"github.com/docker/secrets-engine/plugin"
 )
 
+// envelopeSchemaVersion is the semantic version of the secret payload this
+// plugin returns. Bump deliberately when the payload shape changes; it is
+// intentionally independent of the plugin's module version.
+const envelopeSchemaVersion = "0.0.1"
+
 // KeyRewriter provides a credential-helper credential username and ID (a server URL).
 // The server URL can consist of an http or https prefix and may end with
 // a trailing forward-slash.
@@ -116,7 +121,7 @@ func (s *credentialHelperStore) GetSecrets(_ context.Context, pattern plugin.Pat
 					"Username":  cred.Username,
 				},
 				Provider:   "docker-credential-helper",
-				Version:    "0.0.1",
+				Version:    envelopeSchemaVersion,
 				ResolvedAt: resolvedAt,
 			})
 		}

@@ -41,6 +41,7 @@ func Test_passPlugin(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, e)
 		assert.Equal(t, "bar", string(e[0].Value))
+		assert.Equal(t, envelopeSchemaVersion, e[0].Version)
 	})
 	t.Run("no secrets", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{}))
