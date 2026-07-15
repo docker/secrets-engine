@@ -25,6 +25,8 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"filippo.io/age"
@@ -798,4 +800,205 @@ func TestPOSIXAge(t *testing.T) {
 		_, err = s.Get(t.Context(), id)
 		assert.ErrorIs(t, err, decryptError)
 	})
+}
+
+// scryptStanzaWorkFactor extracts the logN work factor recorded in the scrypt
+// stanza of an age file header. The header is ASCII; the scrypt stanza has the
+// form "-> scrypt <base64 salt> <logN>".
+func scryptStanzaWorkFactor(t *testing.T, ageFile []byte) int {
+	t.Helper()
+	for line := range strings.SplitSeq(string(ageFile), "\n") {
+		if !strings.HasPrefix(line, "-> scrypt ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		logN, err := strconv.Atoi(fields[len(fields)-1])
+		require.NoError(t, err)
+		return logN
+	}
+	t.Fatal("no scrypt stanza found in age header")
+	return 0
+}
+
+// newTempRoot opens an os.Root over a per-test temporary directory and closes
+// it on cleanup.
+func newTempRoot(t *testing.T) *os.Root {
+	t.Helper()
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, root.Close())
+	})
+	return root
+}
+
+// newPasswordStore builds a posixage store over root that encrypts and decrypts
+// with a single password, plus any extra options.
+func newPasswordStore(t *testing.T, root *os.Root, password string, opts ...Options) store.Store {
+	t.Helper()
+	base := []Options{
+		WithLogger(&testLogger{t}),
+		WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+			return []byte(password), nil
+		}),
+		WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+			return []byte(password), nil
+		}),
+	}
+	s, err := New(root,
+		func(_ context.Context, _ store.ID) *mocks.MockCredential {
+			return &mocks.MockCredential{}
+		},
+		append(base, opts...)...,
+	)
+	require.NoError(t, err)
+	return s
+}
+
+// readPassSecret reads the raw password-encrypted age file for id.
+func readPassSecret(t *testing.T, root *os.Root, id store.ID) []byte {
+	t.Helper()
+	encodedID := base64.StdEncoding.EncodeToString([]byte(id.String()))
+	secretRoot, err := root.OpenRoot(encodedID)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, secretRoot.Close())
+	})
+	data, err := secretRoot.ReadFile(secretfile.SecretFileName + "pass")
+	require.NoError(t, err)
+	return data
+}
+
+func TestScryptWorkFactor(t *testing.T) {
+	// Use a low work factor so the KDF stays fast in tests; the default (18) is
+	// tuned to take ~1s per operation.
+	const workFactor = 10
+
+	t.Run("records the configured work factor in the header", func(t *testing.T) {
+		password := uuid.NewString()
+		root := newTempRoot(t)
+		s := newPasswordStore(t, root, password, WithScryptWorkFactor(workFactor))
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, secret))
+
+		encryptedFile := readPassSecret(t, root, id)
+		assert.Equal(t, workFactor, scryptStanzaWorkFactor(t, encryptedFile))
+
+		// Round-trips with the same store.
+		got, err := s.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, secret, got)
+	})
+
+	t.Run("defaults to the age work factor when unset", func(t *testing.T) {
+		password := uuid.NewString()
+		root := newTempRoot(t)
+		s := newPasswordStore(t, root, password)
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, s.Save(t.Context(), id, secret))
+
+		encryptedFile := readPassSecret(t, root, id)
+		// age's NewScryptRecipient default is logN=18.
+		assert.Equal(t, 18, scryptStanzaWorkFactor(t, encryptedFile))
+	})
+
+	t.Run("work factor is self-describing across stores", func(t *testing.T) {
+		// A file written with a custom work factor must decrypt on a store that
+		// has no work-factor option configured: the factor is read from the
+		// header, not from store configuration.
+		password := uuid.NewString()
+		root := newTempRoot(t)
+		writer := newPasswordStore(t, root, password, WithScryptWorkFactor(workFactor))
+
+		secret := &mocks.MockCredential{Username: uuid.NewString(), Password: uuid.NewString()}
+		id := secrets.MustParseID("test/something/" + uuid.NewString())
+		require.NoError(t, writer.Save(t.Context(), id, secret))
+
+		// A separate store with no work-factor option configured.
+		reader := newPasswordStore(t, root, password)
+
+		got, err := reader.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.EqualValues(t, secret, got)
+	})
+
+	t.Run("rejects out-of-range work factors", func(t *testing.T) {
+		root := newTempRoot(t)
+
+		for _, logN := range []int{0, -1, secretfile.MaxScryptWorkFactor + 1} {
+			_, err := New(root,
+				func(_ context.Context, _ store.ID) *mocks.MockCredential {
+					return &mocks.MockCredential{}
+				},
+				WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+					return []byte("a-password"), nil
+				}),
+				WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+					return []byte("a-password"), nil
+				}),
+				WithScryptWorkFactor(logN),
+			)
+			assert.Error(t, err, "logN=%d should be rejected", logN)
+		}
+	})
+}
+
+// TestScryptWorkFactorMigration documents how an existing secret's scrypt work
+// factor is migrated: there is no transparent on-read migration, but because
+// Save/Upsert re-encrypts the whole secret, re-writing a secret with a store
+// configured for a different work factor migrates the stored file to that
+// factor while preserving the plaintext. The factor moves in both directions.
+func TestScryptWorkFactorMigration(t *testing.T) {
+	password := uuid.NewString()
+	root := newTempRoot(t)
+
+	secret := &mocks.MockCredential{
+		Username: uuid.NewString(),
+		Password: uuid.NewString(),
+		Attributes: map[string]string{
+			"val1": uuid.NewString(),
+		},
+	}
+	id := secrets.MustParseID("test/something/" + uuid.NewString())
+
+	// Seed the secret with the age default (logN=18), simulating data written
+	// by a build that never configured a work factor.
+	initial := newPasswordStore(t, root, password)
+	require.NoError(t, initial.Save(t.Context(), id, secret))
+	require.Equal(t, 18, scryptStanzaWorkFactor(t, readPassSecret(t, root, id)))
+
+	// Each step re-writes the same secret with a store configured for a
+	// different work factor: default -> lower -> higher.
+	steps := []struct {
+		name       string
+		workFactor int
+	}{
+		{"migrate to a lower work factor", 8},
+		{"migrate to a higher work factor", 14},
+	}
+
+	for _, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			s := newPasswordStore(t, root, password, WithScryptWorkFactor(step.workFactor))
+
+			// The old file (written with the previous factor) must still decrypt
+			// on this store, since the factor is read from the file header.
+			got, err := s.Get(t.Context(), id)
+			require.NoError(t, err)
+			assert.EqualValues(t, secret, got)
+
+			// Re-writing migrates the stored file to the new work factor.
+			require.NoError(t, s.Upsert(t.Context(), id, secret))
+			assert.Equal(t, step.workFactor, scryptStanzaWorkFactor(t, readPassSecret(t, root, id)))
+
+			// The migrated file still decrypts to the same plaintext.
+			got, err = s.Get(t.Context(), id)
+			require.NoError(t, err)
+			assert.EqualValues(t, secret, got)
+		})
+	}
 }

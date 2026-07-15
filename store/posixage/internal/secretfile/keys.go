@@ -39,13 +39,50 @@ const (
 	SSHKeyType      KeyType = "ssh"
 )
 
-func getRecipient(k KeyType, encryptionKey string) (age.Recipient, error) {
+// MaxScryptWorkFactor is the largest scrypt work factor (2^logN) that may be
+// used when encrypting a password-protected secret. It matches the default
+// maximum work factor accepted by age when decrypting, so files written at or
+// below this value remain decryptable by standard age tooling.
+const MaxScryptWorkFactor = 22
+
+type recipientOptions struct {
+	// scryptWorkFactor is the scrypt work factor (2^logN). A zero value means
+	// the age default is used.
+	scryptWorkFactor int
+}
+
+// RecipientOption configures how recipients are built by [GetRecipients].
+type RecipientOption func(*recipientOptions)
+
+// WithScryptWorkFactor sets the scrypt work factor (2^logN) used for
+// [PasswordKeyType] recipients. It is a no-op for age and ssh key types.
+//
+// A zero value leaves the age default in place. Non-zero values are validated
+// by [GetRecipients], which returns an error when logN is outside 1..[MaxScryptWorkFactor].
+//
+// See the posixage.WithScryptWorkFactor option for a cost/security table and
+// guidance on choosing a value.
+func WithScryptWorkFactor(logN int) RecipientOption {
+	return func(o *recipientOptions) {
+		o.scryptWorkFactor = logN
+	}
+}
+
+func getRecipient(k KeyType, encryptionKey string, o *recipientOptions) (age.Recipient, error) {
 	var recipient age.Recipient
 	var err error
 
 	switch k {
 	case PasswordKeyType:
-		recipient, err = age.NewScryptRecipient(encryptionKey)
+		var scryptRecipient *age.ScryptRecipient
+		scryptRecipient, err = age.NewScryptRecipient(encryptionKey)
+		if err == nil && o.scryptWorkFactor != 0 {
+			if o.scryptWorkFactor < 1 || o.scryptWorkFactor > MaxScryptWorkFactor {
+				return nil, fmt.Errorf("scrypt work factor out of range (1..%d): %d", MaxScryptWorkFactor, o.scryptWorkFactor)
+			}
+			scryptRecipient.SetWorkFactor(o.scryptWorkFactor)
+		}
+		recipient = scryptRecipient
 	case AgeKeyType:
 		recipient, err = age.ParseX25519Recipient(encryptionKey)
 	case SSHKeyType:
@@ -69,12 +106,20 @@ func getRecipient(k KeyType, encryptionKey string) (age.Recipient, error) {
 //   - ageKeyType      → [age.ParseX25519Recipient]
 //   - sshKeyType      → [agessh.ParseRecipient]
 //
-// An error is returned if the key cannot be parsed or the key type is
-// unsupported.
-func GetRecipients(k KeyType, encryptionKeys []string) ([]age.Recipient, error) {
+// Optional [RecipientOption] values tune recipient creation; see
+// [WithScryptWorkFactor].
+//
+// An error is returned if the key cannot be parsed, an option is invalid, or
+// the key type is unsupported.
+func GetRecipients(k KeyType, encryptionKeys []string, opts ...RecipientOption) ([]age.Recipient, error) {
+	o := &recipientOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	var recipients []age.Recipient
 	for _, encryptionKey := range encryptionKeys {
-		recipient, err := getRecipient(k, encryptionKey)
+		recipient, err := getRecipient(k, encryptionKey, o)
 		if err != nil {
 			return nil, err
 		}

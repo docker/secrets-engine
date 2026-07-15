@@ -357,7 +357,7 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 	// (e.g., age + password). However, multiple keys of the same type are
 	// allowed (e.g., password + password).
 	for k, encryptionKeys := range keyGroups {
-		recipients, err := secretfile.GetRecipients(k, encryptionKeys)
+		recipients, err := secretfile.GetRecipients(k, encryptionKeys, secretfile.WithScryptWorkFactor(f.scryptWorkFactor))
 		if err != nil {
 			return err
 		}
@@ -394,6 +394,9 @@ type config struct {
 	logger                    logging.Logger
 	registeredDecryptionFunc  []promptCaller
 	registeredEncryptionFuncs []promptCaller
+	// scryptWorkFactor is the scrypt work factor (2^logN) applied to
+	// password-protected secrets. A zero value uses the age default.
+	scryptWorkFactor int
 }
 
 type Options func(c *config) error
@@ -403,6 +406,68 @@ type Options func(c *config) error
 func WithLogger(l logging.Logger) Options {
 	return func(c *config) error {
 		c.logger = l
+		return nil
+	}
+}
+
+// WithScryptWorkFactor sets the scrypt work factor (2^logN) used when
+// encrypting password-protected secrets. A higher value increases the cost of
+// brute-forcing the passphrase at the expense of encryption and decryption
+// time.
+//
+// age fixes the other scrypt parameters at r=8, p=1, so only N=2^logN varies.
+// Each increment of logN doubles both the derivation time and the memory
+// required: derivation time is roughly linear in N (age calibrates logN=18 at
+// about one second on a modern machine), and memory usage is exactly 2^logN
+// KiB. The following table is anchored to age's own calibration; absolute times
+// are approximate and vary by CPU, but the ratios are exact powers of two:
+//
+//	logN  memory    ~time/unlock  attacker cost vs. 18
+//	----  --------  ------------  --------------------
+//	 8    256 KiB   ~1 ms         1024x cheaper
+//	10    1 MiB     ~4 ms         256x cheaper
+//	12    4 MiB     ~16 ms        64x cheaper
+//	14    16 MiB    ~60 ms        16x cheaper
+//	15    32 MiB    ~125 ms       8x cheaper
+//	16    64 MiB    ~250 ms       4x cheaper
+//	17    128 MiB   ~500 ms       2x cheaper  (OWASP minimum)
+//	18    256 MiB   ~1 s          baseline    (age default)
+//	20    1 GiB     ~4 s          4x dearer
+//	22    4 GiB     ~16 s         16x dearer   (MaxScryptWorkFactor)
+//
+// Guidance on choosing a value:
+//
+//   - The work factor is only a linear multiplier on the attacker's cost per
+//     guess; the passphrase's own entropy dominates security. A low-entropy,
+//     guessable passphrase is not rescued by a high work factor, and genuinely
+//     high-entropy random key material is safe even at a low one.
+//   - OWASP's Password Storage guidance recommends a minimum of N=2^17 (logN
+//     17) with r=8, p=1 for human-chosen passphrases. Values at or below logN
+//     12 fit in CPU cache, lose scrypt's memory-hardness, and degrade toward a
+//     plain fast hash that GPUs and ASICs can attack in parallel; reserve them
+//     for high-entropy key material or tests.
+//   - Pick the highest logN whose derivation time is tolerable on the weakest
+//     device that must unlock a secret (each unlock pays the cost once). Note
+//     that memory is consumed per concurrent derivation, so logN=20 costs 1 GiB
+//     per in-flight unlock and can exhaust constrained hosts.
+//   - Lowering the work factor is a deliberate security downgrade; make sure the
+//     inputs are high-entropy before doing so.
+//
+// Valid values are 1..[secretfile.MaxScryptWorkFactor]. Values above the
+// maximum are rejected because the default age decryption work-factor ceiling
+// is 22; files written with a higher factor could not be decrypted by standard
+// age tooling. If unset, the age default (logN=18) is used.
+//
+// This option only affects password keys; it is a no-op for age and ssh keys.
+// Because the work factor is recorded in each file's header, changing it does
+// not affect the ability to decrypt secrets written with a previous value; the
+// new factor applies only to secrets written after the change.
+func WithScryptWorkFactor(logN int) Options {
+	return func(c *config) error {
+		if logN < 1 || logN > secretfile.MaxScryptWorkFactor {
+			return fmt.Errorf("scrypt work factor out of range (1..%d): %d", secretfile.MaxScryptWorkFactor, logN)
+		}
+		c.scryptWorkFactor = logN
 		return nil
 	}
 }
