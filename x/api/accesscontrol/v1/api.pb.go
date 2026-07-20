@@ -226,8 +226,6 @@ func (b0 CheckAccessRequest_builder) Build() *CheckAccessRequest {
 	return m0
 }
 
-// Requester mirrors runtime procinfo.Details: the verified context of the
-// peer process asking for secrets.
 type Requester struct {
 	state                         protoimpl.MessageState  `protogen:"opaque.v1"`
 	xxx_hidden_Pid                int32                   `protobuf:"varint,1,opt,name=pid"`
