@@ -34,8 +34,6 @@ message CheckAccessRequest {
   Requester requester = 2;
 }
 
-// Requester mirrors runtime procinfo.Details: the verified context of the
-// peer process asking for secrets.
 message Requester {
   // OS process ID of the caller.
   int32 pid = 1;
