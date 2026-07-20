@@ -40,6 +40,13 @@ func (s *pluginService) Shutdown(ctx context.Context, _ *connect.Request[plugins
 func setupInterceptor(chSetup chan struct{}, timeout time.Duration) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			// Fast path once setup is done: avoids allocating a timer per RPC.
+			select {
+			case <-chSetup:
+				return next(ctx, req)
+			default:
+			}
+			// Only reached while registration is still in progress.
 			select {
 			case <-chSetup:
 				return next(ctx, req)
