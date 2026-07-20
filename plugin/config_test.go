@@ -141,12 +141,10 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 					os.Remove(socketPath)
 				})
 
-				m := &mockPlugin{}
-				c, err := newCfgForManualLaunch(m)
+				c, err := newCfgForManualLaunch()
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", c.name)
 				assert.Equal(t, api.DefaultPluginRegistrationTimeout, c.registrationTimeout)
-				assert.Equal(t, m, c.plugin)
 				assert.NotNil(t, c.conn)
 			},
 		},
@@ -162,7 +160,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })
 
-				cfg, err := newCfgForManualLaunch(&mockPlugin{},
+				cfg, err := newCfgForManualLaunch(
 					WithPluginName("test-plugin"),
 					WithRegistrationTimeout(10*api.DefaultPluginRegistrationTimeout),
 					WithConnection(conn),
@@ -200,7 +198,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "no config from the runtime",
 			test: func(t *testing.T) {
-				_, err := restoreConfig(&mockPlugin{})
+				_, err := restoreConfig()
 				assert.ErrorIs(t, err, errPluginNotLaunchedByEngine)
 			},
 		},
@@ -208,7 +206,7 @@ func Test_restoreConfig(t *testing.T) {
 			name: "invalid config from the runtime",
 			test: func(t *testing.T) {
 				t.Setenv(api.PluginLaunchedByEngineVar, "test-plugin")
-				_, err := restoreConfig(&mockPlugin{})
+				_, err := restoreConfig()
 				assert.Error(t, err)
 			},
 		},
@@ -232,7 +230,7 @@ func Test_restoreConfig(t *testing.T) {
 				require.NoError(t, err)
 				t.Setenv(api.PluginLaunchedByEngineVar, cfgString)
 
-				cfg, err := restoreConfig(&mockPlugin{})
+				cfg, err := restoreConfig()
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)

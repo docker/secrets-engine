@@ -17,7 +17,6 @@ package plugin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -45,13 +44,13 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 	}}))
 	setupCompleted := make(chan struct{})
 	gated := connect.WithInterceptors(setupInterceptor(setupCompleted, config.registrationTimeout))
-	switch v := config.plugin.(type) {
-	case SecretsProvider:
-		httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolverv1.NewResolverHandler(v), gated))
-	case AccessControlModule:
-		httpMux.Handle(accesscontrolv1connect.NewAccessControlServiceHandler(accesscontrol.NewAccessControlHandler(v), gated))
+	switch {
+	case config.secretsProviderPlugin != nil:
+		httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolverv1.NewResolverHandler(config.secretsProviderPlugin), gated))
+	case config.accessControlModule != nil:
+		httpMux.Handle(accesscontrolv1connect.NewAccessControlServiceHandler(accesscontrol.NewAccessControlHandler(config.accessControlModule), gated))
 	default:
-		return nil, fmt.Errorf("no service handler for plugin %T", v)
+		return nil, errors.New("no service handler configured for plugin")
 	}
 
 	ipc, c, err := ipc.NewClientIPC(config.Logger, config.conn, httpMux, func(err error) {

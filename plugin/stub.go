@@ -56,27 +56,28 @@ func NewSecretsProvider(p SecretsProvider, config Config, opts ...ManualLaunchOp
 	if config.SecretsProviderConfig == nil {
 		return nil, errors.New("secrets provider config is required")
 	}
-	return newStub(p, config, opts...)
+	return newStub(config, func(c *cfg) { c.secretsProviderPlugin = p }, opts...)
 }
 
 func NewAccessControlModule(p AccessControlModule, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	if config.AccessControlConfig == nil {
 		return nil, errors.New("access control config is required")
 	}
-	return newStub(p, config, opts...)
+	return newStub(config, func(c *cfg) { c.accessControlModule = p }, opts...)
 }
 
-func newStub(p any, config Config, opts ...ManualLaunchOption) (Stub, error) {
+func newStub(config Config, setPlugin func(*cfg), opts ...ManualLaunchOption) (Stub, error) {
 	if err := config.Valid(); err != nil {
 		return nil, err
 	}
 	if config.Logger == nil {
 		config.Logger = logging.NewDefaultLogger("plugin")
 	}
-	cfg, err := newCfg(p, opts...)
+	cfg, err := newCfg(opts...)
 	if err != nil {
 		return nil, err
 	}
+	setPlugin(cfg)
 	cfg.Config = config
 	stub := &stub{
 		name: cfg.name,
