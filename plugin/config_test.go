@@ -35,12 +35,77 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
-var _ ExternalPlugin = &mockPlugin{}
+var _ SecretsProvider = &mockPlugin{}
 
 type mockPlugin struct{}
 
 func (m *mockPlugin) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
+}
+
+func TestConfigValid(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr string
+	}{
+		{
+			name: "valid secrets provider config",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+			},
+		},
+		{
+			name: "valid access control config",
+			config: Config{
+				Version:             api.MustNewVersion("v1"),
+				AccessControlConfig: &AccessControlConfig{},
+			},
+		},
+		{
+			name: "missing version",
+			config: Config{
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+			},
+			wantErr: "version is required",
+		},
+		{
+			name: "no module config set",
+			config: Config{
+				Version: api.MustNewVersion("v1"),
+			},
+			wantErr: "exactly one of SecretsProviderConfig and AccessControlConfig must be set",
+		},
+		{
+			name: "both module configs set",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+				AccessControlConfig:   &AccessControlConfig{},
+			},
+			wantErr: "exactly one of SecretsProviderConfig and AccessControlConfig must be set",
+		},
+		{
+			name: "secrets provider config missing pattern",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{},
+			},
+			wantErr: "pattern is required",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Valid()
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.EqualError(t, err, tt.wantErr)
+		})
+	}
 }
 
 func Test_newCfgForManualLaunch(t *testing.T) {
