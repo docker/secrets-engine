@@ -45,7 +45,7 @@ github.com/docker/docker-credential-helpers/credentials
 ## explicit; go 1.25.12
 # github.com/docker/secrets-engine/store v0.2.1 => ./store
 ## explicit; go 1.25.12
-# github.com/docker/secrets-engine/x v0.2.1-do.not.use => ./x
+# github.com/docker/secrets-engine/x v0.2.2-do.not.use => ./x
 ## explicit; go 1.25.12
 # github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
