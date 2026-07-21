@@ -48,31 +48,36 @@ var (
 	ErrSecretNotFound = secrets.ErrNotFound
 )
 
-func (c *Config) Valid() error {
-	if c.Version == nil {
-		return errors.New("version is required")
-	}
-	if c.Pattern == nil {
-		return errors.New("pattern is required")
-	}
-	return nil
-}
-
-// New creates a stub with the given plugin and options.
+// NewSecretsProvider creates a stub with the given plugin and options.
 // ManualLaunchOption only apply when the plugin is launched manually.
 // If launched by the secrets runtime, they are ignored.
 // If logger is nil, a default logger will be created and used.
-func New(p ExternalPlugin, config Config, opts ...ManualLaunchOption) (Stub, error) {
+func NewSecretsProvider(p SecretsProvider, config Config, opts ...ManualLaunchOption) (Stub, error) {
+	if config.SecretsProviderConfig == nil {
+		return nil, errors.New("secrets provider config is required")
+	}
+	return newStub(config, func(c *cfg) { c.secretsProviderPlugin = p }, opts...)
+}
+
+func NewAccessControlModule(p AccessControlModule, config Config, opts ...ManualLaunchOption) (Stub, error) {
+	if config.AccessControlConfig == nil {
+		return nil, errors.New("access control config is required")
+	}
+	return newStub(config, func(c *cfg) { c.accessControlModule = p }, opts...)
+}
+
+func newStub(config Config, setPlugin func(*cfg), opts ...ManualLaunchOption) (Stub, error) {
 	if err := config.Valid(); err != nil {
 		return nil, err
 	}
 	if config.Logger == nil {
 		config.Logger = logging.NewDefaultLogger("plugin")
 	}
-	cfg, err := newCfg(p, opts...)
+	cfg, err := newCfg(opts...)
 	if err != nil {
 		return nil, err
 	}
+	setPlugin(cfg)
 	cfg.Config = config
 	stub := &stub{
 		name: cfg.name,

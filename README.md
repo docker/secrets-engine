@@ -266,14 +266,16 @@ func (m *myLogger) Warnf(format string, v ...any) {
 func main() {
     config := plugin.Config{
 		Version: plugin.MustNewVersion("v0.0.1"),
-		Pattern: plugin.MustParsePattern("myrealm/**"),
+		SecretsProviderConfig: &plugin.SecretsProviderConfig{
+			Pattern: plugin.MustParsePattern("myrealm/**"),
+		},
         // custom logger
 		Logger:  &myLogger{},
 	}
     secrets := map[plugin.ID]string{
         plugin.MustParseID("myrealm/foo"): "bar",
     }
-	p, err := plugin.New(&myPlugin{secrets: secrets}, config)
+	p, err := plugin.NewSecretsProvider(&myPlugin{secrets: secrets}, config)
 	if err != nil {
 		panic(err)
 	}

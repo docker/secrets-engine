@@ -63,7 +63,17 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		mPlugin := &mockPlugin{}
 		pluginClosed := make(chan struct{})
-		closer, err := setup(t.Context(), cfg{Config{api.MustNewVersion("v1"), secrets.MustParsePattern("*"), testhelper.TestLogger(t)}, mPlugin, "foo", b, 5 * time.Second}, func(err error) {
+		closer, err := setup(t.Context(), cfg{
+			Config: Config{
+				Version:               api.MustNewVersion("v1"),
+				Logger:                testhelper.TestLogger(t),
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+			},
+			secretsProviderPlugin: mPlugin,
+			name:                  "foo",
+			conn:                  b,
+			registrationTimeout:   5 * time.Second,
+		}, func(err error) {
 			assert.NoError(t, err)
 			close(pluginClosed)
 		})

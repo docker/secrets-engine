@@ -69,24 +69,24 @@ func WithConnection(conn net.Conn) ManualLaunchOption {
 
 type cfg struct {
 	Config
-	plugin              ExternalPlugin
-	name                string
-	conn                io.ReadWriteCloser
-	registrationTimeout time.Duration
+	secretsProviderPlugin SecretsProvider
+	accessControlModule   AccessControlModule
+	name                  string
+	conn                  io.ReadWriteCloser
+	registrationTimeout   time.Duration
 }
 
-func newCfg(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, error) {
-	engineCfg, err := restoreConfig(p)
+func newCfg(opts ...ManualLaunchOption) (*cfg, error) {
+	engineCfg, err := restoreConfig()
 	if errors.Is(err, errPluginNotLaunchedByEngine) {
-		cfg, err := newCfgForManualLaunch(p, opts...)
+		cfg, err := newCfgForManualLaunch(opts...)
 		return cfg, err
 	}
 	return engineCfg, err
 }
 
-func newCfgForManualLaunch(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, error) {
+func newCfgForManualLaunch(opts ...ManualLaunchOption) (*cfg, error) {
 	cfg := &cfg{
-		plugin:              p,
 		registrationTimeout: api.DefaultPluginRegistrationTimeout,
 	}
 	for _, o := range opts {
@@ -118,7 +118,7 @@ func newCfgForManualLaunch(p ExternalPlugin, opts ...ManualLaunchOption) (*cfg, 
 
 var errPluginNotLaunchedByEngine = errors.New("plugin not launched by secrets engine")
 
-func restoreConfig(p ExternalPlugin) (*cfg, error) {
+func restoreConfig() (*cfg, error) {
 	cfgString := os.Getenv(api.PluginLaunchedByEngineVar)
 	if cfgString == "" {
 		return nil, errPluginNotLaunchedByEngine
@@ -132,7 +132,6 @@ func restoreConfig(p ExternalPlugin) (*cfg, error) {
 		return nil, err
 	}
 	return &cfg{
-		plugin:              p,
 		name:                c.Name,
 		conn:                conn,
 		registrationTimeout: c.RegistrationTimeout,

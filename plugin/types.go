@@ -16,9 +16,11 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/docker/secrets-engine/x/api"
+	"github.com/docker/secrets-engine/x/api/accesscontrol"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/plugins"
 	"github.com/docker/secrets-engine/x/secrets"
@@ -40,12 +42,18 @@ type (
 	Logger = logging.Logger
 	// Plugin is an internal engine plugin.
 	Plugin = plugins.Plugin
+
+	AccessControl = accesscontrol.AccessControl
 )
 
 var ErrNotFound = secrets.ErrNotFound
 
-type ExternalPlugin interface {
+type SecretsProvider interface {
 	Resolver
+}
+
+type AccessControlModule interface {
+	AccessControl
 }
 
 // Stub is the interface the stub provides for the plugin implementation.
@@ -69,8 +77,29 @@ type Stub interface {
 type Config struct {
 	// Version of the plugin in semver format.
 	Version Version
-	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
-	Pattern Pattern
 	// Logger to be used within plugin side SDK code. If nil, a default logger will be created and used.
 	Logger Logger
+
+	*SecretsProviderConfig
+	*AccessControlConfig
 }
+
+func (c *Config) Valid() error {
+	if c.Version == nil {
+		return errors.New("version is required")
+	}
+	if (c.SecretsProviderConfig != nil) == (c.AccessControlConfig != nil) {
+		return errors.New("exactly one of SecretsProviderConfig and AccessControlConfig must be set")
+	}
+	if c.SecretsProviderConfig != nil && c.Pattern == nil {
+		return errors.New("pattern is required")
+	}
+	return nil
+}
+
+type SecretsProviderConfig struct {
+	// Pattern to control which IDs should match this plugin. Set to `**` to match any ID.
+	Pattern Pattern
+}
+
+type AccessControlConfig struct{}

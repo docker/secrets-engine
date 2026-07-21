@@ -21,6 +21,10 @@ import (
 	"net/http"
 	"sync"
 
+	"connectrpc.com/connect"
+
+	"github.com/docker/secrets-engine/x/api/accesscontrol"
+	"github.com/docker/secrets-engine/x/api/accesscontrol/v1/accesscontrolv1connect"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
@@ -39,11 +43,16 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 		once()
 	}}))
 	setupCompleted := make(chan struct{})
-	httpMux.Handle(resolverv1connect.NewResolverServiceHandler(&resolverService{
-		handler:             resolverv1.NewResolverHandler(config.plugin),
-		setupCompleted:      setupCompleted,
-		registrationTimeout: config.registrationTimeout,
-	}))
+	gated := connect.WithInterceptors(setupInterceptor(setupCompleted, config.registrationTimeout))
+	switch {
+	case config.secretsProviderPlugin != nil:
+		httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolverv1.NewResolverHandler(config.secretsProviderPlugin), gated))
+	case config.accessControlModule != nil:
+		httpMux.Handle(accesscontrolv1connect.NewAccessControlServiceHandler(accesscontrol.NewAccessControlHandler(config.accessControlModule), gated))
+	default:
+		return nil, errors.New("no service handler configured for plugin")
+	}
+
 	ipc, c, err := ipc.NewClientIPC(config.Logger, config.conn, httpMux, func(err error) {
 		if errors.Is(err, io.EOF) {
 			config.Logger.Printf("Plugin runtime stopped, plugin %s is shutting down...", config.name)

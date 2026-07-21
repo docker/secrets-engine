@@ -35,12 +35,77 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
-var _ ExternalPlugin = &mockPlugin{}
+var _ SecretsProvider = &mockPlugin{}
 
 type mockPlugin struct{}
 
 func (m *mockPlugin) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
+}
+
+func TestConfigValid(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr string
+	}{
+		{
+			name: "valid secrets provider config",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+			},
+		},
+		{
+			name: "valid access control config",
+			config: Config{
+				Version:             api.MustNewVersion("v1"),
+				AccessControlConfig: &AccessControlConfig{},
+			},
+		},
+		{
+			name: "missing version",
+			config: Config{
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+			},
+			wantErr: "version is required",
+		},
+		{
+			name: "no module config set",
+			config: Config{
+				Version: api.MustNewVersion("v1"),
+			},
+			wantErr: "exactly one of SecretsProviderConfig and AccessControlConfig must be set",
+		},
+		{
+			name: "both module configs set",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
+				AccessControlConfig:   &AccessControlConfig{},
+			},
+			wantErr: "exactly one of SecretsProviderConfig and AccessControlConfig must be set",
+		},
+		{
+			name: "secrets provider config missing pattern",
+			config: Config{
+				Version:               api.MustNewVersion("v1"),
+				SecretsProviderConfig: &SecretsProviderConfig{},
+			},
+			wantErr: "pattern is required",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Valid()
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.EqualError(t, err, tt.wantErr)
+		})
+	}
 }
 
 func Test_newCfgForManualLaunch(t *testing.T) {
@@ -76,12 +141,10 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 					os.Remove(socketPath)
 				})
 
-				m := &mockPlugin{}
-				c, err := newCfgForManualLaunch(m)
+				c, err := newCfgForManualLaunch()
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", c.name)
 				assert.Equal(t, api.DefaultPluginRegistrationTimeout, c.registrationTimeout)
-				assert.Equal(t, m, c.plugin)
 				assert.NotNil(t, c.conn)
 			},
 		},
@@ -97,7 +160,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })
 
-				cfg, err := newCfgForManualLaunch(&mockPlugin{},
+				cfg, err := newCfgForManualLaunch(
 					WithPluginName("test-plugin"),
 					WithRegistrationTimeout(10*api.DefaultPluginRegistrationTimeout),
 					WithConnection(conn),
@@ -135,7 +198,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "no config from the runtime",
 			test: func(t *testing.T) {
-				_, err := restoreConfig(&mockPlugin{})
+				_, err := restoreConfig()
 				assert.ErrorIs(t, err, errPluginNotLaunchedByEngine)
 			},
 		},
@@ -143,7 +206,7 @@ func Test_restoreConfig(t *testing.T) {
 			name: "invalid config from the runtime",
 			test: func(t *testing.T) {
 				t.Setenv(api.PluginLaunchedByEngineVar, "test-plugin")
-				_, err := restoreConfig(&mockPlugin{})
+				_, err := restoreConfig()
 				assert.Error(t, err)
 			},
 		},
@@ -167,7 +230,7 @@ func Test_restoreConfig(t *testing.T) {
 				require.NoError(t, err)
 				t.Setenv(api.PluginLaunchedByEngineVar, cfgString)
 
-				cfg, err := restoreConfig(&mockPlugin{})
+				cfg, err := restoreConfig()
 				assert.NoError(t, err)
 				assert.Equal(t, "test-plugin", cfg.name)
 				assert.Equal(t, 10*api.DefaultPluginRegistrationTimeout, cfg.registrationTimeout)
