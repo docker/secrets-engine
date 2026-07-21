@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
 	github.com/docker/secrets-engine/client v0.0.29
-	github.com/docker/secrets-engine/plugin v0.1.0
+	github.com/docker/secrets-engine/plugin v0.2.0
 	github.com/docker/secrets-engine/store v0.2.1
 	github.com/docker/secrets-engine/x v0.2.2-do.not.use
 	github.com/joho/godotenv v1.5.1
