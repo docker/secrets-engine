@@ -86,10 +86,13 @@ func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[plugi
 			RunStatus:     plugin.RunStatus.Enum(),
 			StatusMessage: proto.String(plugin.StatusMessage),
 		}
-		if plugin.SecretsProvider != nil {
+		switch {
+		case plugin.SecretsProvider != nil:
 			b.SecretsProvider = pluginsv1.SecretsProvider_builder{
 				Pattern: proto.String(plugin.SecretsProvider.Pattern.String()),
 			}.Build()
+		case plugin.AccessControlModule != nil:
+			b.AccessControlModule = pluginsv1.AccessControlModule_builder{}.Build()
 		}
 		plugins = append(plugins, b.Build())
 	}
@@ -167,6 +170,12 @@ func Test_ListPlugins(t *testing.T) {
 				External:        true,
 				RunStatus:       pluginsv1.RunStatus_RUN_STATUS_CRASHED,
 				StatusMessage:   "exit status 1: connection refused",
+			},
+			{
+				Name:                api.MustNewName("baz"),
+				Version:             api.MustNewVersion("v1"),
+				AccessControlModule: &AccessControlModuleMetadata{},
+				External:            true,
 			},
 		}
 		socket := mockListPluginsEngine(t, plugins)
