@@ -84,20 +84,10 @@ ARG TARGETOS
 FROM ${TARGETOS}-base AS lint
 ENV CGO_ENABLED=1
 COPY --link --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
-RUN apk add --no-cache openssh-client
 WORKDIR /app
-RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 RUN --mount=type=bind,target=.,ro \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=ssh <<EOT
+    --mount=type=cache,target=/go/pkg/mod <<EOT
     set -euo pipefail
-
-    # Avoid interactive git prompts in CI
-    export GIT_TERMINAL_PROMPT=0
-
-    # If no token, prefer SSH for GitHub; if token exists, we’ll override below
-    git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
-
     for dir in $(go list -f '{{.Dir}}' -m); do
       (cd "$dir" && go mod tidy --diff)
     done
