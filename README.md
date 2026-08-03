@@ -236,7 +236,7 @@ func (p *myPlugin) Run(ctx context.Context) error {
 
 ### 2. Build a plugin binary
 
-Create a Go binary that use your plugin interface implementation and runs it through the plugin SDK:
+Create a Go binary that uses your plugin interface implementation and runs it through the plugin SDK:
 
 ```go
 package main
