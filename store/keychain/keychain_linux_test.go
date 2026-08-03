@@ -415,6 +415,32 @@ func TestKeychainFilterRetriesWhenCollectionRelocks(t *testing.T) {
 	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
 }
 
+func TestKeychainFilterEmpty(t *testing.T) {
+	fake := &fakeService{} // no items -> empty search
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	creds, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+	require.NoError(t, err)
+	assert.NotNil(t, creds)
+	assert.Empty(t, creds)
+}
+
+func TestKeychainFilterNoMatch(t *testing.T) {
+	fake := &fakeService{
+		items:      []dbus.ObjectPath{"/org/freedesktop/secrets/collection/login/1"},
+		attributes: kc.Attributes{"id": "com.test.test/test/bob"},
+	}
+	withFakeService(t, fake)
+
+	ks := setupKeychain(t, nil)
+	creds, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/alice"))
+	require.NoError(t, err)
+	assert.NotNil(t, creds)
+	assert.Empty(t, creds)
+	assert.Equal(t, 0, fake.getSecretCalls, "non-matching item must not be loaded")
+}
+
 // The real-keychain dedup tests use their own service group/name so their items
 // are namespace-isolated from TestKeychain (which shares com.test.test/test).
 // GetAllMetadata/Filter search by {service:group, service:name}, so a leaked

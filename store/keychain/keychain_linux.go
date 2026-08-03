@@ -689,10 +689,6 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
 
-	if len(itemPaths) == 0 {
-		return nil, store.ErrCredentialNotFound
-	}
-
 	credentials := make(map[store.ID]store.Secret)
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(itemPath)
@@ -726,10 +722,6 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			return nil, err
 		}
 		credentials[secretID] = secret
-	}
-
-	if len(credentials) == 0 {
-		return nil, store.ErrCredentialNotFound
 	}
 
 	return credentials, nil
