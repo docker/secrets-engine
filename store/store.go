@@ -93,6 +93,9 @@ type Store interface {
 	Upsert(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
 	//
+	// A pattern matching nothing is a valid empty result: implementations
+	// return an empty (non-nil) map with a nil error, not ErrCredentialNotFound.
+	//
 	// Secrets returned will have both [Secret.SetMetadata] and [Secret.Unmarshal]
 	// called; in that order. Any error produced by any of them would result in
 	// an early return with a nil secrets map.
