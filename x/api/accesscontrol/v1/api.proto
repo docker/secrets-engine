@@ -54,36 +54,94 @@ message Requester {
 }
 
 // DarwinSigningInfo carries macOS code-signing context (Security.framework
-// SecCode* APIs) for the requesting process.
+// SecCode* APIs) for the requesting process and its process ancestry.
 message DarwinSigningInfo {
-  // Apple-assigned Team Identifier (kSecCodeInfoTeamIdentifier). Apple
-  // guarantees uniqueness per developer account, so this is a reliable
-  // trust key.
-  string team_id = 1;
-  // Code-signing identifier (kSecCodeInfoIdentifier), typically the bundle
-  // ID, e.g. "com.docker.docker". Use to pin a specific application within
-  // a team.
-  string identifier = 2;
-  // Company name from the leaf certificate subject.O, e.g. "Docker Inc".
-  // Human-readable but NOT guaranteed unique or immutable — display/logging
-  // only, never a sole trust key.
-  string organization = 3;
-  // Leaf certificate subject.CN, e.g.
-  // "Developer ID Application: Docker Inc (9BNSXJN65R)". Contains the company
-  // name and team ID as embedded display text.
-  string common_name = 4;
-  // Code directory hash (kSecCodeInfoUnique), the exact identity of this
-  // specific binary build, hex-encoded. Use to pin an exact build.
-  string cd_hash = 5;
-  // Dynamic code-signing status word (kSecCodeInfoStatus) — the kernel's live
-  // view of the signature. Raw uint32 bitmask; values are fixed by Apple's
-  // <Security/SecCode.h> and preserved verbatim (unknown bits included).
-  // Known flags:
-  //   0x0000_0001 VALID    — dynamically valid; cleared on runtime tamper.
-  //   0x0000_0100 HARD     — kernel refuses to page in invalid pages.
-  //   0x0000_0200 KILL     — process killed if it becomes invalid.
-  //   0x1000_0000 DEBUGGED — debugger attached; red flag for a secrets peer.
-  uint32 status = 6;
+  // Code-signing identity of the outermost recorded ancestor.
+  SigningIdentity root = 1;
+  // Code-signing identity of the process that connected to the socket
+  // (last chain element).
+  SigningIdentity leaf = 2;
+  // The leaf's process ancestry ordered root to leaf. For a single-node
+  // chain, root and leaf describe the same process.
+  repeated ProcessNode chain = 3;
+
+  // Anchor classifies the root a process's code-signing certificate chain
+  // reaches. Values are ordered by increasing trust, so consumers may gate
+  // on a minimum (e.g. anchor >= ANCHOR_APPLE_GENERIC).
+  enum Anchor {
+    // Unsigned.
+    // buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
+    ANCHOR_NONE = 0;
+    // Ad-hoc: a cdhash but no certificate (Homebrew formula, dev build).
+    ANCHOR_AD_HOC = 1;
+    // Signed with a chain that does not reach an Apple root.
+    ANCHOR_OTHER = 2;
+    // Developer ID or Mac App Store.
+    ANCHOR_APPLE_GENERIC = 3;
+    // Apple's own platform binaries.
+    ANCHOR_APPLE_PLATFORM = 4;
+  }
+
+  // SigningIdentity is the verified code-signing identity of a single
+  // process.
+  message SigningIdentity {
+    // Apple-assigned Team Identifier (kSecCodeInfoTeamIdentifier). Apple
+    // guarantees uniqueness per developer account, so this is a reliable
+    // trust key.
+    string team_id = 1;
+    // Code-signing identifier (kSecCodeInfoIdentifier), typically the bundle
+    // ID, e.g. "com.docker.docker". Use to pin a specific application within
+    // a team.
+    string identifier = 2;
+    // Company name from the leaf certificate subject.O, e.g. "Docker Inc".
+    // Human-readable but NOT guaranteed unique or immutable — display/logging
+    // only, never a sole trust key.
+    string organization = 3;
+    // Leaf certificate subject.CN, e.g.
+    // "Developer ID Application: Docker Inc (9BNSXJN65R)". Contains the
+    // company name and team ID as embedded display text.
+    string common_name = 4;
+    // Code directory hash (kSecCodeInfoUnique), the exact identity of this
+    // specific binary build, hex-encoded. Use to pin an exact build.
+    string cd_hash = 5;
+    // Dynamic code-signing status word (kSecCodeInfoStatus) — the kernel's
+    // live view of the signature. Raw uint32 bitmask; values are fixed by
+    // Apple's <Security/SecCode.h> and preserved verbatim (unknown bits
+    // included). Known flags:
+    //   0x0000_0001 VALID    — dynamically valid; cleared on runtime tamper.
+    //   0x0000_0100 HARD     — kernel refuses to page in invalid pages.
+    //   0x0000_0200 KILL     — process killed if it becomes invalid.
+    //   0x1000_0000 DEBUGGED — debugger attached; red flag for a secrets peer.
+    uint32 status = 6;
+    // Root the certificate chain reaches.
+    Anchor anchor = 7;
+    // True if this process's signature chains to Docker's signing identity.
+    bool signed_by_docker = 8;
+  }
+
+  // ProcessNode is one process in the ancestry chain.
+  message ProcessNode {
+    // OS process ID.
+    int32 pid = 1;
+    // Process start token in µs since epoch (p_starttime sec*1e6 + µs).
+    // Together with pid it forms an instance identity that survives PID
+    // reuse.
+    int64 start = 2;
+    // The process's effective uid; -1 when unknown.
+    int32 uid = 3;
+    // Kernel's process name (p_comm, 16 characters max, readable without
+    // root permissions).
+    string comm = 4;
+    // Executable path exactly as the kernel reports it (proc_pidpath).
+    string exe = 5;
+    // exe with symlinks resolved, falling back to exe.
+    string real_exe = 6;
+    // Modification time of real_exe, UTC.
+    google.protobuf.Timestamp mtime = 7;
+    // Process argv via sysctl(KERN_PROCARGS2). Same-uid only and
+    // best-effort: empty when unreadable. Self-reported by the process.
+    repeated string args = 8;
+  }
 }
 
 // WindowsSigningInfo carries Windows Authenticode context for the requesting

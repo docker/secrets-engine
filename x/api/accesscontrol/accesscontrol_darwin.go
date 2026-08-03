@@ -14,7 +14,38 @@
 
 package accesscontrol
 
-type SigningInfo struct {
+import "time"
+
+// Anchor classifies the root a process's code-signing certificate chain
+// reaches. Values are ordered by increasing trust, so callers may gate on a
+// minimum (e.g. Anchor >= AnchorAppleGeneric).
+type Anchor uint8
+
+const (
+	AnchorNone          Anchor = iota // unsigned
+	AnchorAdHoc                       // ad-hoc: a cdhash but no certificate (Homebrew formula, dev build)
+	AnchorOther                       // signed with a chain that does not reach an Apple root
+	AnchorAppleGeneric                // Developer ID or Mac App Store
+	AnchorApplePlatform               // Apple's own platform binaries
+)
+
+func (a Anchor) String() string {
+	switch a {
+	case AnchorAdHoc:
+		return "adhoc"
+	case AnchorOther:
+		return "other"
+	case AnchorAppleGeneric:
+		return "apple-generic"
+	case AnchorApplePlatform:
+		return "apple-platform"
+	default:
+		return "none"
+	}
+}
+
+// SigningIdentity is the verified code-signing identity of a single process.
+type SigningIdentity struct {
 	SigningInfoBase
 
 	// TeamID is the Apple-assigned Team Identifier (kSecCodeInfoTeamIdentifier),
@@ -46,6 +77,47 @@ type SigningInfo struct {
 	// enforced by SecCodeCheckValidityWithErrors, so this is primarily
 	// corroborating/diagnostic (notably the Debugged flag).
 	Status CodeStatus
+
+	// Anchor classifies the root the certificate chain reaches.
+	Anchor Anchor
+}
+
+// SigningInfo describes the code-signing identity of the requesting process
+// and its process ancestry.
+type SigningInfo struct {
+	// Root is the code-signing identity of the outermost recorded ancestor.
+	Root *SigningIdentity
+	// Leaf is the code-signing identity of the process that connected to
+	// the socket (last chain element).
+	Leaf *SigningIdentity
+	// Chain is the leaf's process ancestry ordered root to leaf. For a single-node
+	// chain Root and Leaf describe the same process.
+	Chain []ProcessNode
+}
+
+// ProcessNode is one process in the ancestry chain.
+type ProcessNode struct {
+	PID int
+	// Start is the process start token in µs since epoch
+	// (p_starttime sec*1e6 + µs). Together with PID it forms an instance
+	// identity that survives PID reuse.
+	Start int64
+	// UID is the target process's effective uid.
+	UID int
+
+	// Comm is the kernel's process name (p_comm, 16 characters max, no root permissions required).
+	Comm string
+
+	// Exe is the executable path exactly as the kernel reports it (proc_pidpath).
+	Exe string
+	// RealExe is Exe with symlinks resolved, falling back to Exe.
+	RealExe string
+	// Mtime is the modification time of RealExe, UTC.
+	Mtime time.Time
+
+	// Args is the process argv via sysctl(KERN_PROCARGS2). Same-uid only
+	// and best-effort: nil when unreadable. Self-reported by the process.
+	Args []string
 }
 
 // CodeStatus is a bitmask of the dynamic SecCodeStatus flags reported in
