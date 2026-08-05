@@ -19,19 +19,11 @@ import (
 	"errors"
 	"math/rand"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	"go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/secrets"
-	"github.com/docker/secrets-engine/x/telemetry"
 )
 
 func WaitForErrorWithTimeout(in <-chan error) error {
@@ -90,72 +82,6 @@ func randString(n int) string {
 func TestLogger(t *testing.T) logging.Logger {
 	t.Helper()
 	return logging.NewDefaultLogger(t.Name())
-}
-
-var _ telemetry.Tracker = &testTracker{}
-
-type TestTracker interface {
-	telemetry.Tracker
-	GetQueue() []any
-}
-
-type testTracker struct {
-	Queue []any
-	m     sync.Mutex
-}
-
-func NewTestTracker() TestTracker {
-	return &testTracker{}
-}
-
-func (t *testTracker) GetQueue() []any {
-	t.m.Lock()
-	defer t.m.Unlock()
-	return t.Queue
-}
-
-func (t *testTracker) Notify(error, ...interface{}) {
-}
-
-func (t *testTracker) TrackEvent(event any) {
-	t.m.Lock()
-	defer t.m.Unlock()
-	t.Queue = append(t.Queue, event)
-}
-
-func SetupTelemetry(t *testing.T) (*tracetest.SpanRecorder, *metric.ManualReader) {
-	t.Helper()
-
-	spanRecorder := tracetest.NewSpanRecorder()
-	tracerProvider := trace.NewTracerProvider(
-		trace.WithSpanProcessor(spanRecorder),
-	)
-	otel.SetTracerProvider(tracerProvider)
-
-	reader := metric.NewManualReader()
-	meterProvider := metric.NewMeterProvider(
-		metric.WithReader(reader),
-	)
-	otel.SetMeterProvider(meterProvider)
-
-	t.Cleanup(func() {
-		otel.SetTracerProvider(trace.NewTracerProvider())
-		otel.SetMeterProvider(metric.NewMeterProvider())
-	})
-
-	return spanRecorder, reader
-}
-
-func FilterMetrics(rm metricdata.ResourceMetrics, name string) []metricdata.Metrics {
-	var filtered []metricdata.Metrics
-	for _, sm := range rm.ScopeMetrics {
-		for _, m := range sm.Metrics {
-			if m.Name == name {
-				filtered = append(filtered, m)
-			}
-		}
-	}
-	return filtered
 }
 
 func TestLoggerCtx(t *testing.T) context.Context {
