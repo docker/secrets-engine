@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -57,10 +58,25 @@ var runLong string
 
 type runOpts struct {
 	envFiles []string
+	timeout  *time.Duration
 }
 
-func RunCommand() *cobra.Command {
+type RunOption func(*runOpts)
+
+// WithTimeout sets the request timeout forwarded to the secrets-engine
+// client. A timeout of 0 disables the request timeout; when the option is
+// not provided, the client's default applies.
+func WithTimeout(timeout time.Duration) RunOption {
+	return func(o *runOpts) {
+		o.timeout = &timeout
+	}
+}
+
+func RunCommand(options ...RunOption) *cobra.Command {
 	opts := runOpts{}
+	for _, o := range options {
+		o(&opts)
+	}
 	cmd := &cobra.Command{
 		Use:     "run -- CMD [ARGS...]",
 		Short:   "Run a command with `se://` environment references resolved.",
@@ -73,7 +89,11 @@ func RunCommand() *cobra.Command {
 				return err
 			}
 
-			c, err := client.New(client.WithSocketPath(api.DefaultSocketPath()))
+			copts := []client.Option{client.WithSocketPath(api.DefaultSocketPath())}
+			if opts.timeout != nil {
+				copts = append(copts, client.WithTimeout(*opts.timeout))
+			}
+			c, err := client.New(copts...)
 			if err != nil {
 				return err
 			}
