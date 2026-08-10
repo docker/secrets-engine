@@ -16,6 +16,7 @@ package commands
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -32,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -46,6 +48,10 @@ const (
 	helperActiveEnv  = "GO_PASS_RUN_HELPER_ACTIVE"
 	helperExitEnv    = "GO_PASS_RUN_HELPER_EXIT"
 	helperSleepEnv   = "GO_PASS_RUN_HELPER_SLEEP"
+	// helperSocketEnv switches the wrapper to preflight mode: RunCommand is
+	// built with WithSocketPath(value) and no request timeout, so the
+	// preflight ping must run and fail against the dead socket.
+	helperSocketEnv = "GO_PASS_RUN_HELPER_SOCKET"
 )
 
 func TestMain(m *testing.M) {
@@ -83,7 +89,13 @@ func runAsWrapper() {
 	if err != nil {
 		os.Exit(2)
 	}
-	cmd := RunCommand()
+	// A bounded timeout skips the preflight ping, so these subprocess tests
+	// exercise child-process mechanics without needing a running engine.
+	ropts := []RunOption{WithTimeout(time.Second)}
+	if socket := os.Getenv(helperSocketEnv); socket != "" {
+		ropts = []RunOption{WithSocketPath(socket)}
+	}
+	cmd := RunCommand(ropts...)
 	cmd.SetArgs([]string{exe})
 	cmd.SetContext(context.Background())
 	cmd.SilenceUsage = true
@@ -94,6 +106,7 @@ func runAsWrapper() {
 		os.Exit(exitErr.Code)
 	}
 	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 	os.Exit(0)
@@ -270,6 +283,23 @@ func TestRunCommand(t *testing.T) {
 		assert.Equal(t, 42, exitErr.ExitCode())
 	})
 
+	t.Run("preflight ping fails fast on a dead socket", func(t *testing.T) {
+		sub := exec.CommandContext(t.Context(), exe)
+		sub.Env = append(os.Environ(),
+			helperWrapperEnv+"=1",
+			helperActiveEnv+"=1",
+			helperExitEnv+"=0",
+			helperSocketEnv+"="+filepath.Join(t.TempDir(), "dead.sock"),
+		)
+		var stderr bytes.Buffer
+		sub.Stderr = &stderr
+		err := sub.Run()
+		var exitErr *exec.ExitError
+		require.True(t, errors.As(err, &exitErr), "expected ExitError, got %v", err)
+		assert.Equal(t, 2, exitErr.ExitCode())
+		assert.Contains(t, stderr.String(), "preflight ping")
+	})
+
 	t.Run("forwards SIGINT and exits 130", func(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			t.Skip("SIGINT cross-process semantics differ on Windows")
@@ -317,6 +347,64 @@ func waitForReady(t *testing.T, r io.Reader) {
 	}
 	// Drain remaining stderr in the background so the pipe never blocks.
 	go func() { _, _ = io.Copy(io.Discard, r) }()
+}
+
+// pingClient adapts a Version func to client.Client. The embedded
+// MockResolver supplies GetSecrets, so no hand-rolled resolver mock can drift
+// from the shared one.
+type pingClient struct {
+	testhelper.MockResolver
+	ping func(context.Context) (client.DaemonVersion, error)
+}
+
+func (p pingClient) Version(ctx context.Context) (client.DaemonVersion, error) {
+	return p.ping(ctx)
+}
+
+func TestPreflightPing(t *testing.T) {
+	t.Parallel()
+
+	t.Run("passes when the engine responds", func(t *testing.T) {
+		t.Parallel()
+		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
+			return client.DaemonVersion{}, nil
+		}}
+		require.NoError(t, preflightPing(t.Context(), c, time.Second))
+	})
+
+	t.Run("fails when the engine is unreachable", func(t *testing.T) {
+		t.Parallel()
+		engineErr := errors.New("connection refused")
+		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
+			return client.DaemonVersion{}, engineErr
+		}}
+		err := preflightPing(t.Context(), c, time.Second)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, engineErr)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("gives up after the timeout when the engine hangs", func(t *testing.T) {
+		t.Parallel()
+		c := pingClient{ping: func(ctx context.Context) (client.DaemonVersion, error) {
+			<-ctx.Done()
+			return client.DaemonVersion{}, ctx.Err()
+		}}
+		// Watchdog parent: if preflightPing loses its own deadline, ping
+		// unblocks here and the elapsed assertion fails fast, instead of the
+		// package hanging until the go test panic. A parent deadline alone is
+		// not enough — the regressed path would still surface
+		// DeadlineExceeded, just later, and pass spuriously.
+		watchdogCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		start := time.Now()
+		err := preflightPing(watchdogCtx, c, 50*time.Millisecond)
+		require.Error(t, err)
+		require.Less(t, time.Since(start), 2*time.Second)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+	})
 }
 
 // testWriter forwards cobra output to t.Log so it does not leak onto stderr.
