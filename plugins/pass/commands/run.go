@@ -37,11 +37,10 @@ import (
 
 const sePrefix = "se://"
 
-// ExitCodeError is returned from RunCommand when the executed child process
-// terminated with a non-zero status. It carries the exit code the wrapper
-// should exit with. Returning this instead of calling os.Exit directly lets
-// the surrounding OTel span wrapper finish recording metrics and span data
-// before the process exits.
+const defaultPreflightPingTimeout = 3 * time.Second
+
+// ExitCodeError is returned when the child process exits non-zero, letting the
+// OTel span wrapper finish before the process exits.
 type ExitCodeError struct {
 	Code int
 }
@@ -57,18 +56,32 @@ var runExample string
 var runLong string
 
 type runOpts struct {
-	envFiles []string
-	timeout  *time.Duration
+	envFiles        []string
+	timeout         *time.Duration
+	responseTimeout *time.Duration
+	socketPath      string
 }
 
 type RunOption func(*runOpts)
 
-// WithTimeout sets the request timeout forwarded to the secrets-engine
-// client. A timeout of 0 disables the request timeout; when the option is
-// not provided, the client's default applies.
+// WithTimeout sets the client request timeout; 0 disables it.
 func WithTimeout(timeout time.Duration) RunOption {
 	return func(o *runOpts) {
 		o.timeout = &timeout
+	}
+}
+
+// WithResponseTimeout sets the client response header timeout; 0 disables it.
+func WithResponseTimeout(responseTimeout time.Duration) RunOption {
+	return func(o *runOpts) {
+		o.responseTimeout = &responseTimeout
+	}
+}
+
+// WithSocketPath overrides the engine socket path; empty means the default.
+func WithSocketPath(socketPath string) RunOption {
+	return func(o *runOpts) {
+		o.socketPath = socketPath
 	}
 }
 
@@ -89,13 +102,15 @@ func RunCommand(options ...RunOption) *cobra.Command {
 				return err
 			}
 
-			copts := []client.Option{client.WithSocketPath(api.DefaultSocketPath())}
-			if opts.timeout != nil {
-				copts = append(copts, client.WithTimeout(*opts.timeout))
-			}
-			c, err := client.New(copts...)
+			c, err := newRunClient(opts)
 			if err != nil {
 				return err
+			}
+
+			if opts.timeout == nil || *opts.timeout == 0 {
+				if err := preflightPing(cmd.Context(), c, defaultPreflightPingTimeout); err != nil {
+					return err
+				}
 			}
 
 			env, err := resolveEnv(cmd.Context(), c, merged)
@@ -103,22 +118,17 @@ func RunCommand(options ...RunOption) *cobra.Command {
 				return err
 			}
 
-			// No CommandContext: the signal forwarder owns the child's
-			// lifecycle. Tying the child to cmd.Context() would let cobra's
-			// ctx cancellation SIGKILL the child out from under the forwarder.
+			// No CommandContext: cobra's ctx cancellation would SIGKILL the
+			// child out from under the signal forwarder.
 			child := exec.Command(args[0], args[1:]...)
 			child.Env = env
 			child.Stdin = os.Stdin
 			child.Stdout = os.Stdout
 			child.Stderr = os.Stderr
-			// Isolate the child in its own process group so that
-			// terminal-generated signals (Ctrl-C) are delivered to us alone;
-			// the forwarder is then the sole path that reaches the child.
-			configureChildProcGroup(child)
+			configureChildProcGroup(child) // own process group; Ctrl-C goes to us only
 
-			// Install the signal handler before Start so a signal arriving in
-			// the window between fork and the forwarder goroutine cannot kill
-			// the parent and orphan the child.
+			// Install before Start to avoid orphaning the child if a signal
+			// arrives between fork and the forwarder goroutine.
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, forwardableSignals()...)
 			defer signal.Stop(sigCh)
@@ -157,9 +167,6 @@ func RunCommand(options ...RunOption) *cobra.Command {
 	return cmd
 }
 
-// mergeEnv folds the process environment and any --env-file inputs into a
-// single deterministic KEY=VALUE slice. Precedence: process env first, then
-// each file in order; later entries override earlier ones.
 func mergeEnv(processEnv, files []string) ([]string, error) {
 	merged := make(map[string]string, len(processEnv))
 	for _, kv := range processEnv {
@@ -182,6 +189,38 @@ func mergeEnv(processEnv, files []string) ([]string, error) {
 	return out, nil
 }
 
+func newRunClient(opts runOpts) (client.Client, error) {
+	socketPath := opts.socketPath
+	if socketPath == "" {
+		socketPath = api.DefaultSocketPath()
+	}
+	copts := []client.Option{client.WithSocketPath(socketPath)}
+	if opts.timeout != nil {
+		copts = append(copts, client.WithTimeout(*opts.timeout))
+	}
+	if opts.responseTimeout != nil {
+		copts = append(copts, client.WithResponseTimeout(*opts.responseTimeout))
+	}
+	return client.New(copts...)
+}
+
+// preflightPing fails fast when the engine is unreachable, instead of letting
+// an unbounded client block resolution indefinitely.
+//
+// The Docker CLI bounds its daemon connection ping the same way
+// (docker/cli#3722, fixing the unreachable-daemon hang in docker/cli#3652).
+func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if _, err := c.Version(ctx); err != nil {
+		if !errors.Is(err, client.ErrSecretsEngineNotAvailable) {
+			err = fmt.Errorf("%w: %w", client.ErrSecretsEngineNotAvailable, err)
+		}
+		return fmt.Errorf("preflight ping: %w", err)
+	}
+	return nil
+}
+
 func resolveEnv(ctx context.Context, r secrets.Resolver, env []string) ([]string, error) {
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
@@ -201,8 +240,7 @@ func resolveEnv(ctx context.Context, r secrets.Resolver, env []string) ([]string
 
 func resolveRef(ctx context.Context, r secrets.Resolver, key, value string) (string, error) {
 	name := strings.TrimPrefix(value, sePrefix)
-	// Validate as an ID first so wildcards in the reference are rejected
-	// instead of silently broadening the lookup.
+	// ParseID rejects wildcards before ParsePattern broadens the lookup.
 	if _, err := secrets.ParseID(name); err != nil {
 		return "", fmt.Errorf("resolving %s: %w", key, err)
 	}
