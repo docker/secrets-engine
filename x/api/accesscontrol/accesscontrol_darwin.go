@@ -62,6 +62,13 @@ type SigningIdentity struct {
 	// so suitable for display/logging rather than as a sole trust key.
 	Organization string
 
+	// BundleName is the human-readable application name from the Info.plist
+	// bound into the code signature (kSecCodeInfoPList, CFBundleDisplayName
+	// falling back to CFBundleName), e.g. "Docker Desktop". Present for .app
+	// bundles and bare binaries with an embedded __info_plist section; empty
+	// otherwise. Display-only: chosen freely by the signer, not unique.
+	BundleName string
+
 	// CommonName is the leaf certificate subject.CN, e.g.
 	// "Developer ID Application: Docker Inc (<team-id>)". Contains the company
 	// name and TeamID as embedded display text.

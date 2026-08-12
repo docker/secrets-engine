@@ -55,6 +55,7 @@ func signingIdentityFromProto(p *accesscontrolv1.DarwinSigningInfo_SigningIdenti
 		TeamID:          p.GetTeamId(),
 		Identifier:      p.GetIdentifier(),
 		Organization:    p.GetOrganization(),
+		BundleName:      p.GetBundleName(),
 		CommonName:      p.GetCommonName(),
 		CDHash:          p.GetCdHash(),
 		Status:          CodeStatus(p.GetStatus()),
