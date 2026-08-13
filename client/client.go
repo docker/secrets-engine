@@ -112,12 +112,40 @@ func WithResponseTimeout(responseTimeout time.Duration) Option {
 	}
 }
 
+// WithPreflightPing overrides the preflight liveness ping timeout of the
+// client.
+//
+// When the request timeout is indefinite (see [WithTimeout]) the client, by
+// default, pings the engine with an [api.DefaultClientPreflightPingTimeout]
+// bound before fetching secrets, so an unreachable or wedged engine fails the
+// request fast instead of hanging it indefinitely. A bounded request timeout
+// disables the ping by default, since the request itself cannot hang.
+//
+// This option makes the choice explicit: the given timeout bounds the ping
+// regardless of the request timeout, and a timeout of 0 disables the ping
+// entirely. Negative durations are not allowed and will result in an error.
+//
+// The Docker CLI bounds its daemon connection ping the same way
+// (docker/cli#3722, fixing the unreachable-daemon hang in docker/cli#3652).
+func WithPreflightPing(timeout time.Duration) Option {
+	return func(s *config) error {
+		if timeout < 0 {
+			return errors.New("preflight ping timeout duration cannot be negative")
+		}
+		s.preflightPingTimeout = &timeout
+		return nil
+	}
+}
+
 type dial func(ctx context.Context, network, addr string) (net.Conn, error)
 
 type config struct {
 	dialContext     dial
 	requestTimeout  time.Duration
 	responseTimeout time.Duration
+	// preflightPingTimeout is nil unless [WithPreflightPing] was given;
+	// nil resolves to the default in [New] based on the request timeout.
+	preflightPingTimeout *time.Duration
 }
 
 var (
@@ -129,9 +157,15 @@ type client struct {
 	resolverClient secrets.Resolver
 	engineClient   pluginsv1connect.PluginManagementServiceClient
 	versionClient  healthv1connect.VersionServiceClient
+	// preflightPingTimeout bounds the liveness ping run before fetching
+	// secrets; 0 means the ping is disabled.
+	preflightPingTimeout time.Duration
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	if err := c.preflightPing(ctx); err != nil {
+		return nil, err
+	}
 	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
 	if isDialError(err) {
 		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
@@ -140,6 +174,26 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 		return nil, err
 	}
 	return envelopes, nil
+}
+
+// preflightPing fails fast when the engine is unreachable or wedged, instead
+// of letting an unbounded request block indefinitely. GetSecrets needs this
+// guard because it is the request that may legitimately wait forever on user
+// interaction; the bounded Version ping distinguishes "engine is busy asking
+// the user" from "engine is gone". A zero timeout disables the ping.
+func (c client) preflightPing(ctx context.Context) error {
+	if c.preflightPingTimeout <= 0 {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.preflightPingTimeout)
+	defer cancel()
+	if _, err := c.Version(ctx); err != nil {
+		if !errors.Is(err, ErrSecretsEngineNotAvailable) {
+			err = fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		}
+		return fmt.Errorf("preflight ping: %w", err)
+	}
+	return nil
 }
 
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
@@ -224,10 +278,22 @@ func New(options ...Option) (Client, error) {
 		// it can be overwritten with [WithTimeout]
 		Timeout: cfg.requestTimeout,
 	}
+	// The preflight ping guards exactly the configurations that can hang: an
+	// explicit [WithPreflightPing] wins, otherwise the ping runs only when
+	// the request timeout is indefinite — a bounded request cannot hang, so
+	// pinging first would only add latency.
+	pingTimeout := time.Duration(0)
+	switch {
+	case cfg.preflightPingTimeout != nil:
+		pingTimeout = *cfg.preflightPingTimeout
+	case cfg.requestTimeout == 0:
+		pingTimeout = api.DefaultClientPreflightPingTimeout
+	}
 	return &client{
-		resolverClient: resolver.NewResolverClient(c),
-		engineClient:   pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
-		versionClient:  healthv1connect.NewVersionServiceClient(c, "http://unix"),
+		resolverClient:       resolver.NewResolverClient(c),
+		engineClient:         pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
+		versionClient:        healthv1connect.NewVersionServiceClient(c, "http://unix"),
+		preflightPingTimeout: pingTimeout,
 	}, nil
 }
 

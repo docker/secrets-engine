@@ -33,6 +33,8 @@ import (
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
+	apiresolver "github.com/docker/secrets-engine/x/api/resolver"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -152,6 +154,29 @@ func mockListPluginsEngine(t *testing.T, plugins []PluginInfo) string {
 	return socketPath
 }
 
+// mockSecretsEngine serves both the version service (so the preflight ping
+// succeeds) and a resolver backed by store.
+func mockSecretsEngine(t *testing.T, store map[secrets.ID]string) string {
+	t.Helper()
+	socketPath := testhelper.RandomShortSocketName()
+	muxServer(t, socketPath, []handler{
+		wrapHandler(healthv1connect.NewVersionServiceHandler(&mockVersionService{version: "v1.2.3"})),
+		wrapHandler(resolverv1connect.NewResolverServiceHandler(apiresolver.NewResolverHandler(testhelper.MockResolver{Store: store}))),
+	})
+	return socketPath
+}
+
+// mockHangingEngine accepts connections but never responds — the wedged-engine
+// case the preflight ping exists to catch.
+func mockHangingEngine(t *testing.T) string {
+	t.Helper()
+	socketPath := testhelper.RandomShortSocketName()
+	muxServer(t, socketPath, []handler{{pattern: "/", handler: http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	})}})
+	return socketPath
+}
+
 func Test_ListPlugins(t *testing.T) {
 	t.Parallel()
 	t.Run("external and internal configurable plugins", func(t *testing.T) {
@@ -258,6 +283,88 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+}
+
+func TestPreflightPing(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fetches secrets when the engine is alive", func(t *testing.T) {
+		t.Parallel()
+		socket := mockSecretsEngine(t, map[secrets.ID]string{secrets.MustParseID("tok"): "val"})
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+		envs, err := c.GetSecrets(t.Context(), secrets.MustParsePattern("tok"))
+		require.NoError(t, err)
+		require.Len(t, envs, 1)
+		assert.Equal(t, []byte("val"), envs[0].Value)
+	})
+
+	t.Run("fails fast on a dead socket", func(t *testing.T) {
+		t.Parallel()
+		c, err := New(WithSocketPath(testhelper.RandomShortSocketName()))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("tok"))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("gives up after the ping timeout when the engine hangs", func(t *testing.T) {
+		t.Parallel()
+		socket := mockHangingEngine(t)
+		c, err := New(WithSocketPath(socket), WithResponseTimeout(0), WithPreflightPing(50*time.Millisecond))
+		require.NoError(t, err)
+		// Watchdog parent: if the ping loses its own deadline, the request
+		// unblocks here and the elapsed assertion fails fast, instead of the
+		// package hanging until the go test panic. A parent deadline alone is
+		// not enough — the regressed path would still surface
+		// DeadlineExceeded, just later, and pass spuriously.
+		watchdogCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		start := time.Now()
+		_, err = c.GetSecrets(watchdogCtx, secrets.MustParsePattern("tok"))
+		require.Error(t, err)
+		require.Less(t, time.Since(start), 2*time.Second)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+		assert.ErrorContains(t, err, "preflight ping")
+	})
+
+	t.Run("bounded request timeout disables the ping", func(t *testing.T) {
+		t.Parallel()
+		c, err := New(WithSocketPath(testhelper.RandomShortSocketName()), WithTimeout(time.Second))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("tok"))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+		assert.NotContains(t, err.Error(), "preflight ping")
+	})
+
+	t.Run("explicit option keeps the ping despite a bounded request timeout", func(t *testing.T) {
+		t.Parallel()
+		c, err := New(WithSocketPath(testhelper.RandomShortSocketName()), WithTimeout(time.Second), WithPreflightPing(time.Second))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("tok"))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("zero disables the ping", func(t *testing.T) {
+		t.Parallel()
+		c, err := New(WithSocketPath(testhelper.RandomShortSocketName()), WithPreflightPing(0))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("tok"))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+		assert.NotContains(t, err.Error(), "preflight ping")
+	})
+
+	t.Run("negative timeout is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := New(WithPreflightPing(-time.Second))
+		require.Error(t, err)
+	})
 }
 
 func TestIsDialError(t *testing.T) {

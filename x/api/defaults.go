@@ -31,6 +31,11 @@ const (
 	// header responses, this does not include the response body and usually should
 	// be short.
 	DefaultClientResponseHeaderTimeout = time.Second
+	// DefaultClientPreflightPingTimeout bounds the client's preflight liveness
+	// ping. When the request timeout is indefinite the client pings the engine
+	// with this bound before fetching secrets, so an unreachable or wedged
+	// engine fails the request fast instead of hanging it indefinitely.
+	DefaultClientPreflightPingTimeout = 3 * time.Second
 	// DefaultClientTLSHandshakeTimeout is the default timeout for clients to handle
 	// tls handshakes. It should usually be short.
 	DefaultClientTLSHandshakeTimeout = time.Second

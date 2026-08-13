@@ -37,8 +37,6 @@ import (
 
 const sePrefix = "se://"
 
-const defaultPreflightPingTimeout = 3 * time.Second
-
 // ExitCodeError is returned when the child process exits non-zero, letting the
 // OTel span wrapper finish before the process exits.
 type ExitCodeError struct {
@@ -102,15 +100,12 @@ func RunCommand(options ...RunOption) *cobra.Command {
 				return err
 			}
 
+			// The client preflight-pings the engine before each secret
+			// fetch while the request timeout is indefinite, so an
+			// unreachable engine fails resolution fast instead of hanging.
 			c, err := newRunClient(opts)
 			if err != nil {
 				return err
-			}
-
-			if opts.timeout == nil || *opts.timeout == 0 {
-				if err := preflightPing(cmd.Context(), c, defaultPreflightPingTimeout); err != nil {
-					return err
-				}
 			}
 
 			env, err := resolveEnv(cmd.Context(), c, merged)
@@ -202,23 +197,6 @@ func newRunClient(opts runOpts) (client.Client, error) {
 		copts = append(copts, client.WithResponseTimeout(*opts.responseTimeout))
 	}
 	return client.New(copts...)
-}
-
-// preflightPing fails fast when the engine is unreachable, instead of letting
-// an unbounded client block resolution indefinitely.
-//
-// The Docker CLI bounds its daemon connection ping the same way
-// (docker/cli#3722, fixing the unreachable-daemon hang in docker/cli#3652).
-func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	if _, err := c.Version(ctx); err != nil {
-		if !errors.Is(err, client.ErrSecretsEngineNotAvailable) {
-			err = fmt.Errorf("%w: %w", client.ErrSecretsEngineNotAvailable, err)
-		}
-		return fmt.Errorf("preflight ping: %w", err)
-	}
-	return nil
 }
 
 func resolveEnv(ctx context.Context, r secrets.Resolver, env []string) ([]string, error) {

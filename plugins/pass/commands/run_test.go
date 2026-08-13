@@ -33,7 +33,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -50,7 +49,9 @@ const (
 	helperSleepEnv   = "GO_PASS_RUN_HELPER_SLEEP"
 	// helperSocketEnv switches the wrapper to preflight mode: RunCommand is
 	// built with WithSocketPath(value) and no request timeout, so the
-	// preflight ping must run and fail against the dead socket.
+	// client's preflight ping must run during resolution and fail against
+	// the dead socket. The test injects an se:// reference into the
+	// environment to force a resolution.
 	helperSocketEnv = "GO_PASS_RUN_HELPER_SOCKET"
 )
 
@@ -89,8 +90,9 @@ func runAsWrapper() {
 	if err != nil {
 		os.Exit(2)
 	}
-	// A bounded timeout skips the preflight ping, so these subprocess tests
-	// exercise child-process mechanics without needing a running engine.
+	// A bounded timeout disables the client's preflight ping, so these
+	// subprocess tests exercise child-process mechanics without needing a
+	// running engine.
 	ropts := []RunOption{WithTimeout(time.Second)}
 	if socket := os.Getenv(helperSocketEnv); socket != "" {
 		ropts = []RunOption{WithSocketPath(socket)}
@@ -290,6 +292,9 @@ func TestRunCommand(t *testing.T) {
 			helperActiveEnv+"=1",
 			helperExitEnv+"=0",
 			helperSocketEnv+"="+filepath.Join(t.TempDir(), "dead.sock"),
+			// The client pings before each secret fetch, not up front, so
+			// force one resolution against the dead socket.
+			"GO_PASS_RUN_PING_REF=se://tok",
 		)
 		var stderr bytes.Buffer
 		sub.Stderr = &stderr
@@ -347,64 +352,6 @@ func waitForReady(t *testing.T, r io.Reader) {
 	}
 	// Drain remaining stderr in the background so the pipe never blocks.
 	go func() { _, _ = io.Copy(io.Discard, r) }()
-}
-
-// pingClient adapts a Version func to client.Client. The embedded
-// MockResolver supplies GetSecrets, so no hand-rolled resolver mock can drift
-// from the shared one.
-type pingClient struct {
-	testhelper.MockResolver
-	ping func(context.Context) (client.DaemonVersion, error)
-}
-
-func (p pingClient) Version(ctx context.Context) (client.DaemonVersion, error) {
-	return p.ping(ctx)
-}
-
-func TestPreflightPing(t *testing.T) {
-	t.Parallel()
-
-	t.Run("passes when the engine responds", func(t *testing.T) {
-		t.Parallel()
-		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
-			return client.DaemonVersion{}, nil
-		}}
-		require.NoError(t, preflightPing(t.Context(), c, time.Second))
-	})
-
-	t.Run("fails when the engine is unreachable", func(t *testing.T) {
-		t.Parallel()
-		engineErr := errors.New("connection refused")
-		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
-			return client.DaemonVersion{}, engineErr
-		}}
-		err := preflightPing(t.Context(), c, time.Second)
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "preflight ping")
-		assert.ErrorIs(t, err, engineErr)
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
-	})
-
-	t.Run("gives up after the timeout when the engine hangs", func(t *testing.T) {
-		t.Parallel()
-		c := pingClient{ping: func(ctx context.Context) (client.DaemonVersion, error) {
-			<-ctx.Done()
-			return client.DaemonVersion{}, ctx.Err()
-		}}
-		// Watchdog parent: if preflightPing loses its own deadline, ping
-		// unblocks here and the elapsed assertion fails fast, instead of the
-		// package hanging until the go test panic. A parent deadline alone is
-		// not enough — the regressed path would still surface
-		// DeadlineExceeded, just later, and pass spuriously.
-		watchdogCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		start := time.Now()
-		err := preflightPing(watchdogCtx, c, 50*time.Millisecond)
-		require.Error(t, err)
-		require.Less(t, time.Since(start), 2*time.Second)
-		assert.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
-	})
 }
 
 // testWriter forwards cobra output to t.Log so it does not leak onto stderr.
