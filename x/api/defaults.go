@@ -27,10 +27,11 @@ const (
 	DefaultPluginRegistrationTimeout = 5 * time.Second
 	// DefaultClientRequestTimeout is the default timeout for clients to handle a request.
 	DefaultClientRequestTimeout = time.Duration(0) // 0 means no limit
-	// DefaultClientResponseHeaderTimeout is the default timeout for clients to handle
-	// header responses, this does not include the response body and usually should
-	// be short.
-	DefaultClientResponseHeaderTimeout = time.Second
+	// DefaultClientResponseHeaderTimeout is the default timeout for response
+	// headers, excluding the body. No limit by default: a request may block
+	// on user interaction daemon-side. Use [client.WithResponseTimeout] or a
+	// context deadline for a hard bound.
+	DefaultClientResponseHeaderTimeout = time.Duration(0) // 0 means no limit
 	// DefaultClientTLSHandshakeTimeout is the default timeout for clients to handle
 	// tls handshakes. It should usually be short.
 	DefaultClientTLSHandshakeTimeout = time.Second

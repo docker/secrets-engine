@@ -1596,11 +1596,9 @@ type DarwinSigningInfo_SigningIdentity_builder struct {
 	Anchor *DarwinSigningInfo_Anchor
 	// True if this process's signature chains to Docker's signing identity.
 	SignedByDocker *bool
-	// Human-readable application name from the Info.plist bound into the code
-	// signature (kSecCodeInfoPList, CFBundleDisplayName falling back to
-	// CFBundleName), e.g. "Docker Desktop". Present for .app bundles and bare
-	// binaries with an embedded __info_plist section; empty otherwise.
-	// Display-only: chosen freely by the signer, not unique.
+	// App name from the signed Info.plist (CFBundleDisplayName, falling back
+	// to CFBundleName), e.g. "Docker Desktop". Empty when the binary embeds
+	// no Info.plist. Display-only: not unique, chosen by the signer.
 	BundleName *string
 }
 

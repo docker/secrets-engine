@@ -204,11 +204,8 @@ func newRunClient(opts runOpts) (client.Client, error) {
 	return client.New(copts...)
 }
 
-// preflightPing fails fast when the engine is unreachable, instead of letting
-// an unbounded client block resolution indefinitely.
-//
-// The Docker CLI bounds its daemon connection ping the same way
-// (docker/cli#3722, fixing the unreachable-daemon hang in docker/cli#3652).
+// preflightPing fails fast when the engine is unreachable, so an unbounded
+// client cannot hang resolution indefinitely.
 func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
