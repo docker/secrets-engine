@@ -48,9 +48,8 @@ const (
 	helperActiveEnv  = "GO_PASS_RUN_HELPER_ACTIVE"
 	helperExitEnv    = "GO_PASS_RUN_HELPER_EXIT"
 	helperSleepEnv   = "GO_PASS_RUN_HELPER_SLEEP"
-	// helperSocketEnv switches the wrapper to preflight mode: RunCommand is
-	// built with WithSocketPath(value) and no request timeout, so the
-	// preflight ping must run and fail against the dead socket.
+	// helperSocketEnv makes the wrapper target this socket with no request
+	// timeout, forcing the preflight ping to run.
 	helperSocketEnv = "GO_PASS_RUN_HELPER_SOCKET"
 )
 
@@ -89,8 +88,7 @@ func runAsWrapper() {
 	if err != nil {
 		os.Exit(2)
 	}
-	// A bounded timeout skips the preflight ping, so these subprocess tests
-	// exercise child-process mechanics without needing a running engine.
+	// bounded timeout skips the preflight ping; no engine needed
 	ropts := []RunOption{WithTimeout(time.Second)}
 	if socket := os.Getenv(helperSocketEnv); socket != "" {
 		ropts = []RunOption{WithSocketPath(socket)}
@@ -349,9 +347,7 @@ func waitForReady(t *testing.T, r io.Reader) {
 	go func() { _, _ = io.Copy(io.Discard, r) }()
 }
 
-// pingClient adapts a Version func to client.Client. The embedded
-// MockResolver supplies GetSecrets, so no hand-rolled resolver mock can drift
-// from the shared one.
+// pingClient adapts a Version func to client.Client.
 type pingClient struct {
 	testhelper.MockResolver
 	ping func(context.Context) (client.DaemonVersion, error)
@@ -391,11 +387,8 @@ func TestPreflightPing(t *testing.T) {
 			<-ctx.Done()
 			return client.DaemonVersion{}, ctx.Err()
 		}}
-		// Watchdog parent: if preflightPing loses its own deadline, ping
-		// unblocks here and the elapsed assertion fails fast, instead of the
-		// package hanging until the go test panic. A parent deadline alone is
-		// not enough — the regressed path would still surface
-		// DeadlineExceeded, just later, and pass spuriously.
+		// Watchdog: if preflightPing loses its own deadline, the elapsed
+		// assertion fails instead of the package hanging.
 		watchdogCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		start := time.Now()

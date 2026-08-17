@@ -96,12 +96,8 @@ func WithTimeout(timeout time.Duration) Option {
 }
 
 // WithResponseTimeout overrides the response header timeout of the client.
-//
-// It is useful to set if there are long-lived user interactions required
-// when the Secrets Engine requests secrets from a plugin.
-//
-// A responseTimeout of 0 means no response header timeout will be applied.
-// Negative durations are not allowed and will result in an error.
+// By default no timeout is applied, because a request may block on user
+// interaction. 0 means no timeout; negative durations return an error.
 func WithResponseTimeout(responseTimeout time.Duration) Option {
 	return func(s *config) error {
 		if responseTimeout < 0 {
@@ -211,7 +207,7 @@ func New(options ...Option) (Client, error) {
 			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
 			// keep the connection alive (good for long-lived clients)
 			IdleConnTimeout: api.DefaultClientIdleConnTimeout,
-			// By default it is 1 second, but can be overridden with [WithResponseTimeout]
+			// no timeout by default; override with [WithResponseTimeout]
 			ResponseHeaderTimeout: cfg.responseTimeout,
 			TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
 
