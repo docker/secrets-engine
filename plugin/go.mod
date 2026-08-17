@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/plugin
 
-go 1.25.12
+go 1.25.13
 
 // This `replace` is only for CI to function.
 // The correct version will get resolved from below when this module is
