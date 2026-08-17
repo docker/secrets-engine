@@ -16,10 +16,13 @@ package client
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +36,8 @@ import (
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
+	"github.com/docker/secrets-engine/x/api/resolver"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -258,6 +263,170 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+}
+
+type pingClient struct {
+	testhelper.MockResolver
+	ping func(context.Context) (DaemonVersion, error)
+}
+
+func (p pingClient) Version(ctx context.Context) (DaemonVersion, error) {
+	return p.ping(ctx)
+}
+
+func TestPreflight(t *testing.T) {
+	t.Parallel()
+
+	t.Run("passes when the engine responds", func(t *testing.T) {
+		t.Parallel()
+		c := pingClient{ping: func(_ context.Context) (DaemonVersion, error) {
+			return DaemonVersion{}, nil
+		}}
+		require.NoError(t, preflight(t.Context(), c, time.Second))
+	})
+
+	t.Run("keeps the dial wrapping from Version", func(t *testing.T) {
+		t.Parallel()
+		engineErr := fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, errors.New("connection refused"))
+		c := pingClient{ping: func(_ context.Context) (DaemonVersion, error) {
+			return DaemonVersion{}, engineErr
+		}}
+		err := preflight(t.Context(), c, time.Second)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("wraps an explicit unavailable answer", func(t *testing.T) {
+		t.Parallel()
+		engineErr := connect.NewError(connect.CodeUnavailable, errors.New("draining"))
+		c := pingClient{ping: func(_ context.Context) (DaemonVersion, error) {
+			return DaemonVersion{}, engineErr
+		}}
+		err := preflight(t.Context(), c, time.Second)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("keeps non-availability errors unwrapped", func(t *testing.T) {
+		t.Parallel()
+		engineErr := errors.New(`parsing daemon version "x": invalid`)
+		c := pingClient{ping: func(_ context.Context) (DaemonVersion, error) {
+			return DaemonVersion{}, engineErr
+		}}
+		err := preflight(t.Context(), c, time.Second)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.ErrorIs(t, err, engineErr)
+		assert.NotErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("gives up after the timeout when the engine hangs", func(t *testing.T) {
+		t.Parallel()
+		c := pingClient{ping: func(ctx context.Context) (DaemonVersion, error) {
+			<-ctx.Done()
+			return DaemonVersion{}, ctx.Err()
+		}}
+		// Watchdog parent: if preflight loses its own deadline, ping unblocks
+		// here and the elapsed assertion fails fast, instead of the package
+		// hanging until the go test panic. A parent deadline alone is not
+		// enough — the regressed path would still surface DeadlineExceeded,
+		// just later, and pass spuriously.
+		watchdogCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		start := time.Now()
+		err := preflight(watchdogCtx, c, 50*time.Millisecond)
+		require.Error(t, err)
+		require.Less(t, time.Since(start), 2*time.Second)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+}
+
+// countingVersionService counts pings so tests can assert how often the
+// preflight ran.
+type countingVersionService struct {
+	mockVersionService
+	calls atomic.Int32
+}
+
+func (m *countingVersionService) GetVersion(ctx context.Context, req *connect.Request[healthv1.GetVersionRequest]) (*connect.Response[healthv1.GetVersionResponse], error) {
+	m.calls.Add(1)
+	return m.mockVersionService.GetVersion(ctx, req)
+}
+
+func resolverHandler(store map[secrets.ID]string) handler {
+	return wrapHandler(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(testhelper.MockResolver{Store: store})))
+}
+
+func TestGetSecretsPreflight(t *testing.T) {
+	t.Parallel()
+
+	store := map[secrets.ID]string{secrets.MustParseID("gh-token"): "ghp_abc123"}
+	pattern := secrets.MustParsePattern("gh-token")
+
+	t.Run("unbounded client pings before every resolution", func(t *testing.T) {
+		t.Parallel()
+		versions := &countingVersionService{mockVersionService: mockVersionService{version: "v1.2.3"}}
+		socketPath := testhelper.RandomShortSocketName()
+		muxServer(t, socketPath, []handler{
+			wrapHandler(healthv1connect.NewVersionServiceHandler(versions)),
+			resolverHandler(store),
+		})
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		for range 2 {
+			envs, err := c.GetSecrets(t.Context(), pattern)
+			require.NoError(t, err)
+			require.Len(t, envs, 1)
+			assert.Equal(t, "ghp_abc123", string(envs[0].Value))
+		}
+		assert.Equal(t, int32(2), versions.calls.Load())
+	})
+
+	t.Run("bounded client skips the preflight", func(t *testing.T) {
+		t.Parallel()
+		socketPath := testhelper.RandomShortSocketName()
+		// No version service mounted: a bounded client must resolve without
+		// ever touching it.
+		muxServer(t, socketPath, []handler{resolverHandler(store)})
+		c, err := New(WithSocketPath(socketPath), WithTimeout(time.Second))
+		require.NoError(t, err)
+		envs, err := c.GetSecrets(t.Context(), pattern)
+		require.NoError(t, err)
+		require.Len(t, envs, 1)
+	})
+
+	t.Run("unbounded client requires the version service", func(t *testing.T) {
+		t.Parallel()
+		socketPath := testhelper.RandomShortSocketName()
+		muxServer(t, socketPath, []handler{resolverHandler(store)})
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), pattern)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "preflight ping")
+		// The engine answered, so this is not misreported as unavailability.
+		assert.NotErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	})
+
+	t.Run("failed preflight is retried once the engine is up", func(t *testing.T) {
+		t.Parallel()
+		socketPath := testhelper.RandomShortSocketName()
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), pattern)
+		require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+
+		muxServer(t, socketPath, []handler{
+			wrapHandler(healthv1connect.NewVersionServiceHandler(&mockVersionService{version: "v1.2.3"})),
+			resolverHandler(store),
+		})
+		envs, err := c.GetSecrets(t.Context(), pattern)
+		require.NoError(t, err)
+		require.Len(t, envs, 1)
+	})
 }
 
 func TestIsDialError(t *testing.T) {

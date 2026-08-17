@@ -129,9 +129,15 @@ type client struct {
 	resolverClient secrets.Resolver
 	engineClient   pluginsv1connect.PluginManagementServiceClient
 	versionClient  healthv1connect.VersionServiceClient
+	requestTimeout time.Duration
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	if c.requestTimeout == 0 {
+		if err := preflight(ctx, c, defaultPreflightTimeout); err != nil {
+			return nil, err
+		}
+	}
 	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
 	if isDialError(err) {
 		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
@@ -140,6 +146,27 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 		return nil, err
 	}
 	return envelopes, nil
+}
+
+const defaultPreflightTimeout = 2 * time.Second
+
+// preflight fails fast when the engine is unreachable, instead of letting a
+// client without a request timeout block indefinitely.
+//
+// The Docker CLI bounds its daemon connection ping the same way
+// (docker/cli#3722, fixing the unreachable-daemon hang in docker/cli#3652).
+func preflight(ctx context.Context, c Client, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if _, err := c.Version(ctx); err != nil {
+		unreachable := errors.Is(err, context.DeadlineExceeded) ||
+			connect.CodeOf(err) == connect.CodeUnavailable
+		if unreachable && !errors.Is(err, ErrSecretsEngineNotAvailable) {
+			err = fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		}
+		return fmt.Errorf("preflight ping: %w", err)
+	}
+	return nil
 }
 
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
@@ -228,6 +255,7 @@ func New(options ...Option) (Client, error) {
 		resolverClient: resolver.NewResolverClient(c),
 		engineClient:   pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
 		versionClient:  healthv1connect.NewVersionServiceClient(c, "http://unix"),
+		requestTimeout: cfg.requestTimeout,
 	}, nil
 }
 
