@@ -63,9 +63,8 @@ func (x Decision) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Anchor classifies the root a process's code-signing certificate chain
-// reaches. Values are ordered by increasing trust, so consumers may gate
-// on a minimum (e.g. anchor >= ANCHOR_APPLE_GENERIC).
+// Root the certificate chain reaches, ordered by increasing trust
+// (gate on a minimum).
 type DarwinSigningInfo_Anchor int32
 
 const (
@@ -74,11 +73,11 @@ const (
 	DarwinSigningInfo_ANCHOR_NONE DarwinSigningInfo_Anchor = 0
 	// Ad-hoc: a cdhash but no certificate (Homebrew formula, dev build).
 	DarwinSigningInfo_ANCHOR_AD_HOC DarwinSigningInfo_Anchor = 1
-	// Signed with a chain that does not reach an Apple root.
+	// Chain does not reach an Apple root.
 	DarwinSigningInfo_ANCHOR_OTHER DarwinSigningInfo_Anchor = 2
 	// Developer ID or Mac App Store.
 	DarwinSigningInfo_ANCHOR_APPLE_GENERIC DarwinSigningInfo_Anchor = 3
-	// Apple's own platform binaries.
+	// Apple platform binaries.
 	DarwinSigningInfo_ANCHOR_APPLE_PLATFORM DarwinSigningInfo_Anchor = 4
 )
 
@@ -122,13 +121,12 @@ func (x DarwinSigningInfo_Anchor) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// IntegrityLevel is a Windows mandatory integrity level, ordered so higher
-// values denote a more privileged context (mirrors winnt.h RIDs).
+// Windows mandatory integrity level (winnt.h RIDs); higher = more
+// privileged.
 type WindowsSigningInfo_IntegrityLevel int32
 
 const (
-	// SECURITY_MANDATORY_UNTRUSTED_RID (0x0000). Also the value used when the
-	// integrity level could not be determined.
+	// Untrusted, or could not be determined.
 	WindowsSigningInfo_INTEGRITY_LEVEL_UNSPECIFIED WindowsSigningInfo_IntegrityLevel = 0
 	// SECURITY_MANDATORY_LOW_RID (0x1000), e.g. AppContainer/sandboxed.
 	WindowsSigningInfo_INTEGRITY_LEVEL_LOW WindowsSigningInfo_IntegrityLevel = 4096
@@ -181,13 +179,11 @@ func (x WindowsSigningInfo_IntegrityLevel) Number() protoreflect.EnumNumber {
 }
 
 type CheckAccessRequest struct {
-	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Pattern     *string                `protobuf:"bytes,1,opt,name=pattern"`
-	xxx_hidden_Requester   *Requester             `protobuf:"bytes,2,opt,name=requester"`
-	XXX_raceDetectHookData protoimpl.RaceDetectHookData
-	XXX_presence           [1]uint32
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Patterns  []string               `protobuf:"bytes,1,rep,name=patterns"`
+	xxx_hidden_Requester *Requester             `protobuf:"bytes,2,opt,name=requester"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CheckAccessRequest) Reset() {
@@ -215,14 +211,11 @@ func (x *CheckAccessRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *CheckAccessRequest) GetPattern() string {
+func (x *CheckAccessRequest) GetPatterns() []string {
 	if x != nil {
-		if x.xxx_hidden_Pattern != nil {
-			return *x.xxx_hidden_Pattern
-		}
-		return ""
+		return x.xxx_hidden_Patterns
 	}
-	return ""
+	return nil
 }
 
 func (x *CheckAccessRequest) GetRequester() *Requester {
@@ -232,20 +225,12 @@ func (x *CheckAccessRequest) GetRequester() *Requester {
 	return nil
 }
 
-func (x *CheckAccessRequest) SetPattern(v string) {
-	x.xxx_hidden_Pattern = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+func (x *CheckAccessRequest) SetPatterns(v []string) {
+	x.xxx_hidden_Patterns = v
 }
 
 func (x *CheckAccessRequest) SetRequester(v *Requester) {
 	x.xxx_hidden_Requester = v
-}
-
-func (x *CheckAccessRequest) HasPattern() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *CheckAccessRequest) HasRequester() bool {
@@ -255,11 +240,6 @@ func (x *CheckAccessRequest) HasRequester() bool {
 	return x.xxx_hidden_Requester != nil
 }
 
-func (x *CheckAccessRequest) ClearPattern() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
-	x.xxx_hidden_Pattern = nil
-}
-
 func (x *CheckAccessRequest) ClearRequester() {
 	x.xxx_hidden_Requester = nil
 }
@@ -267,9 +247,8 @@ func (x *CheckAccessRequest) ClearRequester() {
 type CheckAccessRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// What the caller is trying to resolve — mirrors the resolver pattern.
-	Pattern *string
-	// Identity/context of the process making the request.
+	// Patterns the caller wants to resolve; at least one required.
+	Patterns  []string
 	Requester *Requester
 }
 
@@ -277,10 +256,7 @@ func (b0 CheckAccessRequest_builder) Build() *CheckAccessRequest {
 	m0 := &CheckAccessRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	if b.Pattern != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
-		x.xxx_hidden_Pattern = b.Pattern
-	}
+	x.xxx_hidden_Patterns = b.Patterns
 	x.xxx_hidden_Requester = b.Requester
 	return m0
 }
@@ -553,16 +529,12 @@ func (x *Requester) WhichSigningInfo() case_Requester_SigningInfo {
 type Requester_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// OS process ID of the caller.
-	Pid *int32
-	// Process name.
-	Name *string
-	// Absolute path to the caller's binary on disk.
+	Pid                *int32
+	Name               *string
 	AbsoluteBinaryPath *string
-	// True if the binary's signature chains to Docker's signing identity.
+	// Signature chains to Docker's signing identity.
 	SignedByDocker *bool
-	// Platform-specific signing context, set according to the OS the engine
-	// is running on. Exactly one variant is populated.
+	// Platform-specific signing context, per host OS.
 
 	// Fields of oneof xxx_hidden_SigningInfo:
 	Darwin  *DarwinSigningInfo
@@ -635,8 +607,8 @@ func (*requester_Windows) isRequester_SigningInfo() {}
 
 func (*requester_Linux) isRequester_SigningInfo() {}
 
-// DarwinSigningInfo carries macOS code-signing context (Security.framework
-// SecCode* APIs) for the requesting process and its process ancestry.
+// macOS code-signing context (SecCode* APIs) for the requester and its
+// process ancestry.
 type DarwinSigningInfo struct {
 	state            protoimpl.MessageState             `protogen:"opaque.v1"`
 	xxx_hidden_Root  *DarwinSigningInfo_SigningIdentity `protobuf:"bytes,1,opt,name=root"`
@@ -731,13 +703,11 @@ func (x *DarwinSigningInfo) ClearLeaf() {
 type DarwinSigningInfo_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Code-signing identity of the outermost recorded ancestor.
+	// Identity of the outermost recorded ancestor.
 	Root *DarwinSigningInfo_SigningIdentity
-	// Code-signing identity of the process that connected to the socket
-	// (last chain element).
+	// Identity of the process that connected to the socket.
 	Leaf *DarwinSigningInfo_SigningIdentity
-	// The leaf's process ancestry ordered root to leaf. For a single-node
-	// chain, root and leaf describe the same process.
+	// Ancestry ordered root to leaf; may be a single node.
 	Chain []*DarwinSigningInfo_ProcessNode
 }
 
@@ -751,10 +721,7 @@ func (b0 DarwinSigningInfo_builder) Build() *DarwinSigningInfo {
 	return m0
 }
 
-// WindowsSigningInfo carries Windows Authenticode context for the requesting
-// process. Fields fall into three trust tiers: signature-derived (verified by
-// WinVerifyTrust), token-derived (OS-enforced runtime properties), and
-// corroborating PE version metadata (unsigned, display only).
+// Windows Authenticode context for the requesting process.
 type WindowsSigningInfo struct {
 	state                        protoimpl.MessageState            `protogen:"opaque.v1"`
 	xxx_hidden_TrustedChain      bool                              `protobuf:"varint,1,opt,name=trusted_chain,json=trustedChain"`
@@ -1064,32 +1031,22 @@ func (x *WindowsSigningInfo) ClearFileVersion() {
 type WindowsSigningInfo_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Whether WinVerifyTrust confirmed the Authenticode signature chains to a
-	// trusted root and is not revoked. The remaining signature fields are only
-	// meaningful when true.
-	TrustedChain *bool
-	// Signing certificate Subject Organization (O), e.g. "Docker Inc".
-	SubjectOrg *string
-	// Signing certificate Subject Common Name (CN).
+	// Chains to a trusted root and not revoked; remaining signature fields
+	// are meaningful only when true.
+	TrustedChain      *bool
+	SubjectOrg        *string
 	SubjectCommonName *string
-	// Common Name of the issuing CA, e.g. the DigiCert / Sectigo code-signing
-	// intermediate.
+	// Issuing CA Common Name.
 	Issuer *string
-	// Hex-encoded SHA-256 hash of the leaf signing certificate. Strongest
-	// identity pin, but brittle across cert rotation.
+	// SHA-256 of the leaf certificate, hex; strongest pin, breaks on rotation.
 	ThumbprintSha256 *string
-	// Whether the signature uses an Extended Validation code-signing certificate
-	// (hardware-backed key, stricter vetting), detected from the leaf
-	// certificate's CA/Browser Forum EV policy OID.
+	// Extended Validation certificate (CA/Browser Forum EV policy OID).
 	IsEv *bool
-	// Peer process's mandatory integrity level from its access token. Collected
-	// for logging/diagnostics only; trust is gated on the signature, not
-	// integrity (the engine itself runs at Medium as a per-user service).
+	// Integrity level from the peer's access token; diagnostics only,
+	// never gated on.
 	Integrity *WindowsSigningInfo_IntegrityLevel
-	// --- Corroborating only (PE version resource; NOT trustworthy) ---
-	//
-	// From the PE VERSIONINFO resource: unsigned and attacker-controllable, so
-	// display/logging only — must never gate trust.
+	// PE VERSIONINFO (unsigned, attacker-controllable): display only,
+	// never gate trust.
 	CompanyName *string
 	ProductName *string
 	FileVersion *string
@@ -1142,8 +1099,8 @@ func (b0 WindowsSigningInfo_builder) Build() *WindowsSigningInfo {
 	return m0
 }
 
-// LinuxSigningInfo carries sigstore (Fulcio/Rekor) signing context for the
-// requesting process. A binary may be signed by more than one signer.
+// Sigstore (Fulcio/Rekor) context for the requesting process. A binary may
+// have multiple signers.
 type LinuxSigningInfo struct {
 	state              protoimpl.MessageState      `protogen:"opaque.v1"`
 	xxx_hidden_Signers *[]*LinuxSigningInfo_Signer `protobuf:"bytes,1,rep,name=signers"`
@@ -1280,8 +1237,7 @@ func (b0 CheckAccessResponse_builder) Build() *CheckAccessResponse {
 	return m0
 }
 
-// SigningIdentity is the verified code-signing identity of a single
-// process.
+// Verified code-signing identity of one process.
 type DarwinSigningInfo_SigningIdentity struct {
 	state                     protoimpl.MessageState   `protogen:"opaque.v1"`
 	xxx_hidden_TeamId         *string                  `protobuf:"bytes,1,opt,name=team_id,json=teamId"`
@@ -1563,24 +1519,17 @@ func (x *DarwinSigningInfo_SigningIdentity) ClearBundleName() {
 type DarwinSigningInfo_SigningIdentity_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Apple-assigned Team Identifier (kSecCodeInfoTeamIdentifier). Apple
-	// guarantees uniqueness per developer account, so this is a reliable
-	// trust key.
+	// Team Identifier (kSecCodeInfoTeamIdentifier); unique per developer
+	// account — reliable trust key.
 	TeamId *string
-	// Code-signing identifier (kSecCodeInfoIdentifier), typically the bundle
-	// ID, e.g. "com.docker.docker". Use to pin a specific application within
-	// a team.
+	// Code-signing identifier (kSecCodeInfoIdentifier), typically the
+	// bundle ID; pins an app within a team.
 	Identifier *string
-	// Company name from the leaf certificate subject.O, e.g. "Docker Inc".
-	// Human-readable but NOT guaranteed unique or immutable — display/logging
-	// only, never a sole trust key.
+	// Leaf cert subject.O, e.g. "Docker Inc"; display only, not a trust key.
 	Organization *string
-	// Leaf certificate subject.CN, e.g.
-	// "Developer ID Application: Docker Inc (9BNSXJN65R)". Contains the
-	// company name and team ID as embedded display text.
+	// Leaf cert subject.CN; display only.
 	CommonName *string
-	// Code directory hash (kSecCodeInfoUnique), the exact identity of this
-	// specific binary build, hex-encoded. Use to pin an exact build.
+	// Code directory hash (kSecCodeInfoUnique), hex; pins an exact build.
 	CdHash *string
 	// Dynamic code-signing status word (kSecCodeInfoStatus) — the kernel's
 	// live view of the signature. Raw uint32 bitmask; values are fixed by
@@ -1594,11 +1543,10 @@ type DarwinSigningInfo_SigningIdentity_builder struct {
 	Status *uint32
 	// Root the certificate chain reaches.
 	Anchor *DarwinSigningInfo_Anchor
-	// True if this process's signature chains to Docker's signing identity.
+	// Signature chains to Docker's signing identity.
 	SignedByDocker *bool
-	// App name from the signed Info.plist (CFBundleDisplayName, falling back
-	// to CFBundleName), e.g. "Docker Desktop". Empty when the binary embeds
-	// no Info.plist. Display-only: not unique, chosen by the signer.
+	// App name from Info.plist (CFBundleDisplayName or CFBundleName);
+	// display only.
 	BundleName *string
 }
 
@@ -1645,7 +1593,7 @@ func (b0 DarwinSigningInfo_SigningIdentity_builder) Build() *DarwinSigningInfo_S
 	return m0
 }
 
-// ProcessNode is one process in the ancestry chain.
+// One process in the ancestry chain.
 type DarwinSigningInfo_ProcessNode struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Pid         int32                  `protobuf:"varint,1,opt,name=pid"`
@@ -1876,25 +1824,20 @@ func (x *DarwinSigningInfo_ProcessNode) ClearMtime() {
 type DarwinSigningInfo_ProcessNode_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// OS process ID.
 	Pid *int32
-	// Process start token in µs since epoch (p_starttime sec*1e6 + µs).
-	// Together with pid it forms an instance identity that survives PID
-	// reuse.
+	// Start time in µs since epoch; with pid, survives PID reuse.
 	Start *int64
-	// The process's effective uid; -1 when unknown.
+	// Effective uid; -1 when unknown.
 	Uid *int32
-	// Kernel's process name (p_comm, 16 characters max, readable without
-	// root permissions).
+	// Kernel process name (p_comm, 16 chars max).
 	Comm *string
-	// Executable path exactly as the kernel reports it (proc_pidpath).
+	// Executable path (proc_pidpath).
 	Exe *string
-	// exe with symlinks resolved, falling back to exe.
+	// exe with symlinks resolved; falls back to exe.
 	RealExe *string
 	// Modification time of real_exe, UTC.
 	Mtime *timestamppb.Timestamp
-	// Process argv via sysctl(KERN_PROCARGS2). Same-uid only and
-	// best-effort: empty when unreadable. Self-reported by the process.
+	// argv via sysctl(KERN_PROCARGS2); best-effort, self-reported.
 	Args []string
 }
 
@@ -1931,8 +1874,7 @@ func (b0 DarwinSigningInfo_ProcessNode_builder) Build() *DarwinSigningInfo_Proce
 	return m0
 }
 
-// Signer is one verified sigstore signature over the binary: the Fulcio
-// certificate identity plus its bound provenance and Rekor inclusion.
+// One verified sigstore signature over the binary.
 type LinuxSigningInfo_Signer struct {
 	state                        protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_CertIssuer        *string                `protobuf:"bytes,1,opt,name=cert_issuer,json=certIssuer"`
@@ -2241,33 +2183,24 @@ func (x *LinuxSigningInfo_Signer) ClearIntegratedTime() {
 type LinuxSigningInfo_Signer_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// OIDC issuer embedded in the Fulcio leaf certificate, e.g.
+	// OIDC issuer in the Fulcio cert, e.g.
 	// "https://token.actions.githubusercontent.com".
 	CertIssuer *string
-	// Certificate SAN — the signer's workflow identity, e.g.
-	// ".../sign-release.yml@refs/tags/v0.7.1".
+	// Certificate SAN — the signer's workflow identity.
 	CertIdentity *string
-	// Source repository URI from the Fulcio GitHub extension, e.g.
-	// "https://github.com/docker/secrets-engine".
-	SourceRepo *string
-	// Git ref that was built, e.g. "refs/tags/v0.7.1". Ties the binary to a
-	// release tag.
-	SourceRef *string
-	// Source commit SHA the binary was built from (Fulcio source-repository
-	// digest extension).
+	SourceRepo   *string
+	// Git ref built, e.g. "refs/tags/v0.7.1".
+	SourceRef    *string
 	SourceCommit *string
-	// "github-hosted" or "self-hosted" (Fulcio extension) — a self-hosted
-	// runner minting a release signature would be a red flag.
+	// "github-hosted" or "self-hosted".
 	RunnerEnvironment *string
-	// Event that started the signing workflow, e.g. "release" (Fulcio
-	// extension).
+	// Workflow trigger event, e.g. "release".
 	BuildTrigger *string
-	// Points at the specific GitHub Actions run that produced the signature
-	// (Fulcio extension) — for audit/log correlation.
+	// GitHub Actions run that produced the signature.
 	RunInvocationUri *string
 	// Entry's index in the Rekor transparency log.
 	RekorLogIndex *int64
-	// When the signature was recorded in Rekor.
+	// When recorded in Rekor.
 	IntegratedTime *timestamppb.Timestamp
 }
 
@@ -2319,9 +2252,9 @@ var File_accesscontrol_v1_api_proto protoreflect.FileDescriptor
 
 const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x1aaccesscontrol/v1/api.proto\x12\x10accesscontrol.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"i\n" +
-	"\x12CheckAccessRequest\x12\x18\n" +
-	"\apattern\x18\x01 \x01(\tR\apattern\x129\n" +
+	"\x1aaccesscontrol/v1/api.proto\x12\x10accesscontrol.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"k\n" +
+	"\x12CheckAccessRequest\x12\x1a\n" +
+	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +
 	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"\xda\x02\n" +
 	"\tRequester\x12\x10\n" +
 	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x12\n" +

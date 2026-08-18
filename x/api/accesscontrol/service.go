@@ -38,10 +38,17 @@ func NewAccessControlHandler(ac AccessControl) accesscontrolv1connect.AccessCont
 }
 
 func (s *accessControlService) CheckAccess(ctx context.Context, c *connect.Request[accesscontrolv1.CheckAccessRequest]) (*connect.Response[accesscontrolv1.CheckAccessResponse], error) {
-	msgPattern := c.Msg.GetPattern()
-	pattern, err := secrets.ParsePattern(msgPattern)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
+	msgPatterns := c.Msg.GetPatterns()
+	if len(msgPatterns) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("at least one pattern is required"))
+	}
+	patterns := make([]secrets.Pattern, 0, len(msgPatterns))
+	for _, msgPattern := range msgPatterns {
+		pattern, err := secrets.ParsePattern(msgPattern)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
+		}
+		patterns = append(patterns, pattern)
 	}
 
 	requester := c.Msg.GetRequester()
@@ -49,7 +56,7 @@ func (s *accessControlService) CheckAccess(ctx context.Context, c *connect.Reque
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requester is required"))
 	}
 	req := CheckAccessRequest{
-		Pattern: pattern,
+		Patterns: patterns,
 		ProcessInfo: ProcessInfo{
 			PID:                int(requester.GetPid()),
 			Name:               requester.GetName(),
@@ -60,7 +67,7 @@ func (s *accessControlService) CheckAccess(ctx context.Context, c *connect.Reque
 
 	allowed, err := s.ac.CheckAccess(ctx, req)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("access check failed for %q: %w", msgPattern, err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("access check failed for %q: %w", msgPatterns, err))
 	}
 
 	decision := accesscontrolv1.Decision_DECISION_DENY

@@ -40,8 +40,8 @@ const (
 
 // AccessControlServiceClient is a client for the accesscontrol.v1.AccessControlService service.
 type AccessControlServiceClient interface {
-	// CheckAccess decides whether a requesting process may resolve the
-	// secrets matched by the query. Called for every GetSecrets request.
+	// Decides whether the requester may resolve the queried secrets.
+	// Called for every GetSecrets request.
 	CheckAccess(context.Context, *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error)
 }
 
@@ -78,8 +78,8 @@ func (c *accessControlServiceClient) CheckAccess(ctx context.Context, req *conne
 // AccessControlServiceHandler is an implementation of the accesscontrol.v1.AccessControlService
 // service.
 type AccessControlServiceHandler interface {
-	// CheckAccess decides whether a requesting process may resolve the
-	// secrets matched by the query. Called for every GetSecrets request.
+	// Decides whether the requester may resolve the queried secrets.
+	// Called for every GetSecrets request.
 	CheckAccess(context.Context, *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error)
 }
 

@@ -21,31 +21,26 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/docker/secrets-engine/x/api/accesscontrol/v1;accesscontrolv1";
 
 service AccessControlService {
-  // CheckAccess decides whether a requesting process may resolve the
-  // secrets matched by the query. Called for every GetSecrets request.
+  // Decides whether the requester may resolve the queried secrets.
+  // Called for every GetSecrets request.
   rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
 }
 
 message CheckAccessRequest {
-  // What the caller is trying to resolve — mirrors the resolver pattern.
-  string pattern = 1;
+  // Patterns the caller wants to resolve; at least one required.
+  repeated string patterns = 1;
 
-  // Identity/context of the process making the request.
   Requester requester = 2;
 }
 
 message Requester {
-  // OS process ID of the caller.
   int32 pid = 1;
-  // Process name.
   string name = 2;
-  // Absolute path to the caller's binary on disk.
   string absolute_binary_path = 3;
-  // True if the binary's signature chains to Docker's signing identity.
+  // Signature chains to Docker's signing identity.
   bool signed_by_docker = 4;
 
-  // Platform-specific signing context, set according to the OS the engine
-  // is running on. Exactly one variant is populated.
+  // Platform-specific signing context, per host OS.
   oneof signing_info {
     DarwinSigningInfo darwin = 5;
     WindowsSigningInfo windows = 6;
@@ -53,56 +48,45 @@ message Requester {
   }
 }
 
-// DarwinSigningInfo carries macOS code-signing context (Security.framework
-// SecCode* APIs) for the requesting process and its process ancestry.
+// macOS code-signing context (SecCode* APIs) for the requester and its
+// process ancestry.
 message DarwinSigningInfo {
-  // Code-signing identity of the outermost recorded ancestor.
+  // Identity of the outermost recorded ancestor.
   SigningIdentity root = 1;
-  // Code-signing identity of the process that connected to the socket
-  // (last chain element).
+  // Identity of the process that connected to the socket.
   SigningIdentity leaf = 2;
-  // The leaf's process ancestry ordered root to leaf. For a single-node
-  // chain, root and leaf describe the same process.
+  // Ancestry ordered root to leaf; may be a single node.
   repeated ProcessNode chain = 3;
 
-  // Anchor classifies the root a process's code-signing certificate chain
-  // reaches. Values are ordered by increasing trust, so consumers may gate
-  // on a minimum (e.g. anchor >= ANCHOR_APPLE_GENERIC).
+  // Root the certificate chain reaches, ordered by increasing trust
+  // (gate on a minimum).
   enum Anchor {
     // Unsigned.
     // buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
     ANCHOR_NONE = 0;
     // Ad-hoc: a cdhash but no certificate (Homebrew formula, dev build).
     ANCHOR_AD_HOC = 1;
-    // Signed with a chain that does not reach an Apple root.
+    // Chain does not reach an Apple root.
     ANCHOR_OTHER = 2;
     // Developer ID or Mac App Store.
     ANCHOR_APPLE_GENERIC = 3;
-    // Apple's own platform binaries.
+    // Apple platform binaries.
     ANCHOR_APPLE_PLATFORM = 4;
   }
 
-  // SigningIdentity is the verified code-signing identity of a single
-  // process.
+  // Verified code-signing identity of one process.
   message SigningIdentity {
-    // Apple-assigned Team Identifier (kSecCodeInfoTeamIdentifier). Apple
-    // guarantees uniqueness per developer account, so this is a reliable
-    // trust key.
+    // Team Identifier (kSecCodeInfoTeamIdentifier); unique per developer
+    // account — reliable trust key.
     string team_id = 1;
-    // Code-signing identifier (kSecCodeInfoIdentifier), typically the bundle
-    // ID, e.g. "com.docker.docker". Use to pin a specific application within
-    // a team.
+    // Code-signing identifier (kSecCodeInfoIdentifier), typically the
+    // bundle ID; pins an app within a team.
     string identifier = 2;
-    // Company name from the leaf certificate subject.O, e.g. "Docker Inc".
-    // Human-readable but NOT guaranteed unique or immutable — display/logging
-    // only, never a sole trust key.
+    // Leaf cert subject.O, e.g. "Docker Inc"; display only, not a trust key.
     string organization = 3;
-    // Leaf certificate subject.CN, e.g.
-    // "Developer ID Application: Docker Inc (9BNSXJN65R)". Contains the
-    // company name and team ID as embedded display text.
+    // Leaf cert subject.CN; display only.
     string common_name = 4;
-    // Code directory hash (kSecCodeInfoUnique), the exact identity of this
-    // specific binary build, hex-encoded. Use to pin an exact build.
+    // Code directory hash (kSecCodeInfoUnique), hex; pins an exact build.
     string cd_hash = 5;
     // Dynamic code-signing status word (kSecCodeInfoStatus) — the kernel's
     // live view of the signature. Raw uint32 bitmask; values are fixed by
@@ -115,89 +99,63 @@ message DarwinSigningInfo {
     uint32 status = 6;
     // Root the certificate chain reaches.
     Anchor anchor = 7;
-    // True if this process's signature chains to Docker's signing identity.
+    // Signature chains to Docker's signing identity.
     bool signed_by_docker = 8;
-    // App name from the signed Info.plist (CFBundleDisplayName, falling back
-    // to CFBundleName), e.g. "Docker Desktop". Empty when the binary embeds
-    // no Info.plist. Display-only: not unique, chosen by the signer.
+    // App name from Info.plist (CFBundleDisplayName or CFBundleName);
+    // display only.
     string bundle_name = 9;
   }
 
-  // ProcessNode is one process in the ancestry chain.
+  // One process in the ancestry chain.
   message ProcessNode {
-    // OS process ID.
     int32 pid = 1;
-    // Process start token in µs since epoch (p_starttime sec*1e6 + µs).
-    // Together with pid it forms an instance identity that survives PID
-    // reuse.
+    // Start time in µs since epoch; with pid, survives PID reuse.
     int64 start = 2;
-    // The process's effective uid; -1 when unknown.
+    // Effective uid; -1 when unknown.
     int32 uid = 3;
-    // Kernel's process name (p_comm, 16 characters max, readable without
-    // root permissions).
+    // Kernel process name (p_comm, 16 chars max).
     string comm = 4;
-    // Executable path exactly as the kernel reports it (proc_pidpath).
+    // Executable path (proc_pidpath).
     string exe = 5;
-    // exe with symlinks resolved, falling back to exe.
+    // exe with symlinks resolved; falls back to exe.
     string real_exe = 6;
     // Modification time of real_exe, UTC.
     google.protobuf.Timestamp mtime = 7;
-    // Process argv via sysctl(KERN_PROCARGS2). Same-uid only and
-    // best-effort: empty when unreadable. Self-reported by the process.
+    // argv via sysctl(KERN_PROCARGS2); best-effort, self-reported.
     repeated string args = 8;
   }
 }
 
-// WindowsSigningInfo carries Windows Authenticode context for the requesting
-// process. Fields fall into three trust tiers: signature-derived (verified by
-// WinVerifyTrust), token-derived (OS-enforced runtime properties), and
-// corroborating PE version metadata (unsigned, display only).
+// Windows Authenticode context for the requesting process.
 message WindowsSigningInfo {
-  // --- Signature-derived (verified by WinVerifyTrust) ---
-  //
-  // These describe the PE's primary Authenticode signature only; nested
-  // signatures are not enumerated. Safe because trust is gated on the primary
-  // signature, and Docker's EV identity lives there.
+  // Signature-derived, verified by WinVerifyTrust (primary signature only).
 
-  // Whether WinVerifyTrust confirmed the Authenticode signature chains to a
-  // trusted root and is not revoked. The remaining signature fields are only
-  // meaningful when true.
+  // Chains to a trusted root and not revoked; remaining signature fields
+  // are meaningful only when true.
   bool trusted_chain = 1;
-  // Signing certificate Subject Organization (O), e.g. "Docker Inc".
   string subject_org = 2;
-  // Signing certificate Subject Common Name (CN).
   string subject_common_name = 3;
-  // Common Name of the issuing CA, e.g. the DigiCert / Sectigo code-signing
-  // intermediate.
+  // Issuing CA Common Name.
   string issuer = 4;
-  // Hex-encoded SHA-256 hash of the leaf signing certificate. Strongest
-  // identity pin, but brittle across cert rotation.
+  // SHA-256 of the leaf certificate, hex; strongest pin, breaks on rotation.
   string thumbprint_sha256 = 5;
-  // Whether the signature uses an Extended Validation code-signing certificate
-  // (hardware-backed key, stricter vetting), detected from the leaf
-  // certificate's CA/Browser Forum EV policy OID.
+  // Extended Validation certificate (CA/Browser Forum EV policy OID).
   bool is_ev = 6;
 
-  // --- Token-derived (OS-enforced runtime property; collected, not gated) ---
-
-  // Peer process's mandatory integrity level from its access token. Collected
-  // for logging/diagnostics only; trust is gated on the signature, not
-  // integrity (the engine itself runs at Medium as a per-user service).
+  // Integrity level from the peer's access token; diagnostics only,
+  // never gated on.
   IntegrityLevel integrity = 7;
 
-  // --- Corroborating only (PE version resource; NOT trustworthy) ---
-  //
-  // From the PE VERSIONINFO resource: unsigned and attacker-controllable, so
-  // display/logging only — must never gate trust.
+  // PE VERSIONINFO (unsigned, attacker-controllable): display only,
+  // never gate trust.
   string company_name = 8;
   string product_name = 9;
   string file_version = 10;
 
-  // IntegrityLevel is a Windows mandatory integrity level, ordered so higher
-  // values denote a more privileged context (mirrors winnt.h RIDs).
+  // Windows mandatory integrity level (winnt.h RIDs); higher = more
+  // privileged.
   enum IntegrityLevel {
-    // SECURITY_MANDATORY_UNTRUSTED_RID (0x0000). Also the value used when the
-    // integrity level could not be determined.
+    // Untrusted, or could not be determined.
     INTEGRITY_LEVEL_UNSPECIFIED = 0;
     // SECURITY_MANDATORY_LOW_RID (0x1000), e.g. AppContainer/sandboxed.
     INTEGRITY_LEVEL_LOW = 0x1000;
@@ -210,49 +168,37 @@ message WindowsSigningInfo {
   }
 }
 
-// LinuxSigningInfo carries sigstore (Fulcio/Rekor) signing context for the
-// requesting process. A binary may be signed by more than one signer.
+// Sigstore (Fulcio/Rekor) context for the requesting process. A binary may
+// have multiple signers.
 message LinuxSigningInfo {
   repeated Signer signers = 1;
 
-  // Signer is one verified sigstore signature over the binary: the Fulcio
-  // certificate identity plus its bound provenance and Rekor inclusion.
+  // One verified sigstore signature over the binary.
   message Signer {
-    // --- Verified identity ---
-
-    // OIDC issuer embedded in the Fulcio leaf certificate, e.g.
+    // OIDC issuer in the Fulcio cert, e.g.
     // "https://token.actions.githubusercontent.com".
     string cert_issuer = 1;
-    // Certificate SAN — the signer's workflow identity, e.g.
-    // ".../sign-release.yml@refs/tags/v0.7.1".
+    // Certificate SAN — the signer's workflow identity.
     string cert_identity = 2;
-    // Source repository URI from the Fulcio GitHub extension, e.g.
-    // "https://github.com/docker/secrets-engine".
     string source_repo = 3;
 
-    // --- Verified provenance (bound in the cert; diagnostic, not gated) ---
+    // Provenance bound in the cert (diagnostic, not gated).
 
-    // Git ref that was built, e.g. "refs/tags/v0.7.1". Ties the binary to a
-    // release tag.
+    // Git ref built, e.g. "refs/tags/v0.7.1".
     string source_ref = 4;
-    // Source commit SHA the binary was built from (Fulcio source-repository
-    // digest extension).
     string source_commit = 5;
-    // "github-hosted" or "self-hosted" (Fulcio extension) — a self-hosted
-    // runner minting a release signature would be a red flag.
+    // "github-hosted" or "self-hosted".
     string runner_environment = 6;
-    // Event that started the signing workflow, e.g. "release" (Fulcio
-    // extension).
+    // Workflow trigger event, e.g. "release".
     string build_trigger = 7;
-    // Points at the specific GitHub Actions run that produced the signature
-    // (Fulcio extension) — for audit/log correlation.
+    // GitHub Actions run that produced the signature.
     string run_invocation_uri = 8;
 
-    // --- Transparency log (verified inclusion) ---
+    // Verified Rekor inclusion.
 
     // Entry's index in the Rekor transparency log.
     int64 rekor_log_index = 9;
-    // When the signature was recorded in Rekor.
+    // When recorded in Rekor.
     google.protobuf.Timestamp integrated_time = 10;
   }
 }
