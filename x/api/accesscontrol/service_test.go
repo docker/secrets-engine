@@ -53,7 +53,7 @@ func (s *stubAccessControl) Authorize(_ context.Context, req AuthorizeRequest) (
 func TestCheckAccess(t *testing.T) {
 	t.Parallel()
 
-	t.Run("requires at least one pattern", func(t *testing.T) {
+	t.Run("rejects a missing pattern", func(t *testing.T) {
 		ac := &stubAccessControl{allowed: true}
 		svc := NewAccessControlHandler(ac)
 
@@ -64,16 +64,16 @@ func TestCheckAccess(t *testing.T) {
 		_, err := svc.CheckAccess(t.Context(), req)
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
-		assert.ErrorContains(t, err, "at least one pattern is required")
+		assert.ErrorContains(t, err, "invalid pattern")
 		assert.False(t, ac.called, "access control must not run without a pattern")
 	})
 
-	t.Run("forwards all patterns", func(t *testing.T) {
+	t.Run("forwards the pattern", func(t *testing.T) {
 		ac := &stubAccessControl{allowed: true}
 		svc := NewAccessControlHandler(ac)
 
 		req := connect.NewRequest(accesscontrolv1.CheckAccessRequest_builder{
-			Patterns:  []string{"docker/auth/hub/joe", "acme/api-token"},
+			Pattern:   proto.String("docker/auth/hub/joe"),
 			Requester: accesscontrolv1.Requester_builder{Pid: proto.Int32(42)}.Build(),
 		}.Build())
 
@@ -82,9 +82,7 @@ func TestCheckAccess(t *testing.T) {
 		assert.Equal(t, accesscontrolv1.Decision_DECISION_ALLOW, resp.Msg.GetDecision())
 
 		require.True(t, ac.called)
-		require.Len(t, ac.req.Patterns, 2)
-		assert.Equal(t, "docker/auth/hub/joe", ac.req.Patterns[0].String())
-		assert.Equal(t, "acme/api-token", ac.req.Patterns[1].String())
+		assert.Equal(t, "docker/auth/hub/joe", ac.req.String())
 	})
 }
 
