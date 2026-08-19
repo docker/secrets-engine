@@ -46,3 +46,7 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 type Resolver interface {
 	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
 }
+
+type Authorizer interface {
+	Authorize(ctx context.Context, pattern ...Pattern) (time.Time, error)
+}

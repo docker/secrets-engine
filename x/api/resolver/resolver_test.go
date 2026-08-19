@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -155,6 +156,48 @@ func (m maliciousPattern) Match(secrets.ID) bool {
 
 func (m maliciousPattern) Includes(secrets.Pattern) bool {
 	return false
+}
+
+type mockAuthorizer struct {
+	called bool
+	err    error
+}
+
+func (m *mockAuthorizer) Authorize(context.Context, ...secrets.Pattern) (time.Time, error) {
+	m.called = true
+	return time.Time{}, m.err
+}
+
+func TestAuthorizerService_Authorize(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rejects empty patterns", func(t *testing.T) {
+		m := &mockAuthorizer{}
+		s := NewAuthorizerHandler(m)
+		_, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{}.Build()))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+		assert.ErrorContains(t, err, "at least one pattern is required")
+		assert.False(t, m.called, "authorizer must not run without a pattern")
+	})
+
+	t.Run("maps denial to permission denied", func(t *testing.T) {
+		s := NewAuthorizerHandler(&mockAuthorizer{err: secrets.ErrAccessDenied})
+		_, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+			Patterns: []string{"docker/auth/hub/joe"},
+		}.Build()))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+	})
+
+	t.Run("wraps other errors as internal", func(t *testing.T) {
+		s := NewAuthorizerHandler(&mockAuthorizer{err: errors.New("boom")})
+		_, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+			Patterns: []string{"docker/auth/hub/joe"},
+		}.Build()))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+	})
 }
 
 func (m maliciousPattern) String() string {

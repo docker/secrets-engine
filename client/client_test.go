@@ -27,12 +27,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
+	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -224,6 +227,62 @@ func Test_ListPlugins(t *testing.T) {
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
 		}, result)
+	})
+}
+
+var _ resolverv1connect.AuthorizerServiceHandler = &mockAuthorizerService{}
+
+type mockAuthorizerService struct {
+	expiry   time.Time
+	err      error
+	patterns []string
+}
+
+func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Request[resolverv1.AuthorizeRequest]) (*connect.Response[resolverv1.AuthorizeResponse], error) {
+	m.patterns = req.Msg.GetPatterns()
+	if m.err != nil {
+		return nil, m.err
+	}
+	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
+		ExpiresAt: timestamppb.New(m.expiry),
+	}.Build()), nil
+}
+
+func mockAuthorizeEngine(t *testing.T, m *mockAuthorizerService) string {
+	t.Helper()
+	socketPath := testhelper.RandomShortSocketName()
+	muxServer(t, socketPath, []handler{wrapHandler(resolverv1connect.NewAuthorizerServiceHandler(m))})
+	return socketPath
+}
+
+func Test_Authorize(t *testing.T) {
+	t.Parallel()
+	t.Run("forwards patterns and returns expiry", func(t *testing.T) {
+		expiry := time.Now().Add(time.Hour).UTC()
+		m := &mockAuthorizerService{expiry: expiry}
+		socket := mockAuthorizeEngine(t, m)
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+
+		got, err := c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"), MustParsePattern("acme/api-token"))
+		require.NoError(t, err)
+		assert.True(t, got.Equal(expiry), "expiry must round-trip")
+		assert.Equal(t, []string{"docker/auth/hub/joe", "acme/api-token"}, m.patterns)
+	})
+	t.Run("denied", func(t *testing.T) {
+		m := &mockAuthorizerService{err: connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)}
+		socket := mockAuthorizeEngine(t, m)
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+		_, err = c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
+		require.ErrorIs(t, err, ErrAccessDenied)
+	})
+	t.Run("unavailable daemon", func(t *testing.T) {
+		socketPath := testhelper.RandomShortSocketName()
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
+		require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	})
 }
 

@@ -25,9 +25,25 @@ service ResolverService {
   rpc GetSecrets(GetSecretsRequest) returns (GetSecretsResponse);
 }
 
+service AuthorizerService {
+  // Preflight: authorizes the caller for the patterns ahead of use, valid
+  // until the returned expiry.
+  rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
+}
+
 message GetSecretsRequest {
   // ID of the secret to resolve.
   string pattern = 1;
+}
+
+message AuthorizeRequest {
+  // Patterns to authorize; at least one required.
+  repeated string patterns = 1;
+}
+
+message AuthorizeResponse {
+  // When the authorization expires.
+  google.protobuf.Timestamp expires_at = 1;
 }
 
 message GetSecretsResponse {

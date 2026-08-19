@@ -261,6 +261,158 @@ func (b0 CheckAccessRequest_builder) Build() *CheckAccessRequest {
 	return m0
 }
 
+type AuthorizeRequest struct {
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Patterns  []string               `protobuf:"bytes,1,rep,name=patterns"`
+	xxx_hidden_Requester *Requester             `protobuf:"bytes,2,opt,name=requester"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AuthorizeRequest) Reset() {
+	*x = AuthorizeRequest{}
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizeRequest) ProtoMessage() {}
+
+func (x *AuthorizeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AuthorizeRequest) GetPatterns() []string {
+	if x != nil {
+		return x.xxx_hidden_Patterns
+	}
+	return nil
+}
+
+func (x *AuthorizeRequest) GetRequester() *Requester {
+	if x != nil {
+		return x.xxx_hidden_Requester
+	}
+	return nil
+}
+
+func (x *AuthorizeRequest) SetPatterns(v []string) {
+	x.xxx_hidden_Patterns = v
+}
+
+func (x *AuthorizeRequest) SetRequester(v *Requester) {
+	x.xxx_hidden_Requester = v
+}
+
+func (x *AuthorizeRequest) HasRequester() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Requester != nil
+}
+
+func (x *AuthorizeRequest) ClearRequester() {
+	x.xxx_hidden_Requester = nil
+}
+
+type AuthorizeRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// Patterns the caller wants authorized; at least one required.
+	Patterns  []string
+	Requester *Requester
+}
+
+func (b0 AuthorizeRequest_builder) Build() *AuthorizeRequest {
+	m0 := &AuthorizeRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Patterns = b.Patterns
+	x.xxx_hidden_Requester = b.Requester
+	return m0
+}
+
+type AuthorizeResponse struct {
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expires_at,json=expiresAt"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AuthorizeResponse) Reset() {
+	*x = AuthorizeResponse{}
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizeResponse) ProtoMessage() {}
+
+func (x *AuthorizeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AuthorizeResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_ExpiresAt
+	}
+	return nil
+}
+
+func (x *AuthorizeResponse) SetExpiresAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *AuthorizeResponse) HasExpiresAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ExpiresAt != nil
+}
+
+func (x *AuthorizeResponse) ClearExpiresAt() {
+	x.xxx_hidden_ExpiresAt = nil
+}
+
+type AuthorizeResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// When the authorization expires.
+	ExpiresAt *timestamppb.Timestamp
+}
+
+func (b0 AuthorizeResponse_builder) Build() *AuthorizeResponse {
+	m0 := &AuthorizeResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_ExpiresAt = b.ExpiresAt
+	return m0
+}
+
 type Requester struct {
 	state                         protoimpl.MessageState  `protogen:"opaque.v1"`
 	xxx_hidden_Pid                int32                   `protobuf:"varint,1,opt,name=pid"`
@@ -276,7 +428,7 @@ type Requester struct {
 
 func (x *Requester) Reset() {
 	*x = Requester{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[1]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +440,7 @@ func (x *Requester) String() string {
 func (*Requester) ProtoMessage() {}
 
 func (x *Requester) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[1]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +730,7 @@ func (b0 Requester_builder) Build() *Requester {
 type case_Requester_SigningInfo protoreflect.FieldNumber
 
 func (x case_Requester_SigningInfo) String() string {
-	md := file_accesscontrol_v1_api_proto_msgTypes[1].Descriptor()
+	md := file_accesscontrol_v1_api_proto_msgTypes[3].Descriptor()
 	if x == 0 {
 		return "not set"
 	}
@@ -620,7 +772,7 @@ type DarwinSigningInfo struct {
 
 func (x *DarwinSigningInfo) Reset() {
 	*x = DarwinSigningInfo{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[2]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -632,7 +784,7 @@ func (x *DarwinSigningInfo) String() string {
 func (*DarwinSigningInfo) ProtoMessage() {}
 
 func (x *DarwinSigningInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[2]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -742,7 +894,7 @@ type WindowsSigningInfo struct {
 
 func (x *WindowsSigningInfo) Reset() {
 	*x = WindowsSigningInfo{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[3]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -754,7 +906,7 @@ func (x *WindowsSigningInfo) String() string {
 func (*WindowsSigningInfo) ProtoMessage() {}
 
 func (x *WindowsSigningInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[3]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1262,7 @@ type LinuxSigningInfo struct {
 
 func (x *LinuxSigningInfo) Reset() {
 	*x = LinuxSigningInfo{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[4]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1122,7 +1274,7 @@ func (x *LinuxSigningInfo) String() string {
 func (*LinuxSigningInfo) ProtoMessage() {}
 
 func (x *LinuxSigningInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[4]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1171,7 +1323,7 @@ type CheckAccessResponse struct {
 
 func (x *CheckAccessResponse) Reset() {
 	*x = CheckAccessResponse{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[5]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1335,7 @@ func (x *CheckAccessResponse) String() string {
 func (*CheckAccessResponse) ProtoMessage() {}
 
 func (x *CheckAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[5]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1257,7 +1409,7 @@ type DarwinSigningInfo_SigningIdentity struct {
 
 func (x *DarwinSigningInfo_SigningIdentity) Reset() {
 	*x = DarwinSigningInfo_SigningIdentity{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[6]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1269,7 +1421,7 @@ func (x *DarwinSigningInfo_SigningIdentity) String() string {
 func (*DarwinSigningInfo_SigningIdentity) ProtoMessage() {}
 
 func (x *DarwinSigningInfo_SigningIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[6]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1612,7 +1764,7 @@ type DarwinSigningInfo_ProcessNode struct {
 
 func (x *DarwinSigningInfo_ProcessNode) Reset() {
 	*x = DarwinSigningInfo_ProcessNode{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[7]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1624,7 +1776,7 @@ func (x *DarwinSigningInfo_ProcessNode) String() string {
 func (*DarwinSigningInfo_ProcessNode) ProtoMessage() {}
 
 func (x *DarwinSigningInfo_ProcessNode) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[7]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1895,7 +2047,7 @@ type LinuxSigningInfo_Signer struct {
 
 func (x *LinuxSigningInfo_Signer) Reset() {
 	*x = LinuxSigningInfo_Signer{}
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[8]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1907,7 +2059,7 @@ func (x *LinuxSigningInfo_Signer) String() string {
 func (*LinuxSigningInfo_Signer) ProtoMessage() {}
 
 func (x *LinuxSigningInfo_Signer) ProtoReflect() protoreflect.Message {
-	mi := &file_accesscontrol_v1_api_proto_msgTypes[8]
+	mi := &file_accesscontrol_v1_api_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2255,7 +2407,13 @@ const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\x1aaccesscontrol/v1/api.proto\x12\x10accesscontrol.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"k\n" +
 	"\x12CheckAccessRequest\x12\x1a\n" +
 	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +
-	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"\xda\x02\n" +
+	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"i\n" +
+	"\x10AuthorizeRequest\x12\x1a\n" +
+	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +
+	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"N\n" +
+	"\x11AuthorizeResponse\x129\n" +
+	"\n" +
+	"expires_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xda\x02\n" +
 	"\tRequester\x12\x10\n" +
 	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x120\n" +
@@ -2338,49 +2496,56 @@ const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\bdecision\x18\x01 \x01(\x0e2\x1a.accesscontrol.v1.DecisionR\bdecision*1\n" +
 	"\bDecision\x12\x11\n" +
 	"\rDECISION_DENY\x10\x00\x12\x12\n" +
-	"\x0eDECISION_ALLOW\x10\x012r\n" +
+	"\x0eDECISION_ALLOW\x10\x012\xc8\x01\n" +
 	"\x14AccessControlService\x12Z\n" +
-	"\vCheckAccess\x12$.accesscontrol.v1.CheckAccessRequest\x1a%.accesscontrol.v1.CheckAccessResponseB\xca\x01\n" +
+	"\vCheckAccess\x12$.accesscontrol.v1.CheckAccessRequest\x1a%.accesscontrol.v1.CheckAccessResponse\x12T\n" +
+	"\tAuthorize\x12\".accesscontrol.v1.AuthorizeRequest\x1a#.accesscontrol.v1.AuthorizeResponseB\xca\x01\n" +
 	"\x14com.accesscontrol.v1B\bApiProtoP\x01ZGgithub.com/docker/secrets-engine/x/api/accesscontrol/v1;accesscontrolv1\xa2\x02\x03AXX\xaa\x02\x10Accesscontrol.V1\xca\x02\x10Accesscontrol\\V1\xe2\x02\x1cAccesscontrol\\V1\\GPBMetadata\xea\x02\x11Accesscontrol::V1b\beditionsp\xe8\a"
 
 var file_accesscontrol_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_accesscontrol_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_accesscontrol_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_accesscontrol_v1_api_proto_goTypes = []any{
 	(Decision)(0),                             // 0: accesscontrol.v1.Decision
 	(DarwinSigningInfo_Anchor)(0),             // 1: accesscontrol.v1.DarwinSigningInfo.Anchor
 	(WindowsSigningInfo_IntegrityLevel)(0),    // 2: accesscontrol.v1.WindowsSigningInfo.IntegrityLevel
 	(*CheckAccessRequest)(nil),                // 3: accesscontrol.v1.CheckAccessRequest
-	(*Requester)(nil),                         // 4: accesscontrol.v1.Requester
-	(*DarwinSigningInfo)(nil),                 // 5: accesscontrol.v1.DarwinSigningInfo
-	(*WindowsSigningInfo)(nil),                // 6: accesscontrol.v1.WindowsSigningInfo
-	(*LinuxSigningInfo)(nil),                  // 7: accesscontrol.v1.LinuxSigningInfo
-	(*CheckAccessResponse)(nil),               // 8: accesscontrol.v1.CheckAccessResponse
-	(*DarwinSigningInfo_SigningIdentity)(nil), // 9: accesscontrol.v1.DarwinSigningInfo.SigningIdentity
-	(*DarwinSigningInfo_ProcessNode)(nil),     // 10: accesscontrol.v1.DarwinSigningInfo.ProcessNode
-	(*LinuxSigningInfo_Signer)(nil),           // 11: accesscontrol.v1.LinuxSigningInfo.Signer
-	(*timestamppb.Timestamp)(nil),             // 12: google.protobuf.Timestamp
+	(*AuthorizeRequest)(nil),                  // 4: accesscontrol.v1.AuthorizeRequest
+	(*AuthorizeResponse)(nil),                 // 5: accesscontrol.v1.AuthorizeResponse
+	(*Requester)(nil),                         // 6: accesscontrol.v1.Requester
+	(*DarwinSigningInfo)(nil),                 // 7: accesscontrol.v1.DarwinSigningInfo
+	(*WindowsSigningInfo)(nil),                // 8: accesscontrol.v1.WindowsSigningInfo
+	(*LinuxSigningInfo)(nil),                  // 9: accesscontrol.v1.LinuxSigningInfo
+	(*CheckAccessResponse)(nil),               // 10: accesscontrol.v1.CheckAccessResponse
+	(*DarwinSigningInfo_SigningIdentity)(nil), // 11: accesscontrol.v1.DarwinSigningInfo.SigningIdentity
+	(*DarwinSigningInfo_ProcessNode)(nil),     // 12: accesscontrol.v1.DarwinSigningInfo.ProcessNode
+	(*LinuxSigningInfo_Signer)(nil),           // 13: accesscontrol.v1.LinuxSigningInfo.Signer
+	(*timestamppb.Timestamp)(nil),             // 14: google.protobuf.Timestamp
 }
 var file_accesscontrol_v1_api_proto_depIdxs = []int32{
-	4,  // 0: accesscontrol.v1.CheckAccessRequest.requester:type_name -> accesscontrol.v1.Requester
-	5,  // 1: accesscontrol.v1.Requester.darwin:type_name -> accesscontrol.v1.DarwinSigningInfo
-	6,  // 2: accesscontrol.v1.Requester.windows:type_name -> accesscontrol.v1.WindowsSigningInfo
-	7,  // 3: accesscontrol.v1.Requester.linux:type_name -> accesscontrol.v1.LinuxSigningInfo
-	9,  // 4: accesscontrol.v1.DarwinSigningInfo.root:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
-	9,  // 5: accesscontrol.v1.DarwinSigningInfo.leaf:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
-	10, // 6: accesscontrol.v1.DarwinSigningInfo.chain:type_name -> accesscontrol.v1.DarwinSigningInfo.ProcessNode
-	2,  // 7: accesscontrol.v1.WindowsSigningInfo.integrity:type_name -> accesscontrol.v1.WindowsSigningInfo.IntegrityLevel
-	11, // 8: accesscontrol.v1.LinuxSigningInfo.signers:type_name -> accesscontrol.v1.LinuxSigningInfo.Signer
-	0,  // 9: accesscontrol.v1.CheckAccessResponse.decision:type_name -> accesscontrol.v1.Decision
-	1,  // 10: accesscontrol.v1.DarwinSigningInfo.SigningIdentity.anchor:type_name -> accesscontrol.v1.DarwinSigningInfo.Anchor
-	12, // 11: accesscontrol.v1.DarwinSigningInfo.ProcessNode.mtime:type_name -> google.protobuf.Timestamp
-	12, // 12: accesscontrol.v1.LinuxSigningInfo.Signer.integrated_time:type_name -> google.protobuf.Timestamp
-	3,  // 13: accesscontrol.v1.AccessControlService.CheckAccess:input_type -> accesscontrol.v1.CheckAccessRequest
-	8,  // 14: accesscontrol.v1.AccessControlService.CheckAccess:output_type -> accesscontrol.v1.CheckAccessResponse
-	14, // [14:15] is the sub-list for method output_type
-	13, // [13:14] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	6,  // 0: accesscontrol.v1.CheckAccessRequest.requester:type_name -> accesscontrol.v1.Requester
+	6,  // 1: accesscontrol.v1.AuthorizeRequest.requester:type_name -> accesscontrol.v1.Requester
+	14, // 2: accesscontrol.v1.AuthorizeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	7,  // 3: accesscontrol.v1.Requester.darwin:type_name -> accesscontrol.v1.DarwinSigningInfo
+	8,  // 4: accesscontrol.v1.Requester.windows:type_name -> accesscontrol.v1.WindowsSigningInfo
+	9,  // 5: accesscontrol.v1.Requester.linux:type_name -> accesscontrol.v1.LinuxSigningInfo
+	11, // 6: accesscontrol.v1.DarwinSigningInfo.root:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
+	11, // 7: accesscontrol.v1.DarwinSigningInfo.leaf:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
+	12, // 8: accesscontrol.v1.DarwinSigningInfo.chain:type_name -> accesscontrol.v1.DarwinSigningInfo.ProcessNode
+	2,  // 9: accesscontrol.v1.WindowsSigningInfo.integrity:type_name -> accesscontrol.v1.WindowsSigningInfo.IntegrityLevel
+	13, // 10: accesscontrol.v1.LinuxSigningInfo.signers:type_name -> accesscontrol.v1.LinuxSigningInfo.Signer
+	0,  // 11: accesscontrol.v1.CheckAccessResponse.decision:type_name -> accesscontrol.v1.Decision
+	1,  // 12: accesscontrol.v1.DarwinSigningInfo.SigningIdentity.anchor:type_name -> accesscontrol.v1.DarwinSigningInfo.Anchor
+	14, // 13: accesscontrol.v1.DarwinSigningInfo.ProcessNode.mtime:type_name -> google.protobuf.Timestamp
+	14, // 14: accesscontrol.v1.LinuxSigningInfo.Signer.integrated_time:type_name -> google.protobuf.Timestamp
+	3,  // 15: accesscontrol.v1.AccessControlService.CheckAccess:input_type -> accesscontrol.v1.CheckAccessRequest
+	4,  // 16: accesscontrol.v1.AccessControlService.Authorize:input_type -> accesscontrol.v1.AuthorizeRequest
+	10, // 17: accesscontrol.v1.AccessControlService.CheckAccess:output_type -> accesscontrol.v1.CheckAccessResponse
+	5,  // 18: accesscontrol.v1.AccessControlService.Authorize:output_type -> accesscontrol.v1.AuthorizeResponse
+	17, // [17:19] is the sub-list for method output_type
+	15, // [15:17] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_accesscontrol_v1_api_proto_init() }
@@ -2388,7 +2553,7 @@ func file_accesscontrol_v1_api_proto_init() {
 	if File_accesscontrol_v1_api_proto != nil {
 		return
 	}
-	file_accesscontrol_v1_api_proto_msgTypes[1].OneofWrappers = []any{
+	file_accesscontrol_v1_api_proto_msgTypes[3].OneofWrappers = []any{
 		(*requester_Darwin)(nil),
 		(*requester_Windows)(nil),
 		(*requester_Linux)(nil),
@@ -2399,7 +2564,7 @@ func file_accesscontrol_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_accesscontrol_v1_api_proto_rawDesc), len(file_accesscontrol_v1_api_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
