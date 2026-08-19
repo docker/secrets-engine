@@ -36,6 +36,9 @@ const (
 	// AccessControlServiceCheckAccessProcedure is the fully-qualified name of the
 	// AccessControlService's CheckAccess RPC.
 	AccessControlServiceCheckAccessProcedure = "/accesscontrol.v1.AccessControlService/CheckAccess"
+	// AccessControlServiceAuthorizeProcedure is the fully-qualified name of the AccessControlService's
+	// Authorize RPC.
+	AccessControlServiceAuthorizeProcedure = "/accesscontrol.v1.AccessControlService/Authorize"
 )
 
 // AccessControlServiceClient is a client for the accesscontrol.v1.AccessControlService service.
@@ -43,6 +46,9 @@ type AccessControlServiceClient interface {
 	// Decides whether the requester may resolve the queried secrets.
 	// Called for every GetSecrets request.
 	CheckAccess(context.Context, *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error)
+	// Preflight: authorizes the requester ahead of use, valid until the
+	// returned expiry.
+	Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error)
 }
 
 // NewAccessControlServiceClient constructs a client for the accesscontrol.v1.AccessControlService
@@ -62,17 +68,29 @@ func NewAccessControlServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(accessControlServiceMethods.ByName("CheckAccess")),
 			connect.WithClientOptions(opts...),
 		),
+		authorize: connect.NewClient[v1.AuthorizeRequest, v1.AuthorizeResponse](
+			httpClient,
+			baseURL+AccessControlServiceAuthorizeProcedure,
+			connect.WithSchema(accessControlServiceMethods.ByName("Authorize")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // accessControlServiceClient implements AccessControlServiceClient.
 type accessControlServiceClient struct {
 	checkAccess *connect.Client[v1.CheckAccessRequest, v1.CheckAccessResponse]
+	authorize   *connect.Client[v1.AuthorizeRequest, v1.AuthorizeResponse]
 }
 
 // CheckAccess calls accesscontrol.v1.AccessControlService.CheckAccess.
 func (c *accessControlServiceClient) CheckAccess(ctx context.Context, req *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error) {
 	return c.checkAccess.CallUnary(ctx, req)
+}
+
+// Authorize calls accesscontrol.v1.AccessControlService.Authorize.
+func (c *accessControlServiceClient) Authorize(ctx context.Context, req *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error) {
+	return c.authorize.CallUnary(ctx, req)
 }
 
 // AccessControlServiceHandler is an implementation of the accesscontrol.v1.AccessControlService
@@ -81,6 +99,9 @@ type AccessControlServiceHandler interface {
 	// Decides whether the requester may resolve the queried secrets.
 	// Called for every GetSecrets request.
 	CheckAccess(context.Context, *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error)
+	// Preflight: authorizes the requester ahead of use, valid until the
+	// returned expiry.
+	Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error)
 }
 
 // NewAccessControlServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -96,10 +117,18 @@ func NewAccessControlServiceHandler(svc AccessControlServiceHandler, opts ...con
 		connect.WithSchema(accessControlServiceMethods.ByName("CheckAccess")),
 		connect.WithHandlerOptions(opts...),
 	)
+	accessControlServiceAuthorizeHandler := connect.NewUnaryHandler(
+		AccessControlServiceAuthorizeProcedure,
+		svc.Authorize,
+		connect.WithSchema(accessControlServiceMethods.ByName("Authorize")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/accesscontrol.v1.AccessControlService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AccessControlServiceCheckAccessProcedure:
 			accessControlServiceCheckAccessHandler.ServeHTTP(w, r)
+		case AccessControlServiceAuthorizeProcedure:
+			accessControlServiceAuthorizeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -111,4 +140,8 @@ type UnimplementedAccessControlServiceHandler struct{}
 
 func (UnimplementedAccessControlServiceHandler) CheckAccess(context.Context, *connect.Request[v1.CheckAccessRequest]) (*connect.Response[v1.CheckAccessResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("accesscontrol.v1.AccessControlService.CheckAccess is not implemented"))
+}
+
+func (UnimplementedAccessControlServiceHandler) Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("accesscontrol.v1.AccessControlService.Authorize is not implemented"))
 }

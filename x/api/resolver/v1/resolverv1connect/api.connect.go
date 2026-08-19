@@ -23,6 +23,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// ResolverServiceName is the fully-qualified name of the ResolverService service.
 	ResolverServiceName = "resolver.v1.ResolverService"
+	// AuthorizerServiceName is the fully-qualified name of the AuthorizerService service.
+	AuthorizerServiceName = "resolver.v1.AuthorizerService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -36,6 +38,9 @@ const (
 	// ResolverServiceGetSecretsProcedure is the fully-qualified name of the ResolverService's
 	// GetSecrets RPC.
 	ResolverServiceGetSecretsProcedure = "/resolver.v1.ResolverService/GetSecrets"
+	// AuthorizerServiceAuthorizeProcedure is the fully-qualified name of the AuthorizerService's
+	// Authorize RPC.
+	AuthorizerServiceAuthorizeProcedure = "/resolver.v1.AuthorizerService/Authorize"
 )
 
 // ResolverServiceClient is a client for the resolver.v1.ResolverService service.
@@ -108,4 +113,78 @@ type UnimplementedResolverServiceHandler struct{}
 
 func (UnimplementedResolverServiceHandler) GetSecrets(context.Context, *connect.Request[v1.GetSecretsRequest]) (*connect.Response[v1.GetSecretsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.ResolverService.GetSecrets is not implemented"))
+}
+
+// AuthorizerServiceClient is a client for the resolver.v1.AuthorizerService service.
+type AuthorizerServiceClient interface {
+	// Preflight: authorizes the caller for the patterns ahead of use, valid
+	// until the returned expiry.
+	Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error)
+}
+
+// NewAuthorizerServiceClient constructs a client for the resolver.v1.AuthorizerService service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewAuthorizerServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AuthorizerServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	authorizerServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("AuthorizerService").Methods()
+	return &authorizerServiceClient{
+		authorize: connect.NewClient[v1.AuthorizeRequest, v1.AuthorizeResponse](
+			httpClient,
+			baseURL+AuthorizerServiceAuthorizeProcedure,
+			connect.WithSchema(authorizerServiceMethods.ByName("Authorize")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// authorizerServiceClient implements AuthorizerServiceClient.
+type authorizerServiceClient struct {
+	authorize *connect.Client[v1.AuthorizeRequest, v1.AuthorizeResponse]
+}
+
+// Authorize calls resolver.v1.AuthorizerService.Authorize.
+func (c *authorizerServiceClient) Authorize(ctx context.Context, req *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error) {
+	return c.authorize.CallUnary(ctx, req)
+}
+
+// AuthorizerServiceHandler is an implementation of the resolver.v1.AuthorizerService service.
+type AuthorizerServiceHandler interface {
+	// Preflight: authorizes the caller for the patterns ahead of use, valid
+	// until the returned expiry.
+	Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error)
+}
+
+// NewAuthorizerServiceHandler builds an HTTP handler from the service implementation. It returns
+// the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewAuthorizerServiceHandler(svc AuthorizerServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	authorizerServiceMethods := v1.File_resolver_v1_api_proto.Services().ByName("AuthorizerService").Methods()
+	authorizerServiceAuthorizeHandler := connect.NewUnaryHandler(
+		AuthorizerServiceAuthorizeProcedure,
+		svc.Authorize,
+		connect.WithSchema(authorizerServiceMethods.ByName("Authorize")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/resolver.v1.AuthorizerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case AuthorizerServiceAuthorizeProcedure:
+			authorizerServiceAuthorizeHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedAuthorizerServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedAuthorizerServiceHandler struct{}
+
+func (UnimplementedAuthorizerServiceHandler) Authorize(context.Context, *connect.Request[v1.AuthorizeRequest]) (*connect.Response[v1.AuthorizeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("resolver.v1.AuthorizerService.Authorize is not implemented"))
 }

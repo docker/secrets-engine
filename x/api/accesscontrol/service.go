@@ -16,9 +16,11 @@ package accesscontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	accesscontrolv1 "github.com/docker/secrets-engine/x/api/accesscontrol/v1"
 	"github.com/docker/secrets-engine/x/api/accesscontrol/v1/accesscontrolv1connect"
@@ -31,24 +33,17 @@ type accessControlService struct {
 	ac AccessControl
 }
 
-// NewAccessControlHandler adapts an AccessControl implementation to the
-// generated connect handler interface.
-func NewAccessControlHandler(ac AccessControl) accesscontrolv1connect.AccessControlServiceHandler {
-	return &accessControlService{ac}
+// NewAccessControlHandler adapts an ACM implementation to the generated
+// connect handler interface.
+func NewAccessControlHandler(acm AccessControl) accesscontrolv1connect.AccessControlServiceHandler {
+	return &accessControlService{ac: acm}
 }
 
 func (s *accessControlService) CheckAccess(ctx context.Context, c *connect.Request[accesscontrolv1.CheckAccessRequest]) (*connect.Response[accesscontrolv1.CheckAccessResponse], error) {
 	msgPatterns := c.Msg.GetPatterns()
-	if len(msgPatterns) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("at least one pattern is required"))
-	}
-	patterns := make([]secrets.Pattern, 0, len(msgPatterns))
-	for _, msgPattern := range msgPatterns {
-		pattern, err := secrets.ParsePattern(msgPattern)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
-		}
-		patterns = append(patterns, pattern)
+	patterns, err := parsePatterns(msgPatterns)
+	if err != nil {
+		return nil, err
 	}
 
 	requester := c.Msg.GetRequester()
@@ -77,4 +72,52 @@ func (s *accessControlService) CheckAccess(ctx context.Context, c *connect.Reque
 	return connect.NewResponse(accesscontrolv1.CheckAccessResponse_builder{
 		Decision: &decision,
 	}.Build()), nil
+}
+
+func (s *accessControlService) Authorize(ctx context.Context, c *connect.Request[accesscontrolv1.AuthorizeRequest]) (*connect.Response[accesscontrolv1.AuthorizeResponse], error) {
+	msgPatterns := c.Msg.GetPatterns()
+	patterns, err := parsePatterns(msgPatterns)
+	if err != nil {
+		return nil, err
+	}
+
+	requester := c.Msg.GetRequester()
+	if requester == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requester is required"))
+	}
+	req := AuthorizeRequest{
+		Patterns: patterns,
+		ProcessInfo: ProcessInfo{
+			PID:                int(requester.GetPid()),
+			Name:               requester.GetName(),
+			AbsoluteBinaryPath: requester.GetAbsoluteBinaryPath(),
+		},
+		SigningInfo: signingInfoFromProto(requester),
+	}
+
+	expiry, err := s.ac.Authorize(ctx, req)
+	if err != nil {
+		if errors.Is(err, secrets.ErrAccessDenied) {
+			return nil, connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)
+		}
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("authorize failed for %q: %w", msgPatterns, err))
+	}
+	return connect.NewResponse(accesscontrolv1.AuthorizeResponse_builder{
+		ExpiresAt: timestamppb.New(expiry),
+	}.Build()), nil
+}
+
+func parsePatterns(msgPatterns []string) ([]secrets.Pattern, error) {
+	if len(msgPatterns) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("at least one pattern is required"))
+	}
+	patterns := make([]secrets.Pattern, 0, len(msgPatterns))
+	for _, msgPattern := range msgPatterns {
+		pattern, err := secrets.ParsePattern(msgPattern)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
+		}
+		patterns = append(patterns, pattern)
+	}
+	return patterns, nil
 }

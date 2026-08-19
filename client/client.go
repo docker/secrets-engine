@@ -48,6 +48,7 @@ var (
 	MustParsePattern = secrets.MustParsePattern
 
 	ErrSecretNotFound            = secrets.ErrNotFound
+	ErrAccessDenied              = secrets.ErrAccessDenied
 	ErrSecretsEngineNotAvailable = errors.New("secrets engine is not available")
 )
 
@@ -122,9 +123,22 @@ var (
 )
 
 type client struct {
-	resolverClient secrets.Resolver
-	engineClient   pluginsv1connect.PluginManagementServiceClient
-	versionClient  healthv1connect.VersionServiceClient
+	resolverClient   secrets.Resolver
+	engineClient     pluginsv1connect.PluginManagementServiceClient
+	versionClient    healthv1connect.VersionServiceClient
+	authorizerClient secrets.Authorizer
+}
+
+// Authorize grants access to the patterns until the returned expiry.
+func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (time.Time, error) {
+	expiry, err := c.authorizerClient.Authorize(ctx, patterns...)
+	if isDialError(err) {
+		return time.Time{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return expiry, nil
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -156,6 +170,7 @@ func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 // Client is the interface for interacting with the secrets engine daemon.
 type Client interface {
 	secrets.Resolver
+	secrets.Authorizer
 
 	// Version returns the name and version reported by the daemon.
 	Version(ctx context.Context) (DaemonVersion, error)
@@ -221,9 +236,10 @@ func New(options ...Option) (Client, error) {
 		Timeout: cfg.requestTimeout,
 	}
 	return &client{
-		resolverClient: resolver.NewResolverClient(c),
-		engineClient:   pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
-		versionClient:  healthv1connect.NewVersionServiceClient(c, "http://unix"),
+		resolverClient:   resolver.NewResolverClient(c),
+		engineClient:     pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
+		versionClient:    healthv1connect.NewVersionServiceClient(c, "http://unix"),
+		authorizerClient: resolver.NewAuthorizerClient(c),
 	}, nil
 }
 

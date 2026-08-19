@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -114,4 +115,70 @@ func (r resolverClient) GetSecrets(ctx context.Context, pattern secrets.Pattern)
 		})
 	}
 	return envelopes, nil
+}
+
+var _ resolverv1connect.AuthorizerServiceHandler = &authorizerService{}
+
+type authorizerService struct {
+	authorizer secrets.Authorizer
+}
+
+// NewAuthorizerHandler adapts a secrets.Authorizer to the generated connect
+// handler interface. It is served by the engine, not by secrets-provider
+// plugins.
+func NewAuthorizerHandler(a secrets.Authorizer) resolverv1connect.AuthorizerServiceHandler {
+	return &authorizerService{a}
+}
+
+func (s authorizerService) Authorize(ctx context.Context, c *connect.Request[resolverv1.AuthorizeRequest]) (*connect.Response[resolverv1.AuthorizeResponse], error) {
+	msgPatterns := c.Msg.GetPatterns()
+	if len(msgPatterns) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("at least one pattern is required"))
+	}
+	patterns := make([]secrets.Pattern, 0, len(msgPatterns))
+	for _, msgPattern := range msgPatterns {
+		pattern, err := secrets.ParsePattern(msgPattern)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid pattern %q: %w", msgPattern, err))
+		}
+		patterns = append(patterns, pattern)
+	}
+
+	expiry, err := s.authorizer.Authorize(ctx, patterns...)
+	if err != nil {
+		if errors.Is(err, secrets.ErrAccessDenied) {
+			return nil, connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)
+		}
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("authorize failed for %q: %w", msgPatterns, err))
+	}
+	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
+		ExpiresAt: timestamppb.New(expiry),
+	}.Build()), nil
+}
+
+var _ secrets.Authorizer = &authorizerClient{}
+
+type authorizerClient struct {
+	client resolverv1connect.AuthorizerServiceClient
+}
+
+func NewAuthorizerClient(httpClient connect.HTTPClient) secrets.Authorizer {
+	return &authorizerClient{client: resolverv1connect.NewAuthorizerServiceClient(httpClient, "http://unix")}
+}
+
+func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (time.Time, error) {
+	msgPatterns := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		msgPatterns = append(msgPatterns, p.String())
+	}
+	resp, err := a.client.Authorize(ctx, connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+		Patterns: msgPatterns,
+	}.Build()))
+	if err != nil {
+		if connect.CodeOf(err) == connect.CodePermissionDenied {
+			err = secrets.ErrAccessDenied
+		}
+		return time.Time{}, err
+	}
+	return resp.Msg.GetExpiresAt().AsTime(), nil
 }
