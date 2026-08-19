@@ -38,7 +38,7 @@ github.com/docker/docker-credential-helpers/client
 github.com/docker/docker-credential-helpers/credentials
 # github.com/docker/secrets-engine/client v0.0.30 => ./client
 ## explicit; go 1.25.13
-# github.com/docker/secrets-engine/plugin v0.3.0 => ./plugin
+# github.com/docker/secrets-engine/plugin v0.3.1 => ./plugin
 ## explicit; go 1.25.13
 # github.com/docker/secrets-engine/store v0.3.0 => ./store
 ## explicit; go 1.25.13
