@@ -179,11 +179,13 @@ func (x WindowsSigningInfo_IntegrityLevel) Number() protoreflect.EnumNumber {
 }
 
 type CheckAccessRequest struct {
-	state                protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Patterns  []string               `protobuf:"bytes,1,rep,name=patterns"`
-	xxx_hidden_Requester *Requester             `protobuf:"bytes,2,opt,name=requester"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Pattern     *string                `protobuf:"bytes,1,opt,name=pattern"`
+	xxx_hidden_Requester   *Requester             `protobuf:"bytes,2,opt,name=requester"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CheckAccessRequest) Reset() {
@@ -211,11 +213,14 @@ func (x *CheckAccessRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *CheckAccessRequest) GetPatterns() []string {
+func (x *CheckAccessRequest) GetPattern() string {
 	if x != nil {
-		return x.xxx_hidden_Patterns
+		if x.xxx_hidden_Pattern != nil {
+			return *x.xxx_hidden_Pattern
+		}
+		return ""
 	}
-	return nil
+	return ""
 }
 
 func (x *CheckAccessRequest) GetRequester() *Requester {
@@ -225,12 +230,20 @@ func (x *CheckAccessRequest) GetRequester() *Requester {
 	return nil
 }
 
-func (x *CheckAccessRequest) SetPatterns(v []string) {
-	x.xxx_hidden_Patterns = v
+func (x *CheckAccessRequest) SetPattern(v string) {
+	x.xxx_hidden_Pattern = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
 }
 
 func (x *CheckAccessRequest) SetRequester(v *Requester) {
 	x.xxx_hidden_Requester = v
+}
+
+func (x *CheckAccessRequest) HasPattern() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *CheckAccessRequest) HasRequester() bool {
@@ -240,6 +253,11 @@ func (x *CheckAccessRequest) HasRequester() bool {
 	return x.xxx_hidden_Requester != nil
 }
 
+func (x *CheckAccessRequest) ClearPattern() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Pattern = nil
+}
+
 func (x *CheckAccessRequest) ClearRequester() {
 	x.xxx_hidden_Requester = nil
 }
@@ -247,8 +265,8 @@ func (x *CheckAccessRequest) ClearRequester() {
 type CheckAccessRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Patterns the caller wants to resolve; at least one required.
-	Patterns  []string
+	// Pattern the caller wants to resolve.
+	Pattern   *string
 	Requester *Requester
 }
 
@@ -256,7 +274,10 @@ func (b0 CheckAccessRequest_builder) Build() *CheckAccessRequest {
 	m0 := &CheckAccessRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_Patterns = b.Patterns
+	if b.Pattern != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_Pattern = b.Pattern
+	}
 	x.xxx_hidden_Requester = b.Requester
 	return m0
 }
@@ -2404,9 +2425,9 @@ var File_accesscontrol_v1_api_proto protoreflect.FileDescriptor
 
 const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x1aaccesscontrol/v1/api.proto\x12\x10accesscontrol.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"k\n" +
-	"\x12CheckAccessRequest\x12\x1a\n" +
-	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +
+	"\x1aaccesscontrol/v1/api.proto\x12\x10accesscontrol.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"i\n" +
+	"\x12CheckAccessRequest\x12\x18\n" +
+	"\apattern\x18\x01 \x01(\tR\apattern\x129\n" +
 	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"i\n" +
 	"\x10AuthorizeRequest\x12\x1a\n" +
 	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +

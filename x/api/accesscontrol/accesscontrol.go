@@ -29,7 +29,7 @@ type AccessControl interface {
 }
 
 type CheckAccessRequest struct {
-	Patterns []secrets.Pattern
+	secrets.Pattern
 	ProcessInfo
 	SigningInfo
 }

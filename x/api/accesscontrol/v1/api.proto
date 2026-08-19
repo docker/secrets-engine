@@ -31,8 +31,8 @@ service AccessControlService {
 }
 
 message CheckAccessRequest {
-  // Patterns the caller wants to resolve; at least one required.
-  repeated string patterns = 1;
+  // Pattern the caller wants to resolve.
+  string pattern = 1;
 
   Requester requester = 2;
 }
