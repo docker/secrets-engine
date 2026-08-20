@@ -292,14 +292,10 @@ var sleepFn = time.Sleep
 // between the check and the call, so we react to the authoritative signal — the
 // operation's own locked error — by unlocking again and retrying.
 //
-// itemPaths are additional object paths to unlock alongside collectionPath,
-// for operations that target a specific item (e.g. SetItemSecret, DeleteItem,
-// GetSecret). The Secret Service spec lets an item be locked independently of
-// its enclosing collection, so unlocking only the collection can leave the
-// item itself locked and the retried op fails with the same IsLocked error
-// forever. Callers that already know the item's object path must pass it here
-// rather than relying on the collection unlock alone. Omit itemPaths for
-// operations that do not yet have an item path (e.g. CreateItem).
+// itemPaths are unlocked alongside collectionPath. The spec allows an item to
+// be locked independently of its collection (e.g. KeePassXC's per-item access
+// confirmation), so operations that target a known item must pass its path;
+// omit it only when none exists yet (CreateItem).
 //
 // In the common case this is the passwordless auto-unlock path (e.g. the
 // PAM-unlocked login keyring), where Unlock returns the null prompt and asks
