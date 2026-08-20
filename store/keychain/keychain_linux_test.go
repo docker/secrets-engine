@@ -74,6 +74,8 @@ type fakeService struct {
 	unlockCalls          int
 	unlockErr            error
 
+	lastUnlockPaths []dbus.ObjectPath
+
 	// availableErr, when set, is returned by Available so a test can drive the
 	// eager-probe failure paths in New. The zero value (nil) reports the backend
 	// as available, so every existing test that constructs a store via
@@ -110,8 +112,9 @@ func (f *fakeService) OpenSession(kc.AuthenticationMode) (*kc.Session, error) {
 	return &kc.Session{Mode: kc.AuthenticationInsecurePlain}, nil
 }
 func (f *fakeService) CloseSession(*kc.Session) {}
-func (f *fakeService) Unlock([]dbus.ObjectPath) error {
+func (f *fakeService) Unlock(items []dbus.ObjectPath) error {
 	f.unlockCalls++
+	f.lastUnlockPaths = items
 	return f.unlockErr
 }
 
@@ -333,6 +336,8 @@ func TestKeychainSaveRetriesWhenSetSecretRelocks(t *testing.T) {
 	assert.Equal(t, []dbus.ObjectPath{"/item/a"}, fake.setSecretItems,
 		"the secret must be written in place once the relock clears")
 	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
+	assert.Contains(t, fake.lastUnlockPaths, dbus.ObjectPath("/item/a"),
+		"the retry must unlock the item itself, not only its collection")
 }
 
 // TestKeychainSaveCollapseRetriesWhenDeleteRelocks is the unit-level counterpart
@@ -354,6 +359,8 @@ func TestKeychainSaveCollapseRetriesWhenDeleteRelocks(t *testing.T) {
 		"the duplicate must be collapsed once the relock clears")
 	assert.Equal(t, 3, fake.deleteCalls, "two locked failures then one success")
 	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
+	assert.Contains(t, fake.lastUnlockPaths, dbus.ObjectPath("/item/b"),
+		"the retry must unlock the duplicate item itself, not only its collection")
 }
 
 // TestKeychainSaveStopsRetryingAfterMaxRelocks asserts the retry is bounded: a
@@ -389,6 +396,8 @@ func TestKeychainGetRetriesWhenCollectionRelocks(t *testing.T) {
 
 	assert.Equal(t, 3, fake.getSecretCalls, "two locked failures then one success")
 	assert.Equal(t, 2, fake.unlockCalls, "exactly one Unlock per relock retry")
+	assert.Contains(t, fake.lastUnlockPaths, dbus.ObjectPath("/org/freedesktop/secrets/collection/login/1"),
+		"the retry must unlock the item itself, not only its collection")
 }
 
 // TestKeychainFilterRetriesWhenCollectionRelocks covers the read path reached

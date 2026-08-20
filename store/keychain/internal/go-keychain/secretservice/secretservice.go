@@ -110,7 +110,15 @@ func NewService(ctx context.Context) (*SecretService, error) {
 	}
 	signalCh := make(chan *dbus.Signal, 16)
 	conn.Signal(signalCh)
-	_ = conn.AddMatchSignal(dbus.WithMatchOption("org.freedesktop.Secret.Prompt", "Completed"))
+	// Without this subscription the bus never delivers Prompt.Completed and
+	// PromptAndWait times out on every real (non-null) prompt.
+	if err := conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.Secret.Prompt"),
+		dbus.WithMatchMember("Completed"),
+	); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to subscribe to prompt completion signals: %w", err)
+	}
 	return &SecretService{conn: conn, signalCh: signalCh, sessionOpenTimeout: DefaultSessionOpenTimeout}, nil
 }
 
