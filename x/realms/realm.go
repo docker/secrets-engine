@@ -25,3 +25,55 @@
 //	`docker/` is a realm for all known Docker secrets.
 //	`docker/auth` is a realm for all known Docker Auth secrets.
 package realms
+
+import (
+	"slices"
+
+	"github.com/docker/secrets-engine/x/secrets"
+)
+
+var (
+	allAuth = []secrets.Pattern{
+		DockerHubAuthentication,
+		DockerHubStagingAuthentication,
+		DockerRegistryAuthentication,
+		DockerRegistryStagingAuthentication,
+		DockerHubAuthenticationMetadata,
+		DockerHubStagingAuthenticationMetadata,
+	}
+	allMCP = []secrets.Pattern{
+		DockerMCPDefault,
+		DockerMCPOAuth,
+		DockerMCPOAuthDCR,
+	}
+	allSandbox = []secrets.Pattern{
+		DockerSandbox,
+		DockerSandboxOAuth,
+	}
+	allSecretsEngine = []secrets.Pattern{
+		SecretsEngine,
+		SecretsEnginePlugins,
+	}
+
+	all = slices.Concat(allAuth, allMCP, allSandbox, allSecretsEngine)
+)
+
+func All() []secrets.Pattern {
+	return slices.Clone(all)
+}
+
+func AllAuth() []secrets.Pattern {
+	return slices.Clone(allAuth)
+}
+
+func AllMCP() []secrets.Pattern {
+	return slices.Clone(allMCP)
+}
+
+func AllSandbox() []secrets.Pattern {
+	return slices.Clone(allSandbox)
+}
+
+func AllSecretsEngine() []secrets.Pattern {
+	return slices.Clone(allSecretsEngine)
+}
