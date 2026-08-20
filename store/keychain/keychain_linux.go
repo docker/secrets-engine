@@ -277,8 +277,9 @@ const (
 // synchronisation, so tests that swap it must not run in parallel.
 var sleepFn = time.Sleep
 
-// withRelockRetry runs a collection operation, retrying it with exponential
-// backoff when the secret service rejects it because the collection is locked.
+// withRelockRetry runs a collection or item operation, retrying it with
+// exponential backoff when the secret service rejects it because the
+// collection is locked.
 //
 // The store dials a fresh D-Bus connection for every operation and closes it on
 // return. gnome-keyring scopes an unlock to the session that performed it, so
@@ -291,6 +292,15 @@ var sleepFn = time.Sleep
 // between the check and the call, so we react to the authoritative signal — the
 // operation's own locked error — by unlocking again and retrying.
 //
+// itemPaths are additional object paths to unlock alongside collectionPath,
+// for operations that target a specific item (e.g. SetItemSecret, DeleteItem,
+// GetSecret). The Secret Service spec lets an item be locked independently of
+// its enclosing collection, so unlocking only the collection can leave the
+// item itself locked and the retried op fails with the same IsLocked error
+// forever. Callers that already know the item's object path must pass it here
+// rather than relying on the collection unlock alone. Omit itemPaths for
+// operations that do not yet have an item path (e.g. CreateItem).
+//
 // In the common case this is the passwordless auto-unlock path (e.g. the
 // PAM-unlocked login keyring), where Unlock returns the null prompt and asks
 // the user for nothing. withRelockRetry cannot itself prove the keyring is
@@ -298,13 +308,14 @@ var sleepFn = time.Sleep
 // authentication prompt; the bounded retry count and backoff keep that to a
 // handful of spaced-out prompts at worst, and a dismissed prompt makes Unlock
 // return an error that aborts the loop immediately rather than re-prompting.
-func withRelockRetry(service secretService, collectionPath dbus.ObjectPath, op func() error) error {
+func withRelockRetry(service secretService, collectionPath dbus.ObjectPath, op func() error, itemPaths ...dbus.ObjectPath) error {
 	err := op()
 	delay := relockRetryBaseDelay
+	unlockPaths := append([]dbus.ObjectPath{collectionPath}, itemPaths...)
 	for attempt := 0; attempt < maxRelockRetries && isLockedDBusError(err); attempt++ {
 		sleepFn(delay)
 		delay = min(delay*2, relockRetryMaxDelay)
-		if unlockErr := service.Unlock([]dbus.ObjectPath{collectionPath}); unlockErr != nil {
+		if unlockErr := service.Unlock(unlockPaths); unlockErr != nil {
 			// Surface why the retry stopped while preserving errors.Is on the
 			// underlying Unlock error (e.g. a dismissed prompt). The original
 			// locked error is intentionally dropped: the failed unlock is the
@@ -368,7 +379,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 
 	return withRelockRetry(service, objectPath, func() error {
 		return service.DeleteItem(items[0])
-	})
+	}, items[0])
 }
 
 func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
@@ -426,7 +437,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		var getErr error
 		value, getErr = service.GetSecret(items[0], *session)
 		return getErr
-	})
+	}, items[0])
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +605,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	primary := items[0]
 	if err := withRelockRetry(service, objectPath, func() error {
 		return service.SetItemSecret(primary, sessSecret)
-	}); err != nil {
+	}, primary); err != nil {
 		return err
 	}
 	_ = service.SetItemAttributes(primary, attributes)
@@ -605,7 +616,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 		// exists to drain (see withRelockRetry and issue #446).
 		_ = withRelockRetry(service, objectPath, func() error {
 			return service.DeleteItem(dup)
-		})
+		}, dup)
 	}
 
 	return nil
@@ -631,7 +642,7 @@ func (k *keychainStore[T]) loadSecret(
 		var getErr error
 		value, getErr = svc.GetSecret(itemPath, *session)
 		return getErr
-	})
+	}, itemPath)
 	if err != nil {
 		return nil, err
 	}
