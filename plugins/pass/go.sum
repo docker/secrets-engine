@@ -7,8 +7,8 @@ github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMF
 github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/docker/secrets-engine/plugin v0.3.1 h1:4Zk7eathZSop5WsObjb6RDT92PjjKdmxXwmb1y/h8ko=
-github.com/docker/secrets-engine/plugin v0.3.1/go.mod h1:lZAh8WxVsK4EmUnuf6dZ7oKg2oCfBYRJG9xrUTUT5/c=
+github.com/docker/secrets-engine/plugin v0.3.2 h1:FWHSuEY6nev3evUCS7Yt0bsyZM74ki8EfF5OVvQvu6g=
+github.com/docker/secrets-engine/plugin v0.3.2/go.mod h1:VAdAgcYLwEubWDNaWRAUJt6+lCBXRz3yRMNGs9/t3Gg=
 github.com/godbus/dbus/v5 v5.1.0 h1:4KLkAxT3aOY8Li4FRJe/KvhoNFFxo0m6fNuFUO8QJUk=
 github.com/godbus/dbus/v5 v5.1.0/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
