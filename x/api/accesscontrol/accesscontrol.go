@@ -16,16 +16,13 @@ package accesscontrol
 
 import (
 	"context"
-	"time"
 
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type AccessControl interface {
 	CheckAccess(ctx context.Context, req CheckAccessRequest) (bool, error)
-
-	// Authorize grants access ahead of use, until the returned expiry.
-	Authorize(ctx context.Context, req AuthorizeRequest) (time.Time, error)
+	Authorize(ctx context.Context, req AuthorizeRequest) (secrets.AuthorizeResponse, error)
 }
 
 type CheckAccessRequest struct {

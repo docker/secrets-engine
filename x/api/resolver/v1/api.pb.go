@@ -21,6 +21,48 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Decision int32
+
+const (
+	// buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
+	Decision_DECISION_DENY  Decision = 0
+	Decision_DECISION_ALLOW Decision = 1
+)
+
+// Enum value maps for Decision.
+var (
+	Decision_name = map[int32]string{
+		0: "DECISION_DENY",
+		1: "DECISION_ALLOW",
+	}
+	Decision_value = map[string]int32{
+		"DECISION_DENY":  0,
+		"DECISION_ALLOW": 1,
+	}
+)
+
+func (x Decision) Enum() *Decision {
+	p := new(Decision)
+	*p = x
+	return p
+}
+
+func (x Decision) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Decision) Descriptor() protoreflect.EnumDescriptor {
+	return file_resolver_v1_api_proto_enumTypes[0].Descriptor()
+}
+
+func (Decision) Type() protoreflect.EnumType {
+	return &file_resolver_v1_api_proto_enumTypes[0]
+}
+
+func (x Decision) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
 type GetSecretsRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Pattern     *string                `protobuf:"bytes,1,opt,name=pattern"`
@@ -159,10 +201,13 @@ func (b0 AuthorizeRequest_builder) Build() *AuthorizeRequest {
 }
 
 type AuthorizeResponse struct {
-	state                protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expires_at,json=expiresAt"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Decision    Decision               `protobuf:"varint,1,opt,name=decision,enum=resolver.v1.Decision"`
+	xxx_hidden_ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AuthorizeResponse) Reset() {
@@ -190,6 +235,15 @@ func (x *AuthorizeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *AuthorizeResponse) GetDecision() Decision {
+	if x != nil {
+		if protoimpl.X.Present(&(x.XXX_presence[0]), 0) {
+			return x.xxx_hidden_Decision
+		}
+	}
+	return Decision_DECISION_DENY
+}
+
 func (x *AuthorizeResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.xxx_hidden_ExpiresAt
@@ -197,8 +251,20 @@ func (x *AuthorizeResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AuthorizeResponse) SetDecision(v Decision) {
+	x.xxx_hidden_Decision = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+}
+
 func (x *AuthorizeResponse) SetExpiresAt(v *timestamppb.Timestamp) {
 	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *AuthorizeResponse) HasDecision() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *AuthorizeResponse) HasExpiresAt() bool {
@@ -208,6 +274,11 @@ func (x *AuthorizeResponse) HasExpiresAt() bool {
 	return x.xxx_hidden_ExpiresAt != nil
 }
 
+func (x *AuthorizeResponse) ClearDecision() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Decision = Decision_DECISION_DENY
+}
+
 func (x *AuthorizeResponse) ClearExpiresAt() {
 	x.xxx_hidden_ExpiresAt = nil
 }
@@ -215,7 +286,9 @@ func (x *AuthorizeResponse) ClearExpiresAt() {
 type AuthorizeResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// When the authorization expires.
+	// The authorization decision.
+	Decision *Decision
+	// When the authorization decision expires.
 	ExpiresAt *timestamppb.Timestamp
 }
 
@@ -223,6 +296,10 @@ func (b0 AuthorizeResponse_builder) Build() *AuthorizeResponse {
 	m0 := &AuthorizeResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
+	if b.Decision != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_Decision = *b.Decision
+	}
 	x.xxx_hidden_ExpiresAt = b.ExpiresAt
 	return m0
 }
@@ -562,10 +639,11 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\x11GetSecretsRequest\x12\x18\n" +
 	"\apattern\x18\x01 \x01(\tR\apattern\".\n" +
 	"\x10AuthorizeRequest\x12\x1a\n" +
-	"\bpatterns\x18\x01 \x03(\tR\bpatterns\"N\n" +
-	"\x11AuthorizeResponse\x129\n" +
+	"\bpatterns\x18\x01 \x03(\tR\bpatterns\"\x81\x01\n" +
+	"\x11AuthorizeResponse\x121\n" +
+	"\bdecision\x18\x01 \x01(\x0e2\x15.resolver.v1.DecisionR\bdecision\x129\n" +
 	"\n" +
-	"expires_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x89\x04\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x89\x04\n" +
 	"\x12GetSecretsResponse\x12F\n" +
 	"\tenvelopes\x18\x01 \x03(\v2(.resolver.v1.GetSecretsResponse.EnvelopeR\tenvelopes\x1a\xaa\x03\n" +
 	"\bEnvelope\x12\x0e\n" +
@@ -582,7 +660,10 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\bmetadata\x18\b \x03(\v26.resolver.v1.GetSecretsResponse.Envelope.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012`\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*1\n" +
+	"\bDecision\x12\x11\n" +
+	"\rDECISION_DENY\x10\x00\x12\x12\n" +
+	"\x0eDECISION_ALLOW\x10\x012`\n" +
 	"\x0fResolverService\x12M\n" +
 	"\n" +
 	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponse2_\n" +
@@ -590,32 +671,35 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\tAuthorize\x12\x1d.resolver.v1.AuthorizeRequest\x1a\x1e.resolver.v1.AuthorizeResponseB\xa7\x01\n" +
 	"\x0fcom.resolver.v1B\bApiProtoP\x01Z=github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
+var file_resolver_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_resolver_v1_api_proto_goTypes = []any{
-	(*GetSecretsRequest)(nil),           // 0: resolver.v1.GetSecretsRequest
-	(*AuthorizeRequest)(nil),            // 1: resolver.v1.AuthorizeRequest
-	(*AuthorizeResponse)(nil),           // 2: resolver.v1.AuthorizeResponse
-	(*GetSecretsResponse)(nil),          // 3: resolver.v1.GetSecretsResponse
-	(*GetSecretsResponse_Envelope)(nil), // 4: resolver.v1.GetSecretsResponse.Envelope
-	nil,                                 // 5: resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
-	(*timestamppb.Timestamp)(nil),       // 6: google.protobuf.Timestamp
+	(Decision)(0),                       // 0: resolver.v1.Decision
+	(*GetSecretsRequest)(nil),           // 1: resolver.v1.GetSecretsRequest
+	(*AuthorizeRequest)(nil),            // 2: resolver.v1.AuthorizeRequest
+	(*AuthorizeResponse)(nil),           // 3: resolver.v1.AuthorizeResponse
+	(*GetSecretsResponse)(nil),          // 4: resolver.v1.GetSecretsResponse
+	(*GetSecretsResponse_Envelope)(nil), // 5: resolver.v1.GetSecretsResponse.Envelope
+	nil,                                 // 6: resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	(*timestamppb.Timestamp)(nil),       // 7: google.protobuf.Timestamp
 }
 var file_resolver_v1_api_proto_depIdxs = []int32{
-	6, // 0: resolver.v1.AuthorizeResponse.expires_at:type_name -> google.protobuf.Timestamp
-	4, // 1: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
-	6, // 2: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
-	6, // 3: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
-	6, // 4: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
-	5, // 5: resolver.v1.GetSecretsResponse.Envelope.metadata:type_name -> resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
-	0, // 6: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
-	1, // 7: resolver.v1.AuthorizerService.Authorize:input_type -> resolver.v1.AuthorizeRequest
-	3, // 8: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
-	2, // 9: resolver.v1.AuthorizerService.Authorize:output_type -> resolver.v1.AuthorizeResponse
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0, // 0: resolver.v1.AuthorizeResponse.decision:type_name -> resolver.v1.Decision
+	7, // 1: resolver.v1.AuthorizeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	5, // 2: resolver.v1.GetSecretsResponse.envelopes:type_name -> resolver.v1.GetSecretsResponse.Envelope
+	7, // 3: resolver.v1.GetSecretsResponse.Envelope.created_at:type_name -> google.protobuf.Timestamp
+	7, // 4: resolver.v1.GetSecretsResponse.Envelope.resolved_at:type_name -> google.protobuf.Timestamp
+	7, // 5: resolver.v1.GetSecretsResponse.Envelope.expires_at:type_name -> google.protobuf.Timestamp
+	6, // 6: resolver.v1.GetSecretsResponse.Envelope.metadata:type_name -> resolver.v1.GetSecretsResponse.Envelope.MetadataEntry
+	1, // 7: resolver.v1.ResolverService.GetSecrets:input_type -> resolver.v1.GetSecretsRequest
+	2, // 8: resolver.v1.AuthorizerService.Authorize:input_type -> resolver.v1.AuthorizeRequest
+	4, // 9: resolver.v1.ResolverService.GetSecrets:output_type -> resolver.v1.GetSecretsResponse
+	3, // 10: resolver.v1.AuthorizerService.Authorize:output_type -> resolver.v1.AuthorizeResponse
+	9, // [9:11] is the sub-list for method output_type
+	7, // [7:9] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_resolver_v1_api_proto_init() }
@@ -628,13 +712,14 @@ func file_resolver_v1_api_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_resolver_v1_api_proto_rawDesc), len(file_resolver_v1_api_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
 		GoTypes:           file_resolver_v1_api_proto_goTypes,
 		DependencyIndexes: file_resolver_v1_api_proto_depIdxs,
+		EnumInfos:         file_resolver_v1_api_proto_enumTypes,
 		MessageInfos:      file_resolver_v1_api_proto_msgTypes,
 	}.Build()
 	File_resolver_v1_api_proto = out.File

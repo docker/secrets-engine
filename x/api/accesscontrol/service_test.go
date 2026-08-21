@@ -44,10 +44,10 @@ func (s *stubAccessControl) CheckAccess(_ context.Context, req CheckAccessReques
 	return s.allowed, s.err
 }
 
-func (s *stubAccessControl) Authorize(_ context.Context, req AuthorizeRequest) (time.Time, error) {
+func (s *stubAccessControl) Authorize(_ context.Context, req AuthorizeRequest) (secrets.AuthorizeResponse, error) {
 	s.called = true
 	s.authReq = req
-	return s.expiry, s.err
+	return secrets.AuthorizeResponse{Expiry: s.expiry, Allow: s.allowed}, s.err
 }
 
 func TestCheckAccess(t *testing.T) {
@@ -106,7 +106,7 @@ func TestAuthorize(t *testing.T) {
 
 	t.Run("forwards all patterns", func(t *testing.T) {
 		expiry := time.Now().Add(time.Hour).UTC()
-		ac := &stubAccessControl{expiry: expiry}
+		ac := &stubAccessControl{expiry: expiry, allowed: true}
 		svc := NewAccessControlHandler(ac)
 
 		req := connect.NewRequest(accesscontrolv1.AuthorizeRequest_builder{
@@ -117,11 +117,26 @@ func TestAuthorize(t *testing.T) {
 		resp, err := svc.Authorize(t.Context(), req)
 		require.NoError(t, err)
 		assert.True(t, resp.Msg.GetExpiresAt().AsTime().Equal(expiry), "expiry must round-trip")
+		assert.Equal(t, accesscontrolv1.Decision_DECISION_ALLOW, resp.Msg.GetDecision())
 
 		require.True(t, ac.called)
 		require.Len(t, ac.authReq.Patterns, 2)
 		assert.Equal(t, "docker/auth/hub/joe", ac.authReq.Patterns[0].String())
 		assert.Equal(t, "acme/api-token", ac.authReq.Patterns[1].String())
+	})
+
+	t.Run("returns a deny decision without an error", func(t *testing.T) {
+		ac := &stubAccessControl{}
+		svc := NewAccessControlHandler(ac)
+
+		req := connect.NewRequest(accesscontrolv1.AuthorizeRequest_builder{
+			Patterns:  []string{"docker/auth/hub/joe"},
+			Requester: accesscontrolv1.Requester_builder{Pid: proto.Int32(42)}.Build(),
+		}.Build())
+
+		resp, err := svc.Authorize(t.Context(), req)
+		require.NoError(t, err)
+		assert.Equal(t, accesscontrolv1.Decision_DECISION_DENY, resp.Msg.GetDecision())
 	})
 
 	t.Run("maps denial to permission denied", func(t *testing.T) {

@@ -95,15 +95,20 @@ func (s *accessControlService) Authorize(ctx context.Context, c *connect.Request
 		SigningInfo: signingInfoFromProto(requester),
 	}
 
-	expiry, err := s.ac.Authorize(ctx, req)
+	resp, err := s.ac.Authorize(ctx, req)
 	if err != nil {
 		if errors.Is(err, secrets.ErrAccessDenied) {
 			return nil, connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)
 		}
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("authorize failed for %q: %w", msgPatterns, err))
 	}
+	decision := accesscontrolv1.Decision_DECISION_DENY
+	if resp.Allow {
+		decision = accesscontrolv1.Decision_DECISION_ALLOW
+	}
 	return connect.NewResponse(accesscontrolv1.AuthorizeResponse_builder{
-		ExpiresAt: timestamppb.New(expiry),
+		ExpiresAt: timestamppb.New(resp.Expiry),
+		Decision:  &decision,
 	}.Build()), nil
 }
 

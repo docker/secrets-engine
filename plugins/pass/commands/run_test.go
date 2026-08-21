@@ -357,8 +357,8 @@ func (p pingClient) Version(ctx context.Context) (client.DaemonVersion, error) {
 	return p.ping(ctx)
 }
 
-func (p pingClient) Authorize(context.Context, ...secrets.Pattern) (time.Time, error) {
-	return time.Time{}, nil
+func (p pingClient) Authorize(context.Context, ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+	return secrets.AuthorizeResponse{Allow: true}, nil
 }
 
 func TestPreflightPing(t *testing.T) {

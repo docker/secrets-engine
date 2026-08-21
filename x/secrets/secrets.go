@@ -47,6 +47,11 @@ type Resolver interface {
 	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
 }
 
+type AuthorizeResponse struct {
+	Expiry time.Time
+	Allow  bool
+}
+
 type Authorizer interface {
-	Authorize(ctx context.Context, pattern ...Pattern) (time.Time, error)
+	Authorize(ctx context.Context, pattern ...Pattern) (AuthorizeResponse, error)
 }

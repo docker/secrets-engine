@@ -41,9 +41,18 @@ message AuthorizeRequest {
   repeated string patterns = 1;
 }
 
+enum Decision {
+  // buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
+  DECISION_DENY = 0;
+  DECISION_ALLOW = 1;
+}
+
 message AuthorizeResponse {
-  // When the authorization expires.
-  google.protobuf.Timestamp expires_at = 1;
+  // The authorization decision.
+  Decision decision = 1;
+
+  // When the authorization decision expires.
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 message GetSecretsResponse {

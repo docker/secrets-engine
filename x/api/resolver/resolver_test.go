@@ -160,12 +160,13 @@ func (m maliciousPattern) Includes(secrets.Pattern) bool {
 
 type mockAuthorizer struct {
 	called bool
+	resp   secrets.AuthorizeResponse
 	err    error
 }
 
-func (m *mockAuthorizer) Authorize(context.Context, ...secrets.Pattern) (time.Time, error) {
+func (m *mockAuthorizer) Authorize(context.Context, ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	m.called = true
-	return time.Time{}, m.err
+	return m.resp, m.err
 }
 
 func TestAuthorizerService_Authorize(t *testing.T) {
@@ -179,6 +180,26 @@ func TestAuthorizerService_Authorize(t *testing.T) {
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 		assert.ErrorContains(t, err, "at least one pattern is required")
 		assert.False(t, m.called, "authorizer must not run without a pattern")
+	})
+
+	t.Run("returns decision and expiry", func(t *testing.T) {
+		expiry := time.Now().Add(time.Hour).UTC()
+		s := NewAuthorizerHandler(&mockAuthorizer{resp: secrets.AuthorizeResponse{Expiry: expiry, Allow: true}})
+		resp, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+			Patterns: []string{"docker/auth/hub/joe"},
+		}.Build()))
+		require.NoError(t, err)
+		assert.True(t, resp.Msg.GetExpiresAt().AsTime().Equal(expiry), "expiry must round-trip")
+		assert.Equal(t, resolverv1.Decision_DECISION_ALLOW, resp.Msg.GetDecision())
+	})
+
+	t.Run("returns a deny decision without an error", func(t *testing.T) {
+		s := NewAuthorizerHandler(&mockAuthorizer{})
+		resp, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+			Patterns: []string{"docker/auth/hub/joe"},
+		}.Build()))
+		require.NoError(t, err)
+		assert.Equal(t, resolverv1.Decision_DECISION_DENY, resp.Msg.GetDecision())
 	})
 
 	t.Run("maps denial to permission denied", func(t *testing.T) {
