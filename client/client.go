@@ -24,6 +24,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
@@ -152,6 +153,10 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 	return envelopes, nil
 }
 
+func (c client) HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth {
+	return dockerhub.New(c, opts...)
+}
+
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 	resp, err := c.versionClient.GetVersion(ctx, connect.NewRequest(healthv1.GetVersionRequest_builder{}.Build()))
 	if isDialError(err) {
@@ -174,6 +179,9 @@ type Client interface {
 
 	// Version returns the name and version reported by the daemon.
 	Version(ctx context.Context) (DaemonVersion, error)
+
+	// HubAuth returns a Docker Hub authentication accessor backed by this client.
+	HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth
 }
 
 type PluginManagement interface {

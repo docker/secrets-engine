@@ -34,9 +34,12 @@ var (
 )
 
 var (
-	// DockerHubAuthenticationMetadata is a pointer to the default user signed in to Docker
+	// DockerHubAuthenticationMetadata holds one profile entry per signed-in
+	// Docker Hub account, plus a default entry duplicating the default
+	// account's profile.
 	DockerHubAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub/**")
-	// DockerHubStagingAuthenticationMetadata is a pointer to the default staging user signed in to Docker
+	// DockerHubStagingAuthenticationMetadata is the staging variant of
+	// [DockerHubAuthenticationMetadata].
 	DockerHubStagingAuthenticationMetadata = secrets.MustParsePattern("docker/auth/metadata/hub-staging/**")
 )
 

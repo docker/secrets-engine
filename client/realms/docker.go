@@ -26,7 +26,7 @@
 //	docker/auth/hub/**             – Docker Hub authentication (OAuth login)
 //	docker/auth/hub-staging/**     – Docker Hub staging authentication
 //	docker/auth/registry/docker/** – Docker Registry authentication
-//	docker/auth/metadata/hub/**    – metadata for the default Hub user
+//	docker/auth/metadata/hub/**    – Hub account profile metadata
 //	docker/mcp/**                  – MCP-related secrets
 //	docker/mcp/oauth/**            – MCP OAuth credentials
 //	docker/mcp/oauth-dcr/**        – MCP Dynamic Client Registration configs
@@ -58,9 +58,12 @@ var (
 )
 
 var (
-	// DockerHubAuthenticationMetadata is a pointer to the default user signed in to Docker
+	// DockerHubAuthenticationMetadata holds one profile entry per signed-in
+	// Docker Hub account, plus a default entry duplicating the default
+	// account's profile.
 	DockerHubAuthenticationMetadata = xrealms.DockerHubAuthenticationMetadata
-	// DockerHubStagingAuthenticationMetadata is a pointer to the default staging user signed in to Docker
+	// DockerHubStagingAuthenticationMetadata is the staging variant of
+	// [DockerHubAuthenticationMetadata].
 	DockerHubStagingAuthenticationMetadata = xrealms.DockerHubStagingAuthenticationMetadata
 )
 
