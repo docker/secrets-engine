@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/plugin => ../../plugin
 require (
 	github.com/docker/docker-credential-helpers v0.9.4
 	github.com/docker/secrets-engine/plugin v0.3.1
-	github.com/docker/secrets-engine/x v0.6.1-do.not.use
+	github.com/docker/secrets-engine/x v0.7.0-do.not.use
 	github.com/stretchr/testify v1.11.1
 )
 
