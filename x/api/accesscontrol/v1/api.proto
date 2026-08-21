@@ -45,8 +45,11 @@ message AuthorizeRequest {
 }
 
 message AuthorizeResponse {
-  // When the authorization expires.
-  google.protobuf.Timestamp expires_at = 1;
+  // The authorization decision.
+  Decision decision = 1;
+
+  // When the authorization decision expires.
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 message Requester {

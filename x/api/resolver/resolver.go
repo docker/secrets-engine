@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -144,15 +143,20 @@ func (s authorizerService) Authorize(ctx context.Context, c *connect.Request[res
 		patterns = append(patterns, pattern)
 	}
 
-	expiry, err := s.authorizer.Authorize(ctx, patterns...)
+	resp, err := s.authorizer.Authorize(ctx, patterns...)
 	if err != nil {
 		if errors.Is(err, secrets.ErrAccessDenied) {
 			return nil, connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)
 		}
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("authorize failed for %q: %w", msgPatterns, err))
 	}
+	decision := resolverv1.Decision_DECISION_DENY
+	if resp.Allow {
+		decision = resolverv1.Decision_DECISION_ALLOW
+	}
 	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
-		ExpiresAt: timestamppb.New(expiry),
+		ExpiresAt: timestamppb.New(resp.Expiry),
+		Decision:  &decision,
 	}.Build()), nil
 }
 
@@ -166,7 +170,7 @@ func NewAuthorizerClient(httpClient connect.HTTPClient) secrets.Authorizer {
 	return &authorizerClient{client: resolverv1connect.NewAuthorizerServiceClient(httpClient, "http://unix")}
 }
 
-func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (time.Time, error) {
+func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	msgPatterns := make([]string, 0, len(patterns))
 	for _, p := range patterns {
 		msgPatterns = append(msgPatterns, p.String())
@@ -178,7 +182,11 @@ func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pat
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
 			err = secrets.ErrAccessDenied
 		}
-		return time.Time{}, err
+		return secrets.AuthorizeResponse{}, err
 	}
-	return resp.Msg.GetExpiresAt().AsTime(), nil
+
+	return secrets.AuthorizeResponse{
+		Expiry: resp.Msg.GetExpiresAt().AsTime(),
+		Allow:  resp.Msg.GetDecision() == resolverv1.Decision_DECISION_ALLOW,
+	}, nil
 }

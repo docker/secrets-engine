@@ -234,6 +234,7 @@ var _ resolverv1connect.AuthorizerServiceHandler = &mockAuthorizerService{}
 
 type mockAuthorizerService struct {
 	expiry   time.Time
+	decision *resolverv1.Decision // nil leaves the decision unset
 	err      error
 	patterns []string
 }
@@ -245,6 +246,7 @@ func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Reques
 	}
 	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
 		ExpiresAt: timestamppb.New(m.expiry),
+		Decision:  m.decision,
 	}.Build()), nil
 }
 
@@ -257,17 +259,38 @@ func mockAuthorizeEngine(t *testing.T, m *mockAuthorizerService) string {
 
 func Test_Authorize(t *testing.T) {
 	t.Parallel()
-	t.Run("forwards patterns and returns expiry", func(t *testing.T) {
+	t.Run("forwards patterns and returns the decision", func(t *testing.T) {
 		expiry := time.Now().Add(time.Hour).UTC()
-		m := &mockAuthorizerService{expiry: expiry}
+		m := &mockAuthorizerService{expiry: expiry, decision: resolverv1.Decision_DECISION_ALLOW.Enum()}
 		socket := mockAuthorizeEngine(t, m)
 		c, err := New(WithSocketPath(socket))
 		require.NoError(t, err)
 
 		got, err := c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"), MustParsePattern("acme/api-token"))
 		require.NoError(t, err)
-		assert.True(t, got.Equal(expiry), "expiry must round-trip")
+		assert.True(t, got.Expiry.Equal(expiry), "expiry must round-trip")
+		assert.True(t, got.Allow)
 		assert.Equal(t, []string{"docker/auth/hub/joe", "acme/api-token"}, m.patterns)
+	})
+	t.Run("returns a deny decision without an error", func(t *testing.T) {
+		m := &mockAuthorizerService{decision: resolverv1.Decision_DECISION_DENY.Enum()}
+		socket := mockAuthorizeEngine(t, m)
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+
+		got, err := c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
+		require.NoError(t, err)
+		assert.False(t, got.Allow)
+	})
+	t.Run("treats a missing decision as deny", func(t *testing.T) {
+		m := &mockAuthorizerService{}
+		socket := mockAuthorizeEngine(t, m)
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+
+		got, err := c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
+		require.NoError(t, err)
+		assert.False(t, got.Allow, "a decision must be explicit to grant access")
 	})
 	t.Run("denied", func(t *testing.T) {
 		m := &mockAuthorizerService{err: connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)}

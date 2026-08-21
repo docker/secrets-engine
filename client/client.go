@@ -34,10 +34,11 @@ import (
 )
 
 type (
-	Envelope      = secrets.Envelope
-	ID            = secrets.ID
-	Pattern       = secrets.Pattern
-	DaemonVersion = api.DaemonVersion
+	Envelope          = secrets.Envelope
+	ID                = secrets.ID
+	Pattern           = secrets.Pattern
+	AuthorizeResponse = secrets.AuthorizeResponse
+	DaemonVersion     = api.DaemonVersion
 )
 
 var (
@@ -129,16 +130,16 @@ type client struct {
 	authorizerClient secrets.Authorizer
 }
 
-// Authorize grants access to the patterns until the returned expiry.
-func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (time.Time, error) {
-	expiry, err := c.authorizerClient.Authorize(ctx, patterns...)
+// Authorize decides access to the patterns; the decision is valid until the response expiry.
+func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+	resp, err := c.authorizerClient.Authorize(ctx, patterns...)
 	if isDialError(err) {
-		return time.Time{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return secrets.AuthorizeResponse{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
 	}
 	if err != nil {
-		return time.Time{}, err
+		return secrets.AuthorizeResponse{}, err
 	}
-	return expiry, nil
+	return resp, nil
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {

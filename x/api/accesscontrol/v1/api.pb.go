@@ -366,10 +366,13 @@ func (b0 AuthorizeRequest_builder) Build() *AuthorizeRequest {
 }
 
 type AuthorizeResponse struct {
-	state                protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expires_at,json=expiresAt"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Decision    Decision               `protobuf:"varint,1,opt,name=decision,enum=accesscontrol.v1.Decision"`
+	xxx_hidden_ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AuthorizeResponse) Reset() {
@@ -397,6 +400,15 @@ func (x *AuthorizeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *AuthorizeResponse) GetDecision() Decision {
+	if x != nil {
+		if protoimpl.X.Present(&(x.XXX_presence[0]), 0) {
+			return x.xxx_hidden_Decision
+		}
+	}
+	return Decision_DECISION_DENY
+}
+
 func (x *AuthorizeResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.xxx_hidden_ExpiresAt
@@ -404,8 +416,20 @@ func (x *AuthorizeResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AuthorizeResponse) SetDecision(v Decision) {
+	x.xxx_hidden_Decision = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 2)
+}
+
 func (x *AuthorizeResponse) SetExpiresAt(v *timestamppb.Timestamp) {
 	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *AuthorizeResponse) HasDecision() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
 func (x *AuthorizeResponse) HasExpiresAt() bool {
@@ -415,6 +439,11 @@ func (x *AuthorizeResponse) HasExpiresAt() bool {
 	return x.xxx_hidden_ExpiresAt != nil
 }
 
+func (x *AuthorizeResponse) ClearDecision() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_Decision = Decision_DECISION_DENY
+}
+
 func (x *AuthorizeResponse) ClearExpiresAt() {
 	x.xxx_hidden_ExpiresAt = nil
 }
@@ -422,7 +451,9 @@ func (x *AuthorizeResponse) ClearExpiresAt() {
 type AuthorizeResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// When the authorization expires.
+	// The authorization decision.
+	Decision *Decision
+	// When the authorization decision expires.
 	ExpiresAt *timestamppb.Timestamp
 }
 
@@ -430,6 +461,10 @@ func (b0 AuthorizeResponse_builder) Build() *AuthorizeResponse {
 	m0 := &AuthorizeResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
+	if b.Decision != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 2)
+		x.xxx_hidden_Decision = *b.Decision
+	}
 	x.xxx_hidden_ExpiresAt = b.ExpiresAt
 	return m0
 }
@@ -2431,10 +2466,11 @@ const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"i\n" +
 	"\x10AuthorizeRequest\x12\x1a\n" +
 	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x129\n" +
-	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"N\n" +
-	"\x11AuthorizeResponse\x129\n" +
+	"\trequester\x18\x02 \x01(\v2\x1b.accesscontrol.v1.RequesterR\trequester\"\x86\x01\n" +
+	"\x11AuthorizeResponse\x126\n" +
+	"\bdecision\x18\x01 \x01(\x0e2\x1a.accesscontrol.v1.DecisionR\bdecision\x129\n" +
 	"\n" +
-	"expires_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xda\x02\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xda\x02\n" +
 	"\tRequester\x12\x10\n" +
 	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x120\n" +
@@ -2545,28 +2581,29 @@ var file_accesscontrol_v1_api_proto_goTypes = []any{
 var file_accesscontrol_v1_api_proto_depIdxs = []int32{
 	6,  // 0: accesscontrol.v1.CheckAccessRequest.requester:type_name -> accesscontrol.v1.Requester
 	6,  // 1: accesscontrol.v1.AuthorizeRequest.requester:type_name -> accesscontrol.v1.Requester
-	14, // 2: accesscontrol.v1.AuthorizeResponse.expires_at:type_name -> google.protobuf.Timestamp
-	7,  // 3: accesscontrol.v1.Requester.darwin:type_name -> accesscontrol.v1.DarwinSigningInfo
-	8,  // 4: accesscontrol.v1.Requester.windows:type_name -> accesscontrol.v1.WindowsSigningInfo
-	9,  // 5: accesscontrol.v1.Requester.linux:type_name -> accesscontrol.v1.LinuxSigningInfo
-	11, // 6: accesscontrol.v1.DarwinSigningInfo.root:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
-	11, // 7: accesscontrol.v1.DarwinSigningInfo.leaf:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
-	12, // 8: accesscontrol.v1.DarwinSigningInfo.chain:type_name -> accesscontrol.v1.DarwinSigningInfo.ProcessNode
-	2,  // 9: accesscontrol.v1.WindowsSigningInfo.integrity:type_name -> accesscontrol.v1.WindowsSigningInfo.IntegrityLevel
-	13, // 10: accesscontrol.v1.LinuxSigningInfo.signers:type_name -> accesscontrol.v1.LinuxSigningInfo.Signer
-	0,  // 11: accesscontrol.v1.CheckAccessResponse.decision:type_name -> accesscontrol.v1.Decision
-	1,  // 12: accesscontrol.v1.DarwinSigningInfo.SigningIdentity.anchor:type_name -> accesscontrol.v1.DarwinSigningInfo.Anchor
-	14, // 13: accesscontrol.v1.DarwinSigningInfo.ProcessNode.mtime:type_name -> google.protobuf.Timestamp
-	14, // 14: accesscontrol.v1.LinuxSigningInfo.Signer.integrated_time:type_name -> google.protobuf.Timestamp
-	3,  // 15: accesscontrol.v1.AccessControlService.CheckAccess:input_type -> accesscontrol.v1.CheckAccessRequest
-	4,  // 16: accesscontrol.v1.AccessControlService.Authorize:input_type -> accesscontrol.v1.AuthorizeRequest
-	10, // 17: accesscontrol.v1.AccessControlService.CheckAccess:output_type -> accesscontrol.v1.CheckAccessResponse
-	5,  // 18: accesscontrol.v1.AccessControlService.Authorize:output_type -> accesscontrol.v1.AuthorizeResponse
-	17, // [17:19] is the sub-list for method output_type
-	15, // [15:17] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	0,  // 2: accesscontrol.v1.AuthorizeResponse.decision:type_name -> accesscontrol.v1.Decision
+	14, // 3: accesscontrol.v1.AuthorizeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	7,  // 4: accesscontrol.v1.Requester.darwin:type_name -> accesscontrol.v1.DarwinSigningInfo
+	8,  // 5: accesscontrol.v1.Requester.windows:type_name -> accesscontrol.v1.WindowsSigningInfo
+	9,  // 6: accesscontrol.v1.Requester.linux:type_name -> accesscontrol.v1.LinuxSigningInfo
+	11, // 7: accesscontrol.v1.DarwinSigningInfo.root:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
+	11, // 8: accesscontrol.v1.DarwinSigningInfo.leaf:type_name -> accesscontrol.v1.DarwinSigningInfo.SigningIdentity
+	12, // 9: accesscontrol.v1.DarwinSigningInfo.chain:type_name -> accesscontrol.v1.DarwinSigningInfo.ProcessNode
+	2,  // 10: accesscontrol.v1.WindowsSigningInfo.integrity:type_name -> accesscontrol.v1.WindowsSigningInfo.IntegrityLevel
+	13, // 11: accesscontrol.v1.LinuxSigningInfo.signers:type_name -> accesscontrol.v1.LinuxSigningInfo.Signer
+	0,  // 12: accesscontrol.v1.CheckAccessResponse.decision:type_name -> accesscontrol.v1.Decision
+	1,  // 13: accesscontrol.v1.DarwinSigningInfo.SigningIdentity.anchor:type_name -> accesscontrol.v1.DarwinSigningInfo.Anchor
+	14, // 14: accesscontrol.v1.DarwinSigningInfo.ProcessNode.mtime:type_name -> google.protobuf.Timestamp
+	14, // 15: accesscontrol.v1.LinuxSigningInfo.Signer.integrated_time:type_name -> google.protobuf.Timestamp
+	3,  // 16: accesscontrol.v1.AccessControlService.CheckAccess:input_type -> accesscontrol.v1.CheckAccessRequest
+	4,  // 17: accesscontrol.v1.AccessControlService.Authorize:input_type -> accesscontrol.v1.AuthorizeRequest
+	10, // 18: accesscontrol.v1.AccessControlService.CheckAccess:output_type -> accesscontrol.v1.CheckAccessResponse
+	5,  // 19: accesscontrol.v1.AccessControlService.Authorize:output_type -> accesscontrol.v1.AuthorizeResponse
+	18, // [18:20] is the sub-list for method output_type
+	16, // [16:18] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_accesscontrol_v1_api_proto_init() }
