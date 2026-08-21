@@ -193,6 +193,55 @@ if err != nil {
 fmt.Println(secrets[0].Value)
 ```
 
+## How to fetch a Docker Hub access token
+
+The client exposes a Docker Hub authentication accessor via `HubAuth()`. It
+locates the right credential and decodes the JSON payload into a typed
+`UserSession`, so you don't need to know the realm layout or the payload
+format:
+
+```go
+import (
+    "github.com/docker/secrets-engine/client"
+    "github.com/docker/secrets-engine/client/dockerhub"
+)
+
+c, err := client.New()
+if err != nil {
+    log.Fatalf("failed to create secrets engine client: %v", err)
+}
+hub := c.HubAuth()
+
+// Fetch the session of the default signed-in account ...
+session, err := hub.GetDefaultSession(context.Background())
+if errors.Is(err, dockerhub.ErrNoSession) {
+    // Also matches dockerhub.ErrNoDefaultProfile, which wraps ErrNoSession.
+    log.Fatalf("not signed in to Docker Hub")
+}
+if err != nil {
+    log.Fatalf("failed fetching access token: %v", err)
+}
+
+// ... or fetch the session of a specific account.
+session, err = hub.GetSession(context.Background(), "myuser")
+if err != nil {
+    log.Fatalf("failed fetching access token: %v", err)
+}
+
+fmt.Println(session.AccessToken)       // the raw JWT access token
+fmt.Println(session.Claims.Username)   // decoded token claims
+fmt.Println(session.Claims.ExpiresAt)
+
+// List the profiles of all signed-in accounts.
+profiles, err := hub.ListProfiles(context.Background())
+if err != nil {
+    log.Fatalf("failed listing profiles: %v", err)
+}
+for _, profile := range profiles {
+    fmt.Println(profile.Username, profile.UserID)
+}
+```
+
 ## How to create a plugin
 
 ### 1. Implement the plugin interface

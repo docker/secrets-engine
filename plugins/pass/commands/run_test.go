@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -359,6 +360,10 @@ func (p pingClient) Version(ctx context.Context) (client.DaemonVersion, error) {
 
 func (p pingClient) Authorize(context.Context, ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	return secrets.AuthorizeResponse{Allow: true}, nil
+}
+
+func (pingClient) HubAuth(...dockerhub.Option) dockerhub.ClientAuth {
+	return nil
 }
 
 func TestPreflightPing(t *testing.T) {

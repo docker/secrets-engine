@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
@@ -340,6 +341,13 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
 	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
 	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+}
+
+func TestHubAuth(t *testing.T) {
+	client, err := New(WithSocketPath(testhelper.RandomShortSocketName()))
+	require.NoError(t, err)
+	assert.NotNil(t, client.HubAuth())
+	assert.NotNil(t, client.HubAuth(dockerhub.Staging()))
 }
 
 func TestIsDialError(t *testing.T) {
