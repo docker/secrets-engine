@@ -224,3 +224,30 @@ func Test_apply(t *testing.T) {
 		})
 	}
 }
+
+func TestPatternExpandID(t *testing.T) {
+	tests := []struct {
+		pattern string
+		id      string
+		result  string
+	}{
+		{"foo/bar/**", "baz", "foo/bar/baz"},
+		{"**", "foo/bar", "foo/bar"},
+		{"a/*/**", "x", ""},
+		{"*/**", "x", ""},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s + %s", tc.pattern, tc.id), func(t *testing.T) {
+			expanded, err := MustParsePattern(tc.pattern).ExpandID(MustParseID(tc.id))
+			if tc.result == "" {
+				var invalid ErrInvalidID
+				require.ErrorAs(t, err, &invalid)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.result, expanded.String())
+			_, err = ParseID(expanded.String())
+			assert.NoError(t, err)
+		})
+	}
+}
