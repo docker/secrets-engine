@@ -7,8 +7,7 @@ $ docker pass set POSTGRES_PASSWORD=my-secret-password
 ### Or pass the secret via STDIN:
 
 ```console
-$ echo my-secret-password > pwd.txt
-$ cat pwd.txt | docker pass set POSTGRES_PASSWORD
+$ printf '%s' my-secret-password | docker pass set POSTGRES_PASSWORD
 ```
 
 ### Set a secret with metadata:
