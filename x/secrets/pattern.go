@@ -142,7 +142,7 @@ func (p pattern) ExpandID(other ID) (ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	return id(val), err
+	return ParseID(val)
 }
 
 func (p pattern) ExpandPattern(other Pattern) (Pattern, error) {
