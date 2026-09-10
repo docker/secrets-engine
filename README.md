@@ -5,15 +5,14 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-purple)](https://github.com/docker/secrets-engine/blob/main/LICENSE)
 
 Secrets Engine and [docker pass](https://docs.docker.com/reference/cli/docker/pass/)
-are bundled with [Docker Desktop](https://docs.docker.com/desktop/).
+ship with [Docker Desktop](https://docs.docker.com/desktop/).
 
 ## Docker CE (experimental)
 
-Runtime secret injection is available in Docker CE as an **experimental**
-feature, requiring Docker Engine (`dockerd`) **29.2.0 or higher**. Packages are
-published to Docker's official repository at `download.docker.com`, or can be
-downloaded directly from the
-[releases page](https://github.com/docker/secrets-engine/releases).
+Docker CE includes runtime secret injection as an **experimental** feature. It
+requires Docker Engine (`dockerd`) **29.2.0 or higher**. Install the packages
+from Docker's official repository at `download.docker.com`, or download them
+from the [releases page](https://github.com/docker/secrets-engine/releases).
 
 ### Set up Docker's package repository
 
@@ -25,7 +24,7 @@ convenience script:
 curl -fsSL https://get.docker.com | sh -s -- --setup-repo
 ```
 
-Alternatively, follow the
+Or follow the
 [Docker Engine installation instructions](https://docs.docker.com/engine/install/).
 
 ### Install
@@ -68,7 +67,7 @@ sudo dnf remove docker-secrets-engine-plugins docker-secrets-engine
 
 > [!WARNING]
 > Docker CE support is experimental and may change between releases. Do not
-> rely on it for production workloads yet. Also see
+> rely on it for production workloads yet. See
 > [known limitations](#known-limitations).
 
 ## Runtime secret injection (no plaintext in your CLI or Compose)
@@ -78,31 +77,31 @@ and have Docker **resolve and inject** the real values _at runtime_.
 
 **Key idea:** you pass a _pointer_, not the secret.
 
-- In your config (CLI flags / Compose files), you use a `se://` reference like `se://foo`.
+- In CLI flags and Compose files, you write a `se://` reference such as `se://foo`.
 - When the container starts, Docker asks Secrets Engine to resolve that reference
   and injects the secret into the container.
-- The secret value is sourced from a provider, such as **`docker pass`**, which
-  stores secrets securely in your **local OS keychain** (or from a custom provider plugin).
+- A provider supplies the value: **`docker pass`**, which stores secrets in
+  your **local OS keychain**, or a custom provider plugin.
 
-This means you don’t need:
+You no longer need:
 
 - host environment variables containing secret values
 - plaintext secret files on disk (such as `.env` files)
-- secret literals embedded in `compose.yaml`
+- secret literals in `compose.yaml`
 
 ### Example: store once, use everywhere
 
 Store the secret in your OS keychain:
 
 ```bash
-# reads the secret from stdin, to avoid exposure in cmdline (e.g. in htop) and shell history (recommended)
+# recommended: stdin keeps the secret out of the command line (visible in htop) and shell history
 docker pass set foo
 
-# passing directly supported as well
+# or pass the value inline
 docker pass set foo=secret
 ```
 
-Run a container using a secret reference (the value se://foo is not the secret itself):
+Run a container with a secret reference (the value se://foo is not the secret itself):
 
 ```bash
 docker run --rm -e foo=se://foo busybox sh -c 'echo "$foo"'
@@ -131,16 +130,16 @@ A realm is a prefix in the secret key. For example:
 - `docker/db/prod/password`
 
 Because the realm is part of the key, you can query or operate on groups of
-secrets using patterns. For example, to target _all_ Docker auth-related secrets:
+secrets with patterns. To target _all_ Docker auth secrets:
 
 - `docker/auth/**`
 
-This makes it easy to:
+This lets you:
 
-- keep related secrets grouped together
+- group related secrets
 - separate environments (e.g. `prod/`, `staging/`, `dev/`)
-- scope listing/lookup operations to a subset of secrets without knowing every
-  key ahead of time
+- scope listing and lookup to a subset of secrets without knowing every key
+  ahead of time
 
 #### Example layout
 
@@ -157,7 +156,7 @@ docker/
 ```
 
 > [!TIP]
-> Treat realms like paths - predictable structure makes automation and access control much easier.
+> Treat realms like paths: a predictable structure eases automation and access control.
 
 > [!NOTE]
 > **Missing a plugin?** Help us pick the next provider — vote 👍 for your favorite (or request one) on the [plugin backends epic](https://github.com/docker/secrets-engine/issues/534).
@@ -166,13 +165,13 @@ docker/
 
 ## How to query secrets
 
-Use the `client` module in your project:
+Add the `client` module to your project:
 
 ```shell
 go get github.com/docker/secrets-engine/client
 ```
 
-Use the client to fetch a secret:
+Fetch a secret:
 
 ```go
 c, err := client.New()
@@ -180,13 +179,13 @@ if err != nil {
     log.Fatalf("failed to create secrets engine client: %v", err)
 }
 
-// Fetch a secret from the engine
-// We are using an exact match here, so only one or zero results will return.
+// Fetch a secret from the engine.
+// An exact match returns zero or one result.
 secrets, err := c.GetSecrets(context.Background(), client.MustParsePattern("my-secret"))
 if errors.Is(err, client.ErrSecretNotFound) {
     log.Fatalf("no secret found")
 }
-// fallback to generic error
+// handle any other error
 if err != nil {
     log.Fatalf("failed fetching secrets: %v", err)
 }
@@ -195,10 +194,9 @@ fmt.Println(secrets[0].Value)
 
 ## How to fetch a Docker Hub access token
 
-The client exposes a Docker Hub authentication accessor via `HubAuth()`. It
-locates the right credential and decodes the JSON payload into a typed
-`UserSession`, so you don't need to know the realm layout or the payload
-format:
+`HubAuth()` returns a Docker Hub authentication accessor. It locates the right
+credential and decodes the JSON payload into a typed `UserSession`, so you
+don't need to know the realm layout or the payload format:
 
 ```go
 import (
@@ -246,13 +244,13 @@ for _, profile := range profiles {
 
 ### 1. Implement the plugin interface
 
-Use the `plugin` module in your project:
+Add the `plugin` module to your project:
 
 ```shell
 go get github.com/docker/secrets-engine/plugin
 ```
 
-A plugin needs to implement the `Plugin` interface:
+A plugin implements the `Plugin` interface:
 
 ```go
 var _ plugin.Plugin = &myPlugin{}
@@ -280,8 +278,7 @@ func (p *myPlugin) GetSecrets(_ context.Context, pattern plugin.Pattern) ([]plug
 }
 
 func (p *myPlugin) Run(ctx context.Context) error {
-    // add long-running tasks here
-    // for example, OAuth tokens can be refreshed here.
+    // Long-running work goes here — refreshing OAuth tokens, for example.
 	<-ctx.Done()
 	return nil
 }
@@ -339,14 +336,13 @@ func main() {
 }
 ```
 
-### 3. Query secrets from your plugin:
+### 3. Query secrets from your plugin
 
-To verify your plugin works, run the binary and it should connect to the
-Secrets Engine.
+To verify your plugin works, run the binary; it connects to the Secrets Engine.
 
-As a quick test we can retrieve secrets using `curl`, when running standalone
-the default socket is `daemon.sock` and with Docker Desktop it is `engine.sock`.
-Below we will query the Secrets Engine in standalone mode.
+Test it by retrieving secrets with `curl`. Standalone, the engine listens on
+`daemon.sock`; under Docker Desktop, on `engine.sock`. This example queries
+standalone mode:
 
 ```bash
 curl --unix-socket ~/Library/Caches/docker-secrets-engine/daemon.sock \
@@ -355,12 +351,11 @@ curl --unix-socket ~/Library/Caches/docker-secrets-engine/daemon.sock \
     -d '{"pattern": "myrealm/**"}'
 ```
 
-The value of a secret is always encoded into base64.
-When using Go's `json.Unmarshal` it will automatically convert it back into
-a slice of bytes `[]byte`.
+The engine always returns secret values base64-encoded. Go's `json.Unmarshal`
+decodes them to `[]byte`.
 
-To manually decode it, you can pipe the value into `base64`, using the
-flags appropriate for your platform:
+To decode by hand, pipe the value through `base64` with the flag for your
+platform:
 
 ```bash
 # macOS / BSD
@@ -372,26 +367,25 @@ echo "<base64 string>" | base64 --decode
 echo "<base64 string>" | base64 -d
 ```
 
-## Known limitations and issues
+## Known limitations
 
 These apply to the experimental Docker CE integration described above. We are
-actively working to address them.
+working to address them.
 
-- **No multi-user support.** A single Docker Engine is shared by every user on
-  the host, but Secrets Engine runs as a per-user daemon. When multiple users
-  are logged in and using the same engine in parallel, the engine cannot
-  reliably route a resolution request to the right user's daemon. As a
-  consequence, the user the daemon talks to is fixed at install time: the
-  package's post-install script records the installing user's UID (resolved from
-  `$SUDO_UID`, i.e. the user who ran `sudo apt install` / `sudo dnf install`)
-  into `/etc/docker/nri/conf.d/10-secrets-engine.conf`. If the UID
-  cannot be determined at install time, the config is left unset and the integration stays inert until it is
-  configured manually.
-- **Requires a keyring backend.** The daemon depends on D-Bus together with a
-  Secret Service provider (GNOME Keyring or KWallet). On hosts where these are
-  missing — typically headless or server installs — the daemon currently crashes
-  instead of degrading gracefully. We are working on a fix; in the meantime, the
-  workaround is to install and set up D-Bus and either GNOME Keyring or KWallet.
+- **No multi-user support.** One Docker Engine serves every user on the host,
+  but Secrets Engine runs as a per-user daemon. With several users on the same
+  engine in parallel, it cannot reliably route a resolution request to the
+  right user's daemon. The engine therefore targets one fixed user's daemon,
+  chosen at install time: the package's post-install script records the
+  installing user's UID (from `$SUDO_UID`, the user who ran `sudo apt install`
+  / `sudo dnf install`) in `/etc/docker/nri/conf.d/10-secrets-engine.conf`. If
+  the UID cannot be determined at install time, the config stays unset and the
+  integration stays inert until configured manually.
+- **Requires a keyring backend.** The daemon needs D-Bus and a Secret Service
+  provider (GNOME Keyring or KWallet). On hosts that lack them — typically
+  headless or server installs — the daemon crashes instead of degrading
+  gracefully. Until we ship a fix, install and set up D-Bus and either GNOME
+  Keyring or KWallet.
 
 ## Legal
 
