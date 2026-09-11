@@ -95,17 +95,10 @@ type Pattern interface {
 	// ID in common, i.e., matches(p) ∩ matches(other) ≠ ∅.
 	//
 	// Examples:
-	//   - docker/*/mcp/* and docker/proj1/** overlap: both match
-	//     docker/proj1/mcp/x. Yet neither contains the other: only the
-	//     first matches docker/proj2/mcp/x, and only the second matches
-	//     docker/proj1/y.
-	//   - bar/** and foo/** do not overlap: an ID cannot begin with both
-	//     bar and foo.
+	//   - docker/*/mcp/* and docker/proj1/** overlap: both match e.g. docker/proj1/mcp/x.
+	//   - bar/** and foo/** do not overlap: an ID cannot begin with both bar and foo.
 	//
 	// Complexity: O(n*m)
-	//
-	// See also [Filter], which picks the narrower of two patterns when one
-	// contains the other.
 	Overlaps(other Pattern) bool
 	// String returns the pattern text.
 	String() string
@@ -197,9 +190,6 @@ func canonicalize(s string) []token {
 // or '**' in q.
 func covers(p, q []token) bool {
 	np, nq := len(p), len(q)
-	// Dynamic programming over suffixes: cur[j] holds whether p[i:]
-	// matches every component sequence q[j:] matches; prev holds the
-	// answers for i+1, the only row the recurrence needs.
 	prev := make([]bool, nq+1)
 	cur := make([]bool, nq+1)
 	prev[nq] = true
@@ -222,11 +212,12 @@ func covers(p, q []token) bool {
 	return prev[0]
 }
 
+// compatible reports whether p and q match at least one ID in common, for
+// canonical tokens. A common ID aligns both token lists over its
+// components: wildcards accept anything, so only differing literals or
+// mismatched lengths (* vs */foo) rule one out.
 func compatible(p, q []token) bool {
 	np, nq := len(p), len(q)
-	// Dynamic programming over suffixes: cur[j] holds whether some
-	// component sequence is matched by both p[i:] and q[j:]; prev holds
-	// the answers for i+1, the only row the recurrence needs.
 	prev := make([]bool, nq+1)
 	cur := make([]bool, nq+1)
 	prev[nq] = true
@@ -238,9 +229,6 @@ func compatible(p, q []token) bool {
 		for j := nq - 1; j >= 0; j-- {
 			switch {
 			case p[i].kind == tokenGap || q[j].kind == tokenGap:
-				// One side is '**', which matches any components, so a
-				// common match exists if one exists after skipping the
-				// token on either side.
 				cur[j] = prev[j] || cur[j+1]
 			case p[i].kind == tokenLit && q[j].kind == tokenLit && p[i].lit != q[j].lit:
 				cur[j] = false
@@ -289,23 +277,6 @@ func (p pattern) ExpandPattern(other Pattern) (Pattern, error) {
 		return nil, err
 	}
 	return pattern(val), err
-}
-
-// Filter returns the narrower of two patterns: the one the other contains.
-// It returns false when neither contains the other, even if they overlap.
-// Examples:
-// - Filter("bar/**", "**")     => "bar/**"
-// - Filter("**", "**")         => "**"
-// - Filter("bar/**", "bar")    => "bar"
-// - Filter("bar/**", "foo/**") => false
-func Filter(filter, other Pattern) (Pattern, bool) {
-	if filter.Contains(other) {
-		return other, true
-	}
-	if other.Contains(filter) {
-		return filter, true
-	}
-	return nil, false
 }
 
 func replace1(original, other string) (string, error) {
