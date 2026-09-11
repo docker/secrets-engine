@@ -154,7 +154,11 @@ func (m maliciousPattern) Match(secrets.ID) bool {
 	return false
 }
 
-func (m maliciousPattern) Includes(secrets.Pattern) bool {
+func (m maliciousPattern) Contains(secrets.Pattern) bool {
+	return false
+}
+
+func (m maliciousPattern) Overlaps(secrets.Pattern) bool {
 	return false
 }
 

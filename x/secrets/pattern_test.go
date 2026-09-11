@@ -65,11 +65,11 @@ func TestPatternComparable(t *testing.T) {
 	assert.Equal(t, bar, myMap[b])
 }
 
-func TestPatternIncludes(t *testing.T) {
+func TestPatternContains(t *testing.T) {
 	tests := []struct {
-		pattern         string
-		other           string
-		otherIsIncluded bool
+		pattern   string
+		other     string
+		contained bool
 	}{
 		{"**", "**", true},
 		{"**/*", "*/**", true},
@@ -90,9 +90,18 @@ func TestPatternIncludes(t *testing.T) {
 		{"*/foo", "*", false},
 		{"*", "*/foo", false},
 		{"docker/*/mcp/*", "docker/proj1/**", false},
-		{"docker/proj1/**", "docker/*/mcp/*", true},
+		// docker/x/mcp/y matches the other pattern but not this one.
+		{"docker/proj1/**", "docker/*/mcp/*", false},
 		{"docker/proj1/**", "docker/**/mcp/**", false},
 		{"docker/**", "docker/**/mcp/**", true},
+		// a/a/** and a/a/**/** match the same IDs, so each contains the
+		// other.
+		{"a/a/**", "a/a/**/**", true},
+		{"a/a/**/**", "a/a/**", true},
+		{"a/a/*", "a/a/**", false},
+		{"a/a/*", "a/a/**/**", false},
+		{"a/a/**", "a/a/*", true},
+		{"a/a/**/**", "a/a/*", true},
 	}
 	for idx, tc := range tests {
 		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
@@ -100,58 +109,42 @@ func TestPatternIncludes(t *testing.T) {
 			require.NoError(t, err)
 			other, err := ParsePattern(tc.other)
 			require.NoError(t, err)
-			assert.Equal(t, tc.otherIsIncluded, p.Includes(other))
+			assert.Equal(t, tc.contained, p.Contains(other))
 		})
 	}
 }
 
-func Test_Filter(t *testing.T) {
+func TestPatternOverlaps(t *testing.T) {
 	tests := []struct {
-		filter string
-		other  string
-		result string
+		pattern  string
+		other    string
+		overlaps bool
 	}{
-		{
-			filter: "docker/mcp/auth/**",
-			other:  "**",
-			result: "docker/mcp/auth/**",
-		},
-		{
-			filter: "**",
-			other:  "**",
-			result: "**",
-		},
-		{
-			filter: "docker/mcp/auth/**",
-			other:  "docker/mcp/auth/foo/bar/*",
-			result: "docker/mcp/auth/foo/bar/*",
-		},
-		{
-			filter: "**/mcp/auth/**",
-			other:  "docker/*/auth/foo/bar/*",
-			result: "docker/*/auth/foo/bar/*",
-		},
-		{
-			filter: "**/mcp/auth/**",
-			other:  "*/*/auth/foo/bar/*",
-			result: "*/*/auth/foo/bar/*",
-		},
-		{
-			filter: "docker/mcp/auth/**",
-			other:  "foo/bar",
-		},
+		{"**", "**", true},
+		{"*", "*/foo", false},
+		{"*/foo", "*", false},
+		{"foo/bar", "foo/baz", false},
+		{"foo/*", "foo/bar", true},
+		{"foo/**", "**/foo", true},  // both match "foo"
+		{"bar/**", "foo/**", false}, // first components conflict
+		{"foo/*/baz", "foo/bar/**", true},
+		// Overlap without containment in either direction.
+		{"docker/*/mcp/*", "docker/proj1/**", true},
+		{"foo/foo/foo/**", "foo/foo/**/foo", true},
+		{"*/foo/**", "**/bar/*", true},
+		{"docker/mcp/auth/**", "foo/bar", false},
+		{"a/a/**", "a/a/**/**", true},
+		{"a/a/*", "a/a/**", true},
+		{"a/a/*", "a/a/**/**", true},
 	}
-	for _, tc := range tests {
-		t.Run(fmt.Sprintf("f: %s in: %s", tc.filter, tc.other), func(t *testing.T) {
-			filter := MustParsePattern(tc.filter)
-			other := MustParsePattern(tc.other)
-			result, ok := Filter(filter, other)
-			if tc.result == "" {
-				assert.False(t, ok)
-				return
-			}
-			require.True(t, ok)
-			assert.Equal(t, tc.result, result.String())
+	for idx, tc := range tests {
+		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
+			p, err := ParsePattern(tc.pattern)
+			require.NoError(t, err)
+			other, err := ParsePattern(tc.other)
+			require.NoError(t, err)
+			assert.Equal(t, tc.overlaps, p.Overlaps(other))
+			assert.Equal(t, tc.overlaps, other.Overlaps(p), "Overlaps must be symmetric")
 		})
 	}
 }
