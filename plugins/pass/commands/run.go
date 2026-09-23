@@ -102,6 +102,11 @@ func RunCommand(options ...RunOption) *cobra.Command {
 				return err
 			}
 
+			vars, err := parseEnv(merged)
+			if err != nil {
+				return err
+			}
+
 			c, err := newRunClient(opts)
 			if err != nil {
 				return err
@@ -113,7 +118,11 @@ func RunCommand(options ...RunOption) *cobra.Command {
 				}
 			}
 
-			env, err := resolveEnv(cmd.Context(), c, merged)
+			if err := authorizeEnv(cmd.Context(), c, vars); err != nil {
+				return err
+			}
+
+			env, err := resolveEnv(cmd.Context(), c, vars)
 			if err != nil {
 				return err
 			}
@@ -218,42 +227,79 @@ func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) 
 	return nil
 }
 
-func resolveEnv(ctx context.Context, r secrets.Resolver, env []string) ([]string, error) {
-	out := make([]string, 0, len(env))
+type envVar struct {
+	key     string
+	value   string
+	pattern secrets.Pattern
+}
+
+func parseEnv(env []string) ([]envVar, error) {
+	vars := make([]envVar, 0, len(env))
 	for _, kv := range env {
 		key, value, _ := strings.Cut(kv, "=")
-		if !strings.HasPrefix(value, sePrefix) {
-			out = append(out, kv)
+		v := envVar{key: key, value: value}
+		if rawSeRef, ok := strings.CutPrefix(value, sePrefix); ok {
+			// ParseID rejects wildcards before ParsePattern broadens the lookup.
+			if _, err := secrets.ParseID(rawSeRef); err != nil {
+				return nil, fmt.Errorf("resolving %s: %w", key, err)
+			}
+			pattern, err := secrets.ParsePattern(rawSeRef)
+			if err != nil {
+				return nil, fmt.Errorf("resolving %s: %w", key, err)
+			}
+			v.pattern = pattern
+		}
+		vars = append(vars, v)
+	}
+	return vars, nil
+}
+
+func authorizeEnv(ctx context.Context, a secrets.Authorizer, vars []envVar) error {
+	var patterns []secrets.Pattern
+	for _, v := range vars {
+		if v.pattern == nil {
 			continue
 		}
-		resolved, err := resolveRef(ctx, r, key, value)
+		patterns = append(patterns, v.pattern)
+	}
+	if len(patterns) == 0 {
+		return nil
+	}
+	resp, err := a.Authorize(ctx, patterns...)
+	if err != nil {
+		return fmt.Errorf("authorizing: %w", err)
+	}
+	if !resp.Allow {
+		return fmt.Errorf("authorizing: %w", secrets.ErrAccessDenied)
+	}
+	return nil
+}
+
+func resolveEnv(ctx context.Context, r secrets.Resolver, vars []envVar) ([]string, error) {
+	var out []string
+	for _, v := range vars {
+		value, err := resolveVar(ctx, r, v)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, key+"="+resolved)
+		out = append(out, v.key+"="+value)
 	}
 	return out, nil
 }
 
-func resolveRef(ctx context.Context, r secrets.Resolver, key, value string) (string, error) {
-	name := strings.TrimPrefix(value, sePrefix)
-	// ParseID rejects wildcards before ParsePattern broadens the lookup.
-	if _, err := secrets.ParseID(name); err != nil {
-		return "", fmt.Errorf("resolving %s: %w", key, err)
+func resolveVar(ctx context.Context, r secrets.Resolver, v envVar) (string, error) {
+	if v.pattern == nil {
+		return v.value, nil
 	}
-	pattern, err := secrets.ParsePattern(name)
+	envs, err := r.GetSecrets(ctx, v.pattern)
 	if err != nil {
-		return "", fmt.Errorf("resolving %s: %w", key, err)
-	}
-	envs, err := r.GetSecrets(ctx, pattern)
-	if err != nil {
-		return "", fmt.Errorf("resolving %s: %w", key, err)
+		return "", fmt.Errorf("resolving %s: %w", v.key, err)
 	}
 	if len(envs) == 0 {
-		return "", fmt.Errorf("resolving %s: %w", key, secrets.ErrNotFound)
+		return "", fmt.Errorf("resolving %s: %w", v.key, secrets.ErrNotFound)
 	}
 	if len(envs) > 1 {
-		return "", fmt.Errorf("resolving %s: %d secrets matched %s", key, len(envs), name)
+		return "", fmt.Errorf("resolving %s: %d secrets matched %s", v.key, len(envs), v.pattern)
 	}
 	return string(envs[0].Value), nil
 }
