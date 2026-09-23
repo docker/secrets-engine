@@ -263,15 +263,6 @@ func TestRunCommand(t *testing.T) {
 		assert.Contains(t, err.Error(), "requires at least 1 arg")
 	})
 
-	t.Run("empty socket path returns an error", func(t *testing.T) {
-		cmd := RunCommand(WithSocketPath(""), WithTimeout(time.Second))
-		cmd.SetArgs([]string{filepath.Join(t.TempDir(), "must-not-start")})
-		cmd.SetContext(t.Context())
-		cmd.SetOut(testWriter{t})
-		cmd.SetErr(testWriter{t})
-		require.EqualError(t, cmd.Execute(), "no path provided")
-	})
-
 	t.Run("forwards child exit code", func(t *testing.T) {
 		// Spawn a wrapper subprocess that runs RunCommand internally. The
 		// wrapper execs a grandchild (this test binary in helper mode) that

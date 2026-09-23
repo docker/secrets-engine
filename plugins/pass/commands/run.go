@@ -78,8 +78,7 @@ func WithResponseTimeout(responseTimeout time.Duration) RunOption {
 	}
 }
 
-// WithSocketPath overrides the engine socket path.
-// An empty path causes command execution to return an error.
+// WithSocketPath overrides the engine socket path; empty uses [api.DesktopSocketPath].
 func WithSocketPath(socketPath string) RunOption {
 	return func(o *runOpts) {
 		o.socketPath = socketPath
@@ -87,7 +86,7 @@ func WithSocketPath(socketPath string) RunOption {
 }
 
 func RunCommand(options ...RunOption) *cobra.Command {
-	opts := runOpts{socketPath: api.DesktopSocketPath()}
+	opts := runOpts{}
 	for _, o := range options {
 		o(&opts)
 	}
@@ -191,7 +190,11 @@ func mergeEnv(processEnv, files []string) ([]string, error) {
 }
 
 func newRunClient(opts runOpts) (client.Client, error) {
-	copts := []client.Option{client.WithSocketPath(opts.socketPath)}
+	socketPath := opts.socketPath
+	if socketPath == "" {
+		socketPath = api.DesktopSocketPath()
+	}
+	copts := []client.Option{client.WithSocketPath(socketPath)}
 	if opts.timeout != nil {
 		copts = append(copts, client.WithTimeout(*opts.timeout))
 	}
