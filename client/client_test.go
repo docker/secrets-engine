@@ -245,8 +245,12 @@ func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Reques
 	if m.err != nil {
 		return nil, m.err
 	}
+	var expiresAt *timestamppb.Timestamp // nil leaves the expiry absent
+	if !m.expiry.IsZero() {
+		expiresAt = timestamppb.New(m.expiry)
+	}
 	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
-		ExpiresAt: timestamppb.New(m.expiry),
+		ExpiresAt: expiresAt,
 		Decision:  m.decision,
 	}.Build()), nil
 }
@@ -272,6 +276,17 @@ func Test_Authorize(t *testing.T) {
 		assert.True(t, got.Expiry.Equal(expiry), "expiry must round-trip")
 		assert.True(t, got.Allow)
 		assert.Equal(t, []string{"docker/auth/hub/joe", "acme/api-token"}, m.patterns)
+	})
+	t.Run("decodes an absent expiry as the zero time", func(t *testing.T) {
+		m := &mockAuthorizerService{decision: resolverv1.Decision_DECISION_ALLOW.Enum()}
+		socket := mockAuthorizeEngine(t, m)
+		c, err := New(WithSocketPath(socket))
+		require.NoError(t, err)
+
+		got, err := c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
+		require.NoError(t, err)
+		assert.True(t, got.Allow)
+		assert.True(t, got.Expiry.IsZero(), "an absent expiry means the decision never expires")
 	})
 	t.Run("returns a deny decision without an error", func(t *testing.T) {
 		m := &mockAuthorizerService{decision: resolverv1.Decision_DECISION_DENY.Enum()}

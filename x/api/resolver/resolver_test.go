@@ -197,6 +197,16 @@ func TestAuthorizerService_Authorize(t *testing.T) {
 		assert.Equal(t, resolverv1.Decision_DECISION_ALLOW, resp.Msg.GetDecision())
 	})
 
+	t.Run("omits the expiry when the decision never expires", func(t *testing.T) {
+		s := NewAuthorizerHandler(&mockAuthorizer{resp: secrets.AuthorizeResponse{Allow: true}})
+		resp, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
+			Patterns: []string{"docker/auth/hub/joe"},
+		}.Build()))
+		require.NoError(t, err)
+		assert.False(t, resp.Msg.HasExpiresAt(), "a zero expiry must leave the timestamp absent")
+		assert.Equal(t, resolverv1.Decision_DECISION_ALLOW, resp.Msg.GetDecision())
+	})
+
 	t.Run("returns a deny decision without an error", func(t *testing.T) {
 		s := NewAuthorizerHandler(&mockAuthorizer{})
 		resp, err := s.Authorize(t.Context(), connect.NewRequest(resolverv1.AuthorizeRequest_builder{
