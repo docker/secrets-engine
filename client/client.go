@@ -211,6 +211,8 @@ func isDialError(err error) bool {
 	return false
 }
 
+// New creates a client that connects to [api.StandaloneSocketPath] by default.
+// To connect to Docker Desktop, use WithSocketPath(api.DesktopSocketPath()).
 func New(options ...Option) (Client, error) {
 	cfg := &config{
 		requestTimeout:  api.DefaultClientRequestTimeout,
@@ -222,7 +224,7 @@ func New(options ...Option) (Client, error) {
 		}
 	}
 	if cfg.dialContext == nil {
-		cfg.dialContext = dialFromPath(api.DaemonSocketPath())
+		cfg.dialContext = dialFromPath(api.StandaloneSocketPath())
 	}
 	c := &http.Client{
 		Transport: &http.Transport{

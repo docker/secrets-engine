@@ -78,7 +78,7 @@ func WithResponseTimeout(responseTimeout time.Duration) RunOption {
 	}
 }
 
-// WithSocketPath overrides the engine socket path; empty means the default.
+// WithSocketPath overrides the engine socket path; empty uses [api.DesktopSocketPath].
 func WithSocketPath(socketPath string) RunOption {
 	return func(o *runOpts) {
 		o.socketPath = socketPath
@@ -192,7 +192,7 @@ func mergeEnv(processEnv, files []string) ([]string, error) {
 func newRunClient(opts runOpts) (client.Client, error) {
 	socketPath := opts.socketPath
 	if socketPath == "" {
-		socketPath = api.DefaultSocketPath()
+		socketPath = api.DesktopSocketPath()
 	}
 	copts := []client.Option{client.WithSocketPath(socketPath)}
 	if opts.timeout != nil {

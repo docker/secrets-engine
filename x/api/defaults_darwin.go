@@ -21,9 +21,20 @@ import (
 	"path/filepath"
 )
 
-func DaemonSocketPath() string {
+// StandaloneSocketPath returns the standalone Secrets Engine's listening socket
+// path, $HOME/Library/Caches/docker-secrets-engine/daemon.sock.
+// If HOME is unset, it uses $TMPDIR/docker-secrets-engine/daemon.sock, or
+// /tmp/docker-secrets-engine/daemon.sock when TMPDIR is also unset.
+func StandaloneSocketPath() string {
 	if dir, err := os.UserCacheDir(); err == nil {
 		return filepath.Join(dir, "docker-secrets-engine", "daemon.sock")
 	}
 	return filepath.Join(os.TempDir(), "docker-secrets-engine", "daemon.sock")
+}
+
+// DaemonSocketPath returns the standalone Secrets Engine's listening socket path.
+//
+// Deprecated: Use [StandaloneSocketPath] instead.
+func DaemonSocketPath() string {
+	return StandaloneSocketPath()
 }

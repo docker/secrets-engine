@@ -95,7 +95,7 @@ func newCfgForManualLaunch(opts ...ManualLaunchOption) (*cfg, error) {
 		}
 	}
 	if cfg.conn == nil {
-		socketPath := api.DaemonSocketPath()
+		socketPath := api.StandaloneSocketPath()
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to default socket %q: %w", socketPath, err)
