@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -154,8 +155,13 @@ func (s authorizerService) Authorize(ctx context.Context, c *connect.Request[res
 	if resp.Allow {
 		decision = resolverv1.Decision_DECISION_ALLOW
 	}
+	// A zero Expiry means the decision never expires: leave the timestamp absent.
+	var expiresAt *timestamppb.Timestamp
+	if !resp.Expiry.IsZero() {
+		expiresAt = timestamppb.New(resp.Expiry)
+	}
 	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
-		ExpiresAt: timestamppb.New(resp.Expiry),
+		ExpiresAt: expiresAt,
 		Decision:  &decision,
 	}.Build()), nil
 }
@@ -185,8 +191,13 @@ func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pat
 		return secrets.AuthorizeResponse{}, err
 	}
 
+	// An absent timestamp means the decision never expires: keep the zero time.
+	var expiry time.Time
+	if resp.Msg.HasExpiresAt() {
+		expiry = resp.Msg.GetExpiresAt().AsTime()
+	}
 	return secrets.AuthorizeResponse{
-		Expiry: resp.Msg.GetExpiresAt().AsTime(),
+		Expiry: expiry,
 		Allow:  resp.Msg.GetDecision() == resolverv1.Decision_DECISION_ALLOW,
 	}, nil
 }

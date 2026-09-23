@@ -48,6 +48,8 @@ type Resolver interface {
 }
 
 type AuthorizeResponse struct {
+	// Expiry is when the decision stops holding. A zero Expiry means the
+	// decision never expires, and the wire message then carries no timestamp.
 	Expiry time.Time
 	Allow  bool
 }

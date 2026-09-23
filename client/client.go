@@ -131,7 +131,8 @@ type client struct {
 	authorizerClient secrets.Authorizer
 }
 
-// Authorize decides access to the patterns; the decision is valid until the response expiry.
+// Authorize decides access to the patterns. The decision holds until the
+// response expiry. A zero expiry means the decision never expires.
 func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	resp, err := c.authorizerClient.Authorize(ctx, patterns...)
 	if isDialError(err) {
