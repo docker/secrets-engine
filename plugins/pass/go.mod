@@ -9,7 +9,7 @@ replace github.com/docker/secrets-engine/store => ./../../store
 replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
-	github.com/docker/secrets-engine/client v0.1.0
+	github.com/docker/secrets-engine/client v0.1.1
 	github.com/docker/secrets-engine/plugin v0.3.2
 	github.com/docker/secrets-engine/store v0.4.1
 	github.com/docker/secrets-engine/x v0.8.1
