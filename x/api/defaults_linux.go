@@ -21,7 +21,8 @@ import (
 	"os"
 )
 
-// DaemonSocketPath returns the address of the daemon's listening socket.
+// StandaloneSocketPath returns the address of the standalone Secrets Engine's
+// listening socket.
 //
 // On Linux it is an abstract Unix domain socket: the address has a leading
 // "@", which Go's net package maps to a NUL byte, placing the socket in the
@@ -30,6 +31,14 @@ import (
 // The address is namespaced by the user's UID so daemons run by different
 // users on the same host do not collide (the abstract namespace is shared per
 // network namespace, not per user as a filesystem path would be).
-func DaemonSocketPath() string {
+func StandaloneSocketPath() string {
 	return fmt.Sprintf("@docker-secrets-engine/%d/daemon.sock", os.Getuid())
+}
+
+// DaemonSocketPath returns the address of the standalone Secrets Engine's
+// listening socket.
+//
+// Deprecated: Use [StandaloneSocketPath] instead.
+func DaemonSocketPath() string {
+	return StandaloneSocketPath()
 }

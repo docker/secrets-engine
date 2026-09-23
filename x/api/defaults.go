@@ -48,11 +48,21 @@ const (
 	DefaultClientMaxIdleConnsPerHost = 10
 )
 
-func DefaultSocketPath() string {
+// DesktopSocketPath returns the Secrets Engine socket path used by Docker Desktop.
+// It uses the user's cache directory, falling back to the temporary directory
+// when the cache directory cannot be determined.
+func DesktopSocketPath() string {
 	if dir, err := os.UserCacheDir(); err == nil {
 		return filepath.Join(dir, "docker-secrets-engine", "engine.sock")
 	}
 	return filepath.Join(os.TempDir(), "docker-secrets-engine", "engine.sock")
+}
+
+// DefaultSocketPath returns the Secrets Engine socket path used by Docker Desktop.
+//
+// Deprecated: Use [DesktopSocketPath] instead.
+func DefaultSocketPath() string {
+	return DesktopSocketPath()
 }
 
 func DefaultSecretsEngineDirectory() (string, error) {

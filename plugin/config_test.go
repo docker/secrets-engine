@@ -123,7 +123,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				})
 				os.Args = []string{"test-plugin"}
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-				socketPath := api.DaemonSocketPath()
+				socketPath := api.StandaloneSocketPath()
 				// Abstract sockets (leading "@", Linux) live in the abstract
 				// namespace, not on the filesystem, so they need no directory
 				// and leave nothing to clean up.

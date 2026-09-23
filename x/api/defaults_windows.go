@@ -21,10 +21,20 @@ import (
 	"path/filepath"
 )
 
-func DaemonSocketPath() string {
+// StandaloneSocketPath returns the standalone Secrets Engine's listening socket
+// path under LOCALAPPDATA, falling back to USERPROFILE/AppData/Local when
+// LOCALAPPDATA is unset.
+func StandaloneSocketPath() string {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
 	}
 	return filepath.Join(base, "DockerSecretsEngine", "service", "daemon.sock")
+}
+
+// DaemonSocketPath returns the standalone Secrets Engine's listening socket path.
+//
+// Deprecated: Use [StandaloneSocketPath] instead.
+func DaemonSocketPath() string {
+	return StandaloneSocketPath()
 }
