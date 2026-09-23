@@ -163,45 +163,6 @@ docker/
 
 # Developer Guides
 
-## Engine socket paths
-
-`client.New()` uses `api.StandaloneSocketPath()` by default. To connect to the
-engine in Docker Desktop, select `api.DesktopSocketPath()` explicitly:
-
-```go
-import (
-    "log"
-
-    "github.com/docker/secrets-engine/client"
-    "github.com/docker/secrets-engine/x/api"
-)
-
-c, err := client.New(client.WithSocketPath(api.DesktopSocketPath()))
-if err != nil {
-    log.Fatalf("failed to create secrets engine client: %v", err)
-}
-```
-
-| Platform | `api.DesktopSocketPath()` | `api.StandaloneSocketPath()` |
-| --- | --- | --- |
-| Linux | `~/.cache/docker-secrets-engine/engine.sock` | `@docker-secrets-engine/<UID>/daemon.sock` |
-| macOS | `~/Library/Caches/docker-secrets-engine/engine.sock` | `~/Library/Caches/docker-secrets-engine/daemon.sock` |
-| Windows | `%LOCALAPPDATA%\docker-secrets-engine\engine.sock` | `%LOCALAPPDATA%\DockerSecretsEngine\service\daemon.sock` |
-
-On Linux, the Desktop path uses `$XDG_CACHE_HOME` when set; the standalone address
-is an abstract Unix socket and has no filesystem entry. Desktop paths and the
-macOS standalone path use the temporary directory if the user cache directory
-cannot be determined. On Windows, the standalone path uses
-`%USERPROFILE%\AppData\Local` if `%LOCALAPPDATA%` is unset.
-
-There is no automatic discovery or fallback between Desktop and standalone.
-The shared `commands.RunCommand` used by `docker pass run` defaults to the
-Desktop socket unless its caller supplies `commands.WithSocketPath(...)`.
-
-`api.DefaultSocketPath()` and `api.DaemonSocketPath()` are deprecated aliases for
-`api.DesktopSocketPath()` and `api.StandaloneSocketPath()`, respectively. The
-renaming preserves the existing addresses and default selection behavior.
-
 ## How to query secrets
 
 Add the `client` module to your project:
@@ -213,6 +174,8 @@ go get github.com/docker/secrets-engine/client
 Fetch a secret:
 
 ```go
+// Uses api.StandaloneSocketPath() by default.
+// Use api.DesktopSocketPath() to connect to Docker Desktop's Secrets Engine.
 c, err := client.New()
 if err != nil {
     log.Fatalf("failed to create secrets engine client: %v", err)
