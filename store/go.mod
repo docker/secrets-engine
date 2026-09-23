@@ -11,7 +11,7 @@ require (
 	filippo.io/age v1.3.1
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/danieljoos/wincred v1.2.3
-	github.com/docker/secrets-engine/x v0.8.1
+	github.com/docker/secrets-engine/x v0.8.2
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.1
