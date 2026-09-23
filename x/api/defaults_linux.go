@@ -22,7 +22,8 @@ import (
 )
 
 // StandaloneSocketPath returns the address of the standalone Secrets Engine's
-// listening socket.
+// listening socket, @docker-secrets-engine/<UID>/daemon.sock.
+// For example, UID 1000 uses @docker-secrets-engine/1000/daemon.sock.
 //
 // On Linux it is an abstract Unix domain socket: the address has a leading
 // "@", which Go's net package maps to a NUL byte, placing the socket in the

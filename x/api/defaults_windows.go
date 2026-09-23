@@ -22,8 +22,9 @@ import (
 )
 
 // StandaloneSocketPath returns the standalone Secrets Engine's listening socket
-// path under LOCALAPPDATA, falling back to USERPROFILE/AppData/Local when
-// LOCALAPPDATA is unset.
+// path, %LOCALAPPDATA%\DockerSecretsEngine\service\daemon.sock.
+// If LOCALAPPDATA is unset, it uses
+// %USERPROFILE%\AppData\Local\DockerSecretsEngine\service\daemon.sock.
 func StandaloneSocketPath() string {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {

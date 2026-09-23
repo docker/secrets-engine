@@ -22,8 +22,9 @@ import (
 )
 
 // StandaloneSocketPath returns the standalone Secrets Engine's listening socket
-// path. It uses the user's cache directory, falling back to the temporary
-// directory when the cache directory cannot be determined.
+// path, $HOME/Library/Caches/docker-secrets-engine/daemon.sock.
+// If HOME is unset, it uses $TMPDIR/docker-secrets-engine/daemon.sock, or
+// /tmp/docker-secrets-engine/daemon.sock when TMPDIR is also unset.
 func StandaloneSocketPath() string {
 	if dir, err := os.UserCacheDir(); err == nil {
 		return filepath.Join(dir, "docker-secrets-engine", "daemon.sock")
