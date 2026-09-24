@@ -109,6 +109,10 @@ func RunCommand(options ...RunOption) (*cobra.Command, error) {
 			return nil, err
 		}
 	}
+	return newRunCommand(opts), nil
+}
+
+func newRunCommand(opts runOpts) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run -- CMD [ARGS...]",
 		Short:   "Run a command with `se://` environment references resolved.",
@@ -192,7 +196,7 @@ func RunCommand(options ...RunOption) (*cobra.Command, error) {
 	}
 	cmd.Flags().StringArrayVar(&opts.envFiles, "env-file", nil,
 		"Read environment variables from a dotenv-formatted file. Repeatable; later files override earlier files and the process environment.")
-	return cmd, nil
+	return cmd
 }
 
 func mergeEnv(processEnv, files []string) ([]string, error) {
