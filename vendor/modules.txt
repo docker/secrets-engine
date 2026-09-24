@@ -36,7 +36,7 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.21
 github.com/docker/docker-credential-helpers/client
 github.com/docker/docker-credential-helpers/credentials
-# github.com/docker/secrets-engine/client v0.1.1 => ./client
+# github.com/docker/secrets-engine/client v0.1.2 => ./client
 ## explicit; go 1.25.13
 # github.com/docker/secrets-engine/plugin v0.3.2 => ./plugin
 ## explicit; go 1.25.13
