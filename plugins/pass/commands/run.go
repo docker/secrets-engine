@@ -62,7 +62,6 @@ type runOpts struct {
 	socketPath      string
 }
 
-// RunOption configures a run command and reports invalid option values.
 type RunOption func(*runOpts) error
 
 // WithTimeout sets the client request timeout; 0 disables it.
