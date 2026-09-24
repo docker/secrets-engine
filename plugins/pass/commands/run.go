@@ -62,34 +62,53 @@ type runOpts struct {
 	socketPath      string
 }
 
-type RunOption func(*runOpts)
+type RunOption func(*runOpts) error
 
 // WithTimeout sets the client request timeout; 0 disables it.
 func WithTimeout(timeout time.Duration) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if timeout < 0 {
+			return errors.New("request timeout duration cannot be negative")
+		}
 		o.timeout = &timeout
+		return nil
 	}
 }
 
 // WithResponseTimeout sets the client response header timeout; 0 disables it.
 func WithResponseTimeout(responseTimeout time.Duration) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if responseTimeout < 0 {
+			return errors.New("response timeout duration cannot be negative")
+		}
 		o.responseTimeout = &responseTimeout
+		return nil
 	}
 }
 
-// WithSocketPath overrides the engine socket path; empty uses [api.DesktopSocketPath].
+// WithSocketPath overrides the default [api.DesktopSocketPath].
 func WithSocketPath(socketPath string) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if socketPath == "" {
+			return errors.New("no path provided")
+		}
 		o.socketPath = socketPath
+		return nil
 	}
 }
 
-func RunCommand(options ...RunOption) *cobra.Command {
+// RunCommand uses [api.DesktopSocketPath] by default.
+func RunCommand(options ...RunOption) (*cobra.Command, error) {
 	opts := runOpts{}
 	for _, o := range options {
-		o(&opts)
+		if err := o(&opts); err != nil {
+			return nil, err
+		}
 	}
+	return newRunCommand(opts), nil
+}
+
+func newRunCommand(opts runOpts) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run -- CMD [ARGS...]",
 		Short:   "Run a command with `se://` environment references resolved.",
