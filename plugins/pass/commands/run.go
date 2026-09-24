@@ -100,8 +100,7 @@ func WithSocketPath(socketPath string) RunOption {
 	}
 }
 
-// RunCommand creates a command with the supplied options, returning an error if
-// an option is invalid. The default socket path is [api.DesktopSocketPath].
+// RunCommand uses [api.DesktopSocketPath] by default.
 func RunCommand(options ...RunOption) (*cobra.Command, error) {
 	opts := runOpts{}
 	for _, o := range options {
