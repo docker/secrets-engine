@@ -21,11 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -35,6 +40,8 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/x/api/resolver"
+	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -49,6 +56,9 @@ const (
 	helperActiveEnv  = "GO_PASS_RUN_HELPER_ACTIVE"
 	helperExitEnv    = "GO_PASS_RUN_HELPER_EXIT"
 	helperSleepEnv   = "GO_PASS_RUN_HELPER_SLEEP"
+	// helperCheckEnv holds KEY=WANT: the leaf child exits 3 unless its KEY
+	// equals WANT, which proves a reference was resolved before exec.
+	helperCheckEnv = "GO_PASS_RUN_HELPER_CHECK"
 	// helperSocketEnv makes the wrapper target this socket with no request
 	// timeout, forcing the preflight ping to run.
 	helperSocketEnv = "GO_PASS_RUN_HELPER_SOCKET"
@@ -68,6 +78,12 @@ func TestMain(m *testing.M) {
 			// observes a signaled exit, not a normal one).
 			_, _ = fmt.Fprintln(os.Stderr, "READY")
 			select {}
+		}
+		if v := os.Getenv(helperCheckEnv); v != "" {
+			key, want, _ := strings.Cut(v, "=")
+			if os.Getenv(key) != want {
+				os.Exit(3)
+			}
 		}
 		code := 0
 		if v := os.Getenv(helperExitEnv); v != "" {
@@ -111,10 +127,62 @@ func runAsWrapper() {
 	os.Exit(0)
 }
 
+func TestParseEnv(t *testing.T) {
+	t.Parallel()
+
+	t.Run("plain values carry no pattern", func(t *testing.T) {
+		vars, err := parseEnv([]string{"PATH=/usr/bin", "HOME=/home/x", "EMPTY="})
+		require.NoError(t, err)
+		assert.Equal(t, []envVar{
+			{key: "PATH", value: "/usr/bin"},
+			{key: "HOME", value: "/home/x"},
+			{key: "EMPTY"},
+		}, vars)
+	})
+
+	t.Run("se:// values carry their pattern and keep the original value", func(t *testing.T) {
+		vars, err := parseEnv([]string{"SE_TOKEN=se://gh-token", "B=plain", "PG_PWD=se://myapp/postgres/password"})
+		require.NoError(t, err)
+		assert.Equal(t, []envVar{
+			{key: "SE_TOKEN", value: "se://gh-token", pattern: secrets.MustParsePattern("gh-token")},
+			{key: "B", value: "plain"},
+			{key: "PG_PWD", value: "se://myapp/postgres/password", pattern: secrets.MustParsePattern("myapp/postgres/password")},
+		}, vars)
+	})
+
+	t.Run("embedded se:// is left untouched", func(t *testing.T) {
+		vars, err := parseEnv([]string{"DSN=postgres://user:se://gh-token@host/db"})
+		require.NoError(t, err)
+		assert.Equal(t, []envVar{{key: "DSN", value: "postgres://user:se://gh-token@host/db"}}, vars)
+	})
+
+	t.Run("invalid ID hard-fails", func(t *testing.T) {
+		vars, err := parseEnv([]string{"X=se://"})
+		require.Error(t, err)
+		assert.Nil(t, vars)
+		assert.ErrorContains(t, err, "resolving X")
+	})
+
+	t.Run("wildcard in reference is rejected", func(t *testing.T) {
+		vars, err := parseEnv([]string{"X=se://foo/*"})
+		require.Error(t, err)
+		assert.Nil(t, vars)
+		assert.ErrorContains(t, err, "resolving X")
+	})
+}
+
+// mustParseEnv parses env, failing the test on an invalid reference.
+func mustParseEnv(t *testing.T, env []string) []envVar {
+	t.Helper()
+	vars, err := parseEnv(env)
+	require.NoError(t, err)
+	return vars
+}
+
 func TestResolveEnv(t *testing.T) {
 	t.Parallel()
 
-	resolver := testhelper.MockResolver{
+	mock := testhelper.MockResolver{
 		Store: map[secrets.ID]string{
 			secrets.MustParseID("gh-token"):                "ghp_abc123",
 			secrets.MustParseID("myapp/postgres/password"): "s3cr3t",
@@ -123,54 +191,31 @@ func TestResolveEnv(t *testing.T) {
 
 	t.Run("passthrough when no se:// values", func(t *testing.T) {
 		in := []string{"PATH=/usr/bin", "HOME=/home/x", "EMPTY="}
-		out, err := resolveEnv(t.Context(), resolver, in)
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, in, out)
 	})
 
 	t.Run("resolves exact se:// reference", func(t *testing.T) {
 		in := []string{"PATH=/usr/bin", "SE_TOKEN=se://gh-token"}
-		out, err := resolveEnv(t.Context(), resolver, in)
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"PATH=/usr/bin", "SE_TOKEN=ghp_abc123"}, out)
 	})
 
 	t.Run("resolves nested ID", func(t *testing.T) {
 		in := []string{"PG_PWD=se://myapp/postgres/password"}
-		out, err := resolveEnv(t.Context(), resolver, in)
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"PG_PWD=s3cr3t"}, out)
 	})
 
-	t.Run("embedded se:// is left untouched", func(t *testing.T) {
-		in := []string{"DSN=postgres://user:se://gh-token@host/db"}
-		out, err := resolveEnv(t.Context(), resolver, in)
-		require.NoError(t, err)
-		assert.Equal(t, in, out)
-	})
-
 	t.Run("missing reference hard-fails", func(t *testing.T) {
 		in := []string{"X=se://does-not-exist"}
-		out, err := resolveEnv(t.Context(), resolver, in)
-		require.Error(t, err)
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
+		require.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.Nil(t, out)
-		assert.Contains(t, err.Error(), "resolving X")
-	})
-
-	t.Run("invalid ID hard-fails", func(t *testing.T) {
-		in := []string{"X=se://"}
-		out, err := resolveEnv(t.Context(), resolver, in)
-		require.Error(t, err)
-		assert.Nil(t, out)
-		assert.Contains(t, err.Error(), "resolving X")
-	})
-
-	t.Run("wildcard in reference is rejected", func(t *testing.T) {
-		in := []string{"X=se://foo/*"}
-		out, err := resolveEnv(t.Context(), resolver, in)
-		require.Error(t, err)
-		assert.Nil(t, out)
-		assert.Contains(t, err.Error(), "resolving X")
+		assert.ErrorContains(t, err, "resolving X")
 	})
 
 	t.Run("multiple refs resolved in order", func(t *testing.T) {
@@ -179,7 +224,7 @@ func TestResolveEnv(t *testing.T) {
 			"B=plain",
 			"C=se://myapp/postgres/password",
 		}
-		out, err := resolveEnv(t.Context(), resolver, in)
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, []string{
 			"A=ghp_abc123",
@@ -189,15 +234,15 @@ func TestResolveEnv(t *testing.T) {
 	})
 }
 
+func writeEnvFile(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "env")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	return path
+}
+
 func TestMergeEnv(t *testing.T) {
 	t.Parallel()
-
-	writeFile := func(t *testing.T, body string) string {
-		t.Helper()
-		path := filepath.Join(t.TempDir(), "env")
-		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
-		return path
-	}
 
 	t.Run("no files returns sorted process env", func(t *testing.T) {
 		out, err := mergeEnv([]string{"B=2", "A=1"}, nil)
@@ -206,22 +251,22 @@ func TestMergeEnv(t *testing.T) {
 	})
 
 	t.Run("file overrides process env", func(t *testing.T) {
-		f := writeFile(t, "A=from-file\nC=new\n")
+		f := writeEnvFile(t, "A=from-file\nC=new\n")
 		out, err := mergeEnv([]string{"A=from-process", "B=keep"}, []string{f})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"A=from-file", "B=keep", "C=new"}, out)
 	})
 
 	t.Run("later file overrides earlier file", func(t *testing.T) {
-		f1 := writeFile(t, "A=from-file-1\n")
-		f2 := writeFile(t, "A=from-file-2\n")
+		f1 := writeEnvFile(t, "A=from-file-1\n")
+		f2 := writeEnvFile(t, "A=from-file-2\n")
 		out, err := mergeEnv(nil, []string{f1, f2})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"A=from-file-2"}, out)
 	})
 
 	t.Run("comments and quoted values", func(t *testing.T) {
-		f := writeFile(t, "# this is a comment\nGREETING=\"hello world\"\nQUOTED='no $expand'\n")
+		f := writeEnvFile(t, "# this is a comment\nGREETING=\"hello world\"\nQUOTED='no $expand'\n")
 		out, err := mergeEnv(nil, []string{f})
 		require.NoError(t, err)
 		assert.Equal(t, []string{
@@ -231,23 +276,23 @@ func TestMergeEnv(t *testing.T) {
 	})
 
 	t.Run("missing file returns error and does not partially apply", func(t *testing.T) {
-		f := writeFile(t, "A=present\n")
+		f := writeEnvFile(t, "A=present\n")
 		out, err := mergeEnv([]string{"B=keep"}, []string{f, "/does/not/exist/.env"})
 		require.Error(t, err)
 		assert.Nil(t, out)
 		assert.Contains(t, err.Error(), "/does/not/exist/.env")
 	})
 
-	t.Run("preserves se:// values for downstream resolveEnv", func(t *testing.T) {
-		f := writeFile(t, "SE_TOKEN=se://gh-token\nPLAIN=v\n")
+	t.Run("preserves se:// values for downstream parseEnv", func(t *testing.T) {
+		f := writeEnvFile(t, "SE_TOKEN=se://gh-token\nPLAIN=v\n")
 		out, err := mergeEnv(nil, []string{f})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"PLAIN=v", "SE_TOKEN=se://gh-token"}, out)
 	})
 }
 
-// TestRunCommand covers cobra-level behavior that does not depend on a running
-// daemon. Resolution behavior is covered by TestResolveEnv.
+// TestRunCommand covers cobra-level behavior against a mock engine or none.
+// TestParseEnv and TestResolveEnv cover the details.
 func TestRunCommand(t *testing.T) {
 	exe, err := os.Executable()
 	require.NoError(t, err)
@@ -299,6 +344,41 @@ func TestRunCommand(t *testing.T) {
 		assert.Contains(t, stderr.String(), "preflight ping")
 	})
 
+	t.Run("authorizes every reference before resolving", func(t *testing.T) {
+		engine := &mockEngine{allow: true, store: map[secrets.ID]string{
+			secrets.MustParseID("gh-token"): "ghp_abc123",
+		}}
+		// The child is this binary in leaf mode: it exits 3 unless SE_TOKEN
+		// arrives resolved. Files override the process env, so the env-file
+		// drives the child without touching the test process.
+		envFile := writeEnvFile(t, "SE_TOKEN=se://gh-token\n"+
+			helperActiveEnv+"=1\n"+
+			helperCheckEnv+"=SE_TOKEN=ghp_abc123\n")
+		cmd := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd.SetArgs([]string{"--env-file", envFile, exe})
+		cmd.SetContext(t.Context())
+		cmd.SetOut(testWriter{t})
+		cmd.SetErr(testWriter{t})
+		require.NoError(t, cmd.Execute())
+		assert.Equal(t, []string{"authorize gh-token", "resolve gh-token"}, engine.recorded())
+	})
+
+	t.Run("a denied authorization stops before resolving", func(t *testing.T) {
+		engine := &mockEngine{store: map[secrets.ID]string{
+			secrets.MustParseID("gh-token"): "ghp_abc123",
+		}}
+		envFile := writeEnvFile(t, "SE_TOKEN=se://gh-token\n"+helperActiveEnv+"=1\n")
+		cmd := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd.SetArgs([]string{"--env-file", envFile, exe})
+		cmd.SetContext(t.Context())
+		cmd.SetOut(testWriter{t})
+		cmd.SetErr(testWriter{t})
+		err := cmd.Execute()
+		require.ErrorIs(t, err, client.ErrAccessDenied)
+		assert.ErrorContains(t, err, "authorizing: access denied")
+		assert.Equal(t, []string{"authorize gh-token"}, engine.recorded())
+	})
+
 	t.Run("forwards SIGINT and exits 130", func(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			t.Skip("SIGINT cross-process semantics differ on Windows")
@@ -346,6 +426,55 @@ func waitForReady(t *testing.T, r io.Reader) {
 	}
 	// Drain remaining stderr in the background so the pipe never blocks.
 	go func() { _, _ = io.Copy(io.Discard, r) }()
+}
+
+type mockEngine struct {
+	allow bool
+	store map[secrets.ID]string
+
+	mu    sync.Mutex
+	calls []string
+}
+
+func (e *mockEngine) Authorize(_ context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+	names := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		names = append(names, p.String())
+	}
+	e.record("authorize " + strings.Join(names, ","))
+	return secrets.AuthorizeResponse{Allow: e.allow}, nil
+}
+
+func (e *mockEngine) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	e.record("resolve " + pattern.String())
+	return testhelper.MockResolver{Store: e.store}.GetSecrets(ctx, pattern)
+}
+
+func (e *mockEngine) record(call string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.calls = append(e.calls, call)
+}
+
+func (e *mockEngine) recorded() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.calls)
+}
+
+// serve starts the engine on a fresh socket and returns the socket path.
+func (e *mockEngine) serve(t *testing.T) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.Handle(resolverv1connect.NewAuthorizerServiceHandler(resolver.NewAuthorizerHandler(e)))
+	mux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(e)))
+	socket := testhelper.RandomShortSocketName()
+	ln, err := net.Listen("unix", socket)
+	require.NoError(t, err)
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: time.Second}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	return socket
 }
 
 // pingClient adapts a Version func to client.Client.
