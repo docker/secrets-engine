@@ -65,7 +65,6 @@ type runOpts struct {
 type RunOption func(*runOpts) error
 
 // WithTimeout sets the client request timeout; 0 disables it.
-// Negative durations return an error.
 func WithTimeout(timeout time.Duration) RunOption {
 	return func(o *runOpts) error {
 		if timeout < 0 {
@@ -77,7 +76,6 @@ func WithTimeout(timeout time.Duration) RunOption {
 }
 
 // WithResponseTimeout sets the client response header timeout; 0 disables it.
-// Negative durations return an error.
 func WithResponseTimeout(responseTimeout time.Duration) RunOption {
 	return func(o *runOpts) error {
 		if responseTimeout < 0 {
@@ -88,7 +86,7 @@ func WithResponseTimeout(responseTimeout time.Duration) RunOption {
 	}
 }
 
-// WithSocketPath overrides the engine socket path. An empty path returns an error.
+// WithSocketPath overrides the default [api.DesktopSocketPath].
 func WithSocketPath(socketPath string) RunOption {
 	return func(o *runOpts) error {
 		if socketPath == "" {
