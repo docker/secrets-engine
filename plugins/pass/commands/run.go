@@ -62,33 +62,52 @@ type runOpts struct {
 	socketPath      string
 }
 
-type RunOption func(*runOpts)
+// RunOption configures a run command and reports invalid option values.
+type RunOption func(*runOpts) error
 
 // WithTimeout sets the client request timeout; 0 disables it.
+// Negative durations return an error.
 func WithTimeout(timeout time.Duration) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if timeout < 0 {
+			return errors.New("request timeout duration cannot be negative")
+		}
 		o.timeout = &timeout
+		return nil
 	}
 }
 
 // WithResponseTimeout sets the client response header timeout; 0 disables it.
+// Negative durations return an error.
 func WithResponseTimeout(responseTimeout time.Duration) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if responseTimeout < 0 {
+			return errors.New("response timeout duration cannot be negative")
+		}
 		o.responseTimeout = &responseTimeout
+		return nil
 	}
 }
 
-// WithSocketPath overrides the engine socket path; empty uses [api.DesktopSocketPath].
+// WithSocketPath overrides the engine socket path. An empty path returns an error.
 func WithSocketPath(socketPath string) RunOption {
-	return func(o *runOpts) {
+	return func(o *runOpts) error {
+		if socketPath == "" {
+			return errors.New("no path provided")
+		}
 		o.socketPath = socketPath
+		return nil
 	}
 }
 
-func RunCommand(options ...RunOption) *cobra.Command {
+// RunCommand creates a command with the supplied options, returning an error if
+// an option is invalid. The default socket path is [api.DesktopSocketPath].
+func RunCommand(options ...RunOption) (*cobra.Command, error) {
 	opts := runOpts{}
 	for _, o := range options {
-		o(&opts)
+		if err := o(&opts); err != nil {
+			return nil, err
+		}
 	}
 	cmd := &cobra.Command{
 		Use:     "run -- CMD [ARGS...]",
@@ -173,7 +192,7 @@ func RunCommand(options ...RunOption) *cobra.Command {
 	}
 	cmd.Flags().StringArrayVar(&opts.envFiles, "env-file", nil,
 		"Read environment variables from a dotenv-formatted file. Repeatable; later files override earlier files and the process environment.")
-	return cmd
+	return cmd, nil
 }
 
 func mergeEnv(processEnv, files []string) ([]string, error) {

@@ -110,7 +110,11 @@ func runAsWrapper() {
 	if socket := os.Getenv(helperSocketEnv); socket != "" {
 		ropts = []RunOption{WithSocketPath(socket)}
 	}
-	cmd := RunCommand(ropts...)
+	cmd, err := RunCommand(ropts...)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	cmd.SetArgs([]string{exe})
 	cmd.SetContext(context.Background())
 	cmd.SilenceUsage = true
@@ -291,6 +295,73 @@ func TestMergeEnv(t *testing.T) {
 	})
 }
 
+func TestRunCommandOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name    string
+		options []RunOption
+		wantErr string
+	}{
+		{name: "defaults"},
+		{
+			name: "explicit options",
+			options: []RunOption{
+				WithSocketPath("/tmp/secrets-engine.sock"),
+				WithTimeout(time.Second),
+				WithResponseTimeout(time.Second),
+			},
+		},
+		{
+			name:    "zero disables timeouts",
+			options: []RunOption{WithTimeout(0), WithResponseTimeout(0)},
+		},
+		{
+			name:    "empty socket path",
+			options: []RunOption{WithSocketPath("")},
+			wantErr: "no path provided",
+		},
+		{
+			name:    "negative request timeout",
+			options: []RunOption{WithTimeout(-time.Second)},
+			wantErr: "request timeout duration cannot be negative",
+		},
+		{
+			name:    "negative response timeout",
+			options: []RunOption{WithResponseTimeout(-time.Second)},
+			wantErr: "response timeout duration cannot be negative",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd, err := RunCommand(tt.options...)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				assert.Nil(t, cmd)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, cmd)
+		})
+	}
+
+	t.Run("stops at the first option error", func(t *testing.T) {
+		t.Parallel()
+		optionErr := errors.New("invalid option")
+		laterOptionCalled := false
+		cmd, err := RunCommand(
+			func(*runOpts) error { return optionErr },
+			func(*runOpts) error {
+				laterOptionCalled = true
+				return nil
+			},
+		)
+		require.ErrorIs(t, err, optionErr)
+		assert.Nil(t, cmd)
+		assert.False(t, laterOptionCalled)
+	})
+}
+
 // TestRunCommand covers cobra-level behavior against a mock engine or none.
 // TestParseEnv and TestResolveEnv cover the details.
 func TestRunCommand(t *testing.T) {
@@ -298,12 +369,13 @@ func TestRunCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("no command given returns arg error", func(t *testing.T) {
-		cmd := RunCommand()
+		cmd, err := RunCommand()
+		require.NoError(t, err)
 		cmd.SetArgs([]string{})
 		cmd.SetContext(t.Context())
 		cmd.SetOut(testWriter{t})
 		cmd.SetErr(testWriter{t})
-		err := cmd.Execute()
+		err = cmd.Execute()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires at least 1 arg")
 	})
@@ -354,7 +426,8 @@ func TestRunCommand(t *testing.T) {
 		envFile := writeEnvFile(t, "SE_TOKEN=se://gh-token\n"+
 			helperActiveEnv+"=1\n"+
 			helperCheckEnv+"=SE_TOKEN=ghp_abc123\n")
-		cmd := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd, err := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		require.NoError(t, err)
 		cmd.SetArgs([]string{"--env-file", envFile, exe})
 		cmd.SetContext(t.Context())
 		cmd.SetOut(testWriter{t})
@@ -368,12 +441,13 @@ func TestRunCommand(t *testing.T) {
 			secrets.MustParseID("gh-token"): "ghp_abc123",
 		}}
 		envFile := writeEnvFile(t, "SE_TOKEN=se://gh-token\n"+helperActiveEnv+"=1\n")
-		cmd := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd, err := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		require.NoError(t, err)
 		cmd.SetArgs([]string{"--env-file", envFile, exe})
 		cmd.SetContext(t.Context())
 		cmd.SetOut(testWriter{t})
 		cmd.SetErr(testWriter{t})
-		err := cmd.Execute()
+		err = cmd.Execute()
 		require.ErrorIs(t, err, client.ErrAccessDenied)
 		assert.ErrorContains(t, err, "authorizing: access denied")
 		assert.Equal(t, []string{"authorize gh-token"}, engine.recorded())
