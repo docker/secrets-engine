@@ -10,6 +10,12 @@ $ SE_TOKEN=se://gh-token docker pass run -- gh repo list
 $ DB_PASSWORD=se://myapp/postgres/password API_KEY=se://myapp/anthropic/api-key docker pass run -- ./my-binary
 ```
 
+### Wildcard pattern (the first matching secret is used):
+
+```console
+$ DB_PASSWORD=se://*/postgres/password docker pass run -- ./my-binary
+```
+
 ### Resolve references from a dotenv file:
 
 ```console
