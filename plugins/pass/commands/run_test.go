@@ -160,16 +160,18 @@ func TestParseEnv(t *testing.T) {
 		assert.Equal(t, []envVar{{key: "DSN", value: "postgres://user:se://gh-token@host/db"}}, vars)
 	})
 
-	t.Run("invalid ID hard-fails", func(t *testing.T) {
-		vars, err := parseEnv([]string{"X=se://"})
-		require.Error(t, err)
-		assert.Nil(t, vars)
-		assert.ErrorContains(t, err, "resolving X")
+	t.Run("wildcard reference carries its pattern", func(t *testing.T) {
+		vars, err := parseEnv([]string{"X=se://foo/*", "Y=se://**/token"})
+		require.NoError(t, err)
+		assert.Equal(t, []envVar{
+			{key: "X", value: "se://foo/*", pattern: secrets.MustParsePattern("foo/*")},
+			{key: "Y", value: "se://**/token", pattern: secrets.MustParsePattern("**/token")},
+		}, vars)
 	})
 
-	t.Run("wildcard in reference is rejected", func(t *testing.T) {
-		vars, err := parseEnv([]string{"X=se://foo/*"})
-		require.Error(t, err)
+	t.Run("invalid pattern hard-fails", func(t *testing.T) {
+		vars, err := parseEnv([]string{"X=se://"})
+		require.ErrorIs(t, err, secrets.ErrInvalidPattern)
 		assert.Nil(t, vars)
 		assert.ErrorContains(t, err, "resolving X")
 	})
@@ -190,6 +192,7 @@ func TestResolveEnv(t *testing.T) {
 		Store: map[secrets.ID]string{
 			secrets.MustParseID("gh-token"):                "ghp_abc123",
 			secrets.MustParseID("myapp/postgres/password"): "s3cr3t",
+			secrets.MustParseID("other/postgres/password"): "0th3r",
 		},
 	}
 
@@ -209,6 +212,13 @@ func TestResolveEnv(t *testing.T) {
 
 	t.Run("resolves nested ID", func(t *testing.T) {
 		in := []string{"PG_PWD=se://myapp/postgres/password"}
+		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"PG_PWD=s3cr3t"}, out)
+	})
+
+	t.Run("wildcard resolves to the first match", func(t *testing.T) {
+		in := []string{"PG_PWD=se://*/postgres/password"}
 		out, err := resolveEnv(t.Context(), mock, mustParseEnv(t, in))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"PG_PWD=s3cr3t"}, out)

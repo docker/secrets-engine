@@ -258,10 +258,6 @@ func parseEnv(env []string) ([]envVar, error) {
 		key, value, _ := strings.Cut(kv, "=")
 		v := envVar{key: key, value: value}
 		if rawSeRef, ok := strings.CutPrefix(value, sePrefix); ok {
-			// ParseID rejects wildcards before ParsePattern broadens the lookup.
-			if _, err := secrets.ParseID(rawSeRef); err != nil {
-				return nil, fmt.Errorf("resolving %s: %w", key, err)
-			}
 			pattern, err := secrets.ParsePattern(rawSeRef)
 			if err != nil {
 				return nil, fmt.Errorf("resolving %s: %w", key, err)
@@ -317,8 +313,7 @@ func resolveVar(ctx context.Context, r secrets.Resolver, v envVar) (string, erro
 	if len(envs) == 0 {
 		return "", fmt.Errorf("resolving %s: %w", v.key, secrets.ErrNotFound)
 	}
-	if len(envs) > 1 {
-		return "", fmt.Errorf("resolving %s: %d secrets matched %s", v.key, len(envs), v.pattern)
-	}
+	// TODO: Extend the query language
+	// For now: First match wins.
 	return string(envs[0].Value), nil
 }
