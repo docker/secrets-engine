@@ -106,9 +106,9 @@ func runAsWrapper() {
 		os.Exit(2)
 	}
 	// bounded timeout skips the preflight ping; no engine needed
-	ropts := []RunOption{WithTimeout(time.Second)}
+	ropts := []ClientOption{WithTimeout(time.Second)}
 	if socket := os.Getenv(helperSocketEnv); socket != "" {
-		ropts = []RunOption{WithSocketPath(socket)}
+		ropts = []ClientOption{WithSocketPath(socket)}
 	}
 	cmd, err := RunCommand(ropts...)
 	if err != nil {
@@ -310,13 +310,13 @@ func TestRunCommandOptions(t *testing.T) {
 
 	for _, tt := range []struct {
 		name    string
-		options []RunOption
+		options []ClientOption
 		wantErr string
 	}{
 		{name: "defaults"},
 		{
 			name: "explicit options",
-			options: []RunOption{
+			options: []ClientOption{
 				WithSocketPath("/tmp/secrets-engine.sock"),
 				WithTimeout(time.Second),
 				WithResponseTimeout(time.Second),
@@ -324,21 +324,21 @@ func TestRunCommandOptions(t *testing.T) {
 		},
 		{
 			name:    "zero disables timeouts",
-			options: []RunOption{WithTimeout(0), WithResponseTimeout(0)},
+			options: []ClientOption{WithTimeout(0), WithResponseTimeout(0)},
 		},
 		{
 			name:    "empty socket path",
-			options: []RunOption{WithSocketPath("")},
+			options: []ClientOption{WithSocketPath("")},
 			wantErr: "no path provided",
 		},
 		{
 			name:    "negative request timeout",
-			options: []RunOption{WithTimeout(-time.Second)},
+			options: []ClientOption{WithTimeout(-time.Second)},
 			wantErr: "request timeout duration cannot be negative",
 		},
 		{
 			name:    "negative response timeout",
-			options: []RunOption{WithResponseTimeout(-time.Second)},
+			options: []ClientOption{WithResponseTimeout(-time.Second)},
 			wantErr: "response timeout duration cannot be negative",
 		},
 	} {
@@ -360,8 +360,8 @@ func TestRunCommandOptions(t *testing.T) {
 		optionErr := errors.New("invalid option")
 		laterOptionCalled := false
 		cmd, err := RunCommand(
-			func(*runOpts) error { return optionErr },
-			func(*runOpts) error {
+			func(*clientOpts) error { return optionErr },
+			func(*clientOpts) error {
 				laterOptionCalled = true
 				return nil
 			},
