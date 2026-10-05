@@ -20,12 +20,12 @@ import (
 	"os/signal"
 )
 
-type errCtxSignalTerminated struct {
-	signal os.Signal
+type ErrSignalTerminated struct {
+	Signal os.Signal
 }
 
-func (errCtxSignalTerminated) Error() string {
-	return ""
+func (e ErrSignalTerminated) Error() string {
+	return "signal: " + e.Signal.String()
 }
 
 func NotifyContext(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
@@ -40,7 +40,7 @@ func NotifyContext(ctx context.Context, signals ...os.Signal) (context.Context, 
 			signal.Stop(ch)
 			return
 		case sig := <-ch:
-			cancel(errCtxSignalTerminated{signal: sig})
+			cancel(ErrSignalTerminated{Signal: sig})
 			signal.Stop(ch)
 			return
 		}
