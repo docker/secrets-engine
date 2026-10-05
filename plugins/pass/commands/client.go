@@ -125,3 +125,24 @@ func authorize(ctx context.Context, a secrets.Authorizer, patterns ...secrets.Pa
 	}
 	return nil
 }
+
+func authorizeAccess(ctx context.Context, opts clientOpts, ids ...secrets.ID) error {
+	patterns := make([]secrets.Pattern, 0, len(ids))
+	for _, id := range ids {
+		pattern, err := secrets.ParsePattern(id.String())
+		if err != nil {
+			return err
+		}
+		patterns = append(patterns, pattern)
+	}
+	c, err := newClient(opts)
+	if err != nil {
+		return err
+	}
+	if opts.isUnbound() {
+		if err := preflightPing(ctx, c, defaultPreflightPingTimeout); err != nil {
+			return err
+		}
+	}
+	return authorize(ctx, c, patterns...)
+}
