@@ -98,7 +98,7 @@ func TestStoreCommandsHintOnLockedKeychain(t *testing.T) {
 		mock store.Store
 		args []string
 	}{
-		{"get", GetCommand(), teststore.NewMockStore(teststore.WithStoreGetErr(locked)), []string{"foo"}},
+		{"get", mustGetCommand(t), teststore.NewMockStore(teststore.WithStoreGetErr(locked)), []string{"foo"}},
 		{"set", SetCommand(), teststore.NewMockStore(teststore.WithStoreSaveErr(locked)), []string{"foo=bar"}},
 		{"ls", ListCommand(), teststore.NewMockStore(teststore.WithStoreGetAllErr(locked)), nil},
 		{"rm", RmCommand(), teststore.NewMockStore(
