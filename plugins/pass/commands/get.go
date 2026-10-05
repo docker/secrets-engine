@@ -15,14 +15,18 @@
 package commands
 
 import (
+	"context"
 	_ "embed"
 	"errors"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/x/secrets"
 )
 
 //go:embed get_example.md
@@ -31,7 +35,14 @@ var getExample string
 //go:embed get_long.md
 var getLong string
 
-func GetCommand() *cobra.Command {
+const maskedValue = "**********"
+
+func GetCommand(options ...ClientOption) (*cobra.Command, error) {
+	clientOpts, err := parseClientOptions(options...)
+	if err != nil {
+		return nil, err
+	}
+	var reveal bool
 	cmd := &cobra.Command{
 		Use:     "get NAME",
 		Args:    cobra.ExactArgs(1),
@@ -51,13 +62,46 @@ func GetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, ok := s.(*pass.PassValue)
+			pv, ok := s.(*pass.PassValue)
 			if !ok {
 				return errors.New("unknown secret type")
 			}
-			cmd.Printf("ID: %s\nValue: %s\n", id.String(), "**********")
-			return nil
+			if !reveal {
+				return printSecret(cmd.OutOrStdout(), id, []byte(maskedValue))
+			}
+			if err := authorizeReveal(cmd.Context(), clientOpts, id); err != nil {
+				return err
+			}
+			value, err := pv.Marshal()
+			if err != nil {
+				return err
+			}
+			defer clear(value)
+			return printSecret(cmd.OutOrStdout(), id, value)
 		},
 	}
-	return wrapKeychainErrors(cmd)
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "Show the secret value in plaintext")
+	return wrapKeychainErrors(cmd), nil
+}
+
+func authorizeReveal(ctx context.Context, opts clientOpts, id store.ID) error {
+	pattern, err := secrets.ParsePattern(id.String())
+	if err != nil {
+		return err
+	}
+	c, err := newClient(opts)
+	if err != nil {
+		return err
+	}
+	if opts.isUnbound() {
+		if err := preflightPing(ctx, c, defaultPreflightPingTimeout); err != nil {
+			return err
+		}
+	}
+	return authorize(ctx, c, pattern)
+}
+
+func printSecret(w io.Writer, id store.ID, value []byte) error {
+	_, err := fmt.Fprintf(w, "ID: %s\nValue: %s\n", id, value)
+	return err
 }

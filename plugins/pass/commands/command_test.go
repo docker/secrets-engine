@@ -17,12 +17,15 @@ package commands
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/client"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/store"
@@ -245,21 +248,84 @@ func Test_RmCommand(t *testing.T) {
 
 func Test_GetCommand(t *testing.T) {
 	t.Parallel()
-	t.Run("ok", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+	fooStore := func() store.Store {
+		return teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
-		out, err := execute(t, GetCommand(), mock, "foo")
+	}
+	deadSocket := func(t *testing.T) string {
+		t.Helper()
+		return filepath.Join(t.TempDir(), "dead.sock")
+	}
+	t.Run("ok", func(t *testing.T) {
+		out, err := execute(t, mustGetCommand(t), fooStore(), "foo")
 		assert.NoError(t, err)
 		assert.Equal(t, "ID: foo\nValue: **********\n", out)
 	})
 	t.Run("store error", func(t *testing.T) {
 		errGet := errors.New("get error")
 		mock := teststore.NewMockStore(teststore.WithStoreGetErr(errGet))
-		out, err := execute(t, GetCommand(), mock, "foo")
+		out, err := execute(t, mustGetCommand(t), mock, "foo")
 		assert.ErrorIs(t, err, errGet)
 		assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
 	})
+	t.Run("masked output needs no engine", func(t *testing.T) {
+		out, err := execute(t, mustGetCommand(t, WithSocketPath(deadSocket(t))), fooStore(), "foo")
+		assert.NoError(t, err)
+		assert.Equal(t, "ID: foo\nValue: **********\n", out)
+	})
+	t.Run("--reveal prints the value once the engine allows", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
+		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
+		assert.NoError(t, err)
+		assert.Equal(t, "ID: foo\nValue: bar\n", out)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
+	})
+	t.Run("--reveal fails when the engine denies", func(t *testing.T) {
+		engine := &mockEngine{}
+		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
+		assert.ErrorIs(t, err, client.ErrAccessDenied)
+		assert.Equal(t, "Error: authorizing: access denied\n", out)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
+	})
+	t.Run("--reveal reads the keychain before asking the engine", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
+		errGet := errors.New("get error")
+		mock := teststore.NewMockStore(teststore.WithStoreGetErr(errGet))
+		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		out, err := execute(t, cmd, mock, "--reveal", "foo")
+		assert.ErrorIs(t, err, errGet)
+		assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
+		assert.Empty(t, engine.recorded())
+	})
+	t.Run("--reveal fails when the engine is unreachable", func(t *testing.T) {
+		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
+		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorContains(t, err, "authorizing:")
+		assert.NotContains(t, out, "bar")
+	})
+	t.Run("--reveal pings the engine first when requests are unbounded", func(t *testing.T) {
+		cmd := mustGetCommand(t, WithSocketPath(deadSocket(t)))
+		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorContains(t, err, "preflight ping")
+		assert.NotContains(t, out, "bar")
+	})
+	t.Run("rejects an invalid option", func(t *testing.T) {
+		cmd, err := GetCommand(WithTimeout(-time.Second))
+		require.EqualError(t, err, "request timeout duration cannot be negative")
+		assert.Nil(t, cmd)
+	})
+}
+
+func mustGetCommand(t *testing.T, options ...ClientOption) *cobra.Command {
+	t.Helper()
+	cmd, err := GetCommand(options...)
+	require.NoError(t, err)
+	return cmd
 }
 
 // execute runs cmd as if it were the root command: it attaches mock to the
