@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	dbus "github.com/godbus/dbus/v5"
@@ -55,6 +56,9 @@ type SecretService struct {
 	conn               *dbus.Conn
 	signalCh           <-chan *dbus.Signal
 	sessionOpenTimeout time.Duration
+	mu                 sync.Mutex
+	pendingSessions    int
+	closing            bool
 }
 
 // Session
@@ -183,17 +187,34 @@ func unixSocketPath(entry string) (string, bool) {
 	return "", false
 }
 
-// Close releases the underlying D-Bus connection and its socket file
-// descriptor. Each [NewService] call dials a private session-bus connection, so
-// every service MUST be closed when it is no longer needed; otherwise the
-// connection — and its fd — leaks for the lifetime of the process. Closing the
-// connection also tears down the signal goroutine that NewService starts. Close
-// is safe to call on a service whose connection is nil.
+// Close prevents new session negotiations and releases the private D-Bus
+// connection. If an OpenSession request is still pending, Close returns without
+// disconnecting; the last request closes the connection after consuming its
+// reply and closing any session that arrived after the caller timed out.
+// A pending request retains the connection until the backend replies or the
+// transport fails. Close is safe to call repeatedly or on a nil service.
 func (s *SecretService) Close() error {
 	if s == nil || s.conn == nil {
 		return nil
 	}
+	s.mu.Lock()
+	s.closing = true
+	pending := s.pendingSessions != 0
+	s.mu.Unlock()
+	if pending {
+		return nil
+	}
 	return s.conn.Close()
+}
+
+func (s *SecretService) finishSessionRequest() {
+	s.mu.Lock()
+	s.pendingSessions--
+	closeConnection := s.closing && s.pendingSessions == 0
+	s.mu.Unlock()
+	if closeConnection {
+		_ = s.conn.Close()
+	}
 }
 
 // ErrNoSecretService is returned by [SecretService.Available] when no process
@@ -302,16 +323,47 @@ func (s *SecretService) IsLocked(collection dbus.ObjectPath) (bool, error) {
 type sessionOpenResponse struct {
 	algorithmOutput dbus.Variant
 	path            dbus.ObjectPath
+	err             error
 }
 
-func (s *SecretService) openSessionRaw(mode AuthenticationMode, sessionAlgorithmInput dbus.Variant) (resp sessionOpenResponse, err error) {
-	err = s.ServiceObj().
-		Call("org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, sessionAlgorithmInput).
-		Store(&resp.algorithmOutput, &resp.path)
-	if err != nil {
-		return sessionOpenResponse{}, fmt.Errorf("failed to open secretservice session: %w", err)
+func (s *SecretService) openSession(mode AuthenticationMode, input dbus.Variant) (sessionOpenResponse, error) {
+	s.mu.Lock()
+	if s.closing || !s.conn.Connected() {
+		s.mu.Unlock()
+		return sessionOpenResponse{}, dbus.ErrClosed
 	}
-	return resp, nil
+	s.pendingSessions++
+	s.mu.Unlock()
+
+	returned := make(chan struct{})
+	defer close(returned)
+	result := make(chan sessionOpenResponse)
+	go func() {
+		defer s.finishSessionRequest()
+		var resp sessionOpenResponse
+		err := s.ServiceObj().
+			Call("org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, input).
+			Store(&resp.algorithmOutput, &resp.path)
+		if err != nil {
+			resp.err = fmt.Errorf("failed to open secretservice session: %w", err)
+		}
+		select {
+		case result <- resp:
+		case <-returned:
+			if resp.err == nil {
+				s.CloseSession(&Session{Path: resp.path})
+			}
+		}
+	}()
+
+	timer := time.NewTimer(s.sessionOpenTimeout)
+	defer timer.Stop()
+	select {
+	case resp := <-result:
+		return resp, resp.err
+	case <-timer.C:
+		return sessionOpenResponse{}, fmt.Errorf("timed out after %s", s.sessionOpenTimeout)
+	}
 }
 
 // OpenSession
@@ -338,37 +390,16 @@ func (s *SecretService) OpenSession(mode AuthenticationMode) (session *Session, 
 		return nil, fmt.Errorf("unknown authentication mode %v", mode)
 	}
 
-	sessionOpenCh := make(chan sessionOpenResponse)
-	errCh := make(chan error)
-	go func() {
-		resp, err := s.openSessionRaw(mode, sessionAlgorithmInput)
-		if err != nil {
-			errCh <- err
-		} else {
-			sessionOpenCh <- resp
-		}
-	}()
-
-	var sessionAlgorithmOutput dbus.Variant
-	// NOTE: If the timeout case is reached, the above goroutine is leaked.
-	// This is not terrible because D-Bus calls have an internal 2-mintue
-	// timeout, so the goroutine will finish eventually. If two OpenSessions
-	// are called at the saime time, they'll be on different channels so
-	// they won't interfere with each other.
-	select {
-	case resp := <-sessionOpenCh:
-		sessionAlgorithmOutput = resp.algorithmOutput
-		session.Path = resp.path
-	case err := <-errCh:
+	resp, err := s.openSession(mode, sessionAlgorithmInput)
+	if err != nil {
 		return nil, err
-	case <-time.After(s.sessionOpenTimeout):
-		return nil, fmt.Errorf("timed out after %s", s.sessionOpenTimeout)
 	}
+	session.Path = resp.path
 
 	switch mode {
 	case AuthenticationInsecurePlain:
 	case AuthenticationDHAES:
-		theirPublicBigEndian, ok := sessionAlgorithmOutput.Value().([]byte)
+		theirPublicBigEndian, ok := resp.algorithmOutput.Value().([]byte)
 		if !ok {
 			return nil, errors.New("failed to coerce algorithm output value to byteslice")
 		}
