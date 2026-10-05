@@ -25,19 +25,14 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/client"
-	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const sePrefix = "se://"
-
-const defaultPreflightPingTimeout = 3 * time.Second
 
 // ExitCodeError is returned when the child process exits non-zero, letting the
 // OTel span wrapper finish before the process exits.
@@ -56,56 +51,17 @@ var runExample string
 var runLong string
 
 type runOpts struct {
-	envFiles        []string
-	timeout         *time.Duration
-	responseTimeout *time.Duration
-	socketPath      string
-}
-
-type RunOption func(*runOpts) error
-
-// WithTimeout sets the client request timeout; 0 disables it.
-func WithTimeout(timeout time.Duration) RunOption {
-	return func(o *runOpts) error {
-		if timeout < 0 {
-			return errors.New("request timeout duration cannot be negative")
-		}
-		o.timeout = &timeout
-		return nil
-	}
-}
-
-// WithResponseTimeout sets the client response header timeout; 0 disables it.
-func WithResponseTimeout(responseTimeout time.Duration) RunOption {
-	return func(o *runOpts) error {
-		if responseTimeout < 0 {
-			return errors.New("response timeout duration cannot be negative")
-		}
-		o.responseTimeout = &responseTimeout
-		return nil
-	}
-}
-
-// WithSocketPath overrides the default [api.DesktopSocketPath].
-func WithSocketPath(socketPath string) RunOption {
-	return func(o *runOpts) error {
-		if socketPath == "" {
-			return errors.New("no path provided")
-		}
-		o.socketPath = socketPath
-		return nil
-	}
+	clientOpts
+	envFiles []string
 }
 
 // RunCommand uses [api.DesktopSocketPath] by default.
-func RunCommand(options ...RunOption) (*cobra.Command, error) {
-	opts := runOpts{}
-	for _, o := range options {
-		if err := o(&opts); err != nil {
-			return nil, err
-		}
+func RunCommand(options ...ClientOption) (*cobra.Command, error) {
+	copts, err := parseClientOptions(options...)
+	if err != nil {
+		return nil, err
 	}
-	return newRunCommand(opts), nil
+	return newRunCommand(runOpts{clientOpts: copts}), nil
 }
 
 func newRunCommand(opts runOpts) *cobra.Command {
@@ -126,12 +82,11 @@ func newRunCommand(opts runOpts) *cobra.Command {
 				return err
 			}
 
-			c, err := newRunClient(opts)
+			c, err := newClient(opts.clientOpts)
 			if err != nil {
 				return err
 			}
-
-			if opts.timeout == nil || *opts.timeout == 0 {
+			if opts.isUnbound() {
 				if err := preflightPing(cmd.Context(), c, defaultPreflightPingTimeout); err != nil {
 					return err
 				}
@@ -217,35 +172,6 @@ func mergeEnv(processEnv, files []string) ([]string, error) {
 	return out, nil
 }
 
-func newRunClient(opts runOpts) (client.Client, error) {
-	socketPath := opts.socketPath
-	if socketPath == "" {
-		socketPath = api.DesktopSocketPath()
-	}
-	copts := []client.Option{client.WithSocketPath(socketPath)}
-	if opts.timeout != nil {
-		copts = append(copts, client.WithTimeout(*opts.timeout))
-	}
-	if opts.responseTimeout != nil {
-		copts = append(copts, client.WithResponseTimeout(*opts.responseTimeout))
-	}
-	return client.New(copts...)
-}
-
-// preflightPing fails fast when the engine is unreachable, so an unbounded
-// client cannot hang resolution indefinitely.
-func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	if _, err := c.Version(ctx); err != nil {
-		if !errors.Is(err, client.ErrSecretsEngineNotAvailable) {
-			err = fmt.Errorf("%w: %w", client.ErrSecretsEngineNotAvailable, err)
-		}
-		return fmt.Errorf("preflight ping: %w", err)
-	}
-	return nil
-}
-
 type envVar struct {
 	key     string
 	value   string
@@ -280,14 +206,7 @@ func authorizeEnv(ctx context.Context, a secrets.Authorizer, vars []envVar) erro
 	if len(patterns) == 0 {
 		return nil
 	}
-	resp, err := a.Authorize(ctx, patterns...)
-	if err != nil {
-		return fmt.Errorf("authorizing: %w", err)
-	}
-	if !resp.Allow {
-		return fmt.Errorf("authorizing: %w", secrets.ErrAccessDenied)
-	}
-	return nil
+	return authorize(ctx, a, patterns...)
 }
 
 func resolveEnv(ctx context.Context, r secrets.Resolver, vars []envVar) ([]string, error) {

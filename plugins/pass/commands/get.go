@@ -15,7 +15,9 @@
 package commands
 
 import (
+	_ "embed"
 	"errors"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,12 +25,19 @@ import (
 	"github.com/docker/secrets-engine/store"
 )
 
+//go:embed get_example.md
+var getExample string
+
+//go:embed get_long.md
+var getLong string
+
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get NAME",
-		Args:  cobra.ExactArgs(1),
-		Short: "Get a secret from a keystore.",
-		Long:  "Retrieves a named secret from the local OS keychain. The secret value is masked in output.",
+		Use:     "get NAME",
+		Args:    cobra.ExactArgs(1),
+		Short:   "Get a secret from a keystore.",
+		Long:    strings.Trim(getLong, "\n"),
+		Example: strings.Trim(getExample, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := store.ParseID(args[0])
 			if err != nil {
