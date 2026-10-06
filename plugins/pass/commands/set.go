@@ -23,6 +23,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
@@ -59,19 +60,17 @@ func SetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var s secret
-			if isNotImplicitReadFromStdinSyntax(args) {
-				va, err := parseArg(args[0])
-				if err != nil {
-					return err
-				}
-				s = *va
-			} else {
-				val, err := secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin(), args[0])
-				if err != nil {
-					return err
-				}
-				s = *val
+			var s *secret
+			switch in, isFile := unwrapFile(cmd.InOrStdin()); {
+			case isNotImplicitReadFromStdinSyntax(args):
+				s, err = parseArg(args[0])
+			case isFile && term.IsTerminal(in.Fd()):
+				s, err = secretFromPrompt(cmd.Context(), in, cmd.ErrOrStderr(), args[0])
+			default:
+				s, err = secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin(), args[0])
+			}
+			if err != nil {
+				return err
 			}
 			id, err := secrets.ParseID(s.id)
 			if err != nil {

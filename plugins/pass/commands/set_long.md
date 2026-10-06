@@ -1,10 +1,11 @@
-Stores a secret in the local OS keychain. The secret value can be provided inline (`NAME=VALUE`) or piped via STDIN.
+Stores a secret in the local OS keychain. Three ways to pass the value:
+  - `docker pass set NAME` prompts for it. Typed or pasted input is masked.
+  - `... | docker pass set NAME` or `docker pass set NAME < file` reads it
+    from standard input. Use this for scripts and for multi-line values.
+  - `docker pass set NAME=VALUE` sets it inline. Avoid this in an interactive
+    shell as the value ends up in your shell history.
 
-Behavior when a secret with the same id already exists is platform-dependent:
-  - macOS (Keychain): the command fails with a duplicate-item error.
-  - Linux (Secret Service) and Windows (Credential Manager): the existing
-    value is silently overwritten.
-
-Pass `--force` to overwrite an existing secret. On Linux and Windows the
-replacement is performed atomically. On macOS the Keychain API requires
-a delete-then-add sequence.
+Pass `--force` to overwrite an existing secret. Without it, macOS (Keychain)
+refuses with a duplicate-item error, while Linux (Secret Service) and Windows
+(Credential Manager) overwrite silently. The replacement is atomic except on
+macOS, where the Keychain API deletes the old item before adding the new one.

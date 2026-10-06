@@ -17,10 +17,14 @@ package commands
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -435,4 +439,96 @@ func assertStoredMetadata(t *testing.T, kc store.Store, want map[string]string) 
 	impl, ok := s.(*pass.PassValue)
 	require.True(t, ok)
 	assert.Equal(t, want, impl.Metadata())
+}
+
+func Test_promptModel(t *testing.T) {
+	t.Parallel()
+	typeText := func(m promptModel, text string) promptModel {
+		for _, r := range text {
+			next, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+			m = next.(promptModel)
+		}
+		return m
+	}
+	t.Run("masks typed input", func(t *testing.T) {
+		t.Parallel()
+		m := typeText(newPromptModel("foo"), "hunter2")
+		view := m.View().Content
+		assert.Contains(t, view, "Enter secret for foo: ")
+		assert.Contains(t, view, "*******")
+		assert.NotContains(t, view, "hunter2")
+		assert.Equal(t, "hunter2", m.input.Value())
+		assert.True(t, strings.HasSuffix(view, "\n"), "trailing newline keeps the line on screen at exit")
+	})
+	t.Run("enter submits", func(t *testing.T) {
+		t.Parallel()
+		m := typeText(newPromptModel("foo"), "hunter2")
+		next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd())
+		assert.NoError(t, next.(promptModel).err)
+	})
+	t.Run("enter on empty input errors", func(t *testing.T) {
+		t.Parallel()
+		next, cmd := newPromptModel("foo").Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd())
+		assert.ErrorIs(t, next.(promptModel).err, errEmptyValue)
+	})
+	t.Run("ctrl+c interrupts", func(t *testing.T) {
+		t.Parallel()
+		_, cmd := newPromptModel("foo").Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.InterruptMsg{}, cmd())
+	})
+	t.Run("paste drops the trailing newline", func(t *testing.T) {
+		t.Parallel()
+		next, _ := newPromptModel("foo").Update(tea.PasteMsg{Content: "hunter2\n"})
+		m := next.(promptModel)
+		assert.NoError(t, m.err)
+		assert.Equal(t, "hunter2", m.input.Value())
+	})
+	t.Run("multi-line paste is rejected", func(t *testing.T) {
+		t.Parallel()
+		next, cmd := newPromptModel("foo").Update(tea.PasteMsg{Content: "line1\nline2\n"})
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd())
+		assert.ErrorIs(t, next.(promptModel).err, errMultilinePaste)
+	})
+}
+
+type fileWrapper struct {
+	io.Reader
+	f *os.File
+}
+
+func (w fileWrapper) File() (*os.File, bool) { return w.f, w.f != nil }
+
+func Test_unwrapFile(t *testing.T) {
+	t.Parallel()
+	f, err := os.Open(os.DevNull)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = f.Close() })
+	t.Run("plain file", func(t *testing.T) {
+		t.Parallel()
+		got, ok := unwrapFile(f)
+		require.True(t, ok)
+		assert.Same(t, f, got)
+	})
+	t.Run("docker stream wrapper", func(t *testing.T) {
+		t.Parallel()
+		got, ok := unwrapFile(fileWrapper{Reader: &bytes.Buffer{}, f: f})
+		require.True(t, ok)
+		assert.Same(t, f, got)
+	})
+	t.Run("wrapper without a file", func(t *testing.T) {
+		t.Parallel()
+		_, ok := unwrapFile(fileWrapper{Reader: &bytes.Buffer{}})
+		assert.False(t, ok)
+	})
+	t.Run("buffer", func(t *testing.T) {
+		t.Parallel()
+		_, ok := unwrapFile(&bytes.Buffer{})
+		assert.False(t, ok)
+	})
 }
