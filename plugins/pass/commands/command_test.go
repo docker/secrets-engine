@@ -159,29 +159,62 @@ func Test_ListCommand(t *testing.T) {
 
 func Test_RmCommand(t *testing.T) {
 	t.Parallel()
-	t.Run("ok (two secrets)", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+	twoSecrets := func() store.Store {
+		return teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 			store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 		}))
-		out, err := execute(t, RmCommand(), mock, "foo", "baz")
+	}
+	remaining := func(t *testing.T, kc store.Store) int {
+		t.Helper()
+		l, err := kc.GetAllMetadata(t.Context())
+		require.NoError(t, err)
+		return len(l)
+	}
+	t.Run("ok (two secrets)", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
+		mock := twoSecrets()
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "foo", "baz")
 		assert.NoError(t, err)
 		assert.Equal(t, "RM: baz\nRM: foo\n", out)
-		l, err := mock.GetAllMetadata(t.Context())
-		require.NoError(t, err)
-		assert.Empty(t, l)
+		assert.Equal(t, []string{"authorize baz,foo"}, engine.recorded())
+		assert.Equal(t, 0, remaining(t, mock))
 	})
 	t.Run("--all", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
-			store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
-		}))
-		out, err := execute(t, RmCommand(), mock, "--all")
+		engine := &mockEngine{allow: true}
+		mock := twoSecrets()
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "--all")
 		assert.NoError(t, err)
 		assert.Equal(t, "RM: baz\nRM: foo\n", out)
-		l, err := mock.GetAllMetadata(t.Context())
-		require.NoError(t, err)
-		assert.Empty(t, l)
+		assert.Equal(t, []string{"authorize baz,foo"}, engine.recorded())
+		assert.Equal(t, 0, remaining(t, mock))
+	})
+	t.Run("denied removes nothing", func(t *testing.T) {
+		engine := &mockEngine{}
+		mock := twoSecrets()
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "--all")
+		assert.ErrorIs(t, err, client.ErrAccessDenied)
+		assert.Equal(t, "Error: authorizing: access denied\n", out)
+		assert.Equal(t, []string{"authorize baz,foo"}, engine.recorded())
+		assert.Equal(t, 2, remaining(t, mock))
+	})
+	t.Run("denied reports missing secrets and removes nothing", func(t *testing.T) {
+		engine := &mockEngine{}
+		mock := twoSecrets()
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "foo", "missing")
+		assert.ErrorIs(t, err, client.ErrAccessDenied)
+		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+		assert.Equal(t, "ERR: missing: secret not found\nError: missing: secret not found\nauthorizing: access denied\n", out)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
+		assert.Equal(t, 2, remaining(t, mock))
+	})
+	t.Run("unreachable engine removes nothing", func(t *testing.T) {
+		mock := twoSecrets()
+		cmd := mustRmCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
+		out, err := execute(t, cmd, mock, "foo")
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.NotContains(t, out, "RM:")
+		assert.Equal(t, 2, remaining(t, mock))
 	})
 	t.Run("store error", func(t *testing.T) {
 		errRemove := errors.New("remove error")
@@ -191,58 +224,63 @@ func Test_RmCommand(t *testing.T) {
 			}),
 			teststore.WithStoreDeleteErr(errRemove),
 		)
-		out, err := execute(t, RmCommand(), mock, "foo")
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, &mockEngine{allow: true})...), mock, "foo")
 		assert.ErrorIs(t, err, errRemove)
 		assert.Equal(t, "ERR: foo: remove error\nError: "+errRemove.Error()+"\n", out)
 	})
-	t.Run("missing secret errors", func(t *testing.T) {
+	t.Run("missing secret errors without asking the engine", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, RmCommand(), mock, "foo")
+		out, err := execute(t, mustRmCommand(t, WithSocketPath(deadSocket(t))), mock, "foo")
 		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
 		assert.Equal(t, "ERR: foo: secret not found\nError: foo: secret not found\n", out)
 	})
 	t.Run("missing secret among existing ones", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
-		out, err := execute(t, RmCommand(), mock, "foo", "baz")
+		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "foo", "baz")
 		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
 		assert.Equal(t, "ERR: baz: secret not found\nRM: foo\nError: baz: secret not found\n", out)
-		l, err := mock.GetAllMetadata(t.Context())
-		require.NoError(t, err)
-		assert.Empty(t, l)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
+		assert.Equal(t, 0, remaining(t, mock))
 	})
 	t.Run("metadata listing error", func(t *testing.T) {
 		errList := errors.New("list error")
 		mock := teststore.NewMockStore(teststore.WithStoreGetAllErr(errList))
-		out, err := execute(t, RmCommand(), mock, "foo")
+		out, err := execute(t, mustRmCommand(t, WithSocketPath(deadSocket(t))), mock, "foo")
 		assert.ErrorIs(t, err, errList)
 		assert.Equal(t, "Error: "+errList.Error()+"\n", out)
 	})
-	t.Run("--all with empty store", func(t *testing.T) {
+	t.Run("--all with empty store needs no engine", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, RmCommand(), mock, "--all")
+		out, err := execute(t, mustRmCommand(t, WithSocketPath(deadSocket(t))), mock, "--all")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 	})
 	t.Run("invalid id", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, RmCommand(), mock, "/foo")
+		out, err := execute(t, mustRmCommand(t), mock, "/foo")
 		errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 		assert.ErrorIs(t, err, errInvalidID)
 		assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
 	})
 	t.Run("cannot mix --all with explicit list", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, RmCommand(), mock, "--all", "foo")
+		out, err := execute(t, mustRmCommand(t), mock, "--all", "foo")
 		assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
 		assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
 	})
 	t.Run("no args or --all", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, RmCommand(), mock)
+		out, err := execute(t, mustRmCommand(t), mock)
 		assert.ErrorContains(t, err, "either provide a secret name or use --all to remove all secrets")
 		assert.Equal(t, "Error: either provide a secret name or use --all to remove all secrets\n", out)
+	})
+	t.Run("rejects an invalid option", func(t *testing.T) {
+		cmd, err := RmCommand(WithTimeout(-time.Second))
+		require.EqualError(t, err, "request timeout duration cannot be negative")
+		assert.Nil(t, cmd)
 	})
 }
 
@@ -252,10 +290,6 @@ func Test_GetCommand(t *testing.T) {
 		return teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
-	}
-	deadSocket := func(t *testing.T) string {
-		t.Helper()
-		return filepath.Join(t.TempDir(), "dead.sock")
 	}
 	t.Run("ok", func(t *testing.T) {
 		out, err := execute(t, mustGetCommand(t), fooStore(), "foo")
@@ -276,7 +310,7 @@ func Test_GetCommand(t *testing.T) {
 	})
 	t.Run("--reveal prints the value once the engine allows", func(t *testing.T) {
 		engine := &mockEngine{allow: true}
-		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd := mustGetCommand(t, engineOpts(t, engine)...)
 		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
 		assert.NoError(t, err)
 		assert.Equal(t, "ID: foo\nValue: bar\n", out)
@@ -284,7 +318,7 @@ func Test_GetCommand(t *testing.T) {
 	})
 	t.Run("--reveal fails when the engine denies", func(t *testing.T) {
 		engine := &mockEngine{}
-		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd := mustGetCommand(t, engineOpts(t, engine)...)
 		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
 		assert.ErrorIs(t, err, client.ErrAccessDenied)
 		assert.Equal(t, "Error: authorizing: access denied\n", out)
@@ -294,7 +328,7 @@ func Test_GetCommand(t *testing.T) {
 		engine := &mockEngine{allow: true}
 		errGet := errors.New("get error")
 		mock := teststore.NewMockStore(teststore.WithStoreGetErr(errGet))
-		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		cmd := mustGetCommand(t, engineOpts(t, engine)...)
 		out, err := execute(t, cmd, mock, "--reveal", "foo")
 		assert.ErrorIs(t, err, errGet)
 		assert.Equal(t, "Error: "+errGet.Error()+"\n", out)
@@ -326,6 +360,23 @@ func mustGetCommand(t *testing.T, options ...ClientOption) *cobra.Command {
 	cmd, err := GetCommand(options...)
 	require.NoError(t, err)
 	return cmd
+}
+
+func mustRmCommand(t *testing.T, options ...ClientOption) *cobra.Command {
+	t.Helper()
+	cmd, err := RmCommand(options...)
+	require.NoError(t, err)
+	return cmd
+}
+
+func deadSocket(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "dead.sock")
+}
+
+func engineOpts(t *testing.T, engine *mockEngine) []ClientOption {
+	t.Helper()
+	return []ClientOption{WithTimeout(time.Second), WithSocketPath(engine.serve(t))}
 }
 
 // execute runs cmd as if it were the root command: it attaches mock to the

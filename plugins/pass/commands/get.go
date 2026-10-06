@@ -15,7 +15,6 @@
 package commands
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -26,7 +25,6 @@ import (
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/store"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 //go:embed get_example.md
@@ -69,7 +67,7 @@ func GetCommand(options ...ClientOption) (*cobra.Command, error) {
 			if !reveal {
 				return printSecret(cmd.OutOrStdout(), id, []byte(maskedValue))
 			}
-			if err := authorizeReveal(cmd.Context(), clientOpts, id); err != nil {
+			if err := authorizeAccess(cmd.Context(), clientOpts, id); err != nil {
 				return err
 			}
 			value, err := pv.Marshal()
@@ -82,23 +80,6 @@ func GetCommand(options ...ClientOption) (*cobra.Command, error) {
 	}
 	cmd.Flags().BoolVar(&reveal, "reveal", false, "Show the secret value in plaintext")
 	return wrapKeychainErrors(cmd), nil
-}
-
-func authorizeReveal(ctx context.Context, opts clientOpts, id store.ID) error {
-	pattern, err := secrets.ParsePattern(id.String())
-	if err != nil {
-		return err
-	}
-	c, err := newClient(opts)
-	if err != nil {
-		return err
-	}
-	if opts.isUnbound() {
-		if err := preflightPing(ctx, c, defaultPreflightPingTimeout); err != nil {
-			return err
-		}
-	}
-	return authorize(ctx, c, pattern)
 }
 
 func printSecret(w io.Writer, id store.ID, value []byte) error {

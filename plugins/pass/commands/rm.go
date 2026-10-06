@@ -31,17 +31,25 @@ import (
 //go:embed rm_example.md
 var rmExample string
 
+//go:embed rm_long.md
+var rmLong string
+
 type rmOpts struct {
-	All bool
+	clientOpts
+	all bool
 }
 
-func RmCommand() *cobra.Command {
-	opts := rmOpts{}
+func RmCommand(options ...ClientOption) (*cobra.Command, error) {
+	copts, err := parseClientOptions(options...)
+	if err != nil {
+		return nil, err
+	}
+	opts := rmOpts{clientOpts: copts}
 	cmd := &cobra.Command{
 		Use:     "rm name1 name2 ...",
 		Aliases: []string{"delete", "erase", "remove"},
 		Short:   "Remove secrets from local keychain.",
-		Long:    "Removes one or more named secrets from the local OS keychain. Use `--all` to remove every stored secret at once.",
+		Long:    strings.Trim(rmLong, "\n"),
 		Example: strings.Trim(rmExample, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			idList, err := validateArgs(args, opts)
@@ -56,12 +64,12 @@ func RmCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.BoolVar(&opts.All, "all", false, "Remove all secrets")
-	return wrapKeychainErrors(cmd)
+	flags.BoolVar(&opts.all, "all", false, "Remove all secrets")
+	return wrapKeychainErrors(cmd), nil
 }
 
 func validateArgs(args []string, opts rmOpts) ([]store.ID, error) {
-	if (len(args) == 0 && !opts.All) || (len(args) > 0 && opts.All) {
+	if (len(args) == 0 && !opts.all) || (len(args) > 0 && opts.all) {
 		return nil, fmt.Errorf("either provide a secret name or use --all to remove all secrets")
 	}
 	var result []store.ID
@@ -80,19 +88,29 @@ func runRm(ctx context.Context, out io.Writer, kc store.Store, idList []store.ID
 	if err != nil {
 		return err
 	}
-	if opts.All && len(idList) == 0 {
+	if opts.all && len(idList) == 0 {
 		for k := range existing {
 			idList = append(idList, k)
 		}
 	}
 	slices.SortFunc(idList, func(a, b store.ID) int { return strings.Compare(a.String(), b.String()) })
 	var errs []error
+	var toDelete []store.ID
 	for _, id := range idList {
 		if _, ok := existing[id]; !ok {
 			errs = append(errs, fmt.Errorf("%s: %w", id, store.ErrCredentialNotFound))
 			fmt.Fprintf(out, "ERR: %s: %s\n", id, store.ErrCredentialNotFound)
 			continue
 		}
+		toDelete = append(toDelete, id)
+	}
+	if len(toDelete) == 0 {
+		return errors.Join(errs...)
+	}
+	if err := authorizeAccess(ctx, opts.clientOpts, toDelete...); err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, id := range toDelete {
 		if err := kc.Delete(ctx, id); err != nil {
 			errs = append(errs, err)
 			fmt.Fprintf(out, "ERR: %s: %s\n", id, err)
