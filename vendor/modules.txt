@@ -2,9 +2,6 @@
 # charm.land/bubbles/v2 v2.2.1
 ## explicit; go 1.25.0
 charm.land/bubbles/v2/cursor
-charm.land/bubbles/v2/internal/runeutil
-charm.land/bubbles/v2/key
-charm.land/bubbles/v2/textinput
 # charm.land/bubbletea/v2 v2.0.10
 ## explicit; go 1.26.0
 charm.land/bubbletea/v2
@@ -32,9 +29,6 @@ filippo.io/hpke
 filippo.io/hpke/crypto
 filippo.io/hpke/crypto/ecdh
 filippo.io/hpke/internal/byteorder
-# github.com/atotto/clipboard v0.1.4
-## explicit
-github.com/atotto/clipboard
 # github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5

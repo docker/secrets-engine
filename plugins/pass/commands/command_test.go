@@ -450,6 +450,20 @@ func Test_promptModel(t *testing.T) {
 		}
 		return m
 	}
+	press := func(m promptModel, keys ...tea.KeyPressMsg) (promptModel, tea.Cmd) {
+		var cmd tea.Cmd
+		for _, k := range keys {
+			var next tea.Model
+			next, cmd = m.Update(k)
+			m = next.(promptModel)
+		}
+		return m, cmd
+	}
+	ctrl := func(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Mod: tea.ModCtrl} }
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	backspace := tea.KeyPressMsg{Code: tea.KeyBackspace}
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
+
 	t.Run("masks typed input", func(t *testing.T) {
 		t.Parallel()
 		m := typeText(newPromptModel("foo"), "hunter2")
@@ -457,36 +471,98 @@ func Test_promptModel(t *testing.T) {
 		assert.Contains(t, view, "Enter secret for foo: ")
 		assert.Contains(t, view, "*******")
 		assert.NotContains(t, view, "hunter2")
-		assert.Equal(t, "hunter2", m.input.Value())
+		assert.Equal(t, "hunter2", string(m.value))
 		assert.True(t, strings.HasSuffix(view, "\n"), "trailing newline keeps the line on screen at exit")
 	})
 	t.Run("enter submits", func(t *testing.T) {
 		t.Parallel()
-		m := typeText(newPromptModel("foo"), "hunter2")
-		next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m, cmd := press(typeText(newPromptModel("foo"), "hunter2"), enter)
 		require.NotNil(t, cmd)
 		assert.IsType(t, tea.QuitMsg{}, cmd())
-		assert.NoError(t, next.(promptModel).err)
+		assert.NoError(t, m.err)
+		assert.Equal(t, "hunter2", string(m.value))
 	})
 	t.Run("enter on empty input errors", func(t *testing.T) {
 		t.Parallel()
-		next, cmd := newPromptModel("foo").Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m, cmd := press(newPromptModel("foo"), enter)
 		require.NotNil(t, cmd)
 		assert.IsType(t, tea.QuitMsg{}, cmd())
-		assert.ErrorIs(t, next.(promptModel).err, errEmptyValue)
+		assert.ErrorIs(t, m.err, errEmptyValue)
+	})
+	t.Run("ctrl+j and ctrl+d submit like enter", func(t *testing.T) {
+		t.Parallel()
+		for _, k := range []tea.KeyPressMsg{ctrl('j'), ctrl('d')} {
+			m, cmd := press(typeText(newPromptModel("foo"), "hunter2"), k)
+			require.NotNil(t, cmd, k.String())
+			assert.IsType(t, tea.QuitMsg{}, cmd(), k.String())
+			assert.NoError(t, m.err, k.String())
+			assert.Equal(t, "hunter2", string(m.value), k.String())
+		}
 	})
 	t.Run("ctrl+c interrupts", func(t *testing.T) {
 		t.Parallel()
-		_, cmd := newPromptModel("foo").Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		_, cmd := press(newPromptModel("foo"), ctrl('c'))
 		require.NotNil(t, cmd)
 		assert.IsType(t, tea.InterruptMsg{}, cmd())
 	})
-	t.Run("paste drops the trailing newline", func(t *testing.T) {
+	t.Run("input after enter is ignored", func(t *testing.T) {
 		t.Parallel()
-		next, _ := newPromptModel("foo").Update(tea.PasteMsg{Content: "hunter2\n"})
+		m, _ := press(typeText(newPromptModel("foo"), "line1"), enter)
+		m = typeText(m, "line2")
+		next, cmd := m.Update(tea.PasteMsg{Content: "line3"})
+		assert.Nil(t, cmd)
+		m = next.(promptModel)
+		assert.NoError(t, m.err)
+		assert.Equal(t, "line1", string(m.value))
+	})
+	t.Run("backspace erases one rune", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(typeText(newPromptModel("foo"), "héllo"), backspace, backspace, backspace)
+		assert.Equal(t, "hé", string(m.value))
+		m, _ = press(m, backspace, backspace, backspace)
+		assert.Equal(t, "", string(m.value), "erasing past the start is a no-op")
+	})
+	t.Run("ctrl+w erases the last word", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(typeText(newPromptModel("foo"), "two words \t"), ctrl('w'))
+		assert.Equal(t, "two ", string(m.value))
+		m, _ = press(m, ctrl('w'), ctrl('w'))
+		assert.Equal(t, "", string(m.value))
+	})
+	t.Run("ctrl+u clears the line", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(typeText(newPromptModel("foo"), "hunter2"), ctrl('u'))
+		assert.Equal(t, "", string(m.value))
+		assert.Equal(t, "x", string(typeText(m, "x").value), "typing continues after the kill")
+	})
+	t.Run("tab is stored verbatim", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(typeText(newPromptModel("foo"), "a"), tab)
+		m = typeText(m, "b")
+		assert.Equal(t, "a\tb", string(m.value))
+		assert.Contains(t, m.View().Content, "***")
+	})
+	t.Run("ctrl+v inserts the next key literally", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(newPromptModel("foo"), ctrl('v'), ctrl('a'), ctrl('v'), enter, ctrl('v'), ctrl('u'))
+		m = typeText(m, "x")
+		assert.Equal(t, "\x01\r\x15x", string(m.value))
+		assert.NoError(t, m.err)
+		_, cmd := press(m, ctrl('v'), ctrl('c'))
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.InterruptMsg{}, cmd(), "ctrl+c always interrupts")
+	})
+	t.Run("keys without text are ignored", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(typeText(newPromptModel("foo"), "hunter2"), tea.KeyPressMsg{Code: tea.KeyUp}, tea.KeyPressMsg{Code: tea.KeyF1})
+		assert.Equal(t, "hunter2", string(m.value))
+	})
+	t.Run("paste is stored verbatim", func(t *testing.T) {
+		t.Parallel()
+		next, _ := newPromptModel("foo").Update(tea.PasteMsg{Content: "a\tb\x01 \xff\n"})
 		m := next.(promptModel)
 		assert.NoError(t, m.err)
-		assert.Equal(t, "hunter2", m.input.Value())
+		assert.Equal(t, "a\tb\x01 \xff", string(m.value), "only the trailing newline is dropped")
 	})
 	t.Run("multi-line paste is rejected", func(t *testing.T) {
 		t.Parallel()
@@ -494,6 +570,51 @@ func Test_promptModel(t *testing.T) {
 		require.NotNil(t, cmd)
 		assert.IsType(t, tea.QuitMsg{}, cmd())
 		assert.ErrorIs(t, next.(promptModel).err, errMultilinePaste)
+	})
+	t.Run("modifiers on enter, backspace and tab follow the tty", func(t *testing.T) {
+		t.Parallel()
+		shiftEnter := tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}
+		shiftBackspace := tea.KeyPressMsg{Code: tea.KeyBackspace, Mod: tea.ModShift}
+		m, cmd := press(typeText(newPromptModel("foo"), "hunter23"), shiftBackspace, shiftEnter)
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd())
+		assert.Equal(t, "hunter2", string(m.value))
+		ctrlBackspace := tea.KeyPressMsg{Code: tea.KeyBackspace, Mod: tea.ModCtrl}
+		shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+		m, _ = press(typeText(newPromptModel("foo"), "ab"), ctrlBackspace, ctrl('i'), shiftTab)
+		assert.Equal(t, "a\t", string(m.value), "ctrl+backspace erases, ctrl+i is a tab, shift+tab is ignored")
+		_, cmd = press(typeText(newPromptModel("foo"), "x"), ctrl('m'))
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd(), "ctrl+m is CR")
+		_, cmd = press(newPromptModel("foo"), tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl | tea.ModShift})
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.InterruptMsg{}, cmd(), "shift does not mask ctrl+c")
+	})
+	t.Run("a paste spends the ctrl+v quote", func(t *testing.T) {
+		t.Parallel()
+		m, _ := press(newPromptModel("foo"), ctrl('v'))
+		next, _ := m.Update(tea.PasteMsg{Content: "ab"})
+		m, cmd := press(next.(promptModel), enter)
+		require.NotNil(t, cmd)
+		assert.IsType(t, tea.QuitMsg{}, cmd(), "enter after the paste submits instead of inserting a literal CR")
+		assert.NoError(t, m.err)
+		assert.Equal(t, "ab", string(m.value))
+	})
+	t.Run("ctrl+v quotes every key that has bytes", func(t *testing.T) {
+		t.Parallel()
+		alt := func(r rune, mod tea.KeyMod) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Mod: tea.ModAlt | mod} }
+		m, _ := press(newPromptModel("foo"),
+			ctrl('v'), tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl},
+			ctrl('v'), ctrl('\\'),
+			ctrl('v'), ctrl('_'),
+			ctrl('v'), alt('x', 0),
+			ctrl('v'), alt('x', tea.ModShift),
+			ctrl('v'), alt('a', tea.ModCtrl),
+			ctrl('v'), alt(tea.KeyEnter, 0),
+			ctrl('v'), tea.KeyPressMsg{Code: tea.KeyUp}, tea.KeyPressMsg{Code: 'a', Text: "a"},
+		)
+		assert.Equal(t, "\x00\x1c\x1f\x1bx\x1bX\x1b\x01\x1b\ra", string(m.value), "an arrow has no bytes, so the quote waits for the next key")
+		assert.False(t, m.literal)
 	})
 }
 
