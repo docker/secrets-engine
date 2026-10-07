@@ -94,8 +94,11 @@ You no longer need:
 Store the secret in your OS keychain:
 
 ```bash
-# recommended: stdin keeps the secret out of the command line (visible in htop) and shell history
+# recommended: a masked prompt keeps the secret out of the command line (visible in htop) and shell history
 docker pass set foo
+
+# multi-line values, such as certificates, come from a file or a pipe
+docker pass set my-cert < cert.pem
 
 # or pass the value inline
 docker pass set foo=secret

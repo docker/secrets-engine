@@ -9,6 +9,7 @@ replace github.com/docker/secrets-engine/store => ./../../store
 replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
+	github.com/charmbracelet/x/term v0.2.2
 	github.com/docker/secrets-engine/client v0.1.2
 	github.com/docker/secrets-engine/plugin v0.3.2
 	github.com/docker/secrets-engine/store v0.4.1
@@ -16,6 +17,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/sys v0.46.0
 )
 
 require (
@@ -29,7 +31,6 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

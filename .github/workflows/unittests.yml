@@ -4,9 +4,11 @@ on:
     branches:
       - main
   pull_request:
+permissions:
+  contents: read
 jobs:
   unit-tests:
-    name: Unit Tests
+    name: Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -14,5 +16,37 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.work
-      - name: Unit Tests
+      - name: Tests
         run: make unit-tests
+
+  unit-tests-cross:
+    name: ${{ matrix.module }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        module: [plugins/pass]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.work
+      - name: Tests
+        run: go test -trimpath -race -v ./${{ matrix.module }}/...
+        env:
+          CGO_ENABLED: "1"
+
+  unit-tests-result:
+    name: Unit Tests
+    needs:
+      - unit-tests
+      - unit-tests-cross
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          [ "${{ needs.unit-tests.result }}" = "success" ] || exit 1
+          [ "${{ needs.unit-tests-cross.result }}" = "success" ] || exit 1
