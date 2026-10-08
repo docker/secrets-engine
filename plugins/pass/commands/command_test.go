@@ -381,8 +381,6 @@ func TestWithEngineHint(t *testing.T) {
 	connErr := func(reason client.ConnectReason, socket string) error {
 		return fmt.Errorf("authorizing: %w", &client.ConnectError{Reason: reason, SocketPath: socket, Err: errors.New("dial")})
 	}
-	// The wording of each hint is tested in the client package, next to
-	// ConnectError.Hint; here we check that pass finds and appends it.
 	desktop := api.DesktopSocketPath()
 	tests := []struct {
 		name string
