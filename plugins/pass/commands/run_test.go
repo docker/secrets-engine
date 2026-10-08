@@ -46,11 +46,6 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
-// Sentinels driving TestMain modes:
-//
-//	helperWrapperEnv: act as a RunCommand wrapper — invoke RunCommand with
-//	  args=[exe] so it execs this test binary again as a grandchild.
-//	helperActiveEnv:  act as the leaf child — exit with the requested code.
 const (
 	helperWrapperEnv = "GO_PASS_RUN_WRAPPER"
 	helperActiveEnv  = "GO_PASS_RUN_HELPER_ACTIVE"
@@ -96,10 +91,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// runAsWrapper invokes RunCommand with args=[exe], so RunCommand execs the
-// test binary again as a grandchild. The grandchild's exit code propagates:
-// RunCommand calls os.Exit(code), so this wrapper process exits with the same
-// code, which the outer test then observes via exec.ExitError.
 func runAsWrapper() {
 	exe, err := os.Executable()
 	if err != nil {
@@ -177,7 +168,6 @@ func TestParseEnv(t *testing.T) {
 	})
 }
 
-// mustParseEnv parses env, failing the test on an invalid reference.
 func mustParseEnv(t *testing.T, env []string) []envVar {
 	t.Helper()
 	vars, err := parseEnv(env)
@@ -372,8 +362,6 @@ func TestRunCommandOptions(t *testing.T) {
 	})
 }
 
-// TestRunCommand covers cobra-level behavior against a mock engine or none.
-// TestParseEnv and TestResolveEnv cover the details.
 func TestRunCommand(t *testing.T) {
 	exe, err := os.Executable()
 	require.NoError(t, err)
@@ -546,7 +534,6 @@ func (e *mockEngine) recorded() []string {
 	return slices.Clone(e.calls)
 }
 
-// serve starts the engine on a fresh socket and returns the socket path.
 func (e *mockEngine) serve(t *testing.T) string {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -561,7 +548,6 @@ func (e *mockEngine) serve(t *testing.T) string {
 	return socket
 }
 
-// pingClient adapts a Version func to client.Client.
 type pingClient struct {
 	testhelper.MockResolver
 	ping func(context.Context) (client.DaemonVersion, error)
@@ -590,9 +576,9 @@ func TestPreflightPing(t *testing.T) {
 		require.NoError(t, preflightPing(t.Context(), c, time.Second))
 	})
 
-	t.Run("fails when the engine is unreachable", func(t *testing.T) {
+	t.Run("fails when the engine is not running", func(t *testing.T) {
 		t.Parallel()
-		engineErr := errors.New("connection refused")
+		engineErr := &client.ConnectError{Reason: client.ReasonNotRunning, Err: errors.New("connection refused")}
 		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
 			return client.DaemonVersion{}, engineErr
 		}}
@@ -600,7 +586,19 @@ func TestPreflightPing(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "preflight ping")
 		assert.ErrorIs(t, err, engineErr)
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
+	})
+
+	t.Run("passes through engine errors that are not connection failures", func(t *testing.T) {
+		t.Parallel()
+		engineErr := errors.New("unimplemented")
+		c := pingClient{ping: func(_ context.Context) (client.DaemonVersion, error) {
+			return client.DaemonVersion{}, engineErr
+		}}
+		err := preflightPing(t.Context(), c, time.Second)
+		require.ErrorIs(t, err, engineErr)
+		_, ok := errors.AsType[*client.ConnectError](err)
+		assert.False(t, ok)
 	})
 
 	t.Run("gives up after the timeout when the engine hangs", func(t *testing.T) {
@@ -618,11 +616,10 @@ func TestPreflightPing(t *testing.T) {
 		require.Error(t, err)
 		require.Less(t, time.Since(start), 2*time.Second)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineTimeout)
 	})
 }
 
-// testWriter forwards cobra output to t.Log so it does not leak onto stderr.
 type testWriter struct{ t *testing.T }
 
 func (w testWriter) Write(p []byte) (int, error) {

@@ -16,10 +16,13 @@ package client
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 	"time"
 
@@ -321,7 +324,7 @@ func Test_Authorize(t *testing.T) {
 		c, err := New(WithSocketPath(socketPath))
 		require.NoError(t, err)
 		_, err = c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
-		require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
 	})
 }
 
@@ -342,7 +345,7 @@ func Test_Version(t *testing.T) {
 		c, err := New(WithSocketPath(socketPath))
 		require.NoError(t, err)
 		_, err = c.Version(t.Context())
-		require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
 	})
 }
 
@@ -353,9 +356,9 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 	m, err := PluginManagementFromClient(client)
 	require.NoError(t, err)
 	_, err = m.ListPlugins(t.Context())
-	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
 	_, err = client.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
-	require.ErrorIs(t, err, ErrSecretsEngineNotAvailable)
+	require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
 }
 
 func TestHubAuth(t *testing.T) {
@@ -373,4 +376,87 @@ func TestIsDialError(t *testing.T) {
 		Op: "connect",
 	}))
 	require.False(t, isDialError(nil))
+}
+
+func TestConnectError(t *testing.T) {
+	dialErr := func(err error) error {
+		return &net.OpError{Op: "dial", Net: "unix", Err: os.NewSyscallError("connect", err)}
+	}
+	sentinels := []error{ErrSecretsEngineNotRunning, ErrSecretsEnginePermissionDenied, ErrSecretsEngineTimeout}
+	tests := []struct {
+		name     string
+		err      error
+		reason   ConnectReason
+		sentinel error
+	}{
+		{name: "missing socket", err: dialErr(syscall.ENOENT), reason: ReasonNotRunning, sentinel: ErrSecretsEngineNotRunning},
+		{name: "nothing listening", err: dialErr(errConnRefused), reason: ReasonNotRunning, sentinel: ErrSecretsEngineNotRunning},
+		{name: "permission denied", err: dialErr(syscall.EACCES), reason: ReasonPermissionDenied, sentinel: ErrSecretsEnginePermissionDenied},
+		{name: "i/o timeout", err: &net.OpError{Op: "dial", Net: "unix", Err: os.ErrDeadlineExceeded}, reason: ReasonTimeout, sentinel: ErrSecretsEngineTimeout},
+		{name: "context deadline", err: &net.OpError{Op: "dial", Net: "unix", Err: context.DeadlineExceeded}, reason: ReasonTimeout, sentinel: ErrSecretsEngineTimeout},
+		{name: "other", err: dialErr(syscall.ECONNRESET), reason: ReasonUnknown},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := connectError("/run/engine.sock", tc.err)
+			ce, ok := errors.AsType[*ConnectError](err)
+			require.True(t, ok)
+			assert.Equal(t, tc.reason, ce.Reason)
+			assert.Equal(t, "/run/engine.sock", ce.SocketPath)
+			require.ErrorIs(t, err, tc.err, "the dial error stays inspectable")
+			for _, s := range sentinels {
+				assert.Equal(t, s == tc.sentinel, errors.Is(err, s), "errors.Is(err, %q)", s)
+			}
+		})
+	}
+	t.Run("cancelled context is not an engine error", func(t *testing.T) {
+		in := &net.OpError{Op: "dial", Net: "unix", Err: context.Canceled}
+		err := connectError("/run/engine.sock", in)
+		assert.Same(t, in, err)
+	})
+	t.Run("message", func(t *testing.T) {
+		err := connectError("/run/engine.sock", dialErr(syscall.ENOENT))
+		assert.Equal(t, "secrets engine is not running at /run/engine.sock: dial unix: connect: "+syscall.ENOENT.Error(), err.Error())
+		err = connectError("", dialErr(syscall.ECONNRESET))
+		assert.Equal(t, "cannot connect to the secrets engine: dial unix: connect: "+syscall.ECONNRESET.Error(), err.Error())
+	})
+}
+
+func TestConnectErrorFromSocket(t *testing.T) {
+	getSecrets := func(t *testing.T, socketPath string) error {
+		t.Helper()
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		_, err = c.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+		return err
+	}
+
+	t.Run("missing socket", func(t *testing.T) {
+		err := getSecrets(t, testhelper.RandomShortSocketName())
+		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
+	})
+	t.Run("nothing listening", func(t *testing.T) {
+		socketPath := testhelper.RandomShortSocketName()
+		l, err := net.Listen("unix", socketPath)
+		require.NoError(t, err)
+		l.(*net.UnixListener).SetUnlinkOnClose(false)
+		require.NoError(t, l.Close())
+		t.Cleanup(func() { _ = os.Remove(socketPath) })
+
+		err = getSecrets(t, socketPath)
+		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
+	})
+	t.Run("permission denied", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("needs Unix file permissions enforced for the current user")
+		}
+		socketPath := testhelper.RandomShortSocketName()
+		l, err := net.Listen("unix", socketPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = l.Close() })
+		require.NoError(t, os.Chmod(socketPath, 0o000))
+
+		err = getSecrets(t, socketPath)
+		require.ErrorIs(t, err, ErrSecretsEnginePermissionDenied)
+	})
 }

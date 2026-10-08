@@ -49,9 +49,8 @@ var (
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
 
-	ErrSecretNotFound            = secrets.ErrNotFound
-	ErrAccessDenied              = secrets.ErrAccessDenied
-	ErrSecretsEngineNotAvailable = errors.New("secrets engine is not available")
+	ErrSecretNotFound = secrets.ErrNotFound
+	ErrAccessDenied   = secrets.ErrAccessDenied
 )
 
 var _ secrets.Resolver = &client{}
@@ -66,6 +65,7 @@ func WithSocketPath(path string) Option {
 		if s.dialContext != nil {
 			return errors.New("cannot set socket path and dial")
 		}
+		s.socketPath = path
 		s.dialContext = dialFromPath(path)
 		return nil
 	}
@@ -114,6 +114,7 @@ func WithResponseTimeout(responseTimeout time.Duration) Option {
 type dial func(ctx context.Context, network, addr string) (net.Conn, error)
 
 type config struct {
+	socketPath      string
 	dialContext     dial
 	requestTimeout  time.Duration
 	responseTimeout time.Duration
@@ -125,6 +126,7 @@ var (
 )
 
 type client struct {
+	socketPath       string
 	resolverClient   secrets.Resolver
 	engineClient     pluginsv1connect.PluginManagementServiceClient
 	versionClient    healthv1connect.VersionServiceClient
@@ -136,7 +138,7 @@ type client struct {
 func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	resp, err := c.authorizerClient.Authorize(ctx, patterns...)
 	if isDialError(err) {
-		return secrets.AuthorizeResponse{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return secrets.AuthorizeResponse{}, c.connectError(err)
 	}
 	if err != nil {
 		return secrets.AuthorizeResponse{}, err
@@ -147,7 +149,7 @@ func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (sec
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
 	if isDialError(err) {
-		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return nil, c.connectError(err)
 	}
 	if err != nil {
 		return nil, err
@@ -162,7 +164,7 @@ func (c client) HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth {
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 	resp, err := c.versionClient.GetVersion(ctx, connect.NewRequest(healthv1.GetVersionRequest_builder{}.Build()))
 	if isDialError(err) {
-		return DaemonVersion{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return DaemonVersion{}, c.connectError(err)
 	}
 	if err != nil {
 		return DaemonVersion{}, err
@@ -211,6 +213,10 @@ func isDialError(err error) bool {
 	return false
 }
 
+func (c client) connectError(err error) error {
+	return connectError(c.socketPath, err)
+}
+
 // New creates a client that connects to [api.StandaloneSocketPath] by default.
 // To connect to Docker Desktop, use WithSocketPath(api.DesktopSocketPath()).
 func New(options ...Option) (Client, error) {
@@ -224,7 +230,8 @@ func New(options ...Option) (Client, error) {
 		}
 	}
 	if cfg.dialContext == nil {
-		cfg.dialContext = dialFromPath(api.StandaloneSocketPath())
+		cfg.socketPath = api.StandaloneSocketPath()
+		cfg.dialContext = dialFromPath(cfg.socketPath)
 	}
 	c := &http.Client{
 		Transport: &http.Transport{
@@ -248,6 +255,7 @@ func New(options ...Option) (Client, error) {
 		Timeout: cfg.requestTimeout,
 	}
 	return &client{
+		socketPath:       cfg.socketPath,
 		resolverClient:   resolver.NewResolverClient(c),
 		engineClient:     pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
 		versionClient:    healthv1connect.NewVersionServiceClient(c, "http://unix"),
@@ -259,7 +267,7 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 	req := connect.NewRequest(pluginsv1.ListPluginsRequest_builder{}.Build())
 	resp, err := c.engineClient.ListPlugins(ctx, req)
 	if isDialError(err) {
-		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return nil, c.connectError(err)
 	}
 	if err != nil {
 		return nil, err
@@ -303,7 +311,7 @@ func (c client) EnablePlugin(ctx context.Context, name string) error {
 	r.SetName(name)
 	_, err := c.engineClient.EnablePlugin(ctx, connect.NewRequest(r))
 	if isDialError(err) {
-		return fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return c.connectError(err)
 	}
 	return err
 }
@@ -313,7 +321,7 @@ func (c client) DisablePlugin(ctx context.Context, name string) error {
 	r.SetName(name)
 	_, err := c.engineClient.DisablePlugin(ctx, connect.NewRequest(r))
 	if isDialError(err) {
-		return fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
+		return c.connectError(err)
 	}
 	return err
 }

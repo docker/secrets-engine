@@ -211,8 +211,8 @@ func TestGetSession(t *testing.T) {
 		require.ErrorContains(t, err, "must not contain '/'")
 	})
 	t.Run("engine unavailable", func(t *testing.T) {
-		_, err := hub(t, fakeEngine{err: client.ErrSecretsEngineNotAvailable}).GetSession(t.Context(), "alice")
-		require.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		_, err := hub(t, fakeEngine{err: client.ErrSecretsEngineNotRunning}).GetSession(t.Context(), "alice")
+		require.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 	})
 }
 
@@ -390,8 +390,8 @@ func TestListProfiles(t *testing.T) {
 		require.ErrorContains(t, err, "decode profile metadata")
 	})
 	t.Run("engine unavailable", func(t *testing.T) {
-		_, err := hub(t, fakeEngine{err: client.ErrSecretsEngineNotAvailable}).ListProfiles(t.Context())
-		require.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		_, err := hub(t, fakeEngine{err: client.ErrSecretsEngineNotRunning}).ListProfiles(t.Context())
+		require.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 	})
 }
 
