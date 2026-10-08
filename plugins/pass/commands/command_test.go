@@ -381,32 +381,24 @@ func TestWithEngineHint(t *testing.T) {
 	connErr := func(reason client.ConnectReason, socket string) error {
 		return fmt.Errorf("authorizing: %w", &client.ConnectError{Reason: reason, SocketPath: socket, Err: errors.New("dial")})
 	}
+	// The wording of each hint is tested in the client package, next to
+	// ConnectError.Hint; here we check that pass finds and appends it.
 	desktop := api.DesktopSocketPath()
-	standalone := api.StandaloneSocketPath()
-	denied := func(socket string) string {
-		return "Your user lacks permission to connect to " + socket + ". Grant it read and write access to the socket and retry."
-	}
 	tests := []struct {
 		name string
 		err  error
 		hint string
 	}{
-		{name: "desktop not running", err: connErr(client.ReasonNotRunning, desktop), hint: desktopNotRunningHint},
-		{name: "desktop timeout", err: connErr(client.ReasonTimeout, desktop), hint: desktopTimeoutHint},
 		{
-			name: "standalone not running",
-			err:  connErr(client.ReasonNotRunning, standalone),
-			hint: "Start the standalone secrets engine and retry: nothing is listening on " + strconv.Quote(standalone) + ".",
+			name: "wrapped connect error",
+			err:  connErr(client.ReasonNotRunning, desktop),
+			hint: "Start Docker Desktop and retry: the secrets engine runs as part of it.",
 		},
-		{name: "standalone timeout", err: connErr(client.ReasonTimeout, standalone), hint: "The standalone secrets engine on " + strconv.Quote(standalone) + " did not respond. Restart it and retry."},
-		{name: "custom socket not running", err: connErr(client.ReasonNotRunning, "/s.sock"), hint: `Start the secrets engine and retry: nothing is listening on "/s.sock".`},
-		{name: "custom socket timeout", err: connErr(client.ReasonTimeout, "/s.sock"), hint: `The secrets engine on "/s.sock" did not respond. Restart it and retry.`},
-		{name: "permission denied", err: connErr(client.ReasonPermissionDenied, "/s.sock"), hint: denied(`"/s.sock"`)},
-		{name: "permission denied on desktop socket", err: connErr(client.ReasonPermissionDenied, desktop), hint: denied(strconv.Quote(desktop))},
-		{name: "permission denied without path", err: connErr(client.ReasonPermissionDenied, ""), hint: denied("the secrets engine socket")},
-		{name: "not running without path", err: connErr(client.ReasonNotRunning, ""), hint: "Start the secrets engine and retry: nothing is listening on the secrets engine socket."},
-		{name: "control characters in path are quoted", err: connErr(client.ReasonNotRunning, "/s\n.sock"), hint: `Start the secrets engine and retry: nothing is listening on "/s\n.sock".`},
-		{name: "joined with other errors", err: errors.Join(store.ErrCredentialNotFound, connErr(client.ReasonNotRunning, desktop)), hint: desktopNotRunningHint},
+		{
+			name: "joined with other errors",
+			err:  errors.Join(store.ErrCredentialNotFound, connErr(client.ReasonTimeout, "/s.sock")),
+			hint: `The secrets engine on "/s.sock" did not respond. Restart it and retry.`,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

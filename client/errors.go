@@ -17,8 +17,12 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net"
+	"path/filepath"
+
+	"github.com/docker/secrets-engine/x/api"
 )
 
 var (
@@ -87,6 +91,74 @@ func (e *ConnectError) Unwrap() error { return e.Err }
 func (e *ConnectError) Is(target error) bool {
 	s := e.Reason.sentinel()
 	return s != nil && target == s
+}
+
+const (
+	desktopNotRunningHint    = "Start Docker Desktop and retry: the secrets engine runs as part of it."
+	desktopTimeoutHint       = "The secrets engine did not respond. Restart Docker Desktop and retry."
+	standaloneNotRunningHint = "Start the standalone secrets engine and retry: nothing is listening on %s."
+	standaloneTimeoutHint    = "The standalone secrets engine on %s did not respond. Restart it and retry."
+	customNotRunningHint     = "Start the secrets engine and retry: nothing is listening on %s."
+	customTimeoutHint        = "The secrets engine on %s did not respond. Restart it and retry."
+	permissionDeniedHint     = "Your user lacks permission to connect to %s. Grant it read and write access to the socket and retry."
+)
+
+// Hint returns a one-line suggestion for how a user can fix the failed
+// connection, or "" when the reason is unknown. It names Docker Desktop or the
+// standalone engine when SocketPath is that engine's default socket. The socket
+// path is quoted so control characters in it cannot corrupt terminal output.
+func (e *ConnectError) Hint() string {
+	socket := "the secrets engine socket"
+	if e.SocketPath != "" {
+		socket = fmt.Sprintf("%q", e.SocketPath)
+	}
+	kind := classifySocket(e.SocketPath)
+	switch e.Reason {
+	case ReasonNotRunning:
+		switch kind {
+		case engineDesktop:
+			return desktopNotRunningHint
+		case engineStandalone:
+			return fmt.Sprintf(standaloneNotRunningHint, socket)
+		default:
+			return fmt.Sprintf(customNotRunningHint, socket)
+		}
+	case ReasonTimeout:
+		switch kind {
+		case engineDesktop:
+			return desktopTimeoutHint
+		case engineStandalone:
+			return fmt.Sprintf(standaloneTimeoutHint, socket)
+		default:
+			return fmt.Sprintf(customTimeoutHint, socket)
+		}
+	case ReasonPermissionDenied:
+		return fmt.Sprintf(permissionDeniedHint, socket)
+	default:
+		return ""
+	}
+}
+
+type engineKind int
+
+const (
+	engineCustom engineKind = iota
+	engineDesktop
+	engineStandalone
+)
+
+func classifySocket(path string) engineKind {
+	if path == "" {
+		return engineCustom
+	}
+	switch filepath.Clean(path) {
+	case filepath.Clean(api.DesktopSocketPath()):
+		return engineDesktop
+	case filepath.Clean(api.StandaloneSocketPath()):
+		return engineStandalone
+	default:
+		return engineCustom
+	}
 }
 
 func connectReason(err error) ConnectReason {
