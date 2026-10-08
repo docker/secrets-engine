@@ -25,6 +25,8 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/client/internal/hook"
+	"github.com/docker/secrets-engine/client/trace"
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
@@ -40,6 +42,12 @@ type (
 	Pattern           = secrets.Pattern
 	AuthorizeResponse = secrets.AuthorizeResponse
 	DaemonVersion     = api.DaemonVersion
+
+	// Hooks are observability callbacks; see [trace.Hooks].
+	Hooks = trace.Hooks
+	// Operation identifies an SDK call passed to [Hooks]; see
+	// [trace.Operation].
+	Operation = trace.Operation
 )
 
 var (
@@ -111,12 +119,49 @@ func WithResponseTimeout(responseTimeout time.Duration) Option {
 	}
 }
 
+// WithHooks installs observability hooks called around every client
+// operation: GetSecrets, Authorize, Version, and plugin management. They also
+// apply to the accessor returned by HubAuth, which reports its own dockerhub.*
+// operations with the resolver calls nested inside them.
+//
+// Start may return a derived context, for example one carrying a span. The
+// client uses it for the RPC, so it is visible to transports installed with
+// [WithTransport]. A later WithHooks replaces an earlier one.
+//
+// Hooks never receive secret values or request patterns; see
+// [trace.Hooks].
+func WithHooks(h Hooks) Option {
+	return func(s *config) error {
+		s.hooks = h
+		return nil
+	}
+}
+
+// WithTransport wraps the client's HTTP transport, for example to add
+// request-level instrumentation. wrap receives the transport the client would
+// otherwise use and must return a non-nil RoundTripper. The request context
+// is the one returned by [Hooks.Start] when hooks are set.
+//
+// With several WithTransport options, the first wraps the base transport and
+// each later one wraps the result of the previous one.
+func WithTransport(wrap func(http.RoundTripper) http.RoundTripper) Option {
+	return func(s *config) error {
+		if wrap == nil {
+			return errors.New("transport wrapper must not be nil")
+		}
+		s.wrapTransport = append(s.wrapTransport, wrap)
+		return nil
+	}
+}
+
 type dial func(ctx context.Context, network, addr string) (net.Conn, error)
 
 type config struct {
 	dialContext     dial
 	requestTimeout  time.Duration
 	responseTimeout time.Duration
+	hooks           Hooks
+	wrapTransport   []func(http.RoundTripper) http.RoundTripper
 }
 
 var (
@@ -129,11 +174,19 @@ type client struct {
 	engineClient     pluginsv1connect.PluginManagementServiceClient
 	versionClient    healthv1connect.VersionServiceClient
 	authorizerClient secrets.Authorizer
+	hooks            Hooks
 }
 
 // Authorize decides access to the patterns. The decision holds until the
 // response expiry. A zero expiry means the decision never expires.
 func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpAuthorizerAuthorize})
+	resp, err := c.authorize(ctx, patterns...)
+	done(err)
+	return resp, err
+}
+
+func (c client) authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
 	resp, err := c.authorizerClient.Authorize(ctx, patterns...)
 	if isDialError(err) {
 		return secrets.AuthorizeResponse{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
@@ -145,6 +198,13 @@ func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (sec
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpResolverGetSecrets})
+	envelopes, err := c.getSecrets(ctx, pattern)
+	done(err)
+	return envelopes, err
+}
+
+func (c client) getSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
 	if isDialError(err) {
 		return nil, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
@@ -155,11 +215,23 @@ func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secr
 	return envelopes, nil
 }
 
+// HubAuth returns a Docker Hub accessor backed by this client. Hooks set with
+// [WithHooks] apply to it unless opts include dockerhub.WithHooks.
 func (c client) HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth {
+	if hook.Enabled(c.hooks) {
+		opts = append([]dockerhub.Option{dockerhub.WithHooks(c.hooks)}, opts...)
+	}
 	return dockerhub.New(c, opts...)
 }
 
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpVersion})
+	v, err := c.version(ctx)
+	done(err)
+	return v, err
+}
+
+func (c client) version(ctx context.Context) (DaemonVersion, error) {
 	resp, err := c.versionClient.GetVersion(ctx, connect.NewRequest(healthv1.GetVersionRequest_builder{}.Build()))
 	if isDialError(err) {
 		return DaemonVersion{}, fmt.Errorf("%w: %w", ErrSecretsEngineNotAvailable, err)
@@ -169,7 +241,7 @@ func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 	}
 	ver, err := api.NewVersion(resp.Msg.GetVersion())
 	if err != nil {
-		return DaemonVersion{}, fmt.Errorf("parsing daemon version %q: %w", resp.Msg.GetVersion(), err)
+		return DaemonVersion{}, hook.Malformed(fmt.Errorf("parsing daemon version %q: %w", resp.Msg.GetVersion(), err))
 	}
 	return DaemonVersion{Version: ver, Date: resp.Msg.GetDate(), CommitHash: resp.Msg.GetCommitHash()}, nil
 }
@@ -226,23 +298,30 @@ func New(options ...Option) (Client, error) {
 	if cfg.dialContext == nil {
 		cfg.dialContext = dialFromPath(api.StandaloneSocketPath())
 	}
-	c := &http.Client{
-		Transport: &http.Transport{
-			// re-use the same connection to the runtime, this speeds up subsequent
-			// calls.
-			MaxConnsPerHost:     api.DefaultClientMaxConnsPerHost,
-			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
-			// keep the connection alive (good for long-lived clients)
-			IdleConnTimeout: api.DefaultClientIdleConnTimeout,
-			// no timeout by default; override with [WithResponseTimeout]
-			ResponseHeaderTimeout: cfg.responseTimeout,
-			TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
+	var transport http.RoundTripper = &http.Transport{
+		// re-use the same connection to the runtime, this speeds up subsequent
+		// calls.
+		MaxConnsPerHost:     api.DefaultClientMaxConnsPerHost,
+		MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
+		// keep the connection alive (good for long-lived clients)
+		IdleConnTimeout: api.DefaultClientIdleConnTimeout,
+		// no timeout by default; override with [WithResponseTimeout]
+		ResponseHeaderTimeout: cfg.responseTimeout,
+		TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
 
-			DialContext:        cfg.dialContext,
-			DisableKeepAlives:  false,
-			DisableCompression: false,
-			ForceAttemptHTTP2:  true,
-		},
+		DialContext:        cfg.dialContext,
+		DisableKeepAlives:  false,
+		DisableCompression: false,
+		ForceAttemptHTTP2:  true,
+	}
+	for _, wrap := range cfg.wrapTransport {
+		transport = wrap(transport)
+		if transport == nil {
+			return nil, errors.New("transport wrapper returned nil")
+		}
+	}
+	c := &http.Client{
+		Transport: transport,
 		// by default Timeout will be 0 (meaning no timeout)
 		// it can be overwritten with [WithTimeout]
 		Timeout: cfg.requestTimeout,
@@ -252,10 +331,18 @@ func New(options ...Option) (Client, error) {
 		engineClient:     pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
 		versionClient:    healthv1connect.NewVersionServiceClient(c, "http://unix"),
 		authorizerClient: resolver.NewAuthorizerClient(c),
+		hooks:            cfg.hooks,
 	}, nil
 }
 
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpPluginsList})
+	plugins, err := c.listPlugins(ctx)
+	done(err)
+	return plugins, err
+}
+
+func (c client) listPlugins(ctx context.Context) ([]PluginInfo, error) {
 	req := connect.NewRequest(pluginsv1.ListPluginsRequest_builder{}.Build())
 	resp, err := c.engineClient.ListPlugins(ctx, req)
 	if isDialError(err) {
@@ -298,7 +385,16 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 	return result, nil
 }
 
+// EnablePlugin reports [trace.OpPluginsEnable] to hooks without the
+// plugin name.
 func (c client) EnablePlugin(ctx context.Context, name string) error {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpPluginsEnable})
+	err := c.enablePlugin(ctx, name)
+	done(err)
+	return err
+}
+
+func (c client) enablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.EnablePluginRequest_builder{}.Build()
 	r.SetName(name)
 	_, err := c.engineClient.EnablePlugin(ctx, connect.NewRequest(r))
@@ -308,7 +404,16 @@ func (c client) EnablePlugin(ctx context.Context, name string) error {
 	return err
 }
 
+// DisablePlugin reports [trace.OpPluginsDisable] to hooks without the
+// plugin name.
 func (c client) DisablePlugin(ctx context.Context, name string) error {
+	ctx, done := hook.Start(ctx, c.hooks, Operation{Name: trace.OpPluginsDisable})
+	err := c.disablePlugin(ctx, name)
+	done(err)
+	return err
+}
+
+func (c client) disablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.DisablePluginRequest_builder{}.Build()
 	r.SetName(name)
 	_, err := c.engineClient.DisablePlugin(ctx, connect.NewRequest(r))
