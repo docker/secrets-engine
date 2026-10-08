@@ -103,10 +103,7 @@ const (
 	permissionDeniedHint     = "Your user lacks permission to connect to %s. Grant it read and write access to the socket and retry."
 )
 
-// Hint returns a one-line suggestion for how a user can fix the failed
-// connection, or "" when the reason is unknown. It names Docker Desktop or the
-// standalone engine when SocketPath is that engine's default socket. The socket
-// path is quoted so control characters in it cannot corrupt terminal output.
+// Hint returns a user friendly message to help recover from the error.
 func (e *ConnectError) Hint() string {
 	socket := "the secrets engine socket"
 	if e.SocketPath != "" {
