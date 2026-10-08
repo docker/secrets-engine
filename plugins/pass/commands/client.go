@@ -37,19 +37,24 @@ func (o clientOpts) isUnbound() bool {
 	return o.timeout == 0
 }
 
-// preflightPing fails fast when the engine is unreachable, so an unbounded
-// client cannot hang resolution indefinitely.
-// TODO: move into client/client.go
+var errPingTimeout = errors.New("preflight ping timed out")
+
+// preflightPing fails fast when the engine is unreachable. TODO: move into client/client.go
 func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	pingCtx, cancel := context.WithTimeoutCause(ctx, timeout, errPingTimeout)
 	defer cancel()
-	if _, err := c.Version(ctx); err != nil {
-		if !errors.Is(err, client.ErrSecretsEngineNotAvailable) {
-			err = fmt.Errorf("%w: %w", client.ErrSecretsEngineNotAvailable, err)
-		}
+	_, err := c.Version(pingCtx)
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*client.ConnectError](err); ok {
 		return fmt.Errorf("preflight ping: %w", err)
 	}
-	return nil
+	if errors.Is(context.Cause(pingCtx), errPingTimeout) {
+		// Our timeout fired, not the caller's: the engine did not answer in time.
+		err = &client.ConnectError{Reason: client.ReasonTimeout, Err: err}
+	}
+	return fmt.Errorf("preflight ping: %w", err)
 }
 
 type ClientOption func(*clientOpts) error

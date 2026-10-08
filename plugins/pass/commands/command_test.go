@@ -17,7 +17,6 @@ package commands
 import (
 	"bytes"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/keychain"
 	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 var mockInfo = VersionInfo{
@@ -212,7 +212,7 @@ func Test_RmCommand(t *testing.T) {
 		mock := twoSecrets()
 		cmd := mustRmCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
 		out, err := execute(t, cmd, mock, "foo")
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 		assert.NotContains(t, out, "RM:")
 		assert.Equal(t, 2, remaining(t, mock))
 	})
@@ -337,14 +337,14 @@ func Test_GetCommand(t *testing.T) {
 	t.Run("--reveal fails when the engine is unreachable", func(t *testing.T) {
 		cmd := mustGetCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
 		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 		assert.ErrorContains(t, err, "authorizing:")
 		assert.NotContains(t, out, "bar")
 	})
 	t.Run("--reveal pings the engine first when requests are unbounded", func(t *testing.T) {
 		cmd := mustGetCommand(t, WithSocketPath(deadSocket(t)))
 		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
-		assert.ErrorIs(t, err, client.ErrSecretsEngineNotAvailable)
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 		assert.ErrorContains(t, err, "preflight ping")
 		assert.NotContains(t, out, "bar")
 	})
@@ -371,7 +371,7 @@ func mustRmCommand(t *testing.T, options ...ClientOption) *cobra.Command {
 
 func deadSocket(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(t.TempDir(), "dead.sock")
+	return testhelper.RandomShortSocketName()
 }
 
 func engineOpts(t *testing.T, engine *mockEngine) []ClientOption {
@@ -379,12 +379,6 @@ func engineOpts(t *testing.T, engine *mockEngine) []ClientOption {
 	return []ClientOption{WithTimeout(time.Second), WithSocketPath(engine.serve(t))}
 }
 
-// execute runs cmd as if it were the root command: it attaches mock to the
-// command context so RunE bodies can pull it via StoreFrom, captures stdout
-// and stderr into one buffer (mirroring how cobra collapses both onto the
-// user's terminal), and silences usage so error output stays minimal.
-//
-// Pass mock == nil for commands that do not consult the store.
 func execute(t *testing.T, cmd *cobra.Command, mock store.Store, args ...string) (string, error) {
 	t.Helper()
 	return runCobra(t, cmd, mock, nil, args)
@@ -414,9 +408,6 @@ func runCobra(t *testing.T, cmd *cobra.Command, mock store.Store, stdin *bytes.B
 	return buf.String(), err
 }
 
-// assertStoredValue asserts the secret stored under id "foo" — every set-test
-// uses that id, so the helpers hard-code it rather than carrying a parameter
-// that always receives the same string.
 func assertStoredValue(t *testing.T, kc store.Store, want string) {
 	t.Helper()
 	s, err := kc.Get(t.Context(), secrets.MustParseID("foo"))
