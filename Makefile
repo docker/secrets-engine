@@ -3,6 +3,9 @@ GO_VERSION := $(shell sh -c "awk '/^go / { print \$$2 }' go.work")
 
 # For latest version, see: https://github.com/bufbuild/buf/tags
 export BUF_VERSION := v1.56.0
+# protoc-gen-connect-go, pinned by commit. Keep in step with connectrpc.com/connect in go.mod.
+# v1.19.1: https://github.com/connectrpc/connect-go/releases/tag/v1.19.1
+export CONNECT_GO_COMMIT := ad9598763248cc291416c2e956ecd50d128a19bf
 
 ifeq ($(OS),Windows_NT)
 	WINDOWS = $(OS)
@@ -25,6 +28,7 @@ BUILDER=buildx-multiarch
 DOCKER_BUILD_ARGS := --build-arg GO_VERSION \
           			--build-arg GOLANGCI_LINT_VERSION \
           			--build-arg BUF_VERSION \
+          			--build-arg CONNECT_GO_COMMIT \
           			--build-arg GIT_TAG
 
 GO_TEST := go test

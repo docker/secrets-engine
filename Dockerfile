@@ -197,6 +197,11 @@ RUN --mount=type=bind,target=. \
     buf lint
 
 FROM proto-base AS do-proto-generate
+ARG CONNECT_GO_COMMIT
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=tmpfs,target=/go/src/ \
+    go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@${CONNECT_GO_COMMIT}"
 WORKDIR /src
 RUN mkdir -p /generate/out
 RUN --mount=type=bind,target=.,rw <<EOT
