@@ -618,6 +618,24 @@ func TestPreflightPing(t *testing.T) {
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.ErrorIs(t, err, client.ErrSecretsEngineTimeout)
 	})
+
+	t.Run("does not report an engine timeout when the caller's deadline fires first", func(t *testing.T) {
+		t.Parallel()
+		c := pingClient{ping: func(ctx context.Context) (client.DaemonVersion, error) {
+			<-ctx.Done()
+			return client.DaemonVersion{}, ctx.Err()
+		}}
+		callerCtx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		err := preflightPing(callerCtx, c, 5*time.Second)
+		require.Error(t, err)
+		require.Less(t, time.Since(start), 2*time.Second)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.NotErrorIs(t, err, client.ErrSecretsEngineTimeout)
+		_, ok := errors.AsType[*client.ConnectError](err)
+		assert.False(t, ok)
+	})
 }
 
 type testWriter struct{ t *testing.T }

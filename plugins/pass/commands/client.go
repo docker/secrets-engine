@@ -37,16 +37,24 @@ func (o clientOpts) isUnbound() bool {
 	return o.timeout == 0
 }
 
+// errPingTimeout is the cause recorded when preflightPing's own timeout fires,
+// as opposed to the caller's context expiring.
+var errPingTimeout = errors.New("preflight ping timed out")
+
 // preflightPing fails fast when the engine is unreachable. TODO: move into client/client.go
 func preflightPing(ctx context.Context, c client.Client, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	pingCtx, cancel := context.WithTimeoutCause(ctx, timeout, errPingTimeout)
 	defer cancel()
-	_, err := c.Version(ctx)
+	_, err := c.Version(pingCtx)
 	if err == nil {
 		return nil
 	}
-	if _, ok := errors.AsType[*client.ConnectError](err); !ok && errors.Is(err, context.DeadlineExceeded) {
-		// The engine accepted the connection but did not answer in time.
+	if _, ok := errors.AsType[*client.ConnectError](err); ok {
+		// The client already classified the connection failure.
+		return fmt.Errorf("preflight ping: %w", err)
+	}
+	if errors.Is(context.Cause(pingCtx), errPingTimeout) {
+		// Our timeout fired, not the caller's: the engine did not answer in time.
 		err = &client.ConnectError{Reason: client.ReasonTimeout, Err: err}
 	}
 	return fmt.Errorf("preflight ping: %w", err)
