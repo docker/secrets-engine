@@ -20,12 +20,40 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const defaultPreflightPingTimeout = 3 * time.Second
+
+func wrapEngineErrors(cmd *cobra.Command) *cobra.Command {
+	if pre := cmd.PreRunE; pre != nil {
+		cmd.PreRunE = func(c *cobra.Command, args []string) error {
+			return withEngineHint(pre(c, args))
+		}
+	}
+	if run := cmd.RunE; run != nil {
+		cmd.RunE = func(c *cobra.Command, args []string) error {
+			return withEngineHint(run(c, args))
+		}
+	}
+	return cmd
+}
+
+func withEngineHint(err error) error {
+	ce, ok := errors.AsType[*client.ConnectError](err)
+	if !ok {
+		return err
+	}
+	hint := ce.Hint()
+	if hint == "" {
+		return err
+	}
+	return fmt.Errorf("%w\n\n%s", err, hint)
+}
 
 type clientOpts struct {
 	timeout         time.Duration

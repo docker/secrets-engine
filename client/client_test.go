@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -420,6 +421,49 @@ func TestConnectError(t *testing.T) {
 		err = client{}.connectError(dialErr(syscall.ECONNRESET))
 		assert.Equal(t, "cannot connect to the secrets engine: dial unix: connect: "+syscall.ECONNRESET.Error(), err.Error())
 	})
+}
+
+func TestConnectErrorHint(t *testing.T) {
+	desktop := api.DesktopSocketPath()
+	standalone := api.StandaloneSocketPath()
+	denied := func(socket string) string {
+		return "Your user lacks permission to connect to " + socket + ". Grant it read and write access to the socket and retry."
+	}
+	tests := []struct {
+		name   string
+		reason ConnectReason
+		socket string
+		hint   string
+	}{
+		{name: "desktop not running", reason: ReasonNotRunning, socket: desktop, hint: desktopNotRunningHint},
+		{name: "desktop timeout", reason: ReasonTimeout, socket: desktop, hint: desktopTimeoutHint},
+		{
+			name:   "standalone not running",
+			reason: ReasonNotRunning,
+			socket: standalone,
+			hint:   "Start the standalone secrets engine and retry: nothing is listening on " + strconv.Quote(standalone) + ".",
+		},
+		{
+			name:   "standalone timeout",
+			reason: ReasonTimeout,
+			socket: standalone,
+			hint:   "The standalone secrets engine on " + strconv.Quote(standalone) + " did not respond. Restart it and retry.",
+		},
+		{name: "custom socket not running", reason: ReasonNotRunning, socket: "/s.sock", hint: `Start the secrets engine and retry: nothing is listening on "/s.sock".`},
+		{name: "custom socket timeout", reason: ReasonTimeout, socket: "/s.sock", hint: `The secrets engine on "/s.sock" did not respond. Restart it and retry.`},
+		{name: "permission denied", reason: ReasonPermissionDenied, socket: "/s.sock", hint: denied(`"/s.sock"`)},
+		{name: "permission denied on desktop socket", reason: ReasonPermissionDenied, socket: desktop, hint: denied(strconv.Quote(desktop))},
+		{name: "permission denied without path", reason: ReasonPermissionDenied, hint: denied("the secrets engine socket")},
+		{name: "not running without path", reason: ReasonNotRunning, hint: "Start the secrets engine and retry: nothing is listening on the secrets engine socket."},
+		{name: "control characters in path are quoted", reason: ReasonNotRunning, socket: "/s\n.sock", hint: `Start the secrets engine and retry: nothing is listening on "/s\n.sock".`},
+		{name: "unknown reason has no hint", reason: ReasonUnknown, socket: "/s.sock", hint: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ce := &ConnectError{Reason: tc.reason, SocketPath: tc.socket, Err: errors.New("dial")}
+			assert.Equal(t, tc.hint, ce.Hint())
+		})
+	}
 }
 
 func TestConnectErrorFromSocket(t *testing.T) {

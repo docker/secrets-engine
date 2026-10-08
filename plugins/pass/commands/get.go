@@ -79,7 +79,7 @@ func GetCommand(options ...ClientOption) (*cobra.Command, error) {
 		},
 	}
 	cmd.Flags().BoolVar(&reveal, "reveal", false, "Show the secret value in plaintext")
-	return wrapKeychainErrors(cmd), nil
+	return wrapEngineErrors(wrapKeychainErrors(cmd)), nil
 }
 
 func printSecret(w io.Writer, id store.ID, value []byte) error {
