@@ -18,7 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/x/api"
@@ -26,6 +29,56 @@ import (
 )
 
 const defaultPreflightPingTimeout = 3 * time.Second
+
+const (
+	desktopNotRunningHint = "Start Docker Desktop and retry: the secrets engine runs as part of it."
+	desktopTimeoutHint    = "The secrets engine did not respond. Restart Docker Desktop and retry."
+)
+
+func wrapEngineErrors(cmd *cobra.Command) *cobra.Command {
+	if run := cmd.RunE; run != nil {
+		cmd.RunE = func(c *cobra.Command, args []string) error {
+			return withEngineHint(run(c, args))
+		}
+	}
+	return cmd
+}
+
+func withEngineHint(err error) error {
+	ce, ok := errors.AsType[*client.ConnectError](err)
+	if !ok {
+		return err
+	}
+	socket := "the secrets engine socket"
+	if ce.SocketPath != "" {
+		socket = ce.SocketPath
+	}
+	desktop := isDesktopSocket(ce.SocketPath)
+	var hint string
+	switch ce.Reason {
+	case client.ReasonNotRunning:
+		hint = "Start the secrets engine and retry: nothing is listening on " + socket + "."
+		if desktop {
+			hint = desktopNotRunningHint
+		}
+	case client.ReasonTimeout:
+		hint = "The secrets engine on " + socket + " did not respond. Restart it and retry."
+		if desktop {
+			hint = desktopTimeoutHint
+		}
+	case client.ReasonPermissionDenied:
+		hint = "Check that your user may open " + socket + "."
+	default:
+		return err
+	}
+	return fmt.Errorf("%w\n\n%s", err, hint)
+}
+
+// isDesktopSocket reports whether path is the socket Docker Desktop's
+// secrets engine listens on. A standalone engine uses a different socket.
+func isDesktopSocket(path string) bool {
+	return path != "" && filepath.Clean(path) == filepath.Clean(api.DesktopSocketPath())
+}
 
 type clientOpts struct {
 	timeout         time.Duration

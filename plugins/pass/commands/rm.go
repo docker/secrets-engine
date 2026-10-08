@@ -65,7 +65,7 @@ func RmCommand(options ...ClientOption) (*cobra.Command, error) {
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.all, "all", false, "Remove all secrets")
-	return wrapKeychainErrors(cmd), nil
+	return wrapEngineErrors(wrapKeychainErrors(cmd)), nil
 }
 
 func validateArgs(args []string, opts rmOpts) ([]store.ID, error) {

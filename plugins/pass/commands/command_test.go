@@ -17,6 +17,7 @@ package commands
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/keychain"
+	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -210,9 +212,11 @@ func Test_RmCommand(t *testing.T) {
 	})
 	t.Run("unreachable engine removes nothing", func(t *testing.T) {
 		mock := twoSecrets()
-		cmd := mustRmCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
+		socket := deadSocket(t)
+		cmd := mustRmCommand(t, WithTimeout(time.Second), WithSocketPath(socket))
 		out, err := execute(t, cmd, mock, "foo")
 		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
+		assert.Contains(t, out, "Start the secrets engine and retry: nothing is listening on "+socket+".")
 		assert.NotContains(t, out, "RM:")
 		assert.Equal(t, 2, remaining(t, mock))
 	})
@@ -342,10 +346,12 @@ func Test_GetCommand(t *testing.T) {
 		assert.NotContains(t, out, "bar")
 	})
 	t.Run("--reveal pings the engine first when requests are unbounded", func(t *testing.T) {
-		cmd := mustGetCommand(t, WithSocketPath(deadSocket(t)))
+		socket := deadSocket(t)
+		cmd := mustGetCommand(t, WithSocketPath(socket))
 		out, err := execute(t, cmd, fooStore(), "--reveal", "foo")
 		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 		assert.ErrorContains(t, err, "preflight ping")
+		assert.Contains(t, out, "\n\nStart the secrets engine and retry: nothing is listening on "+socket+".\n")
 		assert.NotContains(t, out, "bar")
 	})
 	t.Run("rejects an invalid option", func(t *testing.T) {
@@ -367,6 +373,41 @@ func mustRmCommand(t *testing.T, options ...ClientOption) *cobra.Command {
 	cmd, err := RmCommand(options...)
 	require.NoError(t, err)
 	return cmd
+}
+
+func TestWithEngineHint(t *testing.T) {
+	t.Parallel()
+	connErr := func(reason client.ConnectReason, socket string) error {
+		return fmt.Errorf("authorizing: %w", &client.ConnectError{Reason: reason, SocketPath: socket, Err: errors.New("dial")})
+	}
+	desktop := api.DesktopSocketPath()
+	tests := []struct {
+		name string
+		err  error
+		hint string
+	}{
+		{name: "desktop not running", err: connErr(client.ReasonNotRunning, desktop), hint: desktopNotRunningHint},
+		{name: "desktop timeout", err: connErr(client.ReasonTimeout, desktop), hint: desktopTimeoutHint},
+		{name: "standalone not running", err: connErr(client.ReasonNotRunning, "/s.sock"), hint: "Start the secrets engine and retry: nothing is listening on /s.sock."},
+		{name: "standalone timeout", err: connErr(client.ReasonTimeout, "/s.sock"), hint: "The secrets engine on /s.sock did not respond. Restart it and retry."},
+		{name: "permission denied", err: connErr(client.ReasonPermissionDenied, "/s.sock"), hint: "Check that your user may open /s.sock."},
+		{name: "permission denied on desktop socket", err: connErr(client.ReasonPermissionDenied, desktop), hint: "Check that your user may open " + desktop + "."},
+		{name: "permission denied without path", err: connErr(client.ReasonPermissionDenied, ""), hint: "Check that your user may open the secrets engine socket."},
+		{name: "not running without path", err: connErr(client.ReasonNotRunning, ""), hint: "Start the secrets engine and retry: nothing is listening on the secrets engine socket."},
+		{name: "joined with other errors", err: errors.Join(store.ErrCredentialNotFound, connErr(client.ReasonNotRunning, desktop)), hint: desktopNotRunningHint},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := withEngineHint(tc.err)
+			assert.Equal(t, tc.err.Error()+"\n\n"+tc.hint, got.Error())
+			assert.ErrorIs(t, got, tc.err)
+		})
+	}
+	t.Run("unknown reason and other errors pass through", func(t *testing.T) {
+		for _, err := range []error{nil, connErr(client.ReasonUnknown, "/s.sock"), client.ErrAccessDenied} {
+			assert.Equal(t, err, withEngineHint(err))
+		}
+	})
 }
 
 func deadSocket(t *testing.T) string {

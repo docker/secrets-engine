@@ -61,7 +61,7 @@ func RunCommand(options ...ClientOption) (*cobra.Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newRunCommand(runOpts{clientOpts: copts}), nil
+	return wrapEngineErrors(newRunCommand(runOpts{clientOpts: copts})), nil
 }
 
 func newRunCommand(opts runOpts) *cobra.Command {
