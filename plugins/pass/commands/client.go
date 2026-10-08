@@ -31,11 +31,29 @@ import (
 const defaultPreflightPingTimeout = 3 * time.Second
 
 const (
-	desktopNotRunningHint = "Start Docker Desktop and retry: the secrets engine runs as part of it."
-	desktopTimeoutHint    = "The secrets engine did not respond. Restart Docker Desktop and retry."
+	desktopNotRunningHint    = "Start Docker Desktop and retry: the secrets engine runs as part of it."
+	desktopTimeoutHint       = "The secrets engine did not respond. Restart Docker Desktop and retry."
+	standaloneNotRunningHint = "Start the standalone secrets engine and retry: nothing is listening on %q."
+	standaloneTimeoutHint    = "The standalone secrets engine on %q did not respond. Restart it and retry."
+	customNotRunningHint     = "Start the secrets engine and retry: nothing is listening on %s."
+	customTimeoutHint        = "The secrets engine on %s did not respond. Restart it and retry."
+	permissionDeniedHint     = "Your user lacks permission to connect to %s. Grant it read and write access to the socket and retry."
+)
+
+type engineKind int
+
+const (
+	engineCustom engineKind = iota
+	engineDesktop
+	engineStandalone
 )
 
 func wrapEngineErrors(cmd *cobra.Command) *cobra.Command {
+	if pre := cmd.PreRunE; pre != nil {
+		cmd.PreRunE = func(c *cobra.Command, args []string) error {
+			return withEngineHint(pre(c, args))
+		}
+	}
 	if run := cmd.RunE; run != nil {
 		cmd.RunE = func(c *cobra.Command, args []string) error {
 			return withEngineHint(run(c, args))
@@ -49,35 +67,54 @@ func withEngineHint(err error) error {
 	if !ok {
 		return err
 	}
+	// Quote the path: it is user-controlled and may hold control characters.
 	socket := "the secrets engine socket"
 	if ce.SocketPath != "" {
-		socket = ce.SocketPath
+		socket = fmt.Sprintf("%q", ce.SocketPath)
 	}
-	desktop := isDesktopSocket(ce.SocketPath)
+	kind := classifySocket(ce.SocketPath)
 	var hint string
 	switch ce.Reason {
 	case client.ReasonNotRunning:
-		hint = "Start the secrets engine and retry: nothing is listening on " + socket + "."
-		if desktop {
+		switch kind {
+		case engineDesktop:
 			hint = desktopNotRunningHint
+		case engineStandalone:
+			hint = fmt.Sprintf(standaloneNotRunningHint, ce.SocketPath)
+		default:
+			hint = fmt.Sprintf(customNotRunningHint, socket)
 		}
 	case client.ReasonTimeout:
-		hint = "The secrets engine on " + socket + " did not respond. Restart it and retry."
-		if desktop {
+		switch kind {
+		case engineDesktop:
 			hint = desktopTimeoutHint
+		case engineStandalone:
+			hint = fmt.Sprintf(standaloneTimeoutHint, ce.SocketPath)
+		default:
+			hint = fmt.Sprintf(customTimeoutHint, socket)
 		}
 	case client.ReasonPermissionDenied:
-		hint = "Check that your user may open " + socket + "."
+		hint = fmt.Sprintf(permissionDeniedHint, socket)
 	default:
 		return err
 	}
 	return fmt.Errorf("%w\n\n%s", err, hint)
 }
 
-// isDesktopSocket reports whether path is the socket Docker Desktop's
-// secrets engine listens on. A standalone engine uses a different socket.
-func isDesktopSocket(path string) bool {
-	return path != "" && filepath.Clean(path) == filepath.Clean(api.DesktopSocketPath())
+// classifySocket reports which engine listens on path by default: Docker
+// Desktop's, the standalone engine's, or neither (a custom socket).
+func classifySocket(path string) engineKind {
+	if path == "" {
+		return engineCustom
+	}
+	switch filepath.Clean(path) {
+	case filepath.Clean(api.DesktopSocketPath()):
+		return engineDesktop
+	case filepath.Clean(api.StandaloneSocketPath()):
+		return engineStandalone
+	default:
+		return engineCustom
+	}
 }
 
 type clientOpts struct {
