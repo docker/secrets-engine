@@ -398,7 +398,7 @@ func TestConnectError(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := connectError("/run/engine.sock", tc.err)
+			err := client{socketPath: "/run/engine.sock"}.connectError(tc.err)
 			ce, ok := errors.AsType[*ConnectError](err)
 			require.True(t, ok)
 			assert.Equal(t, tc.reason, ce.Reason)
@@ -411,13 +411,13 @@ func TestConnectError(t *testing.T) {
 	}
 	t.Run("cancelled context is not an engine error", func(t *testing.T) {
 		in := &net.OpError{Op: "dial", Net: "unix", Err: context.Canceled}
-		err := connectError("/run/engine.sock", in)
+		err := client{socketPath: "/run/engine.sock"}.connectError(in)
 		assert.Same(t, in, err)
 	})
 	t.Run("message", func(t *testing.T) {
-		err := connectError("/run/engine.sock", dialErr(syscall.ENOENT))
+		err := client{socketPath: "/run/engine.sock"}.connectError(dialErr(syscall.ENOENT))
 		assert.Equal(t, "secrets engine is not running at /run/engine.sock: dial unix: connect: "+syscall.ENOENT.Error(), err.Error())
-		err = connectError("", dialErr(syscall.ECONNRESET))
+		err = client{}.connectError(dialErr(syscall.ECONNRESET))
 		assert.Equal(t, "cannot connect to the secrets engine: dial unix: connect: "+syscall.ECONNRESET.Error(), err.Error())
 	})
 }

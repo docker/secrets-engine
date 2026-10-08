@@ -214,7 +214,10 @@ func isDialError(err error) bool {
 }
 
 func (c client) connectError(err error) error {
-	return connectError(c.socketPath, err)
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	return &ConnectError{Reason: connectReason(err), SocketPath: c.socketPath, Err: err}
 }
 
 // New creates a client that connects to [api.StandaloneSocketPath] by default.
