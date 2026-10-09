@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -207,6 +208,43 @@ func TestUpsert(t *testing.T) {
 		actual.Attributes = nil
 		assert.Equal(t, updated.Username, actual.Username)
 		assert.Equal(t, updated.Password, actual.Password)
+	})
+
+	t.Run("updates an existing credential in place", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, ks.Delete(t.Context(), id))
+		})
+
+		require.NoError(t, ks.Save(t.Context(), id, &mocks.MockCredential{
+			Username:   "dana",
+			Password:   "original-password",
+			Attributes: map[string]string{"expiry": "1"},
+		}))
+		before, err := getItemWithData(id.String(), &ks)
+		require.NoError(t, err)
+
+		// Keychain timestamps have one-second resolution.
+		time.Sleep(1100 * time.Millisecond)
+
+		updated := &mocks.MockCredential{
+			Username:   "dana",
+			Password:   "updated-password",
+			Attributes: map[string]string{"expiry": "2"},
+		}
+		require.NoError(t, ks.Upsert(t.Context(), id, updated))
+
+		after, err := getItemWithData(id.String(), &ks)
+		require.NoError(t, err)
+		assert.Equal(t, before.CreationDate, after.CreationDate, "the item must be updated, not deleted and re-added")
+		assert.True(t, after.ModificationDate.After(before.ModificationDate))
+		assert.Equal(t, before.Label, after.Label)
+
+		got, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := got.(*mocks.MockCredential)
+		assert.Equal(t, updated.Password, actual.Password)
+		assert.Equal(t, map[string]string{"expiry": "2"}, actual.Metadata())
 	})
 
 	t.Run("save returns duplicate item error when credential already exists", func(t *testing.T) {
