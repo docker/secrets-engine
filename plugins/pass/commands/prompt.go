@@ -126,7 +126,7 @@ func readSecretLine(in input, echo io.Writer, width, col int) (string, error) {
 	for {
 		r, err := lr.readRune()
 		switch {
-		case errors.Is(err, io.EOF), err == nil && r == ctrlD:
+		case errors.Is(err, io.EOF):
 			return "", errNoEnter
 		case err != nil:
 			return "", err
@@ -261,6 +261,8 @@ type lineReader struct {
 	// tail is set when the ESC readRune last returned stood for a '[' or
 	// 'O' taken for that ESC's late tail.
 	tail bool
+	// eof is set once a Ctrl-D ended the input: fill is io.EOF from then on.
+	eof bool
 }
 
 func newLineReader(src input) *lineReader { return &lineReader{src: src} }
@@ -277,7 +279,7 @@ func (lr *lineReader) trailing() (bool, error) {
 		switch {
 		case bytes.IndexByte(rest, ctrlC) >= 0:
 			return false, context.Canceled
-		case len(bytes.Trim(rest, "\r\n\x04")) > 0: // Ctrl-D behind Enter is no input
+		case len(bytes.Trim(rest, "\r\n")) > 0:
 			return true, nil
 		}
 		wait := time.Until(deadline)
@@ -295,6 +297,9 @@ func (lr *lineReader) trailing() (bool, error) {
 }
 
 func (lr *lineReader) fill(wait time.Duration) (bool, error) {
+	if lr.eof {
+		return false, io.EOF
+	}
 	if lr.r > 0 {
 		lr.w = copy(lr.buf[:], lr.buf[lr.r:lr.w])
 		lr.r = 0
@@ -304,10 +309,16 @@ func (lr *lineReader) fill(wait time.Duration) (bool, error) {
 		return false, err
 	}
 	n, err := lr.src.Read(lr.buf[lr.w:])
+	if i := bytes.IndexByte(lr.buf[lr.w:lr.w+n], ctrlD); i >= 0 {
+		clear(lr.buf[lr.w+i : lr.w+n])
+		n, lr.eof = i, true
+	}
 	lr.w += n
 	switch {
 	case n > 0:
 		return true, nil
+	case lr.eof:
+		return false, io.EOF
 	case err == nil:
 		return false, io.ErrNoProgress
 	default:
