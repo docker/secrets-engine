@@ -126,7 +126,7 @@ func Test_readSecretLine(t *testing.T) {
 		for _, seq := range []string{
 			"\x1b[D", "\x1bOH", "\x1b[15~", "\x1b[<0;10;20M", "\x1b[12;40R",
 			"\x1b\x1b[A", "\x1b[[A", "\x1b[M !!", "\x1b]11;rgb:0000/0000/0000\x07", "\x1b]52;c;aGVsbG8=\x1b\\", "\x1bP>|xterm(380)\x1b\\",
-			"\x1b]11;rgb\x1b[D",
+			"\x1b]11;rgb\x1b[D", "\x1b]11;rgb\x1b\x1b[D",
 		} {
 			t.Run(seq, func(t *testing.T) {
 				t.Parallel()
@@ -154,7 +154,7 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a sequence cut short by a key is an error", func(t *testing.T) {
 		t.Parallel()
-		for _, in := range []string{"a\x1b[\r", "a\x1b[M\r", "a\x1bO\x7f", "a\x1b]11;rgb\r", "a\x1b[12;\x04"} {
+		for _, in := range []string{"a\x1b[\r", "a\x1b[M\r", "a\x1bO\x7f", "a\x1b]11;rgb\r", "a\x1b[12;\x04", "a\x1b]11;rgb\x1b\r", "a\x1bP>|xterm\x1b\x7f", "a\x1b]11;rgb\x1b\x1b\r"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errSwallowedInput, "%q", in)
 		}
@@ -180,7 +180,7 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("ctrl+c ends a sequence cut short", func(t *testing.T) {
 		t.Parallel()
-		for _, in := range []string{"\x1b[\x03", "\x1b[12;\x03", "\x1b[[\x03", "\x1bO\x03", "\x1b]11;rgb\x03", "\x1bP>|xterm\x03", "\x1b[M \x03"} {
+		for _, in := range []string{"\x1b[\x03", "\x1b[12;\x03", "\x1b[[\x03", "\x1bO\x03", "\x1b]11;rgb\x03", "\x1b]11;rgb\x1b\x03", "\x1bP>|xterm\x03", "\x1b[M \x03"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, context.Canceled, "%q", in)
 		}

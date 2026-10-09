@@ -492,11 +492,16 @@ func (lr *lineReader) skipString(bel bool) (newSequence bool, err error) {
 			return false, err
 		case c == esc:
 			d, err := lr.readByte(escTimeout)
-			if err != nil {
-				return false, err
+			for d == esc && err == nil { // Escape again; rxvt's ESC ESC [ A
+				d, err = lr.readByte(escTimeout)
 			}
-			if d == '\\' {
-				return false, nil // ST
+			switch {
+			case err != nil:
+				return false, err
+			case d == '\\': // ST
+				return false, nil
+			case isControl(d): // Escape then a key cut the string
+				return false, lr.cut(d)
 			}
 			lr.unreadByte()
 			return true, nil
