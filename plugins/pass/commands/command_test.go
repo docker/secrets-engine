@@ -52,21 +52,21 @@ func Test_SetCommand(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, SetCommand(), mock, "foo=bar=bar=bar")
+		out, err := execute(t, mustSetCommand(t), mock, "foo=bar=bar=bar")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 		assertStoredValue(t, mock, "bar=bar=bar")
 	})
 	t.Run("from STDIN", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := executeWithStdin(t, SetCommand(), mock, "my\nmultiline\nvalue", "foo")
+		out, err := executeWithStdin(t, mustSetCommand(t), mock, "my\nmultiline\nvalue", "foo")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 		assertStoredValue(t, mock, "my\nmultiline\nvalue")
 	})
 	t.Run("with --metadata flag", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := execute(t, SetCommand(), mock, "foo=bar", "--metadata", "name=bob", "--metadata", "expiry=2027-03-01")
+		out, err := execute(t, mustSetCommand(t), mock, "foo=bar", "--metadata", "name=bob", "--metadata", "expiry=2027-03-01")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 		assertStoredValue(t, mock, "bar")
@@ -74,7 +74,7 @@ func Test_SetCommand(t *testing.T) {
 	})
 	t.Run("from STDIN JSON with value and metadata", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := executeWithStdin(t, SetCommand(), mock, `{"secret":"bar","metadata":{"name":"bob"}}`, "foo")
+		out, err := executeWithStdin(t, mustSetCommand(t), mock, `{"secret":"bar","metadata":{"name":"bob"}}`, "foo")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 		assertStoredValue(t, mock, "bar")
@@ -82,7 +82,7 @@ func Test_SetCommand(t *testing.T) {
 	})
 	t.Run("from STDIN JSON merged with --metadata flag wins on collision", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		out, err := executeWithStdin(t, SetCommand(), mock, `{"secret":"bar","metadata":{"name":"bob","extra":"thing"}}`, "foo", "--metadata", "name=alice")
+		out, err := executeWithStdin(t, mustSetCommand(t), mock, `{"secret":"bar","metadata":{"name":"bob","extra":"thing"}}`, "foo", "--metadata", "name=alice")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
 		assertStoredValue(t, mock, "bar")
@@ -90,20 +90,20 @@ func Test_SetCommand(t *testing.T) {
 	})
 	t.Run("invalid --metadata flag (no =)", func(t *testing.T) {
 		mock := teststore.NewMockStore()
-		_, err := execute(t, SetCommand(), mock, "foo=bar", "--metadata", "invalid")
+		_, err := execute(t, mustSetCommand(t), mock, "foo=bar", "--metadata", "invalid")
 		assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
 	})
 	t.Run("store error", func(t *testing.T) {
 		errSave := errors.New("save error")
 		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errSave))
-		out, err := execute(t, SetCommand(), mock, "foo=bar")
+		out, err := execute(t, mustSetCommand(t), mock, "foo=bar")
 		assert.ErrorIs(t, err, errSave)
 		assert.Equal(t, "Error: "+errSave.Error()+"\n", out)
 	})
 	t.Run("invalid id", func(t *testing.T) {
 		errSave := errors.New("save error")
 		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errSave))
-		out, err := execute(t, SetCommand(), mock, "/foo=bar")
+		out, err := execute(t, mustSetCommand(t), mock, "/foo=bar")
 		errInvalidID := secrets.ErrInvalidID{ID: "/foo"}
 		assert.ErrorIs(t, err, errInvalidID)
 		assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
@@ -112,12 +112,20 @@ func Test_SetCommand(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 		}))
-		out, err := execute(t, SetCommand(), mock, "foo=new")
+		out, err := execute(t, mustSetCommand(t), mock, "foo=new")
 		assert.ErrorIs(t, err, keychain.ErrDuplicateItem)
 		assert.Equal(t, "Error: keychain item already exists\n\n"+duplicateItemHint+"\n", out)
 		assertStoredValue(t, mock, "old")
 	})
-	t.Run("--force overwrites existing secret", func(t *testing.T) {
+	t.Run("without --force needs no engine", func(t *testing.T) {
+		mock := teststore.NewMockStore()
+		out, err := execute(t, mustSetCommand(t, WithSocketPath(deadSocket(t))), mock, "foo=bar")
+		assert.NoError(t, err)
+		assert.Empty(t, out)
+		assertStoredValue(t, mock, "bar")
+	})
+	t.Run("--force overwrites existing secret once the engine allows", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
 		// Make Save return an error so the test fails if --force does not
 		// route the call through Upsert.
 		mock := teststore.NewMockStore(
@@ -126,17 +134,54 @@ func Test_SetCommand(t *testing.T) {
 			}),
 			teststore.WithStoreSaveErr(errors.New("save should not be called when --force is set")),
 		)
-		out, err := execute(t, SetCommand(), mock, "foo=new", "--force")
+		out, err := execute(t, mustSetCommand(t, engineOpts(t, engine)...), mock, "foo=new", "--force")
 		assert.NoError(t, err)
 		assert.Empty(t, out)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
 		assertStoredValue(t, mock, "new")
+	})
+	t.Run("--force fails when the engine denies", func(t *testing.T) {
+		engine := &mockEngine{}
+		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		}))
+		out, err := execute(t, mustSetCommand(t, engineOpts(t, engine)...), mock, "foo=new", "--force")
+		assert.ErrorIs(t, err, client.ErrAccessDenied)
+		assert.Equal(t, "Error: authorizing: access denied\n", out)
+		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
+		assertStoredValue(t, mock, "old")
+	})
+	t.Run("--force fails when the engine is unreachable", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		}))
+		socket := deadSocket(t)
+		cmd := mustSetCommand(t, WithTimeout(time.Second), WithSocketPath(socket))
+		out, err := execute(t, cmd, mock, "foo=new", "--force")
+		assert.ErrorIs(t, err, client.ErrSecretsEngineNotRunning)
+		assert.ErrorContains(t, err, "authorizing:")
+		assert.Contains(t, out, "Start the secrets engine and retry: nothing is listening on "+strconv.Quote(socket)+".")
+		assertStoredValue(t, mock, "old")
+	})
+	t.Run("--force validates the input before asking the engine", func(t *testing.T) {
+		mock := teststore.NewMockStore()
+		cmd := mustSetCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
+		_, err := execute(t, cmd, mock, "foo=bar", "--force", "--metadata", "invalid")
+		assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
+		assert.NotErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 	})
 	t.Run("--force surfaces upsert error", func(t *testing.T) {
 		errUpsert := errors.New("upsert error")
 		mock := teststore.NewMockStore(teststore.WithStoreUpsertErr(errUpsert))
-		out, err := execute(t, SetCommand(), mock, "foo=bar", "--force")
+		cmd := mustSetCommand(t, engineOpts(t, &mockEngine{allow: true})...)
+		out, err := execute(t, cmd, mock, "foo=bar", "--force")
 		assert.ErrorIs(t, err, errUpsert)
 		assert.Equal(t, "Error: "+errUpsert.Error()+"\n", out)
+	})
+	t.Run("rejects an invalid option", func(t *testing.T) {
+		cmd, err := SetCommand(WithTimeout(-time.Second))
+		require.EqualError(t, err, "request timeout duration cannot be negative")
+		assert.Nil(t, cmd)
 	})
 }
 
@@ -360,6 +405,13 @@ func Test_GetCommand(t *testing.T) {
 		require.EqualError(t, err, "request timeout duration cannot be negative")
 		assert.Nil(t, cmd)
 	})
+}
+
+func mustSetCommand(t *testing.T, options ...ClientOption) *cobra.Command {
+	t.Helper()
+	cmd, err := SetCommand(options...)
+	require.NoError(t, err)
+	return cmd
 }
 
 func mustGetCommand(t *testing.T, options ...ClientOption) *cobra.Command {

@@ -37,18 +37,18 @@ var setExample string
 //go:embed set_long.md
 var setLong string
 
-type setOpts struct {
-	metadata []string // raw "key=value" strings from --metadata flag
-	force    bool     // if true, overwrite existing setPayload instead of erroring
-}
-
 type stdinPayload struct {
 	Secret   string            `json:"secret"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-func SetCommand() *cobra.Command {
-	opts := setOpts{}
+func SetCommand(options ...ClientOption) (*cobra.Command, error) {
+	copts, err := parseClientOptions(options...)
+	if err != nil {
+		return nil, err
+	}
+	metadata := []string{}
+	var force bool
 	cmd := &cobra.Command{
 		Use:     "set id[=value]",
 		Aliases: []string{"store", "save"},
@@ -66,7 +66,7 @@ func SetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			flagMeta, err := parseMetadataFlags(opts.metadata)
+			flagMeta, err := parseMetadataFlags(metadata)
 			if err != nil {
 				return err
 			}
@@ -104,16 +104,19 @@ func SetCommand() *cobra.Command {
 					return err
 				}
 			}
-			if opts.force {
+			if force {
+				if err := authorizeAccess(cmd.Context(), copts, id); err != nil {
+					return err
+				}
 				return kc.Upsert(cmd.Context(), id, pv)
 			}
 			return kc.Save(cmd.Context(), id, pv)
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringArrayVar(&opts.metadata, "metadata", nil, "Non-sensitive key=value metadata (repeatable)")
-	flags.BoolVarP(&opts.force, "force", "f", false, "Overwrite existing secret if it already exists")
-	return wrapKeychainErrors(cmd)
+	flags.StringArrayVar(&metadata, "metadata", nil, "Non-sensitive key=value metadata (repeatable)")
+	flags.BoolVarP(&force, "force", "f", false, "Overwrite existing secret if it already exists")
+	return wrapEngineErrors(wrapKeychainErrors(cmd)), nil
 }
 
 func parseMetadataFlags(raw []string) (map[string]string, error) {
