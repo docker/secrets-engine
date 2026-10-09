@@ -51,8 +51,7 @@ type UserSession struct {
 	AccessToken string `json:"access_token"`
 	// Claims are zero when the payload carries none.
 	Claims Claims `json:"claims"`
-	// Username is the Docker Hub account the session belongs to. It is filled
-	// in from the account lookup, not decoded from the stored payload.
+	// Username is the Docker Hub account the session belongs to.
 	Username string `json:"-"`
 }
 

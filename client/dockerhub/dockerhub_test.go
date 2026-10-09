@@ -94,7 +94,6 @@ func (e nilIDEngine) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]s
 	return envelopes, nil
 }
 
-// countingEngine records the pattern of every lookup it serves.
 type countingEngine struct {
 	secrets.Resolver
 	patterns []string
