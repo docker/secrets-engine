@@ -31,8 +31,6 @@ import (
 
 func Test_terminalInput(t *testing.T) {
 	t.Parallel()
-	// select(2) stands in for poll(2) where that rejects the terminal, as
-	// macOS does for /dev/tty: both calls get the same tests.
 	for _, selects := range []bool{false, true} {
 		name := "poll(2)"
 		if selects {
@@ -56,16 +54,14 @@ func Test_terminalInput(t *testing.T) {
 		start := time.Now()
 		ready, err := in.wait(escTimeout)
 		require.NoError(t, err)
-		// poll(2) rejects /dev/tty on macOS, and select(2) takes over.
 		assert.Equal(t, runtime.GOOS == "darwin", in.selects)
-		if !ready { // unless a line typed ahead awaits the shell
+		if !ready {
 			assert.GreaterOrEqual(t, time.Since(start), escTimeout)
 		}
 	})
 }
 
 func testTerminalInput(t *testing.T, selects bool) {
-	// pipe stands in for the tty: pollable, and read by whoever reads next.
 	pipe := func(t *testing.T) (r, w *os.File) {
 		t.Helper()
 		r, w, err := os.Pipe()
@@ -76,7 +72,6 @@ func testTerminalInput(t *testing.T, selects bool) {
 		})
 		return r, w
 	}
-	// input watches r by the call under test.
 	input := func(t *testing.T, ctx context.Context, r *os.File) *terminalInput {
 		t.Helper()
 		in, err := newTerminalInput(ctx, r)
@@ -85,8 +80,6 @@ func testTerminalInput(t *testing.T, selects bool) {
 		in.selects = selects
 		return in
 	}
-	// readBack is what r holds for its next reader: the shell, once the
-	// prompt has returned.
 	readBack := func(t *testing.T, r *os.File) string {
 		t.Helper()
 		got := make(chan string, 1)
@@ -163,10 +156,9 @@ func testTerminalInput(t *testing.T, selects bool) {
 		_, err := w.WriteString("hunter2\r")
 		require.NoError(t, err)
 		var echo bytes.Buffer
-		val, err := readSecretLine(in, &echo)
+		val, err := readSecretLine(in, &echo, 0, 0)
 		require.NoError(t, err)
 		assert.Equal(t, "hunter2", val)
-		// The shell's line, typed while the store is still busy.
 		_, err = w.WriteString("ls\n")
 		require.NoError(t, err)
 		assert.Equal(t, "ls\n", readBack(t, r))

@@ -81,7 +81,7 @@ func Test_terminalInput_push(t *testing.T) {
 			in.push(r)
 		}
 		var echo bytes.Buffer
-		val, err := readSecretLine(in, &echo)
+		val, err := readSecretLine(in, &echo, 0, 0)
 		assert.ErrorIs(t, err, errInvalidUTF8)
 		assert.Empty(t, val)
 		assert.Equal(t, "*", echo.String())

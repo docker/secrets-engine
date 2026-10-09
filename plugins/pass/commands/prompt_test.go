@@ -31,7 +31,7 @@ import (
 func read(t *testing.T, in io.Reader) (string, string, error) {
 	t.Helper()
 	var echo bytes.Buffer
-	val, err := readSecretLine(testInput(t.Context(), in), &echo)
+	val, err := readSecretLine(testInput(t.Context(), in), &echo, 0, 0)
 	return val, echo.String(), err
 }
 
@@ -72,7 +72,7 @@ func Test_readSecretLine(t *testing.T) {
 			cancel()
 		}()
 		var echo bytes.Buffer
-		_, err := readSecretLine(testInput(ctx, pr), &echo)
+		_, err := readSecretLine(testInput(ctx, pr), &echo, 0, 0)
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, echo.String())
 	})
@@ -106,6 +106,14 @@ func Test_readSecretLine(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "d", val)
 		assert.Equal(t, "***\b \b\b \b\b \b*", echo)
+	})
+	t.Run("backspace erases the mask across the line end", func(t *testing.T) {
+		t.Parallel()
+		var echo bytes.Buffer
+		val, err := readSecretLine(testInput(t.Context(), strings.NewReader("abcd\x7f\x7f\x7fe\r")), &echo, 8, 5)
+		require.NoError(t, err)
+		assert.Equal(t, "ae", val)
+		assert.Equal(t, "**\r\n**\b \b\b \b\x1b[A\x1b[7G \b*", echo.String())
 	})
 	t.Run("escape sequences are skipped", func(t *testing.T) {
 		t.Parallel()
@@ -401,6 +409,28 @@ func Test_readSecretLine_lateTail(t *testing.T) {
 			})
 		}
 	})
+}
+
+func Test_lineEditor_wrap(t *testing.T) {
+	t.Parallel()
+	var echo bytes.Buffer
+	ed := &lineEditor{echo: &echo, width: 8, col: 5}
+	for _, r := range "abcd" {
+		ed.insert(r)
+	}
+	assert.Equal(t, "**\r\n**", echo.String())
+	echo.Reset()
+	for range 3 {
+		ed.backspace()
+	}
+	assert.Equal(t, "\b \b\b \b\x1b[A\x1b[7G \b", echo.String())
+	assert.Equal(t, 6, ed.col)
+	echo.Reset()
+	ed.insert('e')
+	ed.reset()
+	assert.Equal(t, "*\b \b\b \b", echo.String())
+	assert.Empty(t, ed.val)
+	assert.Equal(t, 5, ed.col)
 }
 
 func Test_lineEditor_zero(t *testing.T) {

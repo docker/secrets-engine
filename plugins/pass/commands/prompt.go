@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/charmbracelet/x/term"
 
 	secrets "github.com/docker/secrets-engine/store"
 )
@@ -94,18 +95,32 @@ func secretFromPrompt(ctx context.Context, in *os.File, out io.Writer, id secret
 			s, err = nil, fmt.Errorf("restoring the terminal: %w; run reset to recover it", rerr)
 		}
 	}()
-	_, _ = fmt.Fprintf(out, "Enter secret for %s: %s", id.String(), bracketedPasteOn)
-	val, err := readSecretLine(src, out)
+	prompt := "Enter secret for " + id.String() + ": "
+	_, _ = io.WriteString(out, prompt+bracketedPasteOn)
+	width, col := layout(in, out, prompt)
+	val, err := readSecretLine(src, out, width, col)
 	if err != nil {
 		return nil, err
 	}
 	return &setPayload{val: val}, nil
 }
 
-func readSecretLine(in input, echo io.Writer) (string, error) {
+func layout(in *os.File, out io.Writer, prompt string) (width, col int) {
+	tty := in
+	if f, ok := unwrapFile(out); ok && term.IsTerminal(f.Fd()) {
+		tty = f
+	}
+	width, _, err := term.GetSize(tty.Fd())
+	if err != nil || width < 2 {
+		return 0, 0
+	}
+	return width, utf8.RuneCountInString(prompt) % width
+}
+
+func readSecretLine(in input, echo io.Writer, width, col int) (string, error) {
 	lr := newLineReader(in)
 	defer lr.zero()
-	ed := &lineEditor{echo: echo}
+	ed := &lineEditor{echo: echo, width: width, col: col}
 	defer ed.zero()
 	for {
 		r, err := lr.readRune()
@@ -137,8 +152,10 @@ func readSecretLine(in input, echo io.Writer) (string, error) {
 }
 
 type lineEditor struct {
-	val  []rune
-	echo io.Writer
+	val   []rune
+	echo  io.Writer
+	width int // columns of the terminal; 0 when unknown
+	col   int // the cursor's column, kept while width is set
 }
 
 func (ed *lineEditor) emit(s string) { _, _ = io.WriteString(ed.echo, s) }
@@ -151,19 +168,39 @@ func (ed *lineEditor) insert(r rune) {
 		ed.val = grown
 	}
 	ed.val = append(ed.val, r)
+	if ed.width > 0 && ed.col >= ed.width-1 {
+		ed.emit("\r\n") // the last column stays blank
+		ed.col = 0
+	}
 	ed.emit("*")
+	ed.col++
 }
 
 func (ed *lineEditor) backspace() {
 	if n := len(ed.val); n > 0 {
 		ed.val[n-1] = 0 // not left behind in the backing array
 		ed.val = ed.val[:n-1]
+		ed.erase()
+	}
+}
+
+func (ed *lineEditor) erase() {
+	switch {
+	case ed.width == 0:
+		ed.emit("\b \b")
+	case ed.col == 0: // it ends the line above: up and onto it
+		ed.col = ed.width - 2
+		ed.emit(fmt.Sprintf("\x1b[A\x1b[%dG \b", ed.col+1))
+	default:
+		ed.col--
 		ed.emit("\b \b")
 	}
 }
 
 func (ed *lineEditor) reset() {
-	ed.emit(strings.Repeat("\b \b", len(ed.val)))
+	for range ed.val {
+		ed.erase()
+	}
 	ed.zero()
 	ed.val = ed.val[:0]
 }
