@@ -27,7 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/secrets-engine/client/internal/hook"
 	"github.com/docker/secrets-engine/client/realms"
+	"github.com/docker/secrets-engine/client/trace"
 	"github.com/docker/secrets-engine/x/secrets"
 )
 
@@ -145,10 +147,10 @@ type Profile struct {
 func parseUserSession(envelope secrets.Envelope) (UserSession, error) {
 	var session UserSession
 	if err := json.Unmarshal(envelope.Value, &session); err != nil {
-		return UserSession{}, fmt.Errorf("decode user session: %w", err)
+		return UserSession{}, hook.Malformed(fmt.Errorf("decode user session: %w", err))
 	}
 	if session.AccessToken == "" {
-		return UserSession{}, errors.New("decode user session: no access token in payload")
+		return UserSession{}, hook.Malformed(errors.New("decode user session: no access token in payload"))
 	}
 	return session, nil
 }
@@ -157,10 +159,10 @@ func parseUserSession(envelope secrets.Envelope) (UserSession, error) {
 func parseProfile(envelope secrets.Envelope) (Profile, error) {
 	var profile Profile
 	if err := json.Unmarshal(envelope.Value, &profile); err != nil {
-		return Profile{}, fmt.Errorf("decode profile metadata: %w", err)
+		return Profile{}, hook.Malformed(fmt.Errorf("decode profile metadata: %w", err))
 	}
 	if profile.UserID == "" {
-		return Profile{}, errors.New("decode profile metadata: no user ID in payload")
+		return Profile{}, hook.Malformed(errors.New("decode profile metadata: no user ID in payload"))
 	}
 	return profile, nil
 }
@@ -188,6 +190,8 @@ type config struct {
 	profiles     secrets.Pattern
 	defaultEntry secrets.Pattern
 	accountEntry secrets.Pattern
+	realm        string
+	hooks        trace.Hooks
 }
 
 // Staging switches the lookup to the Docker Hub staging realms.
@@ -195,6 +199,19 @@ func Staging() Option {
 	return func(c *config) {
 		c.accounts = realms.DockerHubStagingAuthentication
 		c.profiles = realms.DockerHubStagingAuthenticationMetadata
+		c.realm = trace.RealmDockerHubStaging
+	}
+}
+
+// WithHooks installs observability hooks around each [ClientAuth] operation.
+// Operations report [trace.Operation] with a dockerhub.* name and the
+// Docker Hub realm. A later WithHooks replaces an earlier one.
+//
+// The accessor from the client's HubAuth method already carries the client's
+// hooks; pass WithHooks there only to override them.
+func WithHooks(h trace.Hooks) Option {
+	return func(c *config) {
+		c.hooks = h
 	}
 }
 
@@ -202,6 +219,7 @@ func newConfig(opts []Option) config {
 	cfg := config{
 		accounts: realms.DockerHubAuthentication,
 		profiles: realms.DockerHubAuthenticationMetadata,
+		realm:    trace.RealmDockerHub,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -234,7 +252,41 @@ func New(engine secrets.Resolver, opts ...Option) ClientAuth {
 	return clientAuth{engine: engine, cfg: newConfig(opts)}
 }
 
+func (c clientAuth) op(name string) trace.Operation {
+	return trace.Operation{Name: name, Realm: c.cfg.realm}
+}
+
 func (c clientAuth) ListProfiles(ctx context.Context) ([]Profile, error) {
+	ctx, done := hook.Start(ctx, c.cfg.hooks, c.op(trace.OpDockerHubListProfiles))
+	profiles, err := c.listProfiles(ctx)
+	done(err)
+	return profiles, err
+}
+
+func (c clientAuth) GetDefaultProfile(ctx context.Context) (Profile, error) {
+	ctx, done := hook.Start(ctx, c.cfg.hooks, c.op(trace.OpDockerHubGetDefaultProfile))
+	profile, err := c.getDefaultProfile(ctx)
+	done(err)
+	return profile, err
+}
+
+func (c clientAuth) GetDefaultSession(ctx context.Context) (UserSession, error) {
+	ctx, done := hook.Start(ctx, c.cfg.hooks, c.op(trace.OpDockerHubGetDefaultSession))
+	session, err := c.getDefaultSession(ctx)
+	done(err)
+	return session, err
+}
+
+// GetSession reports [trace.OpDockerHubGetSession] to hooks without the
+// username.
+func (c clientAuth) GetSession(ctx context.Context, username string) (UserSession, error) {
+	ctx, done := hook.Start(ctx, c.cfg.hooks, c.op(trace.OpDockerHubGetSession))
+	session, err := c.getSessionByName(ctx, username)
+	done(err)
+	return session, err
+}
+
+func (c clientAuth) listProfiles(ctx context.Context) ([]Profile, error) {
 	envelopes, err := c.engine.GetSecrets(ctx, c.cfg.profiles)
 	if errors.Is(err, secrets.ErrNotFound) {
 		return nil, nil
@@ -267,7 +319,7 @@ func (c clientAuth) ListProfiles(ctx context.Context) ([]Profile, error) {
 	return profiles, nil
 }
 
-func (c clientAuth) GetDefaultProfile(ctx context.Context) (Profile, error) {
+func (c clientAuth) getDefaultProfile(ctx context.Context) (Profile, error) {
 	envelopes, err := c.engine.GetSecrets(ctx, c.cfg.defaultEntry)
 	if errors.Is(err, secrets.ErrNotFound) {
 		return Profile{}, ErrNoDefaultProfile
@@ -278,8 +330,8 @@ func (c clientAuth) GetDefaultProfile(ctx context.Context) (Profile, error) {
 	return parseFirst(envelopes, parseProfile, ErrNoDefaultProfile)
 }
 
-func (c clientAuth) GetDefaultSession(ctx context.Context) (UserSession, error) {
-	profile, err := c.GetDefaultProfile(ctx)
+func (c clientAuth) getDefaultSession(ctx context.Context) (UserSession, error) {
+	profile, err := c.getDefaultProfile(ctx)
 	if err != nil {
 		return UserSession{}, err
 	}
@@ -287,15 +339,15 @@ func (c clientAuth) GetDefaultSession(ctx context.Context) (UserSession, error) 
 	// realm, so a tampered profile cannot address an arbitrary secret.
 	id, err := secrets.ParseID(profile.UserID)
 	if err != nil {
-		return UserSession{}, fmt.Errorf("default profile user id: %w", err)
+		return UserSession{}, hook.Malformed(fmt.Errorf("default profile user id: %w", err))
 	}
 	if !c.cfg.accountEntry.Match(id) {
-		return UserSession{}, fmt.Errorf("default profile user id %q is not an account entry in the %s realm", profile.UserID, c.cfg.accounts)
+		return UserSession{}, hook.Malformed(fmt.Errorf("default profile user id %q is not an account entry in the %s realm", profile.UserID, c.cfg.accounts))
 	}
 	return c.getSession(ctx, exactPattern(id))
 }
 
-func (c clientAuth) GetSession(ctx context.Context, username string) (UserSession, error) {
+func (c clientAuth) getSessionByName(ctx context.Context, username string) (UserSession, error) {
 	if strings.Contains(username, "/") {
 		return UserSession{}, fmt.Errorf("invalid username %q: must not contain '/'", username)
 	}

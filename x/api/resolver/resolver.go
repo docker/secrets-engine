@@ -81,8 +81,11 @@ type resolverClient struct {
 	resolverClient resolverv1connect.ResolverServiceClient
 }
 
-func NewResolverClient(httpClient connect.HTTPClient) secrets.Resolver {
-	return &resolverClient{resolverClient: resolverv1connect.NewResolverServiceClient(httpClient, "http://unix")}
+// NewResolverClient returns a [secrets.Resolver] that calls the resolver
+// service over httpClient. opts are passed to the connect client, for example
+// to add interceptors.
+func NewResolverClient(httpClient connect.HTTPClient, opts ...connect.ClientOption) secrets.Resolver {
+	return &resolverClient{resolverClient: resolverv1connect.NewResolverServiceClient(httpClient, "http://unix", opts...)}
 }
 
 func (r resolverClient) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -172,8 +175,11 @@ type authorizerClient struct {
 	client resolverv1connect.AuthorizerServiceClient
 }
 
-func NewAuthorizerClient(httpClient connect.HTTPClient) secrets.Authorizer {
-	return &authorizerClient{client: resolverv1connect.NewAuthorizerServiceClient(httpClient, "http://unix")}
+// NewAuthorizerClient returns a [secrets.Authorizer] that calls the authorizer
+// service over httpClient. opts are passed to the connect client, for example
+// to add interceptors.
+func NewAuthorizerClient(httpClient connect.HTTPClient, opts ...connect.ClientOption) secrets.Authorizer {
+	return &authorizerClient{client: resolverv1connect.NewAuthorizerServiceClient(httpClient, "http://unix", opts...)}
 }
 
 func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
