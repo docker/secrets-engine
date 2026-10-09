@@ -99,7 +99,7 @@ func TestStoreCommandsHintOnLockedKeychain(t *testing.T) {
 		args []string
 	}{
 		{"get", mustGetCommand(t), teststore.NewMockStore(teststore.WithStoreGetErr(locked)), []string{"foo"}},
-		{"set", SetCommand(), teststore.NewMockStore(teststore.WithStoreSaveErr(locked)), []string{"foo=bar"}},
+		{"set", mustSetCommand(t), teststore.NewMockStore(teststore.WithStoreSaveErr(locked)), []string{"foo=bar"}},
 		{"ls", ListCommand(), teststore.NewMockStore(teststore.WithStoreGetAllErr(locked)), nil},
 		{"rm", mustRmCommand(t, engineOpts(t, &mockEngine{allow: true})...), teststore.NewMockStore(
 			teststore.WithStore(map[store.ID]store.Secret{store.MustParseID("foo"): pass.NewPassValue([]byte("bar"))}),
