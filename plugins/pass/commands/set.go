@@ -23,8 +23,10 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/secrets-engine/plugins/pass/commands/internal/prompt"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -37,7 +39,7 @@ var setLong string
 
 type setOpts struct {
 	metadata []string // raw "key=value" strings from --metadata flag
-	force    bool     // if true, overwrite existing secret instead of erroring
+	force    bool     // if true, overwrite existing setPayload instead of erroring
 }
 
 type stdinPayload struct {
@@ -59,26 +61,27 @@ func SetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var s secret
-			if isNotImplicitReadFromStdinSyntax(args) {
-				va, err := parseArg(args[0])
-				if err != nil {
-					return err
-				}
-				s = *va
-			} else {
-				val, err := secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin(), args[0])
-				if err != nil {
-					return err
-				}
-				s = *val
+			key, value, _ := strings.Cut(args[0], "=")
+			id, err := secrets.ParseID(key)
+			if err != nil {
+				return err
 			}
-			id, err := secrets.ParseID(s.id)
+			flagMeta, err := parseMetadataFlags(opts.metadata)
 			if err != nil {
 				return err
 			}
 
-			flagMeta, err := parseMetadataFlags(opts.metadata)
+			var s *setPayload
+			switch in, isFile := prompt.UnwrapFile(cmd.InOrStdin()); {
+			case isNotImplicitReadFromStdinSyntax(args):
+				s = &setPayload{val: value}
+			case isFile && term.IsTerminal(in.Fd()):
+				var val string
+				val, err = prompt.ReadMasked(cmd.Context(), in, cmd.ErrOrStderr(), id)
+				s = &setPayload{val: val}
+			default:
+				s, err = secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin())
+			}
 			if err != nil {
 				return err
 			}
@@ -129,7 +132,7 @@ func isNotImplicitReadFromStdinSyntax(args []string) bool {
 	return strings.Contains(args[0], "=") || len(args) > 1
 }
 
-func secretMappingFromSTDIN(ctx context.Context, reader io.Reader, id string) (*secret, error) {
+func secretMappingFromSTDIN(ctx context.Context, reader io.Reader) (*setPayload, error) {
 	data, err := readAllWithContext(ctx, reader)
 	if err != nil {
 		return nil, err
@@ -138,23 +141,14 @@ func secretMappingFromSTDIN(ctx context.Context, reader io.Reader, id string) (*
 
 	var payload stdinPayload
 	if err := json.Unmarshal(data, &payload); err == nil && payload.Secret != "" {
-		return &secret{id: id, val: payload.Secret, metadata: payload.Metadata}, nil
+		return &setPayload{val: payload.Secret, metadata: payload.Metadata}, nil
 	}
-	return &secret{id: id, val: string(data)}, nil
+	return &setPayload{val: string(data)}, nil
 }
 
-type secret struct {
-	id       string
+type setPayload struct {
 	val      string
 	metadata map[string]string
-}
-
-func parseArg(arg string) (*secret, error) {
-	key, value, found := strings.Cut(arg, "=")
-	if !found {
-		return nil, fmt.Errorf("no key=value pair: %s", arg)
-	}
-	return &secret{id: key, val: value}, nil
 }
 
 func readAllWithContext(ctx context.Context, r io.Reader) ([]byte, error) {
