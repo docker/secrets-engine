@@ -333,8 +333,9 @@ func (lr *lineReader) decodeRune() (rune, int, error) {
 // readRune returns the next rune. Invalid UTF-8 is errInvalidUTF8, unless a
 // Ctrl-C queued behind it cancels. A '[' or 'O' within tailTimeout of a lone
 // ESC is its sequence's tail and comes back as that ESC, unconsumed, with
-// lr.tail set: escape then takes only a sequence a key sends, as '[' or 'O'
-// typed after Escape would otherwise pass for one and be lost in silence.
+// lr.tail set: escape then takes a paste from it and nothing else, since a
+// key's sequence split from its ESC and '[' or 'O' typed after Escape look
+// alike, and skipping the pair as a key would lose the text in silence.
 func (lr *lineReader) readRune() (rune, error) {
 	r, size, err := lr.decodeRune()
 	if err != nil {
@@ -361,7 +362,7 @@ func (lr *lineReader) unreadByte() { lr.r-- }
 // is returned with ok set, ESC alone is the Escape key. A control byte ends
 // the burst and stays unread, so Enter and Ctrl-C get through. Printable
 // bytes that complete no sequence or trail one are errSwallowedInput, as is
-// a late tail's sequence that no key sends.
+// a late tail's sequence unless it opens a paste.
 func (lr *lineReader) escape() (paste []byte, ok bool, err error) {
 	tail := lr.tail
 	for {
@@ -394,7 +395,7 @@ func (lr *lineReader) escape() (paste []byte, ok bool, err error) {
 
 // sequence parses one sequence after ESC: errEscapeKey for ESC alone or
 // before a control key, errChord for bytes that complete no sequence. With
-// tail set, the sequence must be one a key sends.
+// tail set, only a paste passes.
 func (lr *lineReader) sequence(tail bool) (paste []byte, ok bool, err error) {
 	for {
 		b, err := lr.readByte(escTimeout)
@@ -438,11 +439,11 @@ func (lr *lineReader) csi(tail bool) (paste []byte, ok bool, err error) {
 			params = append(params, c)
 		case c < 0x40 || c > 0x7e: // no sequence holds this byte
 			return nil, false, lr.cut(c)
-		case tail && !keyFinal(c): // no key sends this: typed after Escape
-			return nil, false, errSwallowedInput
 		case c == '~' && string(params) == pasteStart:
 			paste, err = lr.readPaste()
 			return paste, err == nil, err
+		case tail: // a key's sequence or typing after Escape: no telling
+			return nil, false, errSwallowedInput
 		case c == 'M' && len(params) == 0: // X10 mouse report
 			return nil, false, lr.skipMouseReport()
 		default: // final byte
@@ -458,14 +459,10 @@ func (lr *lineReader) skipFinal(tail bool) error {
 		return err
 	case isControl(c):
 		return lr.cut(c)
-	case tail && !keyFinal(c): // no key sends this: typed after Escape
+	case tail: // a key's sequence or typing after Escape: no telling
 		return errSwallowedInput
 	}
 	return nil
-}
-
-func keyFinal(c byte) bool {
-	return 'A' <= c && c <= 'H' || 'P' <= c && c <= 'S' || c == 'Z' || c == '~' || 'a' <= c && c <= 'd'
 }
 
 func (lr *lineReader) skipMouseReport() error {

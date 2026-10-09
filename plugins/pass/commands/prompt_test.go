@@ -405,15 +405,15 @@ func Test_readSecretLine(t *testing.T) {
 // of a lone ESC.
 func Test_readSecretLine_lateTail(t *testing.T) {
 	t.Parallel()
-	t.Run("a sequence tail late after its ESC is still skipped", func(t *testing.T) {
+	t.Run("a paste split from its ESC is taken", func(t *testing.T) {
 		t.Parallel()
-		// A slow link splits ESC from "[D" for longer than escTimeout, yet
-		// within tailTimeout.
-		in := &chunkReader{chunks: []chunk{{data: "hunter2\x1b"}, {delay: 6 * escTimeout, data: "[D"}, {delay: 6 * escTimeout, data: "\r"}}}
+		// A slow link splits ESC from the paste start for longer than
+		// escTimeout, yet within tailTimeout.
+		in := &chunkReader{chunks: []chunk{{data: "\x1b"}, {delay: 6 * escTimeout, data: "[200~hunter2\x1b[201~"}, {delay: 6 * escTimeout, data: "a\r"}}}
 		val, echo, err := read(t, in)
 		require.NoError(t, err)
-		assert.Equal(t, "hunter2", val)
-		assert.Equal(t, "*******", echo)
+		assert.Equal(t, "hunter2a", val)
+		assert.Equal(t, "********", echo)
 	})
 	t.Run("a bracket typed well after escape is text", func(t *testing.T) {
 		t.Parallel()
@@ -428,31 +428,16 @@ func Test_readSecretLine_lateTail(t *testing.T) {
 		_, _, err := read(t, in)
 		assert.ErrorIs(t, err, errSwallowedInput)
 	})
-	t.Run("a late tail a key sends is skipped", func(t *testing.T) {
+	t.Run("any other late tail is an error", func(t *testing.T) {
 		t.Parallel()
 		// Up, Home as SS3, F5, Shift-Tab, F1 as SS3 and on the Linux
-		// console, rxvt's shift+up, ctrl+left; a paste split from its ESC.
-		for _, tail := range []string{"[A", "OH", "[15~", "[Z", "OP", "[[A", "[a", "[1;5D", "[200~hunter2\x1b[201~"} {
-			t.Run(tail, func(t *testing.T) {
-				t.Parallel()
-				in := &chunkReader{chunks: []chunk{{data: "\x1b"}, {delay: 6 * escTimeout, data: tail}, {delay: 6 * escTimeout, data: "a\r"}}}
-				val, _, err := read(t, in)
-				require.NoError(t, err)
-				want := "a"
-				if strings.HasPrefix(tail, "[200~") {
-					want = "hunter2a"
-				}
-				assert.Equal(t, want, val)
-			})
-		}
-	})
-	t.Run("a late tail that no key sends is an error", func(t *testing.T) {
-		t.Parallel()
-		// Escape out of habit, then a value opening with 'O' or '[' whose
-		// second key ssh latency coalesces with the first and a gap follows:
-		// an SS3 or CSI no key sends. Also a mouse report, X10 and SGR, and
-		// a terminal reply split from their ESC, since they end the same way.
-		for _, tail := range []string{"Op", "[x", "[M !!", "[<0;10;20M", "[0n"} {
+		// console, rxvt's shift+up and ctrl+left, split from their ESC by
+		// a slow link; a mouse report, X10 and SGR, and a terminal reply
+		// likewise. Escape out of habit, then a value opening with '[' or
+		// 'O' whose second key ssh latency coalesces with the first and a
+		// gap follows, looks the same whether or not a key sends the pair,
+		// so none of them is skipped in silence.
+		for _, tail := range []string{"[A", "OH", "[15~", "[Z", "OP", "[[A", "[a", "[1;5D", "[M !!", "[<0;10;20M", "[0n", "Op", "[x"} {
 			t.Run(tail, func(t *testing.T) {
 				t.Parallel()
 				in := &chunkReader{chunks: []chunk{{data: "abc\x1b"}, {delay: 6 * escTimeout, data: tail}, {delay: 6 * escTimeout, data: "enSesame\r"}}}
