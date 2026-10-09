@@ -25,7 +25,7 @@ group "default" {
 }
 
 variable "GO_VERSION" {
-  default = "1.26.8"
+  default = "1.26.9"
 }
 
 target "fedora_43_gnome_keyring" {
