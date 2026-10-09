@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package commands
+package prompt
 
 import (
 	"bytes"
@@ -62,8 +62,9 @@ var (
 	errChord     = errors.New("escape chord")
 )
 
-func unwrapFile(s any) (*os.File, bool) {
-	// docker's streams.In and streams.Out hide the file behind File().
+// UnwrapFile returns the file behind s: docker's streams.In and streams.Out
+// hide it behind File().
+func UnwrapFile(s any) (*os.File, bool) {
 	if d, wrapped := s.(interface{ File() (*os.File, bool) }); wrapped {
 		return d.File()
 	}
@@ -76,15 +77,15 @@ type input interface {
 	wait(d time.Duration) (ready bool, err error)
 }
 
-func secretFromPrompt(ctx context.Context, in *os.File, out io.Writer, id secrets.ID) (s *setPayload, err error) {
+func ReadMasked(ctx context.Context, in *os.File, out io.Writer, id secrets.ID) (val string, err error) {
 	src, err := newTerminalInput(ctx, in)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer src.close()
 	state, err := enterRaw(in)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer func() {
 		eol := "\r\n"
@@ -93,22 +94,18 @@ func secretFromPrompt(ctx context.Context, in *os.File, out io.Writer, id secret
 		}
 		_, _ = io.WriteString(out, bracketedPasteOff+eol)
 		if rerr := restoreTerminal(in, state); rerr != nil && err == nil {
-			s, err = nil, fmt.Errorf("restoring the terminal: %w; run reset to recover it", rerr)
+			val, err = "", fmt.Errorf("restoring the terminal: %w; run reset to recover it", rerr)
 		}
 	}()
 	prompt := "Enter secret for " + id.String() + ": "
 	_, _ = io.WriteString(out, prompt+bracketedPasteOn)
 	width, col := layout(in, out, prompt)
-	val, err := readSecretLine(src, out, width, col)
-	if err != nil {
-		return nil, err
-	}
-	return &setPayload{val: val}, nil
+	return readSecretLine(src, out, width, col)
 }
 
 func layout(in *os.File, out io.Writer, prompt string) (width, col int) {
 	tty := in
-	if f, ok := unwrapFile(out); ok && term.IsTerminal(f.Fd()) {
+	if f, ok := UnwrapFile(out); ok && term.IsTerminal(f.Fd()) {
 		tty = f
 	}
 	width, _, err := term.GetSize(tty.Fd())

@@ -26,6 +26,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/secrets-engine/plugins/pass/commands/internal/prompt"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/x/secrets"
 )
@@ -71,11 +72,13 @@ func SetCommand() *cobra.Command {
 			}
 
 			var s *setPayload
-			switch in, isFile := unwrapFile(cmd.InOrStdin()); {
+			switch in, isFile := prompt.UnwrapFile(cmd.InOrStdin()); {
 			case isNotImplicitReadFromStdinSyntax(args):
 				s = &setPayload{val: value}
 			case isFile && term.IsTerminal(in.Fd()):
-				s, err = secretFromPrompt(cmd.Context(), in, cmd.ErrOrStderr(), id)
+				var val string
+				val, err = prompt.ReadMasked(cmd.Context(), in, cmd.ErrOrStderr(), id)
+				s = &setPayload{val: val}
 			default:
 				s, err = secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin())
 			}

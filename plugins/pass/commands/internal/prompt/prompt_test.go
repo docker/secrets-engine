@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package commands
+package prompt
 
 import (
 	"bytes"
@@ -614,31 +614,31 @@ func Test_lineReader_fill(t *testing.T) {
 	})
 }
 
-func Test_unwrapFile(t *testing.T) {
+func Test_UnwrapFile(t *testing.T) {
 	t.Parallel()
 	f, err := os.Open(os.DevNull)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = f.Close() })
 	t.Run("plain file", func(t *testing.T) {
 		t.Parallel()
-		got, ok := unwrapFile(f)
+		got, ok := UnwrapFile(f)
 		require.True(t, ok)
 		assert.Same(t, f, got)
 	})
 	t.Run("docker stream wrapper", func(t *testing.T) {
 		t.Parallel()
-		got, ok := unwrapFile(fileWrapper{Reader: &bytes.Buffer{}, f: f})
+		got, ok := UnwrapFile(fileWrapper{Reader: &bytes.Buffer{}, f: f})
 		require.True(t, ok)
 		assert.Same(t, f, got)
 	})
 	t.Run("wrapper without a file", func(t *testing.T) {
 		t.Parallel()
-		_, ok := unwrapFile(fileWrapper{Reader: &bytes.Buffer{}})
+		_, ok := UnwrapFile(fileWrapper{Reader: &bytes.Buffer{}})
 		assert.False(t, ok)
 	})
 	t.Run("buffer", func(t *testing.T) {
 		t.Parallel()
-		_, ok := unwrapFile(&bytes.Buffer{})
+		_, ok := UnwrapFile(&bytes.Buffer{})
 		assert.False(t, ok)
 	})
 }

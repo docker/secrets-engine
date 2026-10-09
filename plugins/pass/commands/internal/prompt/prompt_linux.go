@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package commands
+package prompt
 
 import "golang.org/x/sys/unix"
 
 // tcsetattr(3) actions: TCSANOW applies at once, TCSAFLUSH also discards the
 // input still queued.
 const (
-	setTermiosNow   = unix.TIOCSETA
-	setTermiosFlush = unix.TIOCSETAF
+	setTermiosNow   = unix.TCSETS
+	setTermiosFlush = unix.TCSETSF
 )

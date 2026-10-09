@@ -14,7 +14,7 @@
 
 //go:build !windows
 
-package commands
+package prompt
 
 import (
 	"context"
