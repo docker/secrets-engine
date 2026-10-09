@@ -87,9 +87,8 @@ type Store interface {
 	// Save persists credentials from the store.
 	Save(ctx context.Context, id ID, secret Secret) error
 	// Upsert atomically replaces an existing credential or inserts a new one.
-	// On stores that do not support overwriting (e.g. macOS Keychain), it
-	// deletes the existing credential and then saves the new one under a mutex
-	// to ensure the two operations are not interleaved.
+	// On the macOS Keychain an existing item is updated in place, keeping the
+	// applications the user allowed to access it.
 	Upsert(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
 	//
