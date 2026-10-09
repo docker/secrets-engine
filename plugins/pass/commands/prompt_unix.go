@@ -111,7 +111,6 @@ func (t *terminalInput) wait(d time.Duration) (bool, error) {
 	}
 }
 
-// watch waits for input or the wake-up for left, without limit when left < 0.
 func (t *terminalInput) watch(left time.Duration) (bool, error) {
 	if t.selects {
 		return t.selectWatch(left)
@@ -138,7 +137,6 @@ func (t *terminalInput) watch(left time.Duration) (bool, error) {
 	return true, nil // input, or a hangup or error for the read to report
 }
 
-// selectWatch is watch by select(2), for a terminal poll(2) cannot watch.
 func (t *terminalInput) selectWatch(left time.Duration) (bool, error) {
 	if t.fd >= unix.FD_SETSIZE || t.wake >= unix.FD_SETSIZE {
 		return false, errBeyondSelect

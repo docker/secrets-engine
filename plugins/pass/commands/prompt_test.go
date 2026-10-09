@@ -68,6 +68,12 @@ func Test_readSecretLine(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "hunter2", val)
 	})
+	t.Run("line breaks behind enter are no input, however many", func(t *testing.T) {
+		t.Parallel()
+		val, _, err := read(t, strings.NewReader("hunter2\r"+strings.Repeat("\n", 5000)))
+		require.NoError(t, err)
+		assert.Equal(t, "hunter2", val)
+	})
 	t.Run("cancelling the context ends the read", func(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(t.Context())

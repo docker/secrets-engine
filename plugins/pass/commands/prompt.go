@@ -282,6 +282,7 @@ func (lr *lineReader) trailing() (bool, error) {
 		case len(bytes.Trim(rest, "\r\n")) > 0:
 			return true, nil
 		}
+		lr.r = lr.w
 		wait := time.Until(deadline)
 		if wait <= 0 {
 			return false, nil
