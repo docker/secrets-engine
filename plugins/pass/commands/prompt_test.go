@@ -28,8 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// read runs the prompt's line reader over in and returns the value, the
-// masked echo, and the error.
 func read(t *testing.T, in io.Reader) (string, string, error) {
 	t.Helper()
 	var echo bytes.Buffer
@@ -60,7 +58,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("ctrl+d ends the prompt without a value", func(t *testing.T) {
 		t.Parallel()
-		// On a Windows console Ctrl-Z arrives as EOF and ends it the same way.
 		val, _, err := read(t, strings.NewReader("hunter2\x04\r"))
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 		assert.Empty(t, val)
@@ -112,12 +109,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("escape sequences are skipped", func(t *testing.T) {
 		t.Parallel()
-		// Left arrow (CSI), Home (SS3), F5 (CSI with parameters), SGR
-		// mouse report, cursor position report; rxvt alt+up (ESC ESC [
-		// A), Linux console F1 (ESC [ [ A), X10 mouse report (ESC [ M and
-		// three bytes), OSC replies ended by BEL and by ST, a DCS reply;
-		// an OSC reply cut short by an arrow key. Typing resumes after a
-		// gap.
 		for _, seq := range []string{
 			"\x1b[D", "\x1bOH", "\x1b[15~", "\x1b[<0;10;20M", "\x1b[12;40R",
 			"\x1b\x1b[A", "\x1b[[A", "\x1b[M !!", "\x1b]11;rgb:0000/0000/0000\x07", "\x1b]52;c;aGVsbG8=\x1b\\", "\x1bP>|xterm(380)\x1b\\",
@@ -135,7 +126,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a control string cut short by a paste", func(t *testing.T) {
 		t.Parallel()
-		// A DCS reply without terminator, then a bracketed paste.
 		val, echo, err := read(t, strings.NewReader("\x1bP>|xterm\x1b[200~b\x1b[201~\r"))
 		require.NoError(t, err)
 		assert.Equal(t, "b", val)
@@ -143,9 +133,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("text swallowed by an escape is an error", func(t *testing.T) {
 		t.Parallel()
-		// Alt+h, or Escape coalesced with typing by ssh latency; the same
-		// where the text opens a CSI or an SS3; alt+ä; alt with a rune cut
-		// short; an arrow key with typing right behind it.
 		for _, in := range []string{"\x1bhunter2\r", "\x1b[hunter2\r", "\x1bOpenSesame\r", "a\x1bäb\r", "\x1b\xc3", "a\x1b[Dab\r"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errSwallowedInput, "%q", in)
@@ -153,7 +140,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a sequence cut short by a key is an error", func(t *testing.T) {
 		t.Parallel()
-		// Enter, Backspace or Ctrl-D right behind Alt+[ or the like.
 		for _, in := range []string{"a\x1b[\r", "a\x1b[M\r", "a\x1bO\x7f", "a\x1b]11;rgb\r", "a\x1b[12;\x04"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errSwallowedInput, "%q", in)
@@ -161,9 +147,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a chord cut short by a gap is an error", func(t *testing.T) {
 		t.Parallel()
-		// Alt+[ opens a CSI, Alt+Shift+O an SS3, Alt+Shift+P a DCS and
-		// Alt+] an OSC; a CSI with parameters and an X10 mouse report cut
-		// short. Nothing follows within escTimeout.
 		for _, chord := range []string{"\x1b[", "\x1bO", "\x1bP", "\x1b]", "\x1b[12;", "\x1b[M "} {
 			t.Run(chord, func(t *testing.T) {
 				t.Parallel()
@@ -190,7 +173,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a lone escape is ignored", func(t *testing.T) {
 		t.Parallel()
-		// Nothing follows ESC within escTimeout: the Escape key.
 		in := &chunkReader{chunks: []chunk{{data: "\x1b"}, {delay: 6 * escTimeout, data: "a\r"}}}
 		val, _, err := read(t, in)
 		require.NoError(t, err)
@@ -205,8 +187,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a sequence split across reads is skipped whole", func(t *testing.T) {
 		t.Parallel()
-		// The rest arrives in the next read, within escTimeout: after ESC,
-		// or inside the sequence.
 		for _, chunks := range [][]chunk{
 			{{data: "\x1b"}, {data: "[D"}, {delay: 6 * escTimeout, data: "a\r"}},
 			{{data: "\x1b[1;"}, {data: "5D"}, {delay: 6 * escTimeout, data: "a\r"}},
@@ -237,8 +217,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("input behind the line end in the same read is rejected", func(t *testing.T) {
 		t.Parallel()
-		// A multi-line paste without bracketing, or type-ahead coalesced
-		// with Enter.
 		for _, in := range []string{"line1\rline2\r", "line1\nline2", "line1\r\nline2\r\n"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errPastLineEnd, "%q", in)
@@ -246,8 +224,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("input right behind the line end in a later read is rejected too", func(t *testing.T) {
 		t.Parallel()
-		// A paste delivered line by line, or chunked at the line end; the
-		// wait outlasts a bare line break.
 		for _, chunks := range [][]chunk{
 			{{data: "line1\r"}, {data: "line2\r"}},
 			{{data: "line1\r"}, {data: "\n"}, {data: "line2\r\n"}},
@@ -258,7 +234,7 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a quiet escTimeout after enter submits", func(t *testing.T) {
 		t.Parallel()
-		pr, pw := io.Pipe() // nothing follows Enter: the read blocks like a quiet tty
+		pr, pw := io.Pipe()
 		t.Cleanup(func() { _ = pw.Close() })
 		go func() { _, _ = pw.Write([]byte("line1\r")) }()
 		val, _, err := read(t, pr)
@@ -267,8 +243,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("ctrl+c right behind enter cancels", func(t *testing.T) {
 		t.Parallel()
-		// Coalesced with Enter by ssh latency, or in the next read within
-		// escTimeout: Ctrl-C, not input past the line end.
 		_, _, err := read(t, strings.NewReader("secret\r\x03"))
 		assert.ErrorIs(t, err, context.Canceled)
 		_, _, err = read(t, &chunkReader{chunks: []chunk{{data: "secret\r"}, {data: "\x03"}}})
@@ -292,7 +266,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("ctrl+c inside a paste cancels", func(t *testing.T) {
 		t.Parallel()
-		// Also the way out of a paste whose end marker never comes.
 		for _, in := range []string{"\x1b[200~abc\x03def\x1b[201~\r", "\x1b[200~abc\x03"} {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, context.Canceled, "%q", in)
@@ -307,7 +280,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a paste stalled for longer than escTimeout completes", func(t *testing.T) {
 		t.Parallel()
-		// A paste streams at the pace of the link: no timeout inside one.
 		in := &chunkReader{chunks: []chunk{{data: "\x1b[200~abc"}, {delay: 6 * escTimeout, data: "def\x1b[201~\r"}}}
 		val, _, err := read(t, in)
 		require.NoError(t, err)
@@ -334,8 +306,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a C1 control rune is an error", func(t *testing.T) {
 		t.Parallel()
-		// NEL and a Windows-1252 quote mark gone mojibake: no key sends
-		// one, so it is text gone wrong, typed or pasted unbracketed.
 		for _, in := range []string{"a\u0085b\r", "a\u0092b\r"} {
 			_, echo, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errControlChars, "%q", in)
@@ -351,8 +321,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("invalid UTF-8 is rejected", func(t *testing.T) {
 		t.Parallel()
-		// A stray byte, a lead byte without its continuation, before a key
-		// or before Enter, a lone continuation byte.
 		for _, in := range []string{"a\xffb\r", "a\xc3b\r", "a\xc3\r", "a\x80b\r"} {
 			val, echo, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, errInvalidUTF8, "%q", in)
@@ -362,7 +330,6 @@ func Test_readSecretLine(t *testing.T) {
 	})
 	t.Run("a lead byte on its own is invalid", func(t *testing.T) {
 		t.Parallel()
-		// The rest of the rune never comes: a terminal sends a rune whole.
 		pr, pw := io.Pipe()
 		t.Cleanup(func() { _ = pw.Close() })
 		go func() { _, _ = pw.Write([]byte("a\xc3")) }()
@@ -375,7 +342,6 @@ func Test_readSecretLine(t *testing.T) {
 			_, _, err := read(t, strings.NewReader(in))
 			assert.ErrorIs(t, err, context.Canceled, "%q", in)
 		}
-		// Also when it arrives in the next read, within escTimeout.
 		in := &chunkReader{chunks: []chunk{{data: "a\xc3"}, {data: "\x03"}}}
 		_, _, err := read(t, in)
 		assert.ErrorIs(t, err, context.Canceled)
@@ -401,14 +367,10 @@ func Test_readSecretLine(t *testing.T) {
 	})
 }
 
-// Test_readSecretLine_lateTail covers a '[' or 'O' arriving within tailTimeout
-// of a lone ESC.
 func Test_readSecretLine_lateTail(t *testing.T) {
 	t.Parallel()
 	t.Run("a paste split from its ESC is taken", func(t *testing.T) {
 		t.Parallel()
-		// A slow link splits ESC from the paste start for longer than
-		// escTimeout, yet within tailTimeout.
 		in := &chunkReader{chunks: []chunk{{data: "\x1b"}, {delay: 6 * escTimeout, data: "[200~hunter2\x1b[201~"}, {delay: 6 * escTimeout, data: "a\r"}}}
 		val, echo, err := read(t, in)
 		require.NoError(t, err)
@@ -430,13 +392,6 @@ func Test_readSecretLine_lateTail(t *testing.T) {
 	})
 	t.Run("any other late tail is an error", func(t *testing.T) {
 		t.Parallel()
-		// Up, Home as SS3, F5, Shift-Tab, F1 as SS3 and on the Linux
-		// console, rxvt's shift+up and ctrl+left, split from their ESC by
-		// a slow link; a mouse report, X10 and SGR, and a terminal reply
-		// likewise. Escape out of habit, then a value opening with '[' or
-		// 'O' whose second key ssh latency coalesces with the first and a
-		// gap follows, looks the same whether or not a key sends the pair,
-		// so none of them is skipped in silence.
 		for _, tail := range []string{"[A", "OH", "[15~", "[Z", "OP", "[[A", "[a", "[1;5D", "[M !!", "[<0;10;20M", "[0n", "Op", "[x"} {
 			t.Run(tail, func(t *testing.T) {
 				t.Parallel()
@@ -450,8 +405,6 @@ func Test_readSecretLine_lateTail(t *testing.T) {
 
 func Test_lineEditor_zero(t *testing.T) {
 	t.Parallel()
-	// A rune Backspace drops leaves no trace in the backing array, and
-	// neither do the runes ctrl+u clears or zero() ends with.
 	ed := &lineEditor{echo: io.Discard}
 	for _, r := range "hunter2x" {
 		ed.insert(r)
@@ -467,7 +420,6 @@ func Test_lineEditor_zero(t *testing.T) {
 	}
 	ed.zero()
 	assert.Equal(t, make([]rune, cap(ed.val)), ed.val[:cap(ed.val)])
-	// An array the value outgrows is retired zeroed, not left to append.
 	ed = &lineEditor{echo: io.Discard}
 	for ed.insert('a'); len(ed.val) < cap(ed.val); {
 		ed.insert('a')
@@ -483,7 +435,6 @@ type chunk struct {
 	data  string
 }
 
-// chunkReader returns one chunk per Read, after the chunk's delay, then EOF.
 type chunkReader struct{ chunks []chunk }
 
 func (c *chunkReader) Read(p []byte) (int, error) {
@@ -496,10 +447,6 @@ func (c *chunkReader) Read(p []byte) (int, error) {
 	return copy(p, next.data), nil
 }
 
-// readerInput makes an io.Reader the prompt's input for tests. A plain reader
-// cannot be awaited, so a Read runs in a goroutine and the wait is on its
-// result; a Read left behind when a test ends is the very thing
-// terminalInput spares the terminal.
 type readerInput struct {
 	ctx     context.Context
 	r       io.Reader
@@ -560,7 +507,6 @@ func (in *readerInput) Read(p []byte) (int, error) {
 	return n, in.res.err
 }
 
-// fakeInput is an input whose wait is scripted and whose reads are counted.
 type fakeInput struct {
 	ready bool
 	err   error
@@ -588,8 +534,6 @@ func Test_lineReader_fill(t *testing.T) {
 	})
 	t.Run("a wait that runs out issues no read", func(t *testing.T) {
 		t.Parallel()
-		// Nothing may be left reading the terminal when the prompt returns:
-		// the line typed next is the shell's.
 		in := &fakeInput{data: "ls\r"}
 		lr := newLineReader(in)
 		more, err := lr.fill(escTimeout)

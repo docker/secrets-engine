@@ -16,4 +16,9 @@ package commands
 
 import "golang.org/x/sys/unix"
 
-const setTermiosFlush = unix.TIOCSETAF
+// tcsetattr(3) actions: TCSANOW applies at once, TCSAFLUSH also discards the
+// input still queued.
+const (
+	setTermiosNow   = unix.TIOCSETA
+	setTermiosFlush = unix.TIOCSETAF
+)

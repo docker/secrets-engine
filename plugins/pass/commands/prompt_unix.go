@@ -41,7 +41,7 @@ func enterRaw(f *os.File) (*term.State, error) {
 	raw.Cflag |= unix.CS8
 	raw.Cc[unix.VMIN] = 1
 	raw.Cc[unix.VTIME] = 0
-	if err := unix.IoctlSetTermios(int(f.Fd()), setTermiosFlush, &raw); err != nil {
+	if err := unix.IoctlSetTermios(int(f.Fd()), setTermiosNow, &raw); err != nil {
 		return nil, err
 	}
 	return state, nil

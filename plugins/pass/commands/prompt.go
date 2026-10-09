@@ -74,17 +74,6 @@ type input interface {
 	wait(d time.Duration) (ready bool, err error)
 }
 
-// secretFromPrompt reads one masked line from the terminal as the value for
-// id. Raw mode is entered and left with TCSAFLUSH, as getpass(3) does, so
-// echoed type-ahead is dropped and a paste's tail never reaches the shell.
-// Printable runes echo as '*', Backspace and ctrl+u edit, Enter submits,
-// Ctrl-C cancels with context.Canceled, Ctrl-D or EOF is io.ErrUnexpectedEOF,
-// escape sequences and unbound control keys are skipped. Whatever else would
-// alter the value in silence is an error: a chord that swallowed text, input
-// trailing Enter, a paste spanning lines, control characters, invalid UTF-8.
-// Cancelling ctx restores the terminal and returns ctx.Err(); a terminal that
-// cannot be restored is an error even after a value was read. No read of the
-// terminal outlives the prompt: the line typed next is the shell's.
 func secretFromPrompt(ctx context.Context, in *os.File, out io.Writer, id secrets.ID) (s *setPayload, err error) {
 	src, err := newTerminalInput(ctx, in)
 	if err != nil {
@@ -156,7 +145,6 @@ func (ed *lineEditor) emit(s string) { _, _ = io.WriteString(ed.echo, s) }
 
 func (ed *lineEditor) insert(r rune) {
 	if len(ed.val) == cap(ed.val) {
-		// append would retire the full array as is: grow by hand and zero it
 		grown := make([]rune, len(ed.val), max(2*cap(ed.val), 64))
 		copy(grown, ed.val)
 		clear(ed.val)
@@ -224,8 +212,6 @@ func (ed *lineEditor) submit(lr *lineReader) (string, error) {
 	return string(ed.val), nil
 }
 
-// zero clears the runes collected, the backing array whole: a rune dropped
-// since the last growth may sit past the length.
 func (ed *lineEditor) zero() { clear(ed.val[:cap(ed.val)]) }
 
 type lineReader struct {
@@ -246,8 +232,6 @@ func (lr *lineReader) zero() {
 	lr.r, lr.w = 0, 0
 }
 
-// trailing reports input other than line breaks within escTimeout of the
-// line end. A Ctrl-C among it cancels, as it does everywhere else.
 func (lr *lineReader) trailing() (bool, error) {
 	deadline := time.Now().Add(escTimeout)
 	for {
@@ -272,8 +256,6 @@ func (lr *lineReader) trailing() (bool, error) {
 	}
 }
 
-// fill awaits input for wait, without limit when wait <= 0, and reads what
-// came. It reports false when the wait ran out, with no read left in flight.
 func (lr *lineReader) fill(wait time.Duration) (bool, error) {
 	if lr.r > 0 {
 		lr.w = copy(lr.buf[:], lr.buf[lr.r:lr.w])
@@ -330,12 +312,6 @@ func (lr *lineReader) decodeRune() (rune, int, error) {
 	return r, size, nil
 }
 
-// readRune returns the next rune. Invalid UTF-8 is errInvalidUTF8, unless a
-// Ctrl-C queued behind it cancels. A '[' or 'O' within tailTimeout of a lone
-// ESC is its sequence's tail and comes back as that ESC, unconsumed, with
-// lr.tail set: escape then takes a paste from it and nothing else, since a
-// key's sequence split from its ESC and '[' or 'O' typed after Escape look
-// alike, and skipping the pair as a key would lose the text in silence.
 func (lr *lineReader) readRune() (rune, error) {
 	r, size, err := lr.decodeRune()
 	if err != nil {
@@ -358,11 +334,6 @@ func (lr *lineReader) readRune() (rune, error) {
 
 func (lr *lineReader) unreadByte() { lr.r-- }
 
-// escape parses the burst after ESC: sequences are skipped, a bracketed paste
-// is returned with ok set, ESC alone is the Escape key. A control byte ends
-// the burst and stays unread, so Enter and Ctrl-C get through. Printable
-// bytes that complete no sequence or trail one are errSwallowedInput, as is
-// a late tail's sequence unless it opens a paste.
 func (lr *lineReader) escape() (paste []byte, ok bool, err error) {
 	tail := lr.tail
 	for {
@@ -393,9 +364,6 @@ func (lr *lineReader) escape() (paste []byte, ok bool, err error) {
 	}
 }
 
-// sequence parses one sequence after ESC: errEscapeKey for ESC alone or
-// before a control key, errChord for bytes that complete no sequence. With
-// tail set, only a paste passes.
 func (lr *lineReader) sequence(tail bool) (paste []byte, ok bool, err error) {
 	for {
 		b, err := lr.readByte(escTimeout)

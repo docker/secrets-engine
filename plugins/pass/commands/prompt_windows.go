@@ -35,9 +35,6 @@ const ctrlZ = 0x1a // EOF on a console, as the console reader in os takes it
 var procReadConsoleInputW = windows.NewLazySystemDLL("kernel32.dll").NewProc("ReadConsoleInputW")
 
 func enterRaw(f *os.File) (*term.State, error) {
-	if err := windows.FlushConsoleInputBuffer(windows.Handle(f.Fd())); err != nil {
-		return nil, err
-	}
 	return term.MakeRaw(f.Fd())
 }
 
