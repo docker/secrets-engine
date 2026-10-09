@@ -53,14 +53,20 @@ func Test_readSecretLine(t *testing.T) {
 	t.Run("EOF before enter does not submit", func(t *testing.T) {
 		t.Parallel()
 		val, _, err := read(t, strings.NewReader("hunter2"))
-		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.ErrorIs(t, err, errNoEnter)
 		assert.Empty(t, val)
 	})
 	t.Run("ctrl+d ends the prompt without a value", func(t *testing.T) {
 		t.Parallel()
 		val, _, err := read(t, strings.NewReader("hunter2\x04\r"))
-		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.ErrorIs(t, err, errNoEnter)
 		assert.Empty(t, val)
+	})
+	t.Run("ctrl+d behind enter is no input", func(t *testing.T) {
+		t.Parallel()
+		val, _, err := read(t, strings.NewReader("hunter2\r\x04"))
+		require.NoError(t, err)
+		assert.Equal(t, "hunter2", val)
 	})
 	t.Run("cancelling the context ends the read", func(t *testing.T) {
 		t.Parallel()
@@ -296,13 +302,13 @@ func Test_readSecretLine(t *testing.T) {
 	t.Run("EOF inside a paste errors", func(t *testing.T) {
 		t.Parallel()
 		_, _, err := read(t, strings.NewReader("\x1b[200~hunter2"))
-		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.ErrorIs(t, err, errNoEnter)
 	})
 	t.Run("EOF inside a sequence errors", func(t *testing.T) {
 		t.Parallel()
 		for _, in := range []string{"\x1b[", "\x1b[12;", "\x1b[[", "\x1bO", "\x1b]11;rgb", "\x1bP>|x", "\x1b[M "} {
 			_, _, err := read(t, strings.NewReader(in))
-			assert.ErrorIs(t, err, io.ErrUnexpectedEOF, "%q", in)
+			assert.ErrorIs(t, err, errNoEnter, "%q", in)
 		}
 	})
 	t.Run("ctrl+v and other control keys are ignored", func(t *testing.T) {

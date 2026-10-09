@@ -37,6 +37,7 @@ var (
 	errControlChars   = errors.New("value contains control characters; pipe it via STDIN instead")
 	errInvalidUTF8    = errors.New("value is not valid UTF-8; pipe it via STDIN instead")
 	errSwallowedInput = errors.New("escape sequence or Alt chord swallowed part of the input; enter the value again")
+	errNoEnter        = errors.New("input ended before Enter; only Enter submits the value")
 )
 
 const (
@@ -126,7 +127,7 @@ func readSecretLine(in input, echo io.Writer, width, col int) (string, error) {
 		r, err := lr.readRune()
 		switch {
 		case errors.Is(err, io.EOF), err == nil && r == ctrlD:
-			return "", io.ErrUnexpectedEOF
+			return "", errNoEnter
 		case err != nil:
 			return "", err
 		case r == '\r' || r == '\n':
@@ -276,7 +277,7 @@ func (lr *lineReader) trailing() (bool, error) {
 		switch {
 		case bytes.IndexByte(rest, ctrlC) >= 0:
 			return false, context.Canceled
-		case len(bytes.Trim(rest, "\r\n")) > 0:
+		case len(bytes.Trim(rest, "\r\n\x04")) > 0: // Ctrl-D behind Enter is no input
 			return true, nil
 		}
 		wait := time.Until(deadline)
@@ -319,7 +320,7 @@ func (lr *lineReader) readByte(wait time.Duration) (byte, error) {
 		more, err := lr.fill(wait)
 		switch {
 		case errors.Is(err, io.EOF):
-			return 0, io.ErrUnexpectedEOF
+			return 0, errNoEnter
 		case err != nil:
 			return 0, err
 		case !more:
