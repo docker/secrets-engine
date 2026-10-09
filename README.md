@@ -229,6 +229,7 @@ if err != nil {
 }
 
 fmt.Println(session.AccessToken)       // the raw JWT access token
+fmt.Println(session.Username)          // the account the session belongs to
 fmt.Println(session.Claims.Username)   // decoded token claims
 fmt.Println(session.Claims.ExpiresAt)
 

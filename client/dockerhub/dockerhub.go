@@ -18,6 +18,7 @@
 package dockerhub
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -50,6 +51,9 @@ type UserSession struct {
 	AccessToken string `json:"access_token"`
 	// Claims are zero when the payload carries none.
 	Claims Claims `json:"claims"`
+	// Username is the Docker Hub account the session belongs to. It is filled
+	// in from the account lookup, not decoded from the stored payload.
+	Username string `json:"-"`
 }
 
 // Claims are the claims of a Docker Hub access token.
@@ -174,9 +178,12 @@ type ClientAuth interface {
 	GetDefaultProfile(ctx context.Context) (Profile, error)
 	// GetDefaultSession returns the default account's session:
 	// [ErrNoDefaultProfile] when no default is set, [ErrNoSession] when its
-	// credential is missing.
+	// credential is missing. The session's Username is the default profile's
+	// username, falling back to the token's username claim, so callers do not
+	// need to call GetDefaultProfile as well.
 	GetDefaultSession(ctx context.Context) (UserSession, error)
-	// GetSession returns the session for username, or [ErrNoSession].
+	// GetSession returns the session for username, or [ErrNoSession]. The
+	// session's Username is username.
 	GetSession(ctx context.Context, username string) (UserSession, error)
 }
 
@@ -292,7 +299,12 @@ func (c clientAuth) GetDefaultSession(ctx context.Context) (UserSession, error) 
 	if !c.cfg.accountEntry.Match(id) {
 		return UserSession{}, fmt.Errorf("default profile user id %q is not an account entry in the %s realm", profile.UserID, c.cfg.accounts)
 	}
-	return c.getSession(ctx, exactPattern(id))
+	session, err := c.getSession(ctx, exactPattern(id))
+	if err != nil {
+		return UserSession{}, err
+	}
+	session.Username = cmp.Or(profile.Username, session.Claims.Username)
+	return session, nil
 }
 
 func (c clientAuth) GetSession(ctx context.Context, username string) (UserSession, error) {
@@ -307,7 +319,12 @@ func (c clientAuth) GetSession(ctx context.Context, username string) (UserSessio
 	if err != nil {
 		return UserSession{}, err
 	}
-	return c.getSession(ctx, exactPattern(id))
+	session, err := c.getSession(ctx, exactPattern(id))
+	if err != nil {
+		return UserSession{}, err
+	}
+	session.Username = username
+	return session, nil
 }
 
 func (c clientAuth) getSession(ctx context.Context, pattern secrets.Pattern) (UserSession, error) {

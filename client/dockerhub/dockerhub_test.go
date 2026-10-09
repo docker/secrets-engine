@@ -94,6 +94,17 @@ func (e nilIDEngine) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]s
 	return envelopes, nil
 }
 
+// countingEngine records the pattern of every lookup it serves.
+type countingEngine struct {
+	secrets.Resolver
+	patterns []string
+}
+
+func (c *countingEngine) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	c.patterns = append(c.patterns, pattern.String())
+	return c.Resolver.GetSecrets(ctx, pattern)
+}
+
 type staticEngine struct {
 	envelopes []secrets.Envelope
 }
@@ -142,6 +153,15 @@ func TestGetSession(t *testing.T) {
 		assert.Equal(t, "session-1", session.Claims.SessionID)
 		assert.Equal(t, "alice@example.com", session.Claims.Email)
 		assert.Equal(t, "alice", session.Claims.Username)
+		assert.Equal(t, "alice", session.Username)
+	})
+	t.Run("username is the requested account", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/hub/alice": `{"access_token":"tok","username":"mallory"}`,
+		})
+		session, err := hub(t, engine).GetSession(t.Context(), "alice")
+		require.NoError(t, err)
+		assert.Equal(t, "alice", session.Username)
 	})
 	t.Run("audience as single string", func(t *testing.T) {
 		engine := serving(map[string]string{
@@ -264,6 +284,53 @@ func TestGetDefaultSession(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "token-alice", session.AccessToken)
 		assert.Equal(t, "alice", session.Claims.Username)
+		assert.Equal(t, "alice", session.Username)
+	})
+	t.Run("username from the profile when claims lack it", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/metadata/hub/default": profileWire,
+			"docker/auth/hub/alice":            `{"access_token":"tok"}`,
+		})
+		session, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, session.Claims.Username)
+		assert.Equal(t, "alice", session.Username)
+	})
+	t.Run("username from claims when the profile lacks it", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/metadata/hub/default": `{"user_id":"docker/auth/hub/alice"}`,
+			"docker/auth/hub/alice":            sessionWire,
+		})
+		session, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "alice", session.Username)
+	})
+	t.Run("profile username takes precedence over claims", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/metadata/hub/default": profileWire,
+			"docker/auth/hub/alice":            `{"access_token":"tok","claims":{"username":"Alice"}}`,
+		})
+		session, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "alice", session.Username)
+	})
+	t.Run("username empty when neither profile nor claims carry one", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/metadata/hub/default": `{"user_id":"docker/auth/hub/alice"}`,
+			"docker/auth/hub/alice":            `{"access_token":"tok"}`,
+		})
+		session, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, session.Username)
+	})
+	t.Run("reads the profile and the session once each", func(t *testing.T) {
+		engine := &countingEngine{Resolver: serving(map[string]string{
+			"docker/auth/metadata/hub/default": profileWire,
+			"docker/auth/hub/alice":            sessionWire,
+		})}
+		_, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, []string{"docker/auth/metadata/hub/default", "docker/auth/hub/alice"}, engine.patterns)
 	})
 	t.Run("no default profile", func(t *testing.T) {
 		_, err := hub(t, serving(nil)).GetDefaultSession(t.Context())
