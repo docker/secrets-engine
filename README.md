@@ -235,6 +235,13 @@ fmt.Println(session.AccessToken)       // the raw JWT access token
 fmt.Println(session.Claims.Username)   // decoded token claims
 fmt.Println(session.Claims.ExpiresAt)
 
+// Check expiry before use. Expired reports whether the token has lapsed;
+// ExpiresWithin also reports true if it lapses within the given duration, so
+// you can act early. Both report true when the token carries no expiry claim.
+if session.ExpiresWithin(30 * time.Second) {
+    // handle a token expiry
+}
+
 // List the profiles of all signed-in accounts.
 profiles, err := hub.ListProfiles(context.Background())
 if err != nil {

@@ -428,6 +428,45 @@ func TestClaimsRoundTrip(t *testing.T) {
 	assert.Equal(t, session.Claims.Username, claims.Username)
 }
 
+func TestUserSessionExpiry(t *testing.T) {
+	t.Parallel()
+	expiringIn := func(d time.Duration) dockerhub.UserSession {
+		return dockerhub.UserSession{
+			AccessToken: "tok",
+			Claims:      dockerhub.Claims{ExpiresAt: &dockerhub.NumericDate{Time: time.Now().Add(d)}},
+		}
+	}
+	t.Run("valid token", func(t *testing.T) {
+		session := expiringIn(time.Hour)
+		assert.False(t, session.Expired())
+		assert.False(t, session.ExpiresWithin(5*time.Minute))
+	})
+	t.Run("expires within the leeway", func(t *testing.T) {
+		session := expiringIn(time.Minute)
+		assert.False(t, session.Expired())
+		assert.True(t, session.ExpiresWithin(5*time.Minute))
+	})
+	t.Run("expired token", func(t *testing.T) {
+		session := expiringIn(-time.Minute)
+		assert.True(t, session.Expired())
+		assert.True(t, session.ExpiresWithin(5*time.Minute))
+	})
+	t.Run("negative leeway tolerates recent expiry", func(t *testing.T) {
+		assert.False(t, expiringIn(-time.Minute).ExpiresWithin(-5*time.Minute))
+	})
+	t.Run("unknown expiry is treated as expired", func(t *testing.T) {
+		assert.True(t, dockerhub.UserSession{AccessToken: "tok"}.Expired())
+		zero := dockerhub.UserSession{AccessToken: "tok", Claims: dockerhub.Claims{ExpiresAt: &dockerhub.NumericDate{}}}
+		assert.True(t, zero.Expired())
+	})
+	t.Run("decoded wire expiry", func(t *testing.T) {
+		var session dockerhub.UserSession
+		require.NoError(t, json.Unmarshal([]byte(sessionWire), &session))
+		// sessionWire expires in August 2025.
+		assert.True(t, session.Expired())
+	})
+}
+
 func TestNumericDate(t *testing.T) {
 	t.Parallel()
 	t.Run("rejects out of range epochs", func(t *testing.T) {
