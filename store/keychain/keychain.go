@@ -52,7 +52,6 @@ type (
 	optionFunc[K any] func(K) error
 )
 
-//nolint:unused
 func (f optionFunc[K]) apply(s K) error { return f(s) }
 
 type darwinOptions interface {

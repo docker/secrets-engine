@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/plugins/pass
 
-go 1.26.9
+go 1.27.2
 
 replace github.com/docker/secrets-engine/client => ./../../client
 

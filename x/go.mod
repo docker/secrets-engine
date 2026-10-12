@@ -1,6 +1,6 @@
 module github.com/docker/secrets-engine/x
 
-go 1.26.9
+go 1.27.2
 
 require (
 	connectrpc.com/connect v1.19.1

@@ -53,7 +53,8 @@ formatters:
       local-prefixes:
         - github.com/docker/secrets-engine
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
   exclusions:
     generated: lax
     paths:
