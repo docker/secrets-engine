@@ -52,6 +52,22 @@ type UserSession struct {
 	Claims Claims `json:"claims"`
 }
 
+// Expired reports whether the access token has expired. It is
+// ExpiresWithin(0).
+func (s UserSession) Expired() bool {
+	return s.ExpiresWithin(0)
+}
+
+// ExpiresWithin reports whether the access token will expire within the next given duration.
+// Sessions without [Claims.ExpiresAt] report as expired by default.
+func (s UserSession) ExpiresWithin(leeway time.Duration) bool {
+	exp := s.Claims.ExpiresAt
+	if exp == nil || exp.IsZero() {
+		return true
+	}
+	return !time.Now().Add(leeway).Before(exp.Time)
+}
+
 // Claims are the claims of a Docker Hub access token.
 type Claims struct {
 	Issuer    string       `json:"iss,omitempty"`
