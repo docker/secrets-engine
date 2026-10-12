@@ -16,7 +16,7 @@
 
 ARG ALPINE_VERSION=3.23.3
 ARG GO_VERSION=latest
-ARG GOLANGCI_LINT_VERSION=v2.12.2
+ARG GOLANGCI_LINT_VERSION=v2.14.0
 ARG OSXCROSS_VERSION=15.5
 ARG ADDLICENSE_VERSION=v1.2.0
 ARG LICENSE_ARGS="-c 'Docker, Inc.' -l apache -ignore '**/*.yaml' -ignore '**/*.yml' -ignore '.github/**' -ignore 'store/keychain/internal/go-keychain/**' -ignore 'vendor/**' -ignore '.git/**' ."

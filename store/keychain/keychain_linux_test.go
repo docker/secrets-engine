@@ -108,6 +108,7 @@ func lockedErr(op string) error {
 func (f *fakeService) Collections() ([]dbus.ObjectPath, error) {
 	return []dbus.ObjectPath{loginKeychainObjectPath}, nil
 }
+
 func (f *fakeService) ReadAlias(string) (dbus.ObjectPath, error) { return loginKeychainObjectPath, nil }
 func (f *fakeService) IsLocked(dbus.ObjectPath) (bool, error)    { return f.locked, nil }
 func (f *fakeService) OpenSession(kc.AuthenticationMode) (*kc.Session, error) {
