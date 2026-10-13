@@ -249,14 +249,14 @@ func TestMergeEnv(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no files returns sorted process env", func(t *testing.T) {
-		out, err := mergeEnv([]string{"B=2", "A=1"}, nil)
+		out, err := mergeEnv([]string{"B=2", "A=1"}, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"A=1", "B=2"}, out)
 	})
 
 	t.Run("file overrides process env", func(t *testing.T) {
 		f := writeEnvFile(t, "A=from-file\nC=new\n")
-		out, err := mergeEnv([]string{"A=from-process", "B=keep"}, []string{f})
+		out, err := mergeEnv([]string{"A=from-process", "B=keep"}, []string{f}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"A=from-file", "B=keep", "C=new"}, out)
 	})
@@ -264,14 +264,14 @@ func TestMergeEnv(t *testing.T) {
 	t.Run("later file overrides earlier file", func(t *testing.T) {
 		f1 := writeEnvFile(t, "A=from-file-1\n")
 		f2 := writeEnvFile(t, "A=from-file-2\n")
-		out, err := mergeEnv(nil, []string{f1, f2})
+		out, err := mergeEnv(nil, []string{f1, f2}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"A=from-file-2"}, out)
 	})
 
 	t.Run("comments and quoted values", func(t *testing.T) {
 		f := writeEnvFile(t, "# this is a comment\nGREETING=\"hello world\"\nQUOTED='no $expand'\n")
-		out, err := mergeEnv(nil, []string{f})
+		out, err := mergeEnv(nil, []string{f}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{
 			"GREETING=hello world",
@@ -281,17 +281,45 @@ func TestMergeEnv(t *testing.T) {
 
 	t.Run("missing file returns error and does not partially apply", func(t *testing.T) {
 		f := writeEnvFile(t, "A=present\n")
-		out, err := mergeEnv([]string{"B=keep"}, []string{f, "/does/not/exist/.env"})
+		out, err := mergeEnv([]string{"B=keep"}, []string{f, "/does/not/exist/.env"}, nil)
 		require.Error(t, err)
 		assert.Nil(t, out)
 		assert.Contains(t, err.Error(), "/does/not/exist/.env")
 	})
 
+	t.Run("--env overrides files and the process env", func(t *testing.T) {
+		f := writeEnvFile(t, "A=from-file\nB=from-file\n")
+		out, err := mergeEnv([]string{"A=from-process", "C=keep"}, []string{f}, []string{"A=from-flag", "D=new"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A=from-flag", "B=from-file", "C=keep", "D=new"}, out)
+	})
+
+	t.Run("later --env overrides earlier --env", func(t *testing.T) {
+		out, err := mergeEnv(nil, nil, []string{"A=1", "A=2"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A=2"}, out)
+	})
+
+	t.Run("--env splits at the first = and allows an empty value", func(t *testing.T) {
+		out, err := mergeEnv(nil, nil, []string{"CHECK=KEY=WANT", "EMPTY="})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"CHECK=KEY=WANT", "EMPTY="}, out)
+	})
+
+	t.Run("--env without KEY=VALUE is rejected", func(t *testing.T) {
+		for _, bad := range []string{"NOVALUE", "=value", ""} {
+			out, err := mergeEnv([]string{"B=keep"}, nil, []string{bad})
+			require.Error(t, err, bad)
+			assert.Nil(t, out)
+			assert.ErrorContains(t, err, "expected KEY=VALUE")
+		}
+	})
+
 	t.Run("preserves se:// values for downstream parseEnv", func(t *testing.T) {
 		f := writeEnvFile(t, "SE_TOKEN=se://gh-token\nPLAIN=v\n")
-		out, err := mergeEnv(nil, []string{f})
+		out, err := mergeEnv(nil, []string{f}, []string{"PG_PWD=se://*/postgres/password"})
 		require.NoError(t, err)
-		assert.Equal(t, []string{"PLAIN=v", "SE_TOKEN=se://gh-token"}, out)
+		assert.Equal(t, []string{"PG_PWD=se://*/postgres/password", "PLAIN=v", "SE_TOKEN=se://gh-token"}, out)
 	})
 }
 
@@ -432,6 +460,41 @@ func TestRunCommand(t *testing.T) {
 		cmd.SetErr(testWriter{t})
 		require.NoError(t, cmd.Execute())
 		assert.Equal(t, []string{"authorize gh-token", "resolve gh-token"}, engine.recorded())
+	})
+
+	t.Run("resolves references set with --env", func(t *testing.T) {
+		engine := &mockEngine{allow: true, store: map[secrets.ID]string{
+			secrets.MustParseID("gh-token"): "ghp_abc123",
+		}}
+		// The env-file plants a dangling reference; --env must win over it.
+		envFile := writeEnvFile(t, "SE_TOKEN=se://does-not-exist\n")
+		cmd, err := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		require.NoError(t, err)
+		cmd.SetArgs([]string{
+			"--env-file", envFile,
+			"-e", "SE_TOKEN=se://gh-token",
+			"-e", helperActiveEnv + "=1",
+			"--env", helperCheckEnv + "=SE_TOKEN=ghp_abc123",
+			exe,
+		})
+		cmd.SetContext(t.Context())
+		cmd.SetOut(testWriter{t})
+		cmd.SetErr(testWriter{t})
+		require.NoError(t, cmd.Execute())
+		assert.Equal(t, []string{"authorize gh-token", "resolve gh-token"}, engine.recorded())
+	})
+
+	t.Run("a malformed --env fails before contacting the engine", func(t *testing.T) {
+		engine := &mockEngine{allow: true}
+		cmd, err := RunCommand(WithTimeout(time.Second), WithSocketPath(engine.serve(t)))
+		require.NoError(t, err)
+		cmd.SetArgs([]string{"-e", "NOVALUE", exe})
+		cmd.SetContext(t.Context())
+		cmd.SetOut(testWriter{t})
+		cmd.SetErr(testWriter{t})
+		err = cmd.Execute()
+		require.ErrorContains(t, err, `invalid --env "NOVALUE": expected KEY=VALUE`)
+		assert.Empty(t, engine.recorded())
 	})
 
 	t.Run("a denied authorization stops before resolving", func(t *testing.T) {
