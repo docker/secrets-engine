@@ -85,11 +85,17 @@ type Store interface {
 	// Experience.
 	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
 	// Save persists credentials from the store.
+	//
+	// The macOS Keychain rejects an empty secret value with
+	// keychain.ErrEmptySecret.
 	Save(ctx context.Context, id ID, secret Secret) error
 	// Upsert atomically replaces an existing credential or inserts a new one.
-	// On stores that do not support overwriting (e.g. macOS Keychain), it
-	// deletes the existing credential and then saves the new one under a mutex
-	// to ensure the two operations are not interleaved.
+	//
+	// On the macOS Keychain an existing item is updated in place, keeping the
+	// applications the user allowed to access it. The macOS Keychain rejects
+	// an empty secret value with keychain.ErrEmptySecret. Another store
+	// instance or process can still write the same item concurrently, in which
+	// case Upsert returns keychain.ErrDuplicateItem.
 	Upsert(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
 	//

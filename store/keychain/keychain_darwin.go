@@ -186,40 +186,83 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 		return err
 	}
 	defer clear(data)
+	if len(data) == 0 {
+		return ErrEmptySecret
+	}
+	return k.add(id, secret, data)
+}
+
+func (k *keychainStore[T]) add(id store.ID, secret store.Secret, data []byte) error {
 	item := newKeychainItem(id.String(), k)
 	item.SetData(data)
 	// only creation of a secret needs the label attribute.
 	// it is a user-friendly name for the item, which is displayed in the keychain UI.
 	// https://developer.apple.com/documentation/security/ksecattrlabel
 	item.SetLabel(k.itemLabel(id.String()))
+	item.SetGenericMetadata(k.genericMetadata(id, secret))
 
+	return mapKeychainError(kc.AddItem(item))
+}
+
+func (k *keychainStore[T]) genericMetadata(id store.ID, secret store.Secret) map[string]any {
 	metadata := make(map[string]string)
 	maps.Copy(metadata, secret.Metadata())
 	safelySetMetadata(k.serviceGroup, k.serviceName, metadata)
 	safelySetID(id, metadata)
 
-	metadataAny := make(map[string]any)
+	metadataAny := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		metadataAny[k] = v
 	}
-	item.SetGenericMetadata(metadataAny)
-
-	return mapKeychainError(kc.AddItem(item))
+	return metadataAny
 }
 
-// Upsert atomically replaces a credential in the macOS Keychain.
+// Upsert updates an existing credential in place and adds it when it does
+// not exist yet.
 //
-// The macOS Keychain does not allow overwriting an existing item via AddItem,
-// so Upsert holds a mutex and performs a Delete followed by a Save to ensure
-// no concurrent Upsert can interleave between the two operations.
-func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+// Updating in place keeps the item's access control and partition lists, so
+// applications the user allowed to read the item stay allowed. Deleting and
+// re-adding it would reset those lists to the calling binary alone.
+//
+// An empty secret value returns [ErrEmptySecret] without touching the
+// keychain. Another store instance or process can still write the same item
+// concurrently, in which case Upsert returns [ErrDuplicateItem].
+func (k *keychainStore[T]) Upsert(_ context.Context, id store.ID, secret store.Secret) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
-	if err := k.Delete(ctx, id); err != nil {
+	data, err := secret.Marshal()
+	if err != nil {
 		return err
 	}
-	return k.Save(ctx, id, secret)
+	defer clear(data)
+	if len(data) == 0 {
+		return ErrEmptySecret
+	}
+
+	err = k.update(id, secret, data)
+	if !errors.Is(err, store.ErrCredentialNotFound) {
+		return err
+	}
+	return k.add(id, secret, data)
+}
+
+func (k *keychainStore[T]) update(id store.ID, secret store.Secret, data []byte) error {
+	// We aren't using newKeychainItem here because we only want to identify the item, not read it.
+	query := kc.NewItem()
+	query.SetSecClass(kc.SecClassGenericPassword)
+	query.SetService(k.serviceName)
+	query.SetAccessGroup(k.serviceGroup)
+	query.SetAccount(id.String())
+	if k.useDataProtectionKeychain {
+		query.SetUseDataProtectionKeychain(kc.UseDataProtectionKeychainYes)
+	}
+
+	changes := kc.NewItem()
+	changes.SetData(data)
+	changes.SetGenericMetadata(k.genericMetadata(id, secret))
+
+	return mapKeychainError(kc.UpdateItem(query, changes))
 }
 
 func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {

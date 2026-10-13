@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/store"
+	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 	"github.com/docker/secrets-engine/store/mocks"
 )
 
@@ -209,6 +210,111 @@ func TestUpsert(t *testing.T) {
 		assert.Equal(t, updated.Password, actual.Password)
 	})
 
+	t.Run("updates an existing credential in place", func(t *testing.T) {
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, ks.Delete(t.Context(), id))
+		})
+
+		require.NoError(t, ks.Save(t.Context(), id, &mocks.MockCredential{
+			Username:   "dana",
+			Password:   "original-password",
+			Attributes: map[string]string{"expiry": "1"},
+		}))
+		query := kc.NewItem()
+		query.SetSecClass(kc.SecClassGenericPassword)
+		query.SetService(serviceName)
+		query.SetAccessGroup(serviceGroup)
+		query.SetAccount(id.String())
+		marker := kc.NewItem()
+		marker.SetComment("set-outside-the-store")
+		require.NoError(t, kc.UpdateItem(query, marker))
+
+		before, err := getItemWithData(id.String(), &ks)
+		require.NoError(t, err)
+		require.Equal(t, "set-outside-the-store", before.Comment)
+
+		updated := &mocks.MockCredential{
+			Username:   "dana",
+			Password:   "updated-password",
+			Attributes: map[string]string{"expiry": "2"},
+		}
+		require.NoError(t, ks.Upsert(t.Context(), id, updated))
+
+		after, err := getItemWithData(id.String(), &ks)
+		require.NoError(t, err)
+		assert.Equal(t, "set-outside-the-store", after.Comment, "the item must be updated, not deleted and re-added")
+		assert.Equal(t, before.Label, after.Label)
+
+		got, err := ks.Get(t.Context(), id)
+		require.NoError(t, err)
+		actual := got.(*mocks.MockCredential)
+		assert.Equal(t, updated.Password, actual.Password)
+		assert.Equal(t, map[string]string{"expiry": "2"}, actual.Metadata())
+	})
+
+	t.Run("inserts a secret whose Marshal returns its backing buffer", func(t *testing.T) {
+		bs := keychainStore[*bufferSecret]{
+			serviceGroup: serviceGroup,
+			serviceName:  serviceName,
+			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+				return &bufferSecret{}
+			},
+		}
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, bs.Delete(t.Context(), id))
+		})
+
+		require.NoError(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte("review-test-value")}))
+
+		got, err := bs.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("review-test-value"), got.(*bufferSecret).value)
+	})
+
+	t.Run("rejects an empty secret value and keeps the existing one", func(t *testing.T) {
+		bs := keychainStore[*bufferSecret]{
+			serviceGroup: serviceGroup,
+			serviceName:  serviceName,
+			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+				return &bufferSecret{}
+			},
+		}
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, bs.Delete(t.Context(), id))
+		})
+
+		require.NoError(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte("review-old-value")}))
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{}), ErrEmptySecret)
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte{}}), ErrEmptySecret)
+
+		got, err := bs.Get(t.Context(), id)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("review-old-value"), got.(*bufferSecret).value)
+	})
+
+	t.Run("save rejects an empty secret value", func(t *testing.T) {
+		bs := keychainStore[*bufferSecret]{
+			serviceGroup: serviceGroup,
+			serviceName:  serviceName,
+			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+				return &bufferSecret{}
+			},
+		}
+		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
+		t.Cleanup(func() {
+			assert.NoError(t, bs.Delete(t.Context(), id))
+		})
+
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{}), ErrEmptySecret)
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte{}}), ErrEmptySecret)
+
+		_, err := bs.Get(t.Context(), id)
+		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+	})
+
 	t.Run("save returns duplicate item error when credential already exists", func(t *testing.T) {
 		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + uuid.NewString())
 		t.Cleanup(func() {
@@ -224,6 +330,33 @@ func TestUpsert(t *testing.T) {
 		err := ks.Save(t.Context(), id, secret)
 		require.ErrorIs(t, err, ErrDuplicateItem)
 	})
+}
+
+type bufferSecret struct {
+	value    []byte
+	metadata map[string]string
+}
+
+func (b *bufferSecret) Marshal() ([]byte, error) {
+	return b.value, nil
+}
+
+func (b *bufferSecret) Unmarshal(data []byte) error {
+	if len(data) == 0 {
+		b.value = nil
+		return nil
+	}
+	b.value = append([]byte(nil), data...)
+	return nil
+}
+
+func (b *bufferSecret) Metadata() map[string]string {
+	return b.metadata
+}
+
+func (b *bufferSecret) SetMetadata(md map[string]string) error {
+	b.metadata = md
+	return nil
 }
 
 func TestConvertAttributes(t *testing.T) {
