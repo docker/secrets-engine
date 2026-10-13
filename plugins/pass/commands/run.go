@@ -53,6 +53,7 @@ var runLong string
 type runOpts struct {
 	clientOpts
 	envFiles []string
+	env      []string
 }
 
 // RunCommand uses [api.DesktopSocketPath] by default.
@@ -72,7 +73,7 @@ func newRunCommand(opts runOpts) *cobra.Command {
 		Example: strings.Trim(runExample, "\n"),
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			merged, err := mergeEnv(os.Environ(), opts.envFiles)
+			merged, err := mergeEnv(os.Environ(), opts.envFiles, opts.env)
 			if err != nil {
 				return err
 			}
@@ -147,10 +148,12 @@ func newRunCommand(opts runOpts) *cobra.Command {
 	}
 	cmd.Flags().StringArrayVar(&opts.envFiles, "env-file", nil,
 		"Read environment variables from a dotenv-formatted file. Repeatable; later files override earlier files and the process environment.")
+	cmd.Flags().StringArrayVarP(&opts.env, "env", "e", nil,
+		"Set an environment variable as `KEY=VALUE`; the value may be an se:// reference. Repeatable; overrides --env-file and the process environment.")
 	return cmd
 }
 
-func mergeEnv(processEnv, files []string) ([]string, error) {
+func mergeEnv(processEnv, files, env []string) ([]string, error) {
 	merged := make(map[string]string, len(processEnv))
 	for _, kv := range processEnv {
 		if k, v, ok := strings.Cut(kv, "="); ok {
@@ -163,6 +166,13 @@ func mergeEnv(processEnv, files []string) ([]string, error) {
 			return nil, fmt.Errorf("reading env-file %s: %w", f, err)
 		}
 		maps.Copy(merged, parsed)
+	}
+	for _, kv := range env {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("invalid --env %q: expected KEY=VALUE", kv)
+		}
+		merged[k] = v
 	}
 	out := make([]string, 0, len(merged))
 	for k, v := range merged {
