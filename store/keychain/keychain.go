@@ -47,11 +47,8 @@ var ErrCollectionLocked = errors.New("keychain collection is locked")
 // existing item in place.
 var ErrDuplicateItem = errors.New("keychain item already exists")
 
-// ErrEmptySecret is returned by Save and Upsert when the secret's value is
-// empty. The macOS Keychain ignores an empty value on update and keeps the old
-// one, so every platform refuses it instead of reporting a success that changed
-// nothing.
-var ErrEmptySecret = errors.New("keychain secret value must not be empty")
+// ErrEmptySecret is [store.ErrEmptySecret].
+var ErrEmptySecret = store.ErrEmptySecret
 
 type (
 	Option            interface{ apply(any) error }

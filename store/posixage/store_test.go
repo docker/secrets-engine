@@ -1002,3 +1002,47 @@ func TestScryptWorkFactorMigration(t *testing.T) {
 		})
 	}
 }
+
+type emptySecret struct {
+	value []byte
+}
+
+func (e *emptySecret) Marshal() ([]byte, error)            { return e.value, nil }
+func (e *emptySecret) Unmarshal([]byte) error              { return nil }
+func (e *emptySecret) Metadata() map[string]string         { return nil }
+func (e *emptySecret) SetMetadata(map[string]string) error { return nil }
+
+func TestSaveRejectsEmptySecret(t *testing.T) {
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, root.Close())
+	})
+
+	prompted := 0
+	s, err := New(root,
+		func(_ context.Context, _ store.ID) *emptySecret {
+			return &emptySecret{}
+		},
+		WithLogger(&testLogger{t}),
+		WithEncryptionCallbackFunc[EncryptionPassword](func(_ context.Context) ([]byte, error) {
+			prompted++
+			return []byte("password"), nil
+		}),
+		WithDecryptionCallbackFunc[DecryptionPassword](func(_ context.Context) ([]byte, error) {
+			return []byte("password"), nil
+		}),
+	)
+	require.NoError(t, err)
+	id := secrets.MustParseID("test/something/" + uuid.NewString())
+
+	for _, secret := range []store.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
+		require.ErrorIs(t, s.Save(t.Context(), id, secret), store.ErrEmptySecret)
+		require.ErrorIs(t, s.Upsert(t.Context(), id, secret), store.ErrEmptySecret)
+	}
+
+	assert.Zero(t, prompted, "must not prompt for encryption keys")
+	dirs, err := onlyDirs(root.FS())
+	require.NoError(t, err)
+	assert.Empty(t, dirs, "must not write anything")
+}

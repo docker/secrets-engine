@@ -86,13 +86,11 @@ type Store interface {
 	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
 	// Save persists credentials from the store.
 	//
-	// The keychain stores reject an empty secret value with
-	// keychain.ErrEmptySecret.
+	// An empty secret value is rejected with [ErrEmptySecret].
 	Save(ctx context.Context, id ID, secret Secret) error
 	// Upsert atomically replaces an existing credential or inserts a new one.
 	//
-	// The keychain stores reject an empty secret value with
-	// keychain.ErrEmptySecret.
+	// An empty secret value is rejected with [ErrEmptySecret].
 	//
 	// On the macOS Keychain an existing item is updated in place, keeping the
 	// applications the user allowed to access it. Another store instance or
