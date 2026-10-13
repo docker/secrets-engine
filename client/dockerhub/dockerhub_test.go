@@ -31,8 +31,14 @@ import (
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
+//nolint:gosec
+const (
+	jwtAlice = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXV1aWQtMSJ9.c2lnbmF0dXJl"
+	jwtOther = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.e30.c2lnbmF0dXJl"
+)
+
 const sessionWire = `{
-	"access_token": "token-alice",
+	"access_token": "` + jwtAlice + `",
 	"claims": {
 		"iss": "https://auth.docker.io",
 		"sub": "user-uuid-1",
@@ -124,7 +130,7 @@ func TestGetSession(t *testing.T) {
 		})
 		session, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.NoError(t, err)
-		assert.Equal(t, "token-alice", session.AccessToken)
+		assert.Equal(t, jwtAlice, session.AccessToken)
 		assert.Equal(t, "https://auth.docker.io", session.Claims.Issuer)
 		assert.Equal(t, "user-uuid-1", session.Claims.Subject)
 		assert.Equal(t, dockerhub.Audience{"audience.docker.io"}, session.Claims.Audience)
@@ -145,7 +151,7 @@ func TestGetSession(t *testing.T) {
 	})
 	t.Run("audience as single string", func(t *testing.T) {
 		engine := serving(map[string]string{
-			"docker/auth/hub/alice": `{"access_token":"tok","claims":{"aud":"audience.docker.io","app_name":"cli","uuid":"u","source":"s","session_id":"sid","email":"e","username":"alice"}}`,
+			"docker/auth/hub/alice": `{"access_token":"` + jwtAlice + `","claims":{"aud":"audience.docker.io","app_name":"cli","uuid":"u","source":"s","session_id":"sid","email":"e","username":"alice"}}`,
 		})
 		session, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.NoError(t, err)
@@ -153,7 +159,7 @@ func TestGetSession(t *testing.T) {
 	})
 	t.Run("fractional expiry seconds", func(t *testing.T) {
 		engine := serving(map[string]string{
-			"docker/auth/hub/alice": `{"access_token":"tok","claims":{"exp":1755500000.5,"app_name":"cli","uuid":"u","source":"s","session_id":"sid","email":"e","username":"alice"}}`,
+			"docker/auth/hub/alice": `{"access_token":"` + jwtAlice + `","claims":{"exp":1755500000.5,"app_name":"cli","uuid":"u","source":"s","session_id":"sid","email":"e","username":"alice"}}`,
 		})
 		session, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.NoError(t, err)
@@ -163,20 +169,74 @@ func TestGetSession(t *testing.T) {
 	})
 	t.Run("payload without claims", func(t *testing.T) {
 		engine := serving(map[string]string{
-			"docker/auth/hub/alice": `{"access_token":"tok"}`,
+			"docker/auth/hub/alice": `{"access_token":"` + jwtAlice + `"}`,
 		})
 		session, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.NoError(t, err)
-		assert.Equal(t, "tok", session.AccessToken)
+		assert.Equal(t, jwtAlice, session.AccessToken)
 		assert.Equal(t, dockerhub.Claims{}, session.Claims)
 	})
 	t.Run("skips undecodable envelopes", func(t *testing.T) {
 		engine := staticEngine{envelopes: []secrets.Envelope{
-			envelope(`not json`), envelope(`{"access_token":""}`), envelope(`{"access_token":"tok"}`),
+			envelope(`not json`), envelope(`{"access_token":""}`), envelope(`{"access_token":"tok"}`), envelope(`{"access_token":"` + jwtOther + `"}`),
 		}}
 		session, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.NoError(t, err)
-		assert.Equal(t, "tok", session.AccessToken)
+		assert.Equal(t, jwtOther, session.AccessToken)
+	})
+	t.Run("skips a malformed JWT before a valid one", func(t *testing.T) {
+		engine := staticEngine{envelopes: []secrets.Envelope{
+			envelope(`{"access_token":"tok"}`), envelope(`{"access_token":"` + jwtOther + `"}`),
+		}}
+		session, err := hub(t, engine).GetSession(t.Context(), "alice")
+		require.NoError(t, err)
+		assert.Equal(t, jwtOther, session.AccessToken)
+	})
+	t.Run("reports malformed JWTs when no envelope is valid", func(t *testing.T) {
+		engine := staticEngine{envelopes: []secrets.Envelope{
+			envelope(`{"access_token":"tok"}`), envelope(`{"access_token":""}`),
+		}}
+		_, err := hub(t, engine).GetSession(t.Context(), "alice")
+		require.ErrorIs(t, err, dockerhub.ErrInvalidAccessToken)
+		require.ErrorIs(t, err, dockerhub.ErrMissingAccessToken)
+		require.ErrorIs(t, err, dockerhub.ErrNoSession)
+	})
+	t.Run("rejects access tokens that are not JWTs", func(t *testing.T) {
+		const header = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
+		const payload = "eyJzdWIiOiJhbGljZSJ9"
+		for name, token := range map[string]string{
+			"opaque":              "tok",
+			"two segments":        header + "." + payload,
+			"four segments":       header + "." + payload + ".c2ln.c2ln",
+			"missing signature":   header + "." + payload + ".",
+			"header not base64":   "!!." + payload + ".c2ln",
+			"header not json":     "bm90anNvbg." + payload + ".c2ln",
+			"header without alg":  "e30." + payload + ".c2ln",
+			"payload not object":  header + ".bnVsbA.c2ln",
+			"signature not b64":   header + "." + payload + ".!!",
+			"padded base64 parts": header + "." + payload + "=.c2ln",
+		} {
+			t.Run(name, func(t *testing.T) {
+				engine := serving(map[string]string{
+					"docker/auth/hub/alice": `{"access_token":"` + token + `"}`,
+				})
+				_, err := hub(t, engine).GetSession(t.Context(), "alice")
+				require.ErrorContains(t, err, "access token is not a JWT")
+				require.ErrorIs(t, err, dockerhub.ErrInvalidAccessToken)
+				require.ErrorIs(t, err, dockerhub.ErrNoSession)
+				require.NotErrorIs(t, err, dockerhub.ErrMissingAccessToken)
+			})
+		}
+	})
+	t.Run("default session rejects access tokens that are not JWTs", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/metadata/hub/default": profileWire,
+			"docker/auth/hub/alice":            `{"access_token":"tok"}`,
+		})
+		_, err := hub(t, engine).GetDefaultSession(t.Context())
+		require.ErrorIs(t, err, dockerhub.ErrInvalidAccessToken)
+		require.ErrorIs(t, err, dockerhub.ErrNoSession)
+		require.NotErrorIs(t, err, dockerhub.ErrNoDefaultProfile)
 	})
 	t.Run("all envelopes undecodable", func(t *testing.T) {
 		engine := staticEngine{envelopes: []secrets.Envelope{
@@ -185,6 +245,16 @@ func TestGetSession(t *testing.T) {
 		_, err := hub(t, engine).GetSession(t.Context(), "alice")
 		require.ErrorContains(t, err, "decode user session")
 		require.ErrorContains(t, err, "no access token in payload")
+		require.ErrorIs(t, err, dockerhub.ErrMissingAccessToken)
+	})
+	t.Run("missing access token", func(t *testing.T) {
+		engine := serving(map[string]string{
+			"docker/auth/hub/alice": `{"access_token":""}`,
+		})
+		_, err := hub(t, engine).GetSession(t.Context(), "alice")
+		require.ErrorIs(t, err, dockerhub.ErrMissingAccessToken)
+		require.ErrorIs(t, err, dockerhub.ErrNoSession)
+		require.NotErrorIs(t, err, dockerhub.ErrInvalidAccessToken)
 	})
 	t.Run("no stored credential", func(t *testing.T) {
 		_, err := hub(t, serving(nil)).GetSession(t.Context(), "alice")
@@ -262,7 +332,7 @@ func TestGetDefaultSession(t *testing.T) {
 		})
 		session, err := hub(t, engine).GetDefaultSession(t.Context())
 		require.NoError(t, err)
-		assert.Equal(t, "token-alice", session.AccessToken)
+		assert.Equal(t, jwtAlice, session.AccessToken)
 		assert.Equal(t, "alice", session.Claims.Username)
 	})
 	t.Run("no default profile", func(t *testing.T) {
@@ -404,11 +474,11 @@ func TestStaging(t *testing.T) {
 
 	session, err := hub(t, engine, dockerhub.Staging()).GetDefaultSession(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "token-alice", session.AccessToken)
+	assert.Equal(t, jwtAlice, session.AccessToken)
 
 	session, err = hub(t, engine, dockerhub.Staging()).GetSession(t.Context(), "alice")
 	require.NoError(t, err)
-	assert.Equal(t, "token-alice", session.AccessToken)
+	assert.Equal(t, jwtAlice, session.AccessToken)
 }
 
 func TestClaimsRoundTrip(t *testing.T) {
