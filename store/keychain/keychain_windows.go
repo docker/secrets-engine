@@ -62,7 +62,7 @@ func encodeSecret(secret store.Secret) ([]byte, error) {
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return nil, ErrEmptySecret
+		return nil, store.ErrEmptySecret
 	}
 
 	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()

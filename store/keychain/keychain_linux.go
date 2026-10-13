@@ -544,7 +544,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	}
 	defer clear(value)
 	if len(value) == 0 {
-		return ErrEmptySecret
+		return store.ErrEmptySecret
 	}
 
 	service, err := operationService(ctx)

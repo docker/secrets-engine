@@ -375,8 +375,8 @@ func TestKeychain(t *testing.T) {
 		})
 
 		for _, secret := range []store.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
-			require.ErrorIs(t, ks.Save(t.Context(), id, secret), ErrEmptySecret)
-			require.ErrorIs(t, ks.Upsert(t.Context(), id, secret), ErrEmptySecret)
+			require.ErrorIs(t, ks.Save(t.Context(), id, secret), store.ErrEmptySecret)
+			require.ErrorIs(t, ks.Upsert(t.Context(), id, secret), store.ErrEmptySecret)
 		}
 
 		_, err := ks.Get(t.Context(), id)

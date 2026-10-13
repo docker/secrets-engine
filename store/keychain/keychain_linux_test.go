@@ -292,8 +292,8 @@ func TestKeychainSaveRejectsEmptySecret(t *testing.T) {
 	fake.opened.Store(0)
 	id := store.MustParseID("com.test.test/test/empty")
 
-	require.ErrorIs(t, ks.Save(t.Context(), id, &emptySecret{}), ErrEmptySecret)
-	require.ErrorIs(t, ks.Upsert(t.Context(), id, &emptySecret{value: []byte{}}), ErrEmptySecret)
+	require.ErrorIs(t, ks.Save(t.Context(), id, &emptySecret{}), store.ErrEmptySecret)
+	require.ErrorIs(t, ks.Upsert(t.Context(), id, &emptySecret{value: []byte{}}), store.ErrEmptySecret)
 
 	assert.Zero(t, fake.opened.Load(), "must not connect to the secret service")
 	assert.Zero(t, fake.createCalls)

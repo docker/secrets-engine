@@ -187,7 +187,7 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return ErrEmptySecret
+		return store.ErrEmptySecret
 	}
 	return k.add(id, secret, data)
 }
@@ -224,7 +224,7 @@ func (k *keychainStore[T]) genericMetadata(id store.ID, secret store.Secret) map
 // applications the user allowed to read the item stay allowed. Deleting and
 // re-adding it would reset those lists to the calling binary alone.
 //
-// An empty secret value returns [ErrEmptySecret] without touching the
+// An empty secret value returns [store.ErrEmptySecret] without touching the
 // keychain. Another store instance or process can still write the same item
 // concurrently, in which case Upsert returns [ErrDuplicateItem].
 func (k *keychainStore[T]) Upsert(_ context.Context, id store.ID, secret store.Secret) error {
@@ -237,7 +237,7 @@ func (k *keychainStore[T]) Upsert(_ context.Context, id store.ID, secret store.S
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return ErrEmptySecret
+		return store.ErrEmptySecret
 	}
 
 	err = k.update(id, secret, data)
