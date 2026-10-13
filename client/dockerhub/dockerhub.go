@@ -19,6 +19,7 @@ package dockerhub
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,7 +38,19 @@ var (
 	// ErrNoDefaultProfile means no account is set as the default. It wraps
 	// [ErrNoSession].
 	ErrNoDefaultProfile = fmt.Errorf("no default account profile set: %w", ErrNoSession)
+	// ErrMissingAccessToken means the stored credential has no access token.
+	// It wraps [ErrNoSession].
+	ErrMissingAccessToken error = &noSessionError{"no access token in payload"}
+	// ErrInvalidAccessToken means the stored access token is not a JWT. It
+	// wraps [ErrNoSession].
+	ErrInvalidAccessToken error = &noSessionError{"access token is not a JWT"}
 )
+
+type noSessionError struct{ msg string }
+
+func (e *noSessionError) Error() string { return e.msg }
+
+func (*noSessionError) Unwrap() error { return ErrNoSession }
 
 var (
 	defaultProfileKey = secrets.MustParsePattern("default")
@@ -164,9 +177,50 @@ func parseUserSession(envelope secrets.Envelope) (UserSession, error) {
 		return UserSession{}, fmt.Errorf("decode user session: %w", err)
 	}
 	if session.AccessToken == "" {
-		return UserSession{}, errors.New("decode user session: no access token in payload")
+		return UserSession{}, fmt.Errorf("decode user session: %w", ErrMissingAccessToken)
+	}
+	if err := checkJWT(session.AccessToken); err != nil {
+		return UserSession{}, fmt.Errorf("decode user session: %w: %w", ErrInvalidAccessToken, err)
 	}
 	return session, nil
+}
+
+func checkJWT(token string) error {
+	segments := strings.Split(token, ".")
+	if len(segments) != 3 {
+		return fmt.Errorf("expected 3 dot-separated segments, got %d", len(segments))
+	}
+	var header struct {
+		Alg string `json:"alg"`
+	}
+	if err := decodeSegment(segments[0], &header); err != nil {
+		return fmt.Errorf("header: %w", err)
+	}
+	if header.Alg == "" {
+		return errors.New("header: missing alg")
+	}
+	var payload map[string]json.RawMessage
+	if err := decodeSegment(segments[1], &payload); err != nil {
+		return fmt.Errorf("payload: %w", err)
+	}
+	if payload == nil {
+		return errors.New("payload: not a JSON object")
+	}
+	if segments[2] == "" {
+		return errors.New("missing signature")
+	}
+	if _, err := base64.RawURLEncoding.DecodeString(segments[2]); err != nil {
+		return fmt.Errorf("signature: %w", err)
+	}
+	return nil
+}
+
+func decodeSegment(segment string, v any) error {
+	data, err := base64.RawURLEncoding.DecodeString(segment)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, v)
 }
 
 // parseProfile decodes a docker/auth/metadata/hub/** envelope into a [Profile].
