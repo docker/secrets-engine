@@ -33,7 +33,7 @@ func NewPassValue(value []byte) *PassValue {
 }
 
 func (m *PassValue) Marshal() ([]byte, error) {
-	return m.value, nil
+	return append([]byte(nil), m.value...), nil
 }
 
 func (m *PassValue) Unmarshal(data []byte) error {
