@@ -66,6 +66,21 @@ func (m *mustUnmarshalError) Unmarshal([]byte) error {
 	return errors.New("i am failing on purpose")
 }
 
+type emptySecret struct {
+	attributes
+	value []byte
+}
+
+var _ store.Secret = &emptySecret{}
+
+func (e *emptySecret) Marshal() ([]byte, error) {
+	return e.value, nil
+}
+
+func (e *emptySecret) Unmarshal([]byte) error {
+	return nil
+}
+
 func setupKeychain(t *testing.T, secretFactory func(context.Context, store.ID) store.Secret) store.Store {
 	t.Helper()
 	if secretFactory == nil {
@@ -350,6 +365,22 @@ func TestKeychain(t *testing.T) {
 		id, err := store.ParseID("something/will/fail")
 		require.NoError(t, err)
 		require.ErrorContains(t, kc.Save(t.Context(), id, &mustMarshalError{}), "i am failing on purpose")
+	})
+
+	t.Run("save and upsert reject an empty secret value", func(t *testing.T) {
+		ks := setupKeychain(t, nil)
+		id := store.MustParseID("com.test.test/test/empty-secret")
+		t.Cleanup(func() {
+			require.NoError(t, ks.Delete(context.Background(), id))
+		})
+
+		for _, secret := range []store.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
+			require.ErrorIs(t, ks.Save(t.Context(), id, secret), ErrEmptySecret)
+			require.ErrorIs(t, ks.Upsert(t.Context(), id, secret), ErrEmptySecret)
+		}
+
+		_, err := ks.Get(t.Context(), id)
+		require.ErrorIs(t, err, store.ErrCredentialNotFound)
 	})
 
 	t.Run("unmarshal error on get", func(t *testing.T) {
