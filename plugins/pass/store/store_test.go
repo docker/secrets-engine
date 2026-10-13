@@ -34,3 +34,15 @@ func TestPassValueUnmarshalCopies(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte("hunter2"), out)
 }
+
+func TestPassValueMarshalCopies(t *testing.T) {
+	pv := NewPassValue([]byte("hunter2"))
+
+	out, err := pv.Marshal()
+	require.NoError(t, err)
+	clear(out)
+
+	again, err := pv.Marshal()
+	require.NoError(t, err)
+	assert.Equal(t, []byte("hunter2"), again)
+}
