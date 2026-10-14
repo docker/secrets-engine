@@ -93,6 +93,17 @@ func Test_SetCommand(t *testing.T) {
 		_, err := execute(t, mustSetCommand(t), mock, "foo=bar", "--metadata", "invalid")
 		assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
 	})
+	t.Run("rejects an empty inline value", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errors.New("save should not be called for an empty value")))
+		out, err := execute(t, mustSetCommand(t), mock, "foo=")
+		assert.ErrorIs(t, err, store.ErrEmptySecret)
+		assert.Equal(t, "Error: "+store.ErrEmptySecret.Error()+"\n", out)
+	})
+	t.Run("rejects empty STDIN", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errors.New("save should not be called for an empty value")))
+		_, err := executeWithStdin(t, mustSetCommand(t), mock, "", "foo")
+		assert.ErrorIs(t, err, store.ErrEmptySecret)
+	})
 	t.Run("store error", func(t *testing.T) {
 		errSave := errors.New("save error")
 		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errSave))
@@ -169,6 +180,16 @@ func Test_SetCommand(t *testing.T) {
 		_, err := execute(t, cmd, mock, "foo=bar", "--force", "--metadata", "invalid")
 		assert.ErrorContains(t, err, "invalid metadata pair (expected key=value): invalid")
 		assert.NotErrorIs(t, err, client.ErrSecretsEngineNotRunning)
+	})
+	t.Run("--force rejects an empty value before asking the engine", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		}))
+		cmd := mustSetCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
+		_, err := execute(t, cmd, mock, "foo=", "--force")
+		assert.ErrorIs(t, err, store.ErrEmptySecret)
+		assert.NotErrorIs(t, err, client.ErrSecretsEngineNotRunning)
+		assertStoredValue(t, mock, "old")
 	})
 	t.Run("--force surfaces upsert error", func(t *testing.T) {
 		errUpsert := errors.New("upsert error")

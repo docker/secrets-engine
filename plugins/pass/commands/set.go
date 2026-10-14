@@ -71,17 +71,7 @@ func SetCommand(options ...ClientOption) (*cobra.Command, error) {
 				return err
 			}
 
-			var s *setPayload
-			switch in, isFile := prompt.UnwrapFile(cmd.InOrStdin()); {
-			case isNotImplicitReadFromStdinSyntax(args):
-				s = &setPayload{val: value}
-			case isFile && term.IsTerminal(in.Fd()):
-				var val string
-				val, err = prompt.ReadMasked(cmd.Context(), in, cmd.ErrOrStderr(), id)
-				s = &setPayload{val: val}
-			default:
-				s, err = secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin())
-			}
+			s, err := readSecret(cmd, args, value, id)
 			if err != nil {
 				return err
 			}
@@ -129,6 +119,28 @@ func parseMetadataFlags(raw []string) (map[string]string, error) {
 		m[k] = v
 	}
 	return m, nil
+}
+
+func readSecret(cmd *cobra.Command, args []string, value string, id secrets.ID) (*setPayload, error) {
+	var s *setPayload
+	var err error
+	switch in, isFile := prompt.UnwrapFile(cmd.InOrStdin()); {
+	case isNotImplicitReadFromStdinSyntax(args):
+		s = &setPayload{val: value}
+	case isFile && term.IsTerminal(in.Fd()):
+		var val string
+		val, err = prompt.ReadMasked(cmd.Context(), in, cmd.ErrOrStderr(), id)
+		s = &setPayload{val: val}
+	default:
+		s, err = secretMappingFromSTDIN(cmd.Context(), cmd.InOrStdin())
+	}
+	if err != nil {
+		return nil, err
+	}
+	if s.val == "" {
+		return nil, secrets.ErrEmptySecret
+	}
+	return s, nil
 }
 
 func isNotImplicitReadFromStdinSyntax(args []string) bool {
