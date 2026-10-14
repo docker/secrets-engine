@@ -287,8 +287,8 @@ func TestUpsert(t *testing.T) {
 		})
 
 		require.NoError(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte("review-old-value")}))
-		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{}), ErrEmptySecret)
-		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte{}}), ErrEmptySecret)
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{}), store.ErrEmptySecret)
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte{}}), store.ErrEmptySecret)
 
 		got, err := bs.Get(t.Context(), id)
 		require.NoError(t, err)
@@ -308,8 +308,8 @@ func TestUpsert(t *testing.T) {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
 
-		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{}), ErrEmptySecret)
-		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte{}}), ErrEmptySecret)
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{}), store.ErrEmptySecret)
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte{}}), store.ErrEmptySecret)
 
 		_, err := bs.Get(t.Context(), id)
 		require.ErrorIs(t, err, store.ErrCredentialNotFound)

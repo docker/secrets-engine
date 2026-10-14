@@ -14,6 +14,14 @@
 
 package store
 
-import "github.com/docker/secrets-engine/x/secrets"
+import (
+	"errors"
+
+	"github.com/docker/secrets-engine/x/secrets"
+)
 
 var ErrCredentialNotFound = secrets.ErrNotFound
+
+// ErrEmptySecret is returned by Save and Upsert when the secret's value is
+// empty.
+var ErrEmptySecret = errors.New("secret value must not be empty")

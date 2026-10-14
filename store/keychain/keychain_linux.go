@@ -538,6 +538,15 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 }
 
 func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+	value, err := secret.Marshal()
+	if err != nil {
+		return err
+	}
+	defer clear(value)
+	if len(value) == 0 {
+		return store.ErrEmptySecret
+	}
+
 	service, err := operationService(ctx)
 	if err != nil {
 		return err
@@ -561,12 +570,6 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
 	}
-
-	value, err := secret.Marshal()
-	if err != nil {
-		return err
-	}
-	defer clear(value)
 
 	sessSecret, err := session.NewSecret(value)
 	if err != nil {

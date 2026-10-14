@@ -330,6 +330,15 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 }
 
 func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) error {
+	secret, err := s.Marshal()
+	if err != nil {
+		return err
+	}
+	defer clear(secret)
+	if len(secret) == 0 {
+		return store.ErrEmptySecret
+	}
+
 	unlock, err := f.tryLock(ctx)
 	if err != nil {
 		return err
@@ -344,11 +353,6 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 		return err
 	}
 
-	secret, err := s.Marshal()
-	if err != nil {
-		return err
-	}
-	defer clear(secret)
 	metadata := s.Metadata()
 
 	var secrets []secretfile.EncryptedSecret

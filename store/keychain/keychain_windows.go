@@ -61,6 +61,9 @@ func encodeSecret(secret store.Secret) ([]byte, error) {
 		return nil, err
 	}
 	defer clear(data)
+	if len(data) == 0 {
+		return nil, store.ErrEmptySecret
+	}
 
 	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
 	blob, _, err := transform.Bytes(encoder, data)
