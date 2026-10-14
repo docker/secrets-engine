@@ -24,6 +24,7 @@ import (
 var (
 	ErrNotFound     = errors.New("secret not found")
 	ErrAccessDenied = errors.New("access denied") // nuh, uh, uh!
+	ErrEmptySecret  = errors.New("secret value must not be empty")
 )
 
 type Envelope struct {
