@@ -224,7 +224,7 @@ func TestKeychain(t *testing.T) {
 
 		t.Cleanup(func() {
 			for id := range moreCreds {
-				assert.NoError(t, ks.Delete(t.Context(), id))
+				assert.NoError(t, ks.Delete(context.Background(), id))
 			}
 		})
 

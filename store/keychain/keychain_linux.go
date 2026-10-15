@@ -58,7 +58,7 @@ type secretService interface {
 	Collections() ([]dbus.ObjectPath, error)
 	ReadAlias(alias string) (dbus.ObjectPath, error)
 	IsLocked(collection dbus.ObjectPath) (bool, error)
-	OpenSession(mode kc.AuthenticationMode) (*kc.Session, error)
+	OpenSession(ctx context.Context, mode kc.AuthenticationMode) (*kc.Session, error)
 	CloseSession(session *kc.Session)
 	Unlock(ctx context.Context, items []dbus.ObjectPath) error
 	SearchCollection(collection dbus.ObjectPath, attributes kc.Attributes) ([]dbus.ObjectPath, error)
@@ -373,7 +373,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return err
 	}
@@ -677,7 +677,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	session, err := service.OpenSession(kc.AuthenticationDHAES)
+	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
