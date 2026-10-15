@@ -299,29 +299,9 @@ func (s *SecretService) IsLocked(collection dbus.ObjectPath) (bool, error) {
 	return locked, nil
 }
 
-type sessionOpenResponse struct {
-	algorithmOutput dbus.Variant
-	path            dbus.ObjectPath
-}
-
-func (s *SecretService) openSessionRaw(mode AuthenticationMode, sessionAlgorithmInput dbus.Variant) (resp sessionOpenResponse, err error) {
-	err = s.ServiceObj().
-		Call("org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, sessionAlgorithmInput).
-		Store(&resp.algorithmOutput, &resp.path)
-	if err != nil {
-		return sessionOpenResponse{}, fmt.Errorf("failed to open secretservice session: %w", err)
-	}
-	return resp, nil
-}
-
-// OpenSession
-func (s *SecretService) OpenSession(mode AuthenticationMode) (session *Session, err error) {
+func (s *SecretService) OpenSession(ctx context.Context, mode AuthenticationMode) (*Session, error) {
+	session := &Session{Mode: mode}
 	var sessionAlgorithmInput dbus.Variant
-
-	session = new(Session)
-
-	session.Mode = mode
-
 	switch mode {
 	case AuthenticationInsecurePlain:
 		sessionAlgorithmInput = dbus.MakeVariant("")
@@ -338,31 +318,16 @@ func (s *SecretService) OpenSession(mode AuthenticationMode) (session *Session, 
 		return nil, fmt.Errorf("unknown authentication mode %v", mode)
 	}
 
-	sessionOpenCh := make(chan sessionOpenResponse)
-	errCh := make(chan error)
-	go func() {
-		resp, err := s.openSessionRaw(mode, sessionAlgorithmInput)
-		if err != nil {
-			errCh <- err
-		} else {
-			sessionOpenCh <- resp
-		}
-	}()
-
+	callCtx, cancel := context.WithTimeout(ctx, s.sessionOpenTimeout)
+	defer cancel()
 	var sessionAlgorithmOutput dbus.Variant
-	// NOTE: If the timeout case is reached, the above goroutine is leaked.
-	// This is not terrible because D-Bus calls have an internal 2-mintue
-	// timeout, so the goroutine will finish eventually. If two OpenSessions
-	// are called at the saime time, they'll be on different channels so
-	// they won't interfere with each other.
-	select {
-	case resp := <-sessionOpenCh:
-		sessionAlgorithmOutput = resp.algorithmOutput
-		session.Path = resp.path
-	case err := <-errCh:
-		return nil, err
-	case <-time.After(s.sessionOpenTimeout):
-		return nil, fmt.Errorf("timed out after %s", s.sessionOpenTimeout)
+	if err := s.ServiceObj().
+		CallWithContext(callCtx, "org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, sessionAlgorithmInput).
+		Store(&sessionAlgorithmOutput, &session.Path); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+			return nil, fmt.Errorf("failed to open secretservice session: timed out after %s: %w", s.sessionOpenTimeout, err)
+		}
+		return nil, fmt.Errorf("failed to open secretservice session: %w", err)
 	}
 
 	switch mode {

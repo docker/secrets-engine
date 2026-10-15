@@ -111,7 +111,7 @@ func (f *fakeService) Collections() ([]dbus.ObjectPath, error) {
 
 func (f *fakeService) ReadAlias(string) (dbus.ObjectPath, error) { return loginKeychainObjectPath, nil }
 func (f *fakeService) IsLocked(dbus.ObjectPath) (bool, error)    { return f.locked, nil }
-func (f *fakeService) OpenSession(kc.AuthenticationMode) (*kc.Session, error) {
+func (f *fakeService) OpenSession(context.Context, kc.AuthenticationMode) (*kc.Session, error) {
 	// plain mode so Session.NewSecret works without a negotiated AES key, which
 	// lets the Save path run end-to-end against the fake.
 	return &kc.Session{Mode: kc.AuthenticationInsecurePlain}, nil
@@ -634,7 +634,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
-	session, err := svc.OpenSession(kc.AuthenticationDHAES)
+	session, err := svc.OpenSession(context.Background(), kc.AuthenticationDHAES)
 	require.NoError(t, err)
 	defer svc.CloseSession(session)
 
