@@ -80,6 +80,8 @@ type fakeService struct {
 
 	lastUnlockPaths []dbus.ObjectPath
 
+	calls []string
+
 	// availableErr, when set, is returned by Available so a test can drive the
 	// eager-probe failure paths in New. The zero value (nil) reports the backend
 	// as available, so every existing test that constructs a store via
@@ -106,12 +108,14 @@ func lockedErr(op string) error {
 }
 
 func (f *fakeService) Collections() ([]dbus.ObjectPath, error) {
+	f.calls = append(f.calls, "Collections")
 	return []dbus.ObjectPath{loginKeychainObjectPath}, nil
 }
 
 func (f *fakeService) ReadAlias(string) (dbus.ObjectPath, error) { return loginKeychainObjectPath, nil }
 func (f *fakeService) IsLocked(dbus.ObjectPath) (bool, error)    { return f.locked, nil }
 func (f *fakeService) OpenSession(context.Context, kc.AuthenticationMode) (*kc.Session, error) {
+	f.calls = append(f.calls, "OpenSession")
 	// plain mode so Session.NewSecret works without a negotiated AES key, which
 	// lets the Save path run end-to-end against the fake.
 	return &kc.Session{Mode: kc.AuthenticationInsecurePlain}, nil
@@ -401,6 +405,27 @@ func TestKeychainSaveStopsRetryingAfterMaxRelocks(t *testing.T) {
 	assert.ErrorIs(t, err, ErrCollectionLocked,
 		"a collection still locked after the bounded retries must be detectable via the exported sentinel")
 	assert.Equal(t, maxRelockRetries+1, fake.createCalls, "initial attempt plus the bounded retries")
+}
+
+func TestKeychainReadsCollectionsBeforeOpeningSession(t *testing.T) {
+	id := store.MustParseID("com.test.test/test/bob")
+	creds := &mocks.MockCredential{Username: "bob", Password: "bob-password"}
+	ops := map[string]func(store.Store){
+		"get":              func(ks store.Store) { _, _ = ks.Get(t.Context(), id) },
+		"save":             func(ks store.Store) { _ = ks.Save(t.Context(), id, creds) },
+		"delete":           func(ks store.Store) { _ = ks.Delete(t.Context(), id) },
+		"get all metadata": func(ks store.Store) { _, _ = ks.GetAllMetadata(t.Context()) },
+		"filter":           func(ks store.Store) { _, _ = ks.Filter(t.Context(), store.MustParsePattern("**")) },
+	}
+	for name, op := range ops {
+		t.Run(name, func(t *testing.T) {
+			fake := &fakeService{}
+			withFakeService(t, fake)
+
+			op(setupKeychain(t, nil))
+			assert.Equal(t, []string{"Collections", "OpenSession"}, fake.calls)
+		})
+	}
 }
 
 func TestKeychainLockedCollectionSurfacesErrCollectionLocked(t *testing.T) {

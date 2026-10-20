@@ -373,16 +373,16 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return err
+	}
+
 	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return err
 	}
 	defer service.CloseSession(session)
-
-	objectPath, err := getDefaultCollection(service)
-	if err != nil {
-		return err
-	}
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -416,16 +416,16 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return nil, err
+	}
+
 	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
 	defer service.CloseSession(session)
-
-	objectPath, err := getDefaultCollection(service)
-	if err != nil {
-		return nil, err
-	}
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -482,16 +482,16 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return nil, err
+	}
+
 	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
 	defer service.CloseSession(session)
-
-	objectPath, err := getDefaultCollection(service)
-	if err != nil {
-		return nil, err
-	}
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -556,16 +556,16 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return err
+	}
+
 	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return err
 	}
 	defer service.CloseSession(session)
-
-	objectPath, err := getDefaultCollection(service)
-	if err != nil {
-		return err
-	}
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -677,16 +677,16 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
+	objectPath, err := getDefaultCollection(service)
+	if err != nil {
+		return nil, err
+	}
+
 	session, err := service.OpenSession(ctx, kc.AuthenticationDHAES)
 	if err != nil {
 		return nil, err
 	}
 	defer service.CloseSession(session)
-
-	objectPath, err := getDefaultCollection(service)
-	if err != nil {
-		return nil, err
-	}
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
