@@ -13,8 +13,8 @@ replace github.com/docker/secrets-engine/x => ./../../x
 require (
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/docker/secrets-engine/client v0.2.2
-	github.com/docker/secrets-engine/plugin v0.3.3
-	github.com/docker/secrets-engine/store v0.4.2
+	github.com/docker/secrets-engine/plugin v0.3.4
+	github.com/docker/secrets-engine/store v0.4.3
 	github.com/docker/secrets-engine/x v0.8.5
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.1
