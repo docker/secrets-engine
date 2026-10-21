@@ -12,7 +12,7 @@ replace github.com/docker/secrets-engine/x => ./../../x
 
 require (
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/docker/secrets-engine/client v0.2.1
+	github.com/docker/secrets-engine/client v0.2.2
 	github.com/docker/secrets-engine/plugin v0.3.3
 	github.com/docker/secrets-engine/store v0.4.2
 	github.com/docker/secrets-engine/x v0.8.5
