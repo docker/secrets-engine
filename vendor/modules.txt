@@ -43,7 +43,7 @@ github.com/docker/docker-credential-helpers/credentials
 ## explicit; go 1.26.10
 # github.com/docker/secrets-engine/plugin v0.3.4 => ./plugin
 ## explicit; go 1.26.10
-# github.com/docker/secrets-engine/store v0.4.2 => ./store
+# github.com/docker/secrets-engine/store v0.4.3 => ./store
 ## explicit; go 1.26.10
 # github.com/docker/secrets-engine/x v0.8.5 => ./x
 ## explicit; go 1.26.10
