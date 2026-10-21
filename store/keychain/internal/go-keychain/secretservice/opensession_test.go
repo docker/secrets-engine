@@ -184,10 +184,7 @@ func newDelayedSessionService(t *testing.T) (*SecretService, *delayedSessionServ
 		backend.sessions = append(backend.sessions, session)
 	}
 	require.NoError(t, conn.Export(backend, SecretServiceObjectPath, "org.freedesktop.Secret.Service"))
-	svc := &SecretService{
-		conn:               client,
-		sessionOpenTimeout: 250 * time.Millisecond,
-	}
+	svc := &SecretService{conn: client}
 	return svc, backend
 }
 
@@ -219,7 +216,6 @@ func openSessionAsync(ctx context.Context, svc *SecretService) <-chan openResult
 
 func TestOpenSessionNegotiatesDHAES(t *testing.T) {
 	svc, backend := newDelayedSessionService(t)
-	svc.SetSessionOpenTimeout(5 * time.Second)
 
 	result := openSessionAsync(t.Context(), svc)
 	request := receiveSessionValue(t, backend.requests)
@@ -248,7 +244,9 @@ func TestOpenSessionTimeout(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			svc, backend := newDelayedSessionService(t)
 
-			result := openSessionAsync(t.Context(), svc)
+			timeoutCtx, cancelTimeout := context.WithTimeout(t.Context(), 250*time.Millisecond)
+			defer cancelTimeout()
+			result := openSessionAsync(timeoutCtx, svc)
 			late := receiveSessionValue(t, backend.requests)
 			timedOut := receiveSessionValue(t, result)
 			require.ErrorIs(t, timedOut.err, context.DeadlineExceeded)
@@ -257,8 +255,9 @@ func TestOpenSessionTimeout(t *testing.T) {
 
 			late.reply <- test.reply
 
-			svc.SetSessionOpenTimeout(5 * time.Second)
-			result = openSessionAsync(t.Context(), svc)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			result = openSessionAsync(ctx, svc)
 			next := receiveSessionValue(t, backend.requests)
 			next.reply <- nil
 			opened := receiveSessionValue(t, result)
@@ -275,7 +274,9 @@ func TestOpenSessionTimeout(t *testing.T) {
 func TestOpenSessionTimeoutThenCloseDisconnects(t *testing.T) {
 	svc, backend := newDelayedSessionService(t)
 
-	result := openSessionAsync(t.Context(), svc)
+	ctx, cancel := context.WithTimeout(t.Context(), 250*time.Millisecond)
+	defer cancel()
+	result := openSessionAsync(ctx, svc)
 	receiveSessionValue(t, backend.requests)
 	require.ErrorIs(t, receiveSessionValue(t, result).err, context.DeadlineExceeded)
 
@@ -286,7 +287,6 @@ func TestOpenSessionTimeoutThenCloseDisconnects(t *testing.T) {
 
 func TestOpenSessionCallerCancel(t *testing.T) {
 	svc, backend := newDelayedSessionService(t)
-	svc.SetSessionOpenTimeout(5 * time.Second)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -304,7 +304,6 @@ func TestOpenSessionCancelledContext(t *testing.T) {
 	for _, mode := range []AuthenticationMode{AuthenticationInsecurePlain, AuthenticationDHAES} {
 		t.Run(string(mode), func(t *testing.T) {
 			svc, backend := newDelayedSessionService(t)
-			svc.SetSessionOpenTimeout(5 * time.Second)
 
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()

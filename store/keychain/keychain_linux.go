@@ -55,9 +55,9 @@ const (
 // Every method maps to a method on [kc.SecretService]; none expose a
 // dbus.BusObject, so a fake never needs to talk to the bus.
 type secretService interface {
-	Collections() ([]dbus.ObjectPath, error)
-	ReadAlias(alias string) (dbus.ObjectPath, error)
-	IsLocked(collection dbus.ObjectPath) (bool, error)
+	Collections(ctx context.Context) ([]dbus.ObjectPath, error)
+	ReadAlias(ctx context.Context, alias string) (dbus.ObjectPath, error)
+	IsLocked(ctx context.Context, collection dbus.ObjectPath) (bool, error)
 	OpenSession(ctx context.Context, mode kc.AuthenticationMode) (*kc.Session, error)
 	CloseSession(session *kc.Session)
 	Unlock(ctx context.Context, items []dbus.ObjectPath) error
@@ -179,8 +179,8 @@ func ensureAvailable(ctx context.Context) error {
 // As a fallback it queries the secret service for the default collection.
 // It is possible that the host does not have a collection set up, in that case
 // the only option is to error.
-func getDefaultCollection(service secretService) (dbus.ObjectPath, error) {
-	collections, err := service.Collections()
+func getDefaultCollection(ctx context.Context, service secretService) (dbus.ObjectPath, error) {
+	collections, err := service.Collections(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -189,7 +189,7 @@ func getDefaultCollection(service secretService) (dbus.ObjectPath, error) {
 		return loginKeychainObjectPath, nil
 	}
 	// we need to fallback to the default collection
-	defaultKeychainObjectPath, err := service.ReadAlias("default")
+	defaultKeychainObjectPath, err := service.ReadAlias(ctx, "default")
 	if err != nil {
 		return "", err
 	}
@@ -228,8 +228,8 @@ func resolveDefaultCollection(collections []dbus.ObjectPath, aliasPath dbus.Obje
 //
 // It returns [ErrCollectionLocked] by default if the collection is locked.
 // On any other error, it returns the underlying error instead.
-func isCollectionUnlocked(collectionPath dbus.ObjectPath, service secretService) error {
-	locked, err := service.IsLocked(collectionPath)
+func isCollectionUnlocked(ctx context.Context, collectionPath dbus.ObjectPath, service secretService) error {
+	locked, err := service.IsLocked(ctx, collectionPath)
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func lockedError(collectionPath dbus.ObjectPath, cause error) error {
 // A failed unlock (prompt dismissed, timed out, or ctx expired) wraps
 // [ErrCollectionLocked].
 func ensureCollectionUnlocked(ctx context.Context, service secretService, collectionPath dbus.ObjectPath) error {
-	err := isCollectionUnlocked(collectionPath, service)
+	err := isCollectionUnlocked(ctx, collectionPath, service)
 	if err == nil {
 		return nil
 	}
@@ -373,7 +373,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	objectPath, err := getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	objectPath, err := getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	objectPath, err := getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	objectPath, err := getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -677,7 +677,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	// LIFO order, the session is closed first and the connection last.
 	defer func() { _ = service.Close() }()
 
-	objectPath, err := getDefaultCollection(service)
+	objectPath, err := getDefaultCollection(ctx, service)
 	if err != nil {
 		return nil, err
 	}
