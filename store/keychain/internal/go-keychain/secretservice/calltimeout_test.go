@@ -58,6 +58,51 @@ func (b *blockedCall) ReadAlias(string) (dbus.ObjectPath, *dbus.Error) {
 	return loginCollectionPath, nil
 }
 
+func (b *blockedCall) Set(string, string, dbus.Variant) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) SearchItems(map[string]string) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) CreateItem(map[string]dbus.Variant, Secret, bool) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) Delete() *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) GetSecret(dbus.ObjectPath) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) SetSecret(Secret) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) Unlock([]dbus.ObjectPath) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) Lock([]dbus.ObjectPath) *dbus.Error {
+	b.block()
+	return nil
+}
+
+func (b *blockedCall) Prompt(string) *dbus.Error {
+	b.block()
+	return nil
+}
+
 func TestCallContextDeadline(t *testing.T) {
 	t.Run("falls back to the default when the caller sets none", func(t *testing.T) {
 		before := time.Now()
@@ -146,4 +191,108 @@ func TestReadAliasCallerDeadline(t *testing.T) {
 	receiveSessionValue(t, blocked.entered)
 	require.ErrorIs(t, receiveSessionValue(t, result), context.DeadlineExceeded)
 	require.True(t, svc.conn.Connected())
+}
+
+func TestItemCallsCallerDeadline(t *testing.T) {
+	const (
+		itemPath    = dbus.ObjectPath("/org/freedesktop/secrets/collection/login/1")
+		sessionPath = dbus.ObjectPath("/session/blocked")
+		promptPath  = dbus.ObjectPath("/prompt/blocked")
+	)
+	secret := Secret{Session: sessionPath, Value: []byte("value"), ContentType: "text/plain"}
+	attributes := Attributes{"foo": "bar"}
+
+	for _, test := range []struct {
+		name  string
+		path  dbus.ObjectPath
+		iface string
+		call  func(context.Context, *SecretService) error
+	}{
+		{
+			name: "SearchCollection", path: loginCollectionPath, iface: secretCollectionInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				_, err := svc.SearchCollection(ctx, loginCollectionPath, attributes)
+				return err
+			},
+		},
+		{
+			name: "CreateItem", path: loginCollectionPath, iface: secretCollectionInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				_, err := svc.CreateItem(ctx, loginCollectionPath, NewSecretProperties("label", attributes), secret, ReplaceBehaviorReplace)
+				return err
+			},
+		},
+		{
+			name: "DeleteItem", path: itemPath, iface: secretItemInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.DeleteItem(ctx, itemPath)
+			},
+		},
+		{
+			name: "GetAttributes", path: itemPath, iface: propertiesInterface,
+			call: func(ctx context.Context, svc *SecretService) error {
+				_, err := svc.GetAttributes(ctx, itemPath)
+				return err
+			},
+		},
+		{
+			name: "GetSecret", path: itemPath, iface: secretItemInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				_, err := svc.GetSecret(ctx, itemPath, Session{Mode: AuthenticationInsecurePlain, Path: sessionPath})
+				return err
+			},
+		},
+		{
+			name: "SetItemSecret", path: itemPath, iface: secretItemInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.SetItemSecret(ctx, itemPath, secret)
+			},
+		},
+		{
+			name: "SetItemAttributes", path: itemPath, iface: propertiesInterface,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.SetItemAttributes(ctx, itemPath, attributes)
+			},
+		},
+		{
+			name: "SetItemLabel", path: itemPath, iface: propertiesInterface,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.SetItemLabel(ctx, itemPath, "label")
+			},
+		},
+		{
+			name: "Unlock", path: SecretServiceObjectPath, iface: secretServiceInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.Unlock(ctx, []dbus.ObjectPath{loginCollectionPath})
+			},
+		},
+		{
+			name: "LockItems", path: SecretServiceObjectPath, iface: secretServiceInterfaceName,
+			call: func(ctx context.Context, svc *SecretService) error {
+				return svc.LockItems(ctx, []dbus.ObjectPath{loginCollectionPath})
+			},
+		},
+		{
+			name: "PromptAndWait", path: promptPath, iface: "org.freedesktop.Secret.Prompt",
+			call: func(ctx context.Context, svc *SecretService) error {
+				_, err := svc.PromptAndWait(ctx, promptPath)
+				return err
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			svc, backend := newDelayedSessionService(t)
+			blocked := newBlockedCall(t)
+			require.NoError(t, backend.conn.Export(blocked, test.path, test.iface))
+
+			ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+			defer cancel()
+			result := make(chan error, 1)
+			go func() { result <- test.call(ctx, svc) }()
+
+			receiveSessionValue(t, blocked.entered)
+			require.ErrorIs(t, receiveSessionValue(t, result), context.DeadlineExceeded)
+			require.True(t, svc.conn.Connected())
+		})
+	}
 }

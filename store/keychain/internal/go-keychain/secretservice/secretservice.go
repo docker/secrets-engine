@@ -261,21 +261,33 @@ func (s *SecretService) Obj(path dbus.ObjectPath) dbus.BusObject {
 const (
 	secretServiceInterfaceName    = "org.freedesktop.Secret.Service"
 	secretCollectionInterfaceName = "org.freedesktop.Secret.Collection"
+	secretItemInterfaceName       = "org.freedesktop.Secret.Item"
 	collectionsProperty           = "Collections"
 	collectionLockedProp          = "Locked"
+	itemAttributesProperty        = "Attributes"
+	itemLabelProperty             = "Label"
 	readAliasMethod               = "org.freedesktop.Secret.Service.ReadAlias"
 	propertiesGetMethod           = "org.freedesktop.DBus.Properties.Get"
+	propertiesSetMethod           = "org.freedesktop.DBus.Properties.Set"
 )
 
-func (s *SecretService) getProperty(ctx context.Context, obj dbus.BusObject, interfaceName, property string) (dbus.Variant, error) {
+func call(ctx context.Context, obj dbus.BusObject, failure, method string, args []any, retvalues ...any) error {
 	callCtx, cancel := callContext(ctx)
 	defer cancel()
-	var variant dbus.Variant
-	if err := obj.CallWithContext(callCtx, propertiesGetMethod, NilFlags, interfaceName, property).Store(&variant); err != nil {
+	if err := obj.CallWithContext(callCtx, method, NilFlags, args...).Store(retvalues...); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
-			return dbus.Variant{}, fmt.Errorf("failed to get property %s.%s: timed out after %s: %w", interfaceName, property, defaultCallTimeout, err)
+			return fmt.Errorf("%s: timed out after %s: %w", failure, defaultCallTimeout, err)
 		}
-		return dbus.Variant{}, fmt.Errorf("failed to get property %s.%s: %w", interfaceName, property, err)
+		return fmt.Errorf("%s: %w", failure, err)
+	}
+	return nil
+}
+
+func (s *SecretService) getProperty(ctx context.Context, obj dbus.BusObject, interfaceName, property string) (dbus.Variant, error) {
+	var variant dbus.Variant
+	failure := fmt.Sprintf("failed to get property %s.%s", interfaceName, property)
+	if err := call(ctx, obj, failure, propertiesGetMethod, []any{interfaceName, property}, &variant); err != nil {
+		return dbus.Variant{}, err
 	}
 	return variant, nil
 }
@@ -298,14 +310,9 @@ func (s *SecretService) Collections(ctx context.Context) ([]dbus.ObjectPath, err
 // points at. The secret service returns the null path "/" when the alias is not
 // assigned to any collection.
 func (s *SecretService) ReadAlias(ctx context.Context, alias string) (dbus.ObjectPath, error) {
-	callCtx, cancel := callContext(ctx)
-	defer cancel()
 	var path dbus.ObjectPath
-	if err := s.ServiceObj().CallWithContext(callCtx, readAliasMethod, NilFlags, alias).Store(&path); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
-			return "", fmt.Errorf("failed to read alias %q: timed out after %s: %w", alias, defaultCallTimeout, err)
-		}
-		return "", fmt.Errorf("failed to read alias %q: %w", alias, err)
+	if err := call(ctx, s.ServiceObj(), fmt.Sprintf("failed to read alias %q", alias), readAliasMethod, []any{alias}, &path); err != nil {
+		return "", err
 	}
 	return path, nil
 }
@@ -342,16 +349,11 @@ func (s *SecretService) OpenSession(ctx context.Context, mode AuthenticationMode
 		return nil, fmt.Errorf("unknown authentication mode %v", mode)
 	}
 
-	callCtx, cancel := callContext(ctx)
-	defer cancel()
 	var sessionAlgorithmOutput dbus.Variant
-	if err := s.ServiceObj().
-		CallWithContext(callCtx, "org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, sessionAlgorithmInput).
-		Store(&sessionAlgorithmOutput, &session.Path); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
-			return nil, fmt.Errorf("failed to open secretservice session: timed out after %s: %w", defaultCallTimeout, err)
-		}
-		return nil, fmt.Errorf("failed to open secretservice session: %w", err)
+	if err := call(ctx, s.ServiceObj(), "failed to open secretservice session",
+		"org.freedesktop.Secret.Service.OpenSession", []any{mode, sessionAlgorithmInput},
+		&sessionAlgorithmOutput, &session.Path); err != nil {
+		return nil, err
 	}
 
 	switch mode {
@@ -378,16 +380,14 @@ func (s *SecretService) OpenSession(ctx context.Context, mode AuthenticationMode
 
 // CloseSession
 func (s *SecretService) CloseSession(session *Session) {
-	s.Obj(session.Path).Call("org.freedesktop.Secret.Session.Close", NilFlags)
+	_ = call(context.Background(), s.Obj(session.Path), "failed to close session", "org.freedesktop.Secret.Session.Close", nil)
 }
 
 // SearchCollection
-func (s *SecretService) SearchCollection(collection dbus.ObjectPath, attributes Attributes) (items []dbus.ObjectPath, err error) {
-	err = s.Obj(collection).
-		Call("org.freedesktop.Secret.Collection.SearchItems", NilFlags, attributes).
-		Store(&items)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search collection: %w", err)
+func (s *SecretService) SearchCollection(ctx context.Context, collection dbus.ObjectPath, attributes Attributes) (items []dbus.ObjectPath, err error) {
+	if err := call(ctx, s.Obj(collection), "failed to search collection",
+		"org.freedesktop.Secret.Collection.SearchItems", []any{attributes}, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -420,11 +420,10 @@ func (s *SecretService) CreateItem(
 	}
 
 	var prompt dbus.ObjectPath
-	err = s.Obj(collection).
-		Call("org.freedesktop.Secret.Collection.CreateItem", NilFlags, properties, secret, replace).
-		Store(&item, &prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to create item: %w", err)
+	if err := call(ctx, s.Obj(collection), "failed to create item",
+		"org.freedesktop.Secret.Collection.CreateItem", []any{properties, secret, replace},
+		&item, &prompt); err != nil {
+		return "", err
 	}
 	_, err = s.PromptAndWait(ctx, prompt)
 	if err != nil {
@@ -436,11 +435,8 @@ func (s *SecretService) CreateItem(
 // DeleteItem deletes an item; ctx bounds the prompt wait.
 func (s *SecretService) DeleteItem(ctx context.Context, item dbus.ObjectPath) (err error) {
 	var prompt dbus.ObjectPath
-	err = s.Obj(item).
-		Call("org.freedesktop.Secret.Item.Delete", NilFlags).
-		Store(&prompt)
-	if err != nil {
-		return fmt.Errorf("failed to delete item: %w", err)
+	if err := call(ctx, s.Obj(item), "failed to delete item", "org.freedesktop.Secret.Item.Delete", nil, &prompt); err != nil {
+		return err
 	}
 	_, err = s.PromptAndWait(ctx, prompt)
 	if err != nil {
@@ -450,10 +446,10 @@ func (s *SecretService) DeleteItem(ctx context.Context, item dbus.ObjectPath) (e
 }
 
 // GetAttributes
-func (s *SecretService) GetAttributes(item dbus.ObjectPath) (attributes Attributes, err error) {
-	attributesV, err := s.Obj(item).GetProperty("org.freedesktop.Secret.Item.Attributes")
+func (s *SecretService) GetAttributes(ctx context.Context, item dbus.ObjectPath) (attributes Attributes, err error) {
+	attributesV, err := s.getProperty(ctx, s.Obj(item), secretItemInterfaceName, itemAttributesProperty)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get attributes: %w", err)
+		return nil, err
 	}
 	attributesMap, ok := attributesV.Value().(map[string]string)
 	if !ok {
@@ -463,13 +459,11 @@ func (s *SecretService) GetAttributes(item dbus.ObjectPath) (attributes Attribut
 }
 
 // GetSecret
-func (s *SecretService) GetSecret(item dbus.ObjectPath, session Session) (secretPlaintext []byte, err error) {
+func (s *SecretService) GetSecret(ctx context.Context, item dbus.ObjectPath, session Session) (secretPlaintext []byte, err error) {
 	var secretI []interface{}
-	err = s.Obj(item).
-		Call("org.freedesktop.Secret.Item.GetSecret", NilFlags, session.Path).
-		Store(&secretI)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get secret: %w", err)
+	if err := call(ctx, s.Obj(item), "failed to get secret",
+		"org.freedesktop.Secret.Item.GetSecret", []any{session.Path}, &secretI); err != nil {
+		return nil, err
 	}
 	secret := new(Secret)
 	err = dbus.Store(secretI, &secret.Session, &secret.Parameters, &secret.Value, &secret.ContentType)
@@ -500,11 +494,9 @@ const NullPrompt = "/"
 func (s *SecretService) Unlock(ctx context.Context, items []dbus.ObjectPath) (err error) {
 	var dummy []dbus.ObjectPath
 	var prompt dbus.ObjectPath
-	err = s.ServiceObj().
-		Call("org.freedesktop.Secret.Service.Unlock", NilFlags, items).
-		Store(&dummy, &prompt)
-	if err != nil {
-		return fmt.Errorf("failed to unlock items: %w", err)
+	if err := call(ctx, s.ServiceObj(), "failed to unlock items",
+		"org.freedesktop.Secret.Service.Unlock", []any{items}, &dummy, &prompt); err != nil {
+		return err
 	}
 	_, err = s.PromptAndWait(ctx, prompt)
 	if err != nil {
@@ -517,11 +509,9 @@ func (s *SecretService) Unlock(ctx context.Context, items []dbus.ObjectPath) (er
 func (s *SecretService) LockItems(ctx context.Context, items []dbus.ObjectPath) (err error) {
 	var dummy []dbus.ObjectPath
 	var prompt dbus.ObjectPath
-	err = s.ServiceObj().
-		Call("org.freedesktop.Secret.Service.Lock", NilFlags, items).
-		Store(&dummy, &prompt)
-	if err != nil {
-		return fmt.Errorf("failed to lock items: %w", err)
+	if err := call(ctx, s.ServiceObj(), "failed to lock items",
+		"org.freedesktop.Secret.Service.Lock", []any{items}, &dummy, &prompt); err != nil {
+		return err
 	}
 	_, err = s.PromptAndWait(ctx, prompt)
 	if err != nil {
@@ -552,9 +542,8 @@ func (s *SecretService) PromptAndWait(ctx context.Context, prompt dbus.ObjectPat
 	if prompt == NullPrompt {
 		return nil, nil
 	}
-	call := s.Obj(prompt).Call("org.freedesktop.Secret.Prompt.Prompt", NilFlags, "Keyring Prompt")
-	if call.Err != nil {
-		return nil, fmt.Errorf("failed to prompt: %w", call.Err)
+	if err := call(ctx, s.Obj(prompt), "failed to prompt", "org.freedesktop.Secret.Prompt.Prompt", []any{"Keyring Prompt"}); err != nil {
+		return nil, err
 	}
 	// created once, outside the loop, so unrelated signals cannot reset it
 	timeout := time.After(promptTimeout)
@@ -593,32 +582,26 @@ func (s *SecretService) PromptAndWait(ctx context.Context, prompt dbus.ObjectPat
 // Secret argument (D-Bus signature (oayays)) and returns no values, so there is
 // no prompt path: the item's collection must be unlocked first (use [Unlock]),
 // otherwise the call fails.
-func (s *SecretService) SetItemSecret(item dbus.ObjectPath, secret Secret) error {
-	if err := s.Obj(item).Call("org.freedesktop.Secret.Item.SetSecret", NilFlags, secret).Store(); err != nil {
-		return fmt.Errorf("failed to set item secret: %w", err)
-	}
-	return nil
+func (s *SecretService) SetItemSecret(ctx context.Context, item dbus.ObjectPath, secret Secret) error {
+	return call(ctx, s.Obj(item), "failed to set item secret", "org.freedesktop.Secret.Item.SetSecret", []any{secret})
 }
 
 // SetItemAttributes replaces an existing item's lookup attributes in place by
 // setting the read-write org.freedesktop.Secret.Item.Attributes property
 // (type a{ss}) through org.freedesktop.DBus.Properties.Set. The collection must
 // be unlocked.
-func (s *SecretService) SetItemAttributes(item dbus.ObjectPath, attributes Attributes) error {
-	if err := s.Obj(item).SetProperty("org.freedesktop.Secret.Item.Attributes", dbus.MakeVariant(map[string]string(attributes))); err != nil {
-		return fmt.Errorf("failed to set item attributes: %w", err)
-	}
-	return nil
+func (s *SecretService) SetItemAttributes(ctx context.Context, item dbus.ObjectPath, attributes Attributes) error {
+	value := dbus.MakeVariant(map[string]string(attributes))
+	return call(ctx, s.Obj(item), "failed to set item attributes", propertiesSetMethod,
+		[]any{secretItemInterfaceName, itemAttributesProperty, value})
 }
 
 // SetItemLabel replaces an existing item's displayable label in place by setting
 // the read-write org.freedesktop.Secret.Item.Label property (type s) through
 // org.freedesktop.DBus.Properties.Set. The collection must be unlocked.
-func (s *SecretService) SetItemLabel(item dbus.ObjectPath, label string) error {
-	if err := s.Obj(item).SetProperty("org.freedesktop.Secret.Item.Label", dbus.MakeVariant(label)); err != nil {
-		return fmt.Errorf("failed to set item label: %w", err)
-	}
-	return nil
+func (s *SecretService) SetItemLabel(ctx context.Context, item dbus.ObjectPath, label string) error {
+	return call(ctx, s.Obj(item), "failed to set item label", propertiesSetMethod,
+		[]any{secretItemInterfaceName, itemLabelProperty, dbus.MakeVariant(label)})
 }
 
 // NewSecretProperties
