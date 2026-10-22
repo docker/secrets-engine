@@ -59,7 +59,7 @@ type secretService interface {
 	ReadAlias(ctx context.Context, alias string) (dbus.ObjectPath, error)
 	IsLocked(ctx context.Context, collection dbus.ObjectPath) (bool, error)
 	OpenSession(ctx context.Context, mode kc.AuthenticationMode) (*kc.Session, error)
-	CloseSession(ctx context.Context, session *kc.Session)
+	CloseSession(session *kc.Session)
 	Unlock(ctx context.Context, items []dbus.ObjectPath) error
 	SearchCollection(ctx context.Context, collection dbus.ObjectPath, attributes kc.Attributes) ([]dbus.ObjectPath, error)
 	CreateItem(ctx context.Context, collection dbus.ObjectPath, properties map[string]dbus.Variant, secret kc.Secret, replaceBehavior kc.ReplaceBehavior) (dbus.ObjectPath, error)
@@ -382,7 +382,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	if err != nil {
 		return err
 	}
-	defer service.CloseSession(ctx, session)
+	defer service.CloseSession(session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -425,7 +425,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(ctx, session)
+	defer service.CloseSession(session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -491,7 +491,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(ctx, session)
+	defer service.CloseSession(session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -565,7 +565,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	if err != nil {
 		return err
 	}
-	defer service.CloseSession(ctx, session)
+	defer service.CloseSession(session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -686,7 +686,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(ctx, session)
+	defer service.CloseSession(session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err

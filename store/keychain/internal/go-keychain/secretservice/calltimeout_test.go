@@ -98,11 +98,6 @@ func (b *blockedCall) Lock([]dbus.ObjectPath) *dbus.Error {
 	return nil
 }
 
-func (b *blockedCall) Close() *dbus.Error {
-	b.block()
-	return nil
-}
-
 func (b *blockedCall) Prompt(string) *dbus.Error {
 	b.block()
 	return nil
@@ -282,13 +277,6 @@ func TestItemCallsCallerDeadline(t *testing.T) {
 			call: func(ctx context.Context, svc *SecretService) error {
 				_, err := svc.PromptAndWait(ctx, promptPath)
 				return err
-			},
-		},
-		{
-			name: "CloseSession", path: sessionPath, iface: "org.freedesktop.Secret.Session",
-			call: func(ctx context.Context, svc *SecretService) error {
-				svc.CloseSession(ctx, &Session{Path: sessionPath})
-				return ctx.Err()
 			},
 		},
 	} {

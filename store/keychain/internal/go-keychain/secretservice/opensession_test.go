@@ -227,7 +227,7 @@ func TestOpenSessionNegotiatesDHAES(t *testing.T) {
 	require.Equal(t, receiveSessionValue(t, request.aesKey), opened.session.AESKey)
 
 	request.closeReply <- struct{}{}
-	svc.CloseSession(t.Context(), opened.session)
+	svc.CloseSession(opened.session)
 	receiveSessionValue(t, request.closed)
 	require.NoError(t, svc.Close())
 	receiveSessionValue(t, svc.conn.Context().Done())

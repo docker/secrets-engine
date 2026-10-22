@@ -27,7 +27,7 @@ func testKeyring(t *testing.T, mode AuthenticationMode) {
 	require.NoError(t, err)
 	session, err := srv.OpenSession(t.Context(), mode)
 	require.NoError(t, err)
-	defer srv.CloseSession(t.Context(), session)
+	defer srv.CloseSession(session)
 
 	collection := DefaultCollection
 
@@ -64,7 +64,7 @@ func TestGetAll(t *testing.T) {
 	require.NoError(t, err)
 	session, err := srv.OpenSession(t.Context(), AuthenticationDHAES)
 	require.NoError(t, err)
-	defer srv.CloseSession(t.Context(), session)
+	defer srv.CloseSession(session)
 
 	collection := DefaultCollection
 

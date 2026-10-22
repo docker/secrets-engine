@@ -379,8 +379,8 @@ func (s *SecretService) OpenSession(ctx context.Context, mode AuthenticationMode
 }
 
 // CloseSession
-func (s *SecretService) CloseSession(ctx context.Context, session *Session) {
-	_ = call(ctx, s.Obj(session.Path), "failed to close session", "org.freedesktop.Secret.Session.Close", nil)
+func (s *SecretService) CloseSession(session *Session) {
+	_ = call(context.Background(), s.Obj(session.Path), "failed to close session", "org.freedesktop.Secret.Session.Close", nil)
 }
 
 // SearchCollection

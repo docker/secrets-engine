@@ -126,7 +126,7 @@ func (f *fakeService) OpenSession(context.Context, kc.AuthenticationMode) (*kc.S
 	// lets the Save path run end-to-end against the fake.
 	return &kc.Session{Mode: kc.AuthenticationInsecurePlain}, nil
 }
-func (f *fakeService) CloseSession(context.Context, *kc.Session) {}
+func (f *fakeService) CloseSession(*kc.Session) {}
 func (f *fakeService) Unlock(_ context.Context, items []dbus.ObjectPath) error {
 	f.unlockCalls++
 	f.lastUnlockPaths = items
@@ -674,7 +674,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 
 	session, err := svc.OpenSession(context.Background(), kc.AuthenticationDHAES)
 	require.NoError(t, err)
-	defer svc.CloseSession(context.Background(), session)
+	defer svc.CloseSession(session)
 
 	collection, err := getDefaultCollection(context.Background(), svc)
 	require.NoError(t, err)
