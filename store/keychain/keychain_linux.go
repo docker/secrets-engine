@@ -59,16 +59,16 @@ type secretService interface {
 	ReadAlias(ctx context.Context, alias string) (dbus.ObjectPath, error)
 	IsLocked(ctx context.Context, collection dbus.ObjectPath) (bool, error)
 	OpenSession(ctx context.Context, mode kc.AuthenticationMode) (*kc.Session, error)
-	CloseSession(session *kc.Session)
+	CloseSession(ctx context.Context, session *kc.Session)
 	Unlock(ctx context.Context, items []dbus.ObjectPath) error
-	SearchCollection(collection dbus.ObjectPath, attributes kc.Attributes) ([]dbus.ObjectPath, error)
+	SearchCollection(ctx context.Context, collection dbus.ObjectPath, attributes kc.Attributes) ([]dbus.ObjectPath, error)
 	CreateItem(ctx context.Context, collection dbus.ObjectPath, properties map[string]dbus.Variant, secret kc.Secret, replaceBehavior kc.ReplaceBehavior) (dbus.ObjectPath, error)
 	DeleteItem(ctx context.Context, item dbus.ObjectPath) error
-	GetAttributes(item dbus.ObjectPath) (kc.Attributes, error)
-	GetSecret(item dbus.ObjectPath, session kc.Session) ([]byte, error)
-	SetItemSecret(item dbus.ObjectPath, secret kc.Secret) error
-	SetItemAttributes(item dbus.ObjectPath, attributes kc.Attributes) error
-	SetItemLabel(item dbus.ObjectPath, label string) error
+	GetAttributes(ctx context.Context, item dbus.ObjectPath) (kc.Attributes, error)
+	GetSecret(ctx context.Context, item dbus.ObjectPath, session kc.Session) ([]byte, error)
+	SetItemSecret(ctx context.Context, item dbus.ObjectPath, secret kc.Secret) error
+	SetItemAttributes(ctx context.Context, item dbus.ObjectPath, attributes kc.Attributes) error
+	SetItemLabel(ctx context.Context, item dbus.ObjectPath, label string) error
 	// Available reports whether the secret service backend is reachable,
 	// without activating it or prompting the user. It backs the eager
 	// availability check in New (see ensureAvailable).
@@ -382,7 +382,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	if err != nil {
 		return err
 	}
-	defer service.CloseSession(session)
+	defer service.CloseSession(ctx, session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -392,7 +392,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
 	safelySetID(id, attributes)
 
-	items, err := service.SearchCollection(objectPath, attributes)
+	items, err := service.SearchCollection(ctx, objectPath, attributes)
 	if err != nil {
 		return err
 	}
@@ -425,7 +425,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(session)
+	defer service.CloseSession(ctx, session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -435,7 +435,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	safelySetMetadata(k.serviceGroup, k.serviceName, searchMetadata)
 	safelySetID(id, searchMetadata)
 
-	items, err := service.SearchCollection(objectPath, searchMetadata)
+	items, err := service.SearchCollection(ctx, objectPath, searchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
@@ -444,7 +444,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 		return nil, store.ErrCredentialNotFound
 	}
 
-	attributes, err := service.GetAttributes(items[0])
+	attributes, err := service.GetAttributes(ctx, items[0])
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +453,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	var value []byte
 	err = withRelockRetry(ctx, service, objectPath, func() error {
 		var getErr error
-		value, getErr = service.GetSecret(items[0], *session)
+		value, getErr = service.GetSecret(ctx, items[0], *session)
 		return getErr
 	}, items[0])
 	if err != nil {
@@ -491,7 +491,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(session)
+	defer service.CloseSession(ctx, session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -500,7 +500,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	searchMetadata := make(map[string]string)
 	safelySetMetadata(k.serviceGroup, k.serviceName, searchMetadata)
 
-	itemPaths, err := service.SearchCollection(objectPath, searchMetadata)
+	itemPaths, err := service.SearchCollection(ctx, objectPath, searchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
@@ -510,7 +510,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	// have no empty-as-error guard.
 	credentials := make(map[store.ID]store.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
-		attributes, err := service.GetAttributes(itemPath)
+		attributes, err := service.GetAttributes(ctx, itemPath)
 		if err != nil {
 			return nil, err
 		}
@@ -565,7 +565,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	if err != nil {
 		return err
 	}
-	defer service.CloseSession(session)
+	defer service.CloseSession(ctx, session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return err
@@ -592,7 +592,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	safelySetMetadata(k.serviceGroup, k.serviceName, ident)
 	safelySetID(id, ident)
 
-	items, err := service.SearchCollection(objectPath, ident)
+	items, err := service.SearchCollection(ctx, objectPath, ident)
 	if err != nil {
 		return err
 	}
@@ -613,12 +613,12 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	// best-effort (the secret is already stored) and must not flip the result.
 	primary := items[0]
 	if err := withRelockRetry(ctx, service, objectPath, func() error {
-		return service.SetItemSecret(primary, sessSecret)
+		return service.SetItemSecret(ctx, primary, sessSecret)
 	}, primary); err != nil {
 		return err
 	}
-	_ = service.SetItemAttributes(primary, attributes)
-	_ = service.SetItemLabel(primary, label)
+	_ = service.SetItemAttributes(ctx, primary, attributes)
+	_ = service.SetItemLabel(ctx, primary, label)
 	for _, dup := range items[1:] {
 		// Best-effort, but still relock-aware: a collection that relocks
 		// mid-collapse would otherwise leave the duplicates the whole feature
@@ -649,7 +649,7 @@ func (k *keychainStore[T]) loadSecret(
 	var value []byte
 	err := withRelockRetry(ctx, svc, collectionPath, func() error {
 		var getErr error
-		value, getErr = svc.GetSecret(itemPath, *session)
+		value, getErr = svc.GetSecret(ctx, itemPath, *session)
 		return getErr
 	}, itemPath)
 	if err != nil {
@@ -686,7 +686,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	if err != nil {
 		return nil, err
 	}
-	defer service.CloseSession(session)
+	defer service.CloseSession(ctx, session)
 
 	if err := ensureCollectionUnlocked(ctx, service, objectPath); err != nil {
 		return nil, err
@@ -698,14 +698,14 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 	// only concrete types are used
 	safelySetMetadata(k.serviceGroup, k.serviceName, attributes)
 
-	itemPaths, err := service.SearchCollection(objectPath, attributes)
+	itemPaths, err := service.SearchCollection(ctx, objectPath, attributes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
 
 	credentials := make(map[store.ID]store.Secret)
 	for _, itemPath := range itemPaths {
-		attributes, err := service.GetAttributes(itemPath)
+		attributes, err := service.GetAttributes(ctx, itemPath)
 		if err != nil {
 			return nil, err
 		}

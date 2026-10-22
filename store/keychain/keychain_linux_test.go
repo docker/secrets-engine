@@ -126,14 +126,14 @@ func (f *fakeService) OpenSession(context.Context, kc.AuthenticationMode) (*kc.S
 	// lets the Save path run end-to-end against the fake.
 	return &kc.Session{Mode: kc.AuthenticationInsecurePlain}, nil
 }
-func (f *fakeService) CloseSession(*kc.Session) {}
+func (f *fakeService) CloseSession(context.Context, *kc.Session) {}
 func (f *fakeService) Unlock(_ context.Context, items []dbus.ObjectPath) error {
 	f.unlockCalls++
 	f.lastUnlockPaths = items
 	return f.unlockErr
 }
 
-func (f *fakeService) SearchCollection(dbus.ObjectPath, kc.Attributes) ([]dbus.ObjectPath, error) {
+func (f *fakeService) SearchCollection(context.Context, dbus.ObjectPath, kc.Attributes) ([]dbus.ObjectPath, error) {
 	return f.items, nil
 }
 
@@ -154,11 +154,11 @@ func (f *fakeService) DeleteItem(_ context.Context, item dbus.ObjectPath) error 
 	return nil
 }
 
-func (f *fakeService) GetAttributes(dbus.ObjectPath) (kc.Attributes, error) {
+func (f *fakeService) GetAttributes(context.Context, dbus.ObjectPath) (kc.Attributes, error) {
 	return f.attributes, nil
 }
 
-func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) {
+func (f *fakeService) GetSecret(context.Context, dbus.ObjectPath, kc.Session) ([]byte, error) {
 	f.getSecretCalls++
 	if f.getSecretCalls <= f.getSecretLockedErrs {
 		return nil, lockedErr("get secret")
@@ -168,7 +168,7 @@ func (f *fakeService) GetSecret(dbus.ObjectPath, kc.Session) ([]byte, error) {
 	return []byte("bob:bob-password"), nil
 }
 
-func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
+func (f *fakeService) SetItemSecret(_ context.Context, item dbus.ObjectPath, _ kc.Secret) error {
 	f.setSecretCalls++
 	if f.setSecretCalls <= f.setSecretLockedErrs {
 		return lockedErr("set item secret")
@@ -176,8 +176,15 @@ func (f *fakeService) SetItemSecret(item dbus.ObjectPath, _ kc.Secret) error {
 	f.setSecretItems = append(f.setSecretItems, item)
 	return nil
 }
-func (f *fakeService) SetItemAttributes(dbus.ObjectPath, kc.Attributes) error { return nil }
-func (f *fakeService) SetItemLabel(dbus.ObjectPath, string) error             { return nil }
+
+func (f *fakeService) SetItemAttributes(context.Context, dbus.ObjectPath, kc.Attributes) error {
+	return nil
+}
+
+func (f *fakeService) SetItemLabel(context.Context, dbus.ObjectPath, string) error {
+	return nil
+}
+
 func (f *fakeService) Available(ctx context.Context) error {
 	f.availableCalls++
 	f.availableCtxDeadline, f.availableCtxHasDeadline = ctx.Deadline()
@@ -626,7 +633,7 @@ func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.Obje
 	safelySetMetadata(serviceGroup, serviceName, attrs)
 	safelySetID(id, attrs)
 
-	return svc.SearchCollection(collection, attrs)
+	return svc.SearchCollection(context.Background(), collection, attrs)
 }
 
 // findRealItems is the test-goroutine wrapper around [searchRealItems] that fails
@@ -667,7 +674,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 
 	session, err := svc.OpenSession(context.Background(), kc.AuthenticationDHAES)
 	require.NoError(t, err)
-	defer svc.CloseSession(session)
+	defer svc.CloseSession(context.Background(), session)
 
 	collection, err := getDefaultCollection(context.Background(), svc)
 	require.NoError(t, err)
@@ -722,7 +729,7 @@ func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID)
 	attrs := map[string]string{}
 	safelySetMetadata(serviceGroup, serviceName, attrs)
 	safelySetID(id, attrs)
-	items, err := svc.SearchCollection(collection, attrs)
+	items, err := svc.SearchCollection(context.Background(), collection, attrs)
 	require.NoError(t, err)
 	for _, item := range items {
 		require.NoError(t, withRelockRetry(context.Background(), svc, collection, func() error {

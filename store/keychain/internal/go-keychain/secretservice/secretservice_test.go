@@ -27,11 +27,11 @@ func testKeyring(t *testing.T, mode AuthenticationMode) {
 	require.NoError(t, err)
 	session, err := srv.OpenSession(t.Context(), mode)
 	require.NoError(t, err)
-	defer srv.CloseSession(session)
+	defer srv.CloseSession(t.Context(), session)
 
 	collection := DefaultCollection
 
-	items, err := srv.SearchCollection(collection, map[string]string{"foo": "bar"})
+	items, err := srv.SearchCollection(t.Context(), collection, map[string]string{"foo": "bar"})
 	require.NoError(t, err)
 	require.Equal(t, len(items), 0)
 
@@ -44,11 +44,11 @@ func testKeyring(t *testing.T, mode AuthenticationMode) {
 	_, err = srv.CreateItem(t.Context(), collection, NewSecretProperties("testlabel", map[string]string{"foo": "bar"}), secret, ReplaceBehaviorReplace)
 	require.NoError(t, err)
 
-	items, err = srv.SearchCollection(collection, map[string]string{"foo": "bar"})
+	items, err = srv.SearchCollection(t.Context(), collection, map[string]string{"foo": "bar"})
 	require.NoError(t, err)
 	require.Equal(t, len(items), 1)
 	gotItem := items[0]
-	secretPlaintext, err := srv.GetSecret(gotItem, *session)
+	secretPlaintext, err := srv.GetSecret(t.Context(), gotItem, *session)
 	require.NoError(t, err)
 	require.Equal(t, secretPlaintext, []byte("secret"))
 
@@ -64,7 +64,7 @@ func TestGetAll(t *testing.T) {
 	require.NoError(t, err)
 	session, err := srv.OpenSession(t.Context(), AuthenticationDHAES)
 	require.NoError(t, err)
-	defer srv.CloseSession(session)
+	defer srv.CloseSession(t.Context(), session)
 
 	collection := DefaultCollection
 
@@ -77,7 +77,7 @@ func TestGetAll(t *testing.T) {
 	item, err := srv.CreateItem(t.Context(), collection, NewSecretProperties("testlabel", map[string]string{"username": "testuser"}), secret, ReplaceBehaviorReplace)
 	require.NoError(t, err)
 
-	attrs, err := srv.GetAttributes(item)
+	attrs, err := srv.GetAttributes(t.Context(), item)
 	require.NoError(t, err)
 	require.Equal(t, attrs["username"], "testuser")
 
