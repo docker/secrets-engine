@@ -52,9 +52,8 @@ type PromptCompletedResult struct {
 
 // SecretService
 type SecretService struct {
-	conn               *dbus.Conn
-	signalCh           <-chan *dbus.Signal
-	sessionOpenTimeout time.Duration
+	conn     *dbus.Conn
+	signalCh <-chan *dbus.Signal
 }
 
 // Session
@@ -66,8 +65,17 @@ type Session struct {
 	AESKey  []byte
 }
 
-// DefaultSessionOpenTimeout
-const DefaultSessionOpenTimeout = 10 * time.Second
+// defaultCallTimeout is used when the caller's context has no deadline set.
+const defaultCallTimeout = 10 * time.Second
+
+// callContext accepts a context with a deadline, if the context has no
+// deadline, the default [defaultCallTimeout] is set instead.
+func callContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, defaultCallTimeout)
+}
 
 // ErrNoSessionBus is returned by [NewService] when no D-Bus session bus can be
 // reached: either DBUS_SESSION_BUS_ADDRESS names a unix socket that does not
@@ -119,7 +127,7 @@ func NewService(ctx context.Context) (*SecretService, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("failed to subscribe to prompt completion signals: %w", err)
 	}
-	return &SecretService{conn: conn, signalCh: signalCh, sessionOpenTimeout: DefaultSessionOpenTimeout}, nil
+	return &SecretService{conn: conn, signalCh: signalCh}, nil
 }
 
 // sessionBusMissingSocket reports whether DBUS_SESSION_BUS_ADDRESS names one or
@@ -237,11 +245,6 @@ func (s *SecretService) Available(ctx context.Context) error {
 	return nil
 }
 
-// SetSessionOpenTimeout
-func (s *SecretService) SetSessionOpenTimeout(d time.Duration) {
-	s.sessionOpenTimeout = d
-}
-
 // ServiceObj
 func (s *SecretService) ServiceObj() dbus.BusObject {
 	return s.conn.Object(SecretServiceInterface, SecretServiceObjectPath)
@@ -256,15 +259,31 @@ func (s *SecretService) Obj(path dbus.ObjectPath) dbus.BusObject {
 //
 // https://specifications.freedesktop.org/secret-service-spec/latest/index.html
 const (
-	collectionsProperty  = "org.freedesktop.Secret.Service.Collections"
-	readAliasMethod      = "org.freedesktop.Secret.Service.ReadAlias"
-	collectionLockedProp = "org.freedesktop.Secret.Collection.Locked"
+	secretServiceInterfaceName    = "org.freedesktop.Secret.Service"
+	secretCollectionInterfaceName = "org.freedesktop.Secret.Collection"
+	collectionsProperty           = "Collections"
+	collectionLockedProp          = "Locked"
+	readAliasMethod               = "org.freedesktop.Secret.Service.ReadAlias"
+	propertiesGetMethod           = "org.freedesktop.DBus.Properties.Get"
 )
 
+func (s *SecretService) getProperty(ctx context.Context, obj dbus.BusObject, interfaceName, property string) (dbus.Variant, error) {
+	callCtx, cancel := callContext(ctx)
+	defer cancel()
+	var variant dbus.Variant
+	if err := obj.CallWithContext(callCtx, propertiesGetMethod, NilFlags, interfaceName, property).Store(&variant); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+			return dbus.Variant{}, fmt.Errorf("failed to get property %s.%s: timed out after %s: %w", interfaceName, property, defaultCallTimeout, err)
+		}
+		return dbus.Variant{}, fmt.Errorf("failed to get property %s.%s: %w", interfaceName, property, err)
+	}
+	return variant, nil
+}
+
 // Collections returns the object paths of every collection known to the secret
-// service.
-func (s *SecretService) Collections() ([]dbus.ObjectPath, error) {
-	variant, err := s.ServiceObj().GetProperty(collectionsProperty)
+// service. ctx bounds the round-trip (see [callContext]).
+func (s *SecretService) Collections(ctx context.Context) ([]dbus.ObjectPath, error) {
+	variant, err := s.getProperty(ctx, s.ServiceObj(), secretServiceInterfaceName, collectionsProperty)
 	if err != nil {
 		return nil, err
 	}
@@ -278,17 +297,22 @@ func (s *SecretService) Collections() ([]dbus.ObjectPath, error) {
 // ReadAlias resolves an alias (e.g. "default") to the collection object path it
 // points at. The secret service returns the null path "/" when the alias is not
 // assigned to any collection.
-func (s *SecretService) ReadAlias(alias string) (dbus.ObjectPath, error) {
+func (s *SecretService) ReadAlias(ctx context.Context, alias string) (dbus.ObjectPath, error) {
+	callCtx, cancel := callContext(ctx)
+	defer cancel()
 	var path dbus.ObjectPath
-	if err := s.ServiceObj().Call(readAliasMethod, NilFlags, alias).Store(&path); err != nil {
-		return "", err
+	if err := s.ServiceObj().CallWithContext(callCtx, readAliasMethod, NilFlags, alias).Store(&path); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+			return "", fmt.Errorf("failed to read alias %q: timed out after %s: %w", alias, defaultCallTimeout, err)
+		}
+		return "", fmt.Errorf("failed to read alias %q: %w", alias, err)
 	}
 	return path, nil
 }
 
 // IsLocked reports whether the given collection is currently locked.
-func (s *SecretService) IsLocked(collection dbus.ObjectPath) (bool, error) {
-	variant, err := s.Obj(collection).GetProperty(collectionLockedProp)
+func (s *SecretService) IsLocked(ctx context.Context, collection dbus.ObjectPath) (bool, error) {
+	variant, err := s.getProperty(ctx, s.Obj(collection), secretCollectionInterfaceName, collectionLockedProp)
 	if err != nil {
 		return false, err
 	}
@@ -318,14 +342,14 @@ func (s *SecretService) OpenSession(ctx context.Context, mode AuthenticationMode
 		return nil, fmt.Errorf("unknown authentication mode %v", mode)
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, s.sessionOpenTimeout)
+	callCtx, cancel := callContext(ctx)
 	defer cancel()
 	var sessionAlgorithmOutput dbus.Variant
 	if err := s.ServiceObj().
 		CallWithContext(callCtx, "org.freedesktop.Secret.Service.OpenSession", NilFlags, mode, sessionAlgorithmInput).
 		Store(&sessionAlgorithmOutput, &session.Path); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
-			return nil, fmt.Errorf("failed to open secretservice session: timed out after %s: %w", s.sessionOpenTimeout, err)
+			return nil, fmt.Errorf("failed to open secretservice session: timed out after %s: %w", defaultCallTimeout, err)
 		}
 		return nil, fmt.Errorf("failed to open secretservice session: %w", err)
 	}

@@ -107,13 +107,19 @@ func lockedErr(op string) error {
 	return fmt.Errorf("failed to %s: %w", op, dbus.Error{Name: secretServiceIsLockedError})
 }
 
-func (f *fakeService) Collections() ([]dbus.ObjectPath, error) {
+func (f *fakeService) Collections(context.Context) ([]dbus.ObjectPath, error) {
 	f.calls = append(f.calls, "Collections")
 	return []dbus.ObjectPath{loginKeychainObjectPath}, nil
 }
 
-func (f *fakeService) ReadAlias(string) (dbus.ObjectPath, error) { return loginKeychainObjectPath, nil }
-func (f *fakeService) IsLocked(dbus.ObjectPath) (bool, error)    { return f.locked, nil }
+func (f *fakeService) ReadAlias(context.Context, string) (dbus.ObjectPath, error) {
+	return loginKeychainObjectPath, nil
+}
+
+func (f *fakeService) IsLocked(context.Context, dbus.ObjectPath) (bool, error) {
+	return f.locked, nil
+}
+
 func (f *fakeService) OpenSession(context.Context, kc.AuthenticationMode) (*kc.Session, error) {
 	f.calls = append(f.calls, "OpenSession")
 	// plain mode so Session.NewSecret works without a negotiated AES key, which
@@ -587,7 +593,7 @@ func ensureUnlocked(t *testing.T, svc *kc.SecretService, collection dbus.ObjectP
 	t.Helper()
 	require.NoError(t, svc.Unlock(context.Background(), []dbus.ObjectPath{collection}))
 	require.Eventually(t, func() bool {
-		locked, err := svc.IsLocked(collection)
+		locked, err := svc.IsLocked(context.Background(), collection)
 		return err == nil && !locked
 	}, 5*time.Second, 100*time.Millisecond, "collection did not unlock")
 }
@@ -611,7 +617,7 @@ func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.Obje
 	}
 	defer func() { _ = svc.Close() }()
 
-	collection, err := getDefaultCollection(svc)
+	collection, err := getDefaultCollection(context.Background(), svc)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +669,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 	require.NoError(t, err)
 	defer svc.CloseSession(session)
 
-	collection, err := getDefaultCollection(svc)
+	collection, err := getDefaultCollection(context.Background(), svc)
 	require.NoError(t, err)
 
 	// Talking to the daemon directly skips the unlock the store does internally,
@@ -709,7 +715,7 @@ func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID)
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
-	collection, err := getDefaultCollection(svc)
+	collection, err := getDefaultCollection(context.Background(), svc)
 	require.NoError(t, err)
 	ensureUnlocked(t, svc, collection)
 
@@ -802,10 +808,10 @@ func TestKeychainLiveLockedCollection(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = svc.Close() }()
 
-	collection, err := getDefaultCollection(svc)
+	collection, err := getDefaultCollection(context.Background(), svc)
 	require.NoError(t, err)
 	require.NoError(t, svc.LockItems(context.Background(), []dbus.ObjectPath{collection}))
-	locked, err := svc.IsLocked(collection)
+	locked, err := svc.IsLocked(context.Background(), collection)
 	require.NoError(t, err)
 	require.True(t, locked, "collection must be locked; is the keyring password-protected?")
 
