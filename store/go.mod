@@ -13,7 +13,6 @@ require (
 	github.com/danieljoos/wincred v1.2.3
 	github.com/docker/secrets-engine/x v0.8.5
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.52.0
