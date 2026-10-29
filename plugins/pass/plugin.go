@@ -17,6 +17,8 @@ package pass
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/docker/secrets-engine/plugin"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
@@ -57,6 +59,11 @@ func (m *passPlugin) GetSecrets(ctx context.Context, pattern plugin.Pattern) ([]
 		}
 		result = append(result, *s)
 	}
+
+	// Filter ranges a map. Sort so the first match does not change between calls.
+	slices.SortFunc(result, func(a, b plugin.Envelope) int {
+		return strings.Compare(a.ID.String(), b.ID.String())
+	})
 
 	if len(result) == 0 {
 		return nil, plugin.ErrNotFound

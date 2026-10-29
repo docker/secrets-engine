@@ -56,6 +56,20 @@ func Test_passPlugin(t *testing.T) {
 		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, errFilter)
 	})
+	t.Run("wildcard matches stay in id order", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
+			store.MustParseID("app/prod/pw"): pass.NewPassValue([]byte("prod")),
+			store.MustParseID("app/dev/pw"):  pass.NewPassValue([]byte("dev")),
+		}))
+		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
+		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("app/*/pw"))
+		require.NoError(t, err)
+		require.Len(t, e, 2)
+		assert.Equal(t, "app/dev/pw", e[0].ID.String())
+		assert.Equal(t, "dev", string(e[0].Value))
+		assert.Equal(t, "app/prod/pw", e[1].ID.String())
+		assert.Equal(t, "prod", string(e[1].Value))
+	})
 	t.Run("unwrap error", func(*testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
 			store.MustParseID("foo"): &MockMyOtherValue{Value: 7},
