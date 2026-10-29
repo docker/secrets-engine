@@ -100,14 +100,9 @@ The `keychain` assumes that any secret stored would conform to the `store.Secret
 interface. This allows the `keychain` to store secrets of any type and leaves
 it up to the implementer to decide how they would like their secret parsed.
 
-## Example CLI
+## Example
 
-The `keychain` package also contains an example CLI tool to test out how a real
-application might interact with the host keychain.
-
-You can build the CLI by running `go build` inside the `store/` root directory.
-
-```console
-$ go build -o keychain-cli ./keychain/cmd/
-$ ./keychain-cli
-```
+For a real application built on the `keychain` store, see the
+[`docker pass` commands](https://github.com/docker/secrets-engine/tree/main/plugins/pass/commands).
+The [pass plugin README](https://github.com/docker/secrets-engine/tree/main/plugins/pass)
+explains how to use the CLI and how it wires the commands to the keychain.
