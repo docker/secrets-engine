@@ -26,9 +26,6 @@ github.com/cenkalti/backoff/v5
 # github.com/charmbracelet/x/term v0.2.2
 ## explicit; go 1.24.0
 github.com/charmbracelet/x/term
-# github.com/containerd/nri v0.11.0
-## explicit; go 1.24.0
-github.com/containerd/nri/pkg/net
 # github.com/danieljoos/wincred v1.2.3
 ## explicit; go 1.18
 github.com/danieljoos/wincred
