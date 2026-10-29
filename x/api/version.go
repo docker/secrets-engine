@@ -17,8 +17,6 @@ package api
 import (
 	"errors"
 	"fmt"
-
-	"golang.org/x/mod/semver"
 )
 
 var (
@@ -63,7 +61,7 @@ func MustNewVersion(s string) Version {
 // The result will be 0 if a == b, -1 if a < b, or +1 if a > b.
 // An invalid semver string is considered less than a valid one.
 func Compare(a, b Version) int {
-	return semver.Compare(a.String(), b.String())
+	return compareSemver(a.String(), b.String())
 }
 
 func valid(s string) error {
@@ -73,7 +71,7 @@ func valid(s string) error {
 	if s == "" {
 		return ErrEmptyVersion
 	}
-	if !semver.IsValid(s) {
+	if _, ok := parseSemver(s); !ok {
 		return fmt.Errorf("invalid version: %s", s)
 	}
 	return nil
