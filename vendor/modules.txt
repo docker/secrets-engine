@@ -71,9 +71,6 @@ github.com/joho/godotenv
 github.com/pmezard/go-difflib/difflib
 # github.com/rogpeppe/go-internal v1.14.1
 ## explicit; go 1.23
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
-github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.10.1
 ## explicit; go 1.15
 github.com/spf13/cobra
