@@ -15,14 +15,13 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
 	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
-
-	"golang.org/x/crypto/hkdf"
 )
 
 type dhGroup struct {
@@ -78,15 +77,7 @@ func (group *dhGroup) keygenHKDFSHA256AES128(theirPublic, myPrivate *big.Int) ([
 	sharedSecretBytes := group.encode(sharedSecret)
 	defer clear(sharedSecretBytes)
 
-	r := hkdf.New(sha256.New, sharedSecretBytes, nil, nil)
-
-	aesKey := make([]byte, 16)
-	_, err = io.ReadFull(r, aesKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return aesKey, nil
+	return hkdf.Key(sha256.New, sharedSecretBytes, nil, "", 16)
 }
 
 func unauthenticatedAESCBCEncrypt(unpaddedPlaintext, key []byte) (iv, ciphertext []byte, err error) {

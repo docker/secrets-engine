@@ -2,13 +2,12 @@ package secretservice
 
 import (
 	"bytes"
+	"crypto/hkdf"
 	"crypto/sha256"
-	"io"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/hkdf"
 )
 
 func TestNewKeypair(t *testing.T) {
@@ -141,9 +140,7 @@ func TestKeygenPadsSharedSecretWithLeadingZero(t *testing.T) {
 // keygenHKDFSHA256AES128 does, so tests can assert against the expected input.
 func hkdfAESKey(t *testing.T, ikm []byte) []byte {
 	t.Helper()
-	r := hkdf.New(sha256.New, ikm, nil, nil)
-	key := make([]byte, 16)
-	_, err := io.ReadFull(r, key)
+	key, err := hkdf.Key(sha256.New, ikm, nil, "", 16)
 	require.NoError(t, err)
 	return key
 }
