@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	nriNet "github.com/containerd/nri/pkg/net"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -213,14 +212,7 @@ func Test_restoreConfig(t *testing.T) {
 		{
 			name: "valid config",
 			test: func(t *testing.T) {
-				sockets, err := nriNet.NewSocketPair()
-				require.NoError(t, err)
-				t.Cleanup(func() { sockets.Close() })
-				conn, err := sockets.LocalConn()
-				require.NoError(t, err)
-				t.Cleanup(func() { conn.Close() })
-				peerFile := sockets.PeerFile()
-				t.Cleanup(func() { peerFile.Close() })
+				conn, peerFile := newSocketPair(t)
 				engineCfg := ipc.PluginConfigFromEngine{
 					Name:                "test-plugin",
 					RegistrationTimeout: 10 * api.DefaultPluginRegistrationTimeout,
