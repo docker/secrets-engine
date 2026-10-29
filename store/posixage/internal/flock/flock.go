@@ -88,18 +88,6 @@ var heartbeatInterval = 10 * time.Second
 // so the file descriptor is never touched after it has been closed.
 type UnlockFunc func() error
 
-// openFile is a helper function for internal use by [tryLock]
-func openFile(root *os.Root) (*os.File, error) {
-	// we need to open in readwrite mode so that the file modtime gets updated
-	// with os.Truncate when we actually acquire a lock.
-	fl, err := root.OpenFile(lockFileName, os.O_RDWR|os.O_CREATE, 0o600)
-	if err != nil {
-		return nil, err
-	}
-
-	return fl, nil
-}
-
 // acquireOnce performs a single lock acquisition attempt and verifies the
 // resulting lock is on the file currently at the lock-file path.
 //

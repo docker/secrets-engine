@@ -36,8 +36,9 @@ var staleThreshold = 30 * time.Second
 // lock-file path.
 //
 // A lock is considered stale if its modification time is at least
-// [staleThreshold] old. On Unix the stale lock file is unlinked; on
-// Windows this typically fails while another process has the file open.
+// [staleThreshold] old. The stale lock file is unlinked; on Windows the
+// lock file is opened with FILE_SHARE_DELETE so this succeeds even while
+// the stuck holder still has it open.
 //
 // The function tolerates concurrent removers: if the file disappears
 // between the modtime check and the unlink, nil is returned. Callers
