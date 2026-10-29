@@ -25,10 +25,9 @@ import (
 
 	"github.com/danieljoos/wincred"
 	"golang.org/x/sys/windows"
-	"golang.org/x/text/encoding/unicode"
-	"golang.org/x/text/transform"
 
 	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/store/keychain/internal/utf16le"
 )
 
 var (
@@ -65,22 +64,13 @@ func encodeSecret(secret store.Secret) ([]byte, error) {
 		return nil, store.ErrEmptySecret
 	}
 
-	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
-	blob, _, err := transform.Bytes(encoder, data)
-	if err != nil {
-		return nil, err
-	}
-	return blob, nil
+	return utf16le.Encode(data), nil
 }
 
 // decodeSecret unmarshals the secret from UTF16 format to UTF8
 // secret will contain the unmarshaled value.
 func decodeSecret(blob []byte, secret store.Secret) error {
-	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-	val, _, err := transform.Bytes(decoder, blob)
-	if err != nil {
-		return err
-	}
+	val := utf16le.Decode(blob)
 	defer clear(val)
 
 	return secret.Unmarshal(val)
@@ -432,11 +422,7 @@ func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, gc *winc
 		return nil, err
 	}
 
-	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
-	blob, _, err := transform.Bytes(decoder, rawBlob)
-	if err != nil {
-		return nil, err
-	}
+	blob := utf16le.Decode(rawBlob)
 	defer clear(blob)
 
 	return secret, secret.Unmarshal(blob)
