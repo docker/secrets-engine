@@ -19,10 +19,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 const xSecretPrefix = "x-secret"
+
+var logger = logging.NewDefaultLogger("")
 
 func parseXSecretLabel(key, value string) (string, string, error) {
 	if !strings.HasPrefix(key, xSecretPrefix+":") {
@@ -43,7 +45,7 @@ func SecretMapFromLabels(labels map[string]string) map[string]string {
 		}
 		name, path, err := parseXSecretLabel(k, v)
 		if err != nil {
-			logrus.Warnf("parsing x-secret label: %v", err)
+			logger.Warnf("parsing x-secret label: %v", err)
 			continue
 		}
 		result[name] = path
