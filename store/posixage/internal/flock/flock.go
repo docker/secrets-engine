@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
-
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -256,13 +254,9 @@ func heartbeat(ctx context.Context, fl *os.File, root *os.Root, logger logging.L
 // fd, so a [errStaleInode] result simply causes the next attempt to start
 // over against whatever file is currently at the path.
 func retryLock(ctx context.Context, root *os.Root, exclusive bool) (*os.File, error) {
-	ep := backoff.NewExponentialBackOff()
-	ep.InitialInterval = time.Millisecond * 10
-	ep.MaxInterval = time.Millisecond * 100
-
-	fl, err := backoff.Retry(ctx, func() (*os.File, error) {
+	fl, err := retry(ctx, newBackoff(), func() (*os.File, error) {
 		return acquireOnce(root, exclusive)
-	}, backoff.WithBackOff(ep), backoff.WithMaxElapsedTime(0))
+	})
 	if err != nil {
 		return nil, errors.Join(ErrLockUnsuccessful, err)
 	}

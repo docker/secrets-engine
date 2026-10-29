@@ -20,9 +20,6 @@ filippo.io/hpke
 filippo.io/hpke/crypto
 filippo.io/hpke/crypto/ecdh
 filippo.io/hpke/internal/byteorder
-# github.com/cenkalti/backoff/v5 v5.0.3
-## explicit; go 1.23
-github.com/cenkalti/backoff/v5
 # github.com/charmbracelet/x/term v0.2.2
 ## explicit; go 1.24.0
 github.com/charmbracelet/x/term
