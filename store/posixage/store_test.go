@@ -305,6 +305,37 @@ func TestPOSIXAge(t *testing.T) {
 		assert.EqualValues(t, results[secretOne], storeSecrets[secretOne])
 	})
 
+	t.Run("filter on an empty store returns an empty map", func(t *testing.T) {
+		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+
+		storeSecrets, err := s.Filter(t.Context(), secrets.MustParsePattern("**"))
+		require.NoError(t, err)
+		assert.NotNil(t, storeSecrets)
+		assert.Empty(t, storeSecrets)
+	})
+
+	t.Run("filter with no matching secret returns an empty map", func(t *testing.T) {
+		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+		require.NoError(t, s.Save(t.Context(), secrets.MustParseID("something/secret1/bob"), &mocks.MockCredential{
+			Username: testhelper.RandomString(),
+			Password: testhelper.RandomString(),
+		}))
+
+		storeSecrets, err := s.Filter(t.Context(), secrets.MustParsePattern("something/secret1/alice"))
+		require.NoError(t, err)
+		assert.NotNil(t, storeSecrets)
+		assert.Empty(t, storeSecrets)
+	})
+
+	t.Run("get all metadata on an empty store returns an empty map", func(t *testing.T) {
+		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+
+		storeSecrets, err := s.GetAllMetadata(t.Context())
+		require.NoError(t, err)
+		assert.NotNil(t, storeSecrets)
+		assert.Empty(t, storeSecrets)
+	})
+
 	t.Run("can use multiple keys to encrypt and decrypt", func(t *testing.T) {
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)

@@ -240,9 +240,6 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern secrets.Pattern) (map
 		return nil, err
 	}
 
-	if len(results) == 0 {
-		return nil, secrets.ErrNotFound
-	}
 	return results, nil
 }
 
@@ -323,9 +320,6 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[secrets.ID]secre
 		return nil, err
 	}
 
-	if len(results) == 0 {
-		return nil, secrets.ErrNotFound
-	}
 	return results, nil
 }
 
