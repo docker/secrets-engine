@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 	"github.com/docker/secrets-engine/store/mocks"
 	"github.com/docker/secrets-engine/x/testhelper"
@@ -38,7 +38,7 @@ func TestMacosKeychain(t *testing.T) {
 	keychainStore := keychainStore[*mocks.MockCredential]{
 		serviceGroup: serviceGroup,
 		serviceName:  serviceName,
-		factory: func(_ context.Context, _ store.ID) *mocks.MockCredential {
+		factory: func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	}
@@ -50,11 +50,11 @@ func TestMacosKeychain(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		for _, id := range ids {
-			assert.NoError(t, keychainStore.Delete(t.Context(), store.MustParseID(id)))
+			assert.NoError(t, keychainStore.Delete(t.Context(), secrets.MustParseID(id)))
 		}
 	})
 	for _, id := range ids {
-		assert.NoError(t, keychainStore.Save(t.Context(), store.MustParseID(id), &mocks.MockCredential{
+		assert.NoError(t, keychainStore.Save(t.Context(), secrets.MustParseID(id), &mocks.MockCredential{
 			Username: testhelper.RandomString(),
 			Password: testhelper.RandomString(),
 			Attributes: map[string]string{
@@ -65,7 +65,7 @@ func TestMacosKeychain(t *testing.T) {
 	}
 
 	t.Run("can store secret that has no attribute", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 
 		secret := &mocks.MockCredential{
 			Username: testhelper.RandomString(),
@@ -81,7 +81,7 @@ func TestMacosKeychain(t *testing.T) {
 	})
 
 	t.Run("can store large attributes", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
 		})
@@ -103,7 +103,7 @@ func TestMacosKeychain(t *testing.T) {
 	})
 
 	t.Run("filter populates both metadata and secret", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
@@ -117,19 +117,19 @@ func TestMacosKeychain(t *testing.T) {
 		}
 
 		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
-		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern(id.String()))
+		results, err := keychainStore.Filter(t.Context(), secrets.MustParsePattern(id.String()))
 		require.NoError(t, err)
-		assert.Len(t, secrets, 1)
-		assert.Subset(t, secrets[id].Metadata(), map[string]string{
+		assert.Len(t, results, 1)
+		assert.Subset(t, results[id].Metadata(), map[string]string{
 			"game": "elden ring",
 		})
-		assert.IsType(t, &mocks.MockCredential{}, secrets[id], "secret from store must be of type *mocks.MockCredential")
-		mockSecret := secrets[id].(*mocks.MockCredential)
+		assert.IsType(t, &mocks.MockCredential{}, results[id], "secret from store must be of type *mocks.MockCredential")
+		mockSecret := results[id].(*mocks.MockCredential)
 		assert.Equal(t, secret.Password, mockSecret.Password)
 	})
 
 	t.Run("can use pattern only matching service name", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
@@ -143,10 +143,10 @@ func TestMacosKeychain(t *testing.T) {
 			},
 		}
 		require.NoError(t, keychainStore.Save(t.Context(), id, secret))
-		secrets, err := keychainStore.Filter(t.Context(), store.MustParsePattern("*/"+serviceName+"/*"))
+		results, err := keychainStore.Filter(t.Context(), secrets.MustParsePattern("*/"+serviceName+"/*"))
 		require.NoError(t, err)
-		assert.Len(t, secrets, 4)
-		_, ok := secrets[id]
+		assert.Len(t, results, 4)
+		_, ok := results[id]
 		assert.Truef(t, ok, "returned secret must match original id")
 	})
 }
@@ -159,13 +159,13 @@ func TestUpsert(t *testing.T) {
 	ks := keychainStore[*mocks.MockCredential]{
 		serviceGroup: serviceGroup,
 		serviceName:  serviceName,
-		factory: func(_ context.Context, _ store.ID) *mocks.MockCredential {
+		factory: func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	}
 
 	t.Run("inserts when credential does not exist", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -185,7 +185,7 @@ func TestUpsert(t *testing.T) {
 	})
 
 	t.Run("overwrites an existing credential", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -211,7 +211,7 @@ func TestUpsert(t *testing.T) {
 	})
 
 	t.Run("updates an existing credential in place", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -257,11 +257,11 @@ func TestUpsert(t *testing.T) {
 		bs := keychainStore[*bufferSecret]{
 			serviceGroup: serviceGroup,
 			serviceName:  serviceName,
-			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+			factory: func(_ context.Context, _ secrets.ID) *bufferSecret {
 				return &bufferSecret{}
 			},
 		}
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
@@ -277,18 +277,18 @@ func TestUpsert(t *testing.T) {
 		bs := keychainStore[*bufferSecret]{
 			serviceGroup: serviceGroup,
 			serviceName:  serviceName,
-			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+			factory: func(_ context.Context, _ secrets.ID) *bufferSecret {
 				return &bufferSecret{}
 			},
 		}
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
 
 		require.NoError(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte("review-old-value")}))
-		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{}), store.ErrEmptySecret)
-		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte{}}), store.ErrEmptySecret)
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{}), secrets.ErrEmptySecret)
+		require.ErrorIs(t, bs.Upsert(t.Context(), id, &bufferSecret{value: []byte{}}), secrets.ErrEmptySecret)
 
 		got, err := bs.Get(t.Context(), id)
 		require.NoError(t, err)
@@ -299,24 +299,24 @@ func TestUpsert(t *testing.T) {
 		bs := keychainStore[*bufferSecret]{
 			serviceGroup: serviceGroup,
 			serviceName:  serviceName,
-			factory: func(_ context.Context, _ store.ID) *bufferSecret {
+			factory: func(_ context.Context, _ secrets.ID) *bufferSecret {
 				return &bufferSecret{}
 			},
 		}
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
 
-		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{}), store.ErrEmptySecret)
-		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte{}}), store.ErrEmptySecret)
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{}), secrets.ErrEmptySecret)
+		require.ErrorIs(t, bs.Save(t.Context(), id, &bufferSecret{value: []byte{}}), secrets.ErrEmptySecret)
 
 		_, err := bs.Get(t.Context(), id)
-		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+		require.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 
 	t.Run("save returns duplicate item error when credential already exists", func(t *testing.T) {
-		id := store.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})

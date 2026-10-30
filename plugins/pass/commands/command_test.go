@@ -30,7 +30,7 @@ import (
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/store"
+
 	"github.com/docker/secrets-engine/store/keychain"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/testhelper"
@@ -96,13 +96,13 @@ func Test_SetCommand(t *testing.T) {
 	t.Run("rejects an empty inline value", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errors.New("save should not be called for an empty value")))
 		out, err := execute(t, mustSetCommand(t), mock, "foo=")
-		assert.ErrorIs(t, err, store.ErrEmptySecret)
-		assert.Equal(t, "Error: "+store.ErrEmptySecret.Error()+"\n", out)
+		assert.ErrorIs(t, err, secrets.ErrEmptySecret)
+		assert.Equal(t, "Error: "+secrets.ErrEmptySecret.Error()+"\n", out)
 	})
 	t.Run("rejects empty STDIN", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStoreSaveErr(errors.New("save should not be called for an empty value")))
 		_, err := executeWithStdin(t, mustSetCommand(t), mock, "", "foo")
-		assert.ErrorIs(t, err, store.ErrEmptySecret)
+		assert.ErrorIs(t, err, secrets.ErrEmptySecret)
 	})
 	t.Run("store error", func(t *testing.T) {
 		errSave := errors.New("save error")
@@ -120,8 +120,8 @@ func Test_SetCommand(t *testing.T) {
 		assert.Equal(t, "Error: "+errInvalidID.Error()+"\n", out)
 	})
 	t.Run("existing secret hints --force", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 		}))
 		out, err := execute(t, mustSetCommand(t), mock, "foo=new")
 		assert.ErrorIs(t, err, keychain.ErrDuplicateItem)
@@ -140,8 +140,8 @@ func Test_SetCommand(t *testing.T) {
 		// Make Save return an error so the test fails if --force does not
 		// route the call through Upsert.
 		mock := teststore.NewMockStore(
-			teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+			teststore.WithStore(map[secrets.ID]secrets.Secret{
+				secrets.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 			}),
 			teststore.WithStoreSaveErr(errors.New("save should not be called when --force is set")),
 		)
@@ -153,8 +153,8 @@ func Test_SetCommand(t *testing.T) {
 	})
 	t.Run("--force fails when the engine denies", func(t *testing.T) {
 		engine := &mockEngine{}
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 		}))
 		out, err := execute(t, mustSetCommand(t, engineOpts(t, engine)...), mock, "foo=new", "--force")
 		assert.ErrorIs(t, err, client.ErrAccessDenied)
@@ -163,8 +163,8 @@ func Test_SetCommand(t *testing.T) {
 		assertStoredValue(t, mock, "old")
 	})
 	t.Run("--force fails when the engine is unreachable", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 		}))
 		socket := deadSocket(t)
 		cmd := mustSetCommand(t, WithTimeout(time.Second), WithSocketPath(socket))
@@ -182,12 +182,12 @@ func Test_SetCommand(t *testing.T) {
 		assert.NotErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 	})
 	t.Run("--force rejects an empty value before asking the engine", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("old")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("old")),
 		}))
 		cmd := mustSetCommand(t, WithTimeout(time.Second), WithSocketPath(deadSocket(t)))
 		_, err := execute(t, cmd, mock, "foo=", "--force")
-		assert.ErrorIs(t, err, store.ErrEmptySecret)
+		assert.ErrorIs(t, err, secrets.ErrEmptySecret)
 		assert.NotErrorIs(t, err, client.ErrSecretsEngineNotRunning)
 		assertStoredValue(t, mock, "old")
 	})
@@ -209,9 +209,9 @@ func Test_SetCommand(t *testing.T) {
 func Test_ListCommand(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
-			store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+			secrets.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 		}))
 		out, err := execute(t, ListCommand(), mock)
 		assert.NoError(t, err)
@@ -228,13 +228,13 @@ func Test_ListCommand(t *testing.T) {
 
 func Test_RmCommand(t *testing.T) {
 	t.Parallel()
-	twoSecrets := func() store.Store {
-		return teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
-			store.MustParseID("baz"): pass.NewPassValue([]byte("0")),
+	twoSecrets := func() secrets.Store {
+		return teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+			secrets.MustParseID("baz"): pass.NewPassValue([]byte("0")),
 		}))
 	}
-	remaining := func(t *testing.T, kc store.Store) int {
+	remaining := func(t *testing.T, kc secrets.Store) int {
 		t.Helper()
 		l, err := kc.GetAllMetadata(t.Context())
 		require.NoError(t, err)
@@ -272,7 +272,7 @@ func Test_RmCommand(t *testing.T) {
 		mock := twoSecrets()
 		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "foo", "missing")
 		assert.ErrorIs(t, err, client.ErrAccessDenied)
-		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.Equal(t, "ERR: missing: secret not found\nError: missing: secret not found\nauthorizing: access denied\n", out)
 		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
 		assert.Equal(t, 2, remaining(t, mock))
@@ -290,8 +290,8 @@ func Test_RmCommand(t *testing.T) {
 	t.Run("store error", func(t *testing.T) {
 		errRemove := errors.New("remove error")
 		mock := teststore.NewMockStore(
-			teststore.WithStore(map[store.ID]store.Secret{
-				store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+			teststore.WithStore(map[secrets.ID]secrets.Secret{
+				secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 			}),
 			teststore.WithStoreDeleteErr(errRemove),
 		)
@@ -302,16 +302,16 @@ func Test_RmCommand(t *testing.T) {
 	t.Run("missing secret errors without asking the engine", func(t *testing.T) {
 		mock := teststore.NewMockStore()
 		out, err := execute(t, mustRmCommand(t, WithSocketPath(deadSocket(t))), mock, "foo")
-		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.Equal(t, "ERR: foo: secret not found\nError: foo: secret not found\n", out)
 	})
 	t.Run("missing secret among existing ones", func(t *testing.T) {
 		engine := &mockEngine{allow: true}
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
 		out, err := execute(t, mustRmCommand(t, engineOpts(t, engine)...), mock, "foo", "baz")
-		assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
 		assert.Equal(t, "ERR: baz: secret not found\nRM: foo\nError: baz: secret not found\n", out)
 		assert.Equal(t, []string{"authorize foo"}, engine.recorded())
 		assert.Equal(t, 0, remaining(t, mock))
@@ -357,9 +357,9 @@ func Test_RmCommand(t *testing.T) {
 
 func Test_GetCommand(t *testing.T) {
 	t.Parallel()
-	fooStore := func() store.Store {
-		return teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+	fooStore := func() secrets.Store {
+		return teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
 	}
 	t.Run("ok", func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestWithEngineHint(t *testing.T) {
 		},
 		{
 			name: "joined with other errors",
-			err:  errors.Join(store.ErrCredentialNotFound, connErr(client.ReasonTimeout, "/s.sock")),
+			err:  errors.Join(secrets.ErrNotFound, connErr(client.ReasonTimeout, "/s.sock")),
 			hint: `The secrets engine on "/s.sock" did not respond. Restart it and retry.`,
 		},
 	}
@@ -495,17 +495,17 @@ func engineOpts(t *testing.T, engine *mockEngine) []ClientOption {
 	return []ClientOption{WithTimeout(time.Second), WithSocketPath(engine.serve(t))}
 }
 
-func execute(t *testing.T, cmd *cobra.Command, mock store.Store, args ...string) (string, error) {
+func execute(t *testing.T, cmd *cobra.Command, mock secrets.Store, args ...string) (string, error) {
 	t.Helper()
 	return runCobra(t, cmd, mock, nil, args)
 }
 
-func executeWithStdin(t *testing.T, cmd *cobra.Command, mock store.Store, stdin string, args ...string) (string, error) {
+func executeWithStdin(t *testing.T, cmd *cobra.Command, mock secrets.Store, stdin string, args ...string) (string, error) {
 	t.Helper()
 	return runCobra(t, cmd, mock, bytes.NewBufferString(stdin), args)
 }
 
-func runCobra(t *testing.T, cmd *cobra.Command, mock store.Store, stdin *bytes.Buffer, args []string) (string, error) {
+func runCobra(t *testing.T, cmd *cobra.Command, mock secrets.Store, stdin *bytes.Buffer, args []string) (string, error) {
 	t.Helper()
 	cmd.SilenceUsage = true
 	ctx := t.Context()
@@ -524,7 +524,7 @@ func runCobra(t *testing.T, cmd *cobra.Command, mock store.Store, stdin *bytes.B
 	return buf.String(), err
 }
 
-func assertStoredValue(t *testing.T, kc store.Store, want string) {
+func assertStoredValue(t *testing.T, kc secrets.Store, want string) {
 	t.Helper()
 	s, err := kc.Get(t.Context(), secrets.MustParseID("foo"))
 	require.NoError(t, err)
@@ -535,7 +535,7 @@ func assertStoredValue(t *testing.T, kc store.Store, want string) {
 	assert.Equal(t, want, string(got))
 }
 
-func assertStoredMetadata(t *testing.T, kc store.Store, want map[string]string) {
+func assertStoredMetadata(t *testing.T, kc secrets.Store, want map[string]string) {
 	t.Helper()
 	s, err := kc.Get(t.Context(), secrets.MustParseID("foo"))
 	require.NoError(t, err)

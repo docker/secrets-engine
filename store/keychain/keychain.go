@@ -21,10 +21,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
-var _ store.Store = &keychainStore[store.Secret]{}
+var _ secrets.Store = &keychainStore[secrets.Secret]{}
 
 // ErrNoDefaultCollection is returned when the secret service has no usable
 // default collection, typically on headless hosts with an uninitialized
@@ -113,7 +113,7 @@ func WithUseDataProtectionKeychain() DarwinOptions {
 // caller-supplied deadline always takes precedence. On macOS/Windows the probe
 // is a no-op and ctx is unused. New does not retain ctx: it governs construction
 // only, not later store operations.
-func New[T store.Secret](ctx context.Context, serviceGroup, serviceName string, factory store.Factory[T], opts ...Option) (store.Store, error) {
+func New[T secrets.Secret](ctx context.Context, serviceGroup, serviceName string, factory secrets.Factory[T], opts ...Option) (secrets.Store, error) {
 	if serviceGroup == "" || serviceName == "" {
 		return nil, errors.New("serviceGroup and serviceName are required")
 	}
@@ -194,7 +194,7 @@ func safelyCleanMetadata(attributes map[string]string) {
 }
 
 // safelySetID stores the id inside the attributes
-func safelySetID(id store.ID, attributes map[string]string) {
+func safelySetID(id secrets.ID, attributes map[string]string) {
 	// first check if the "id" key already exists, it's possibly set by the
 	// caller, so we should avoid overwriting it.
 	if v, ok := attributes[secretIDKey]; ok {

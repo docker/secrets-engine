@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain/secretservice"
 	"github.com/docker/secrets-engine/store/mocks"
 )
@@ -226,30 +226,30 @@ func stubRelockSleep(t *testing.T) {
 
 // TestKeychainGetNotFound exercises the full Get path against the fake — open,
 // resolve collection, search — and asserts an empty search maps to
-// ErrCredentialNotFound, all without a live keyring.
+// ErrNotFound, all without a live keyring.
 func TestKeychainGetNotFound(t *testing.T) {
 	fake := &fakeService{} // no items -> not found
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	_, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/missing"))
-	assert.ErrorIs(t, err, store.ErrCredentialNotFound)
+	_, err := ks.Get(t.Context(), secrets.MustParseID("com.test.test/test/missing"))
+	assert.ErrorIs(t, err, secrets.ErrNotFound)
 }
 
 // TestKeychainGetAllMetadataEmpty is a regression test for `docker pass ls`
 // against an empty keychain: listing all is a valid empty result, not a miss,
 // so GetAllMetadata must return an empty (non-nil) map with a nil error rather
-// than ErrCredentialNotFound. This keeps the Linux backend consistent with
+// than ErrNotFound. This keeps the Linux backend consistent with
 // macOS and Windows, where `ls` on an empty store exits 0.
 func TestKeychainGetAllMetadataEmpty(t *testing.T) {
 	fake := &fakeService{} // no items -> empty collection
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	secrets, err := ks.GetAllMetadata(t.Context())
+	results, err := ks.GetAllMetadata(t.Context())
 	require.NoError(t, err)
-	assert.NotNil(t, secrets)
-	assert.Empty(t, secrets)
+	assert.NotNil(t, results)
+	assert.Empty(t, results)
 }
 
 // TestKeychainClosesEveryConnection is a deterministic regression test for the
@@ -258,11 +258,11 @@ func TestKeychainGetAllMetadataEmpty(t *testing.T) {
 // the contract directly — every opened connection is closed — instead of
 // counting host file descriptors.
 func TestKeychainClosesEveryConnection(t *testing.T) {
-	fake := &fakeService{} // no items -> Get returns ErrCredentialNotFound
+	fake := &fakeService{} // no items -> Get returns ErrNotFound
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	missing := store.MustParseID("com.test.test/test/missing")
+	missing := secrets.MustParseID("com.test.test/test/missing")
 
 	// New eagerly probes the backend in ensureAvailable, which dials and closes
 	// one connection through the same seam. Assert it dialed exactly one and
@@ -277,7 +277,7 @@ func TestKeychainClosesEveryConnection(t *testing.T) {
 	const iterations = 30
 	for range iterations {
 		_, err := ks.Get(t.Context(), missing)
-		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+		require.ErrorIs(t, err, secrets.ErrNotFound)
 	}
 
 	opened, closed := fake.opened.Load(), fake.closed.Load()
@@ -292,7 +292,7 @@ func TestKeychainSaveCreatesWhenAbsent(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	id := store.MustParseID("com.test.test/test/new-user")
+	id := secrets.MustParseID("com.test.test/test/new-user")
 	creds := &mocks.MockCredential{Username: "alice", Password: "alice-password"}
 
 	require.NoError(t, ks.Save(t.Context(), id, creds))
@@ -308,10 +308,10 @@ func TestKeychainSaveRejectsEmptySecret(t *testing.T) {
 
 	ks := setupKeychain(t, nil)
 	fake.opened.Store(0)
-	id := store.MustParseID("com.test.test/test/empty")
+	id := secrets.MustParseID("com.test.test/test/empty")
 
-	require.ErrorIs(t, ks.Save(t.Context(), id, &emptySecret{}), store.ErrEmptySecret)
-	require.ErrorIs(t, ks.Upsert(t.Context(), id, &emptySecret{value: []byte{}}), store.ErrEmptySecret)
+	require.ErrorIs(t, ks.Save(t.Context(), id, &emptySecret{}), secrets.ErrEmptySecret)
+	require.ErrorIs(t, ks.Upsert(t.Context(), id, &emptySecret{value: []byte{}}), secrets.ErrEmptySecret)
 
 	assert.Zero(t, fake.opened.Load(), "must not connect to the secret service")
 	assert.Zero(t, fake.createCalls)
@@ -329,7 +329,7 @@ func TestKeychainSaveCollapsesDuplicatesInPlace(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	id := store.MustParseID("com.test.test/test/bob")
+	id := secrets.MustParseID("com.test.test/test/bob")
 	creds := &mocks.MockCredential{Username: "bob", Password: "bob-password"}
 
 	require.NoError(t, ks.Save(t.Context(), id, creds))
@@ -352,7 +352,7 @@ func TestKeychainSaveRetriesWhenCreateRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	require.NoError(t, ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+	require.NoError(t, ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 		&mocks.MockCredential{Username: "bob", Password: "bob-password"}))
 
 	assert.Equal(t, 3, fake.createCalls, "two locked failures then one success")
@@ -368,7 +368,7 @@ func TestKeychainSaveRetriesWhenSetSecretRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	require.NoError(t, ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+	require.NoError(t, ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 		&mocks.MockCredential{Username: "bob", Password: "bob-password"}))
 
 	assert.Equal(t, []dbus.ObjectPath{"/item/a"}, fake.setSecretItems,
@@ -390,7 +390,7 @@ func TestKeychainSaveCollapseRetriesWhenDeleteRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	require.NoError(t, ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+	require.NoError(t, ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 		&mocks.MockCredential{Username: "bob", Password: "bob-password"}))
 
 	assert.Equal(t, []dbus.ObjectPath{"/item/b"}, fake.deletedItems,
@@ -411,7 +411,7 @@ func TestKeychainSaveStopsRetryingAfterMaxRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	err := ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+	err := ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 		&mocks.MockCredential{Username: "bob", Password: "bob-password"})
 	require.Error(t, err)
 	assert.True(t, isLockedDBusError(err), "the persistent locked error must reach the caller")
@@ -421,14 +421,14 @@ func TestKeychainSaveStopsRetryingAfterMaxRelocks(t *testing.T) {
 }
 
 func TestKeychainReadsCollectionsBeforeOpeningSession(t *testing.T) {
-	id := store.MustParseID("com.test.test/test/bob")
+	id := secrets.MustParseID("com.test.test/test/bob")
 	creds := &mocks.MockCredential{Username: "bob", Password: "bob-password"}
-	ops := map[string]func(store.Store){
-		"get":              func(ks store.Store) { _, _ = ks.Get(t.Context(), id) },
-		"save":             func(ks store.Store) { _ = ks.Save(t.Context(), id, creds) },
-		"delete":           func(ks store.Store) { _ = ks.Delete(t.Context(), id) },
-		"get all metadata": func(ks store.Store) { _, _ = ks.GetAllMetadata(t.Context()) },
-		"filter":           func(ks store.Store) { _, _ = ks.Filter(t.Context(), store.MustParsePattern("**")) },
+	ops := map[string]func(secrets.Store){
+		"get":              func(ks secrets.Store) { _, _ = ks.Get(t.Context(), id) },
+		"save":             func(ks secrets.Store) { _ = ks.Save(t.Context(), id, creds) },
+		"delete":           func(ks secrets.Store) { _ = ks.Delete(t.Context(), id) },
+		"get all metadata": func(ks secrets.Store) { _, _ = ks.GetAllMetadata(t.Context()) },
+		"filter":           func(ks secrets.Store) { _, _ = ks.Filter(t.Context(), secrets.MustParsePattern("**")) },
 	}
 	for name, op := range ops {
 		t.Run(name, func(t *testing.T) {
@@ -442,24 +442,24 @@ func TestKeychainReadsCollectionsBeforeOpeningSession(t *testing.T) {
 }
 
 func TestKeychainLockedCollectionSurfacesErrCollectionLocked(t *testing.T) {
-	ops := map[string]func(store.Store) error{
-		"get": func(ks store.Store) error {
-			_, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/bob"))
+	ops := map[string]func(secrets.Store) error{
+		"get": func(ks secrets.Store) error {
+			_, err := ks.Get(t.Context(), secrets.MustParseID("com.test.test/test/bob"))
 			return err
 		},
-		"save": func(ks store.Store) error {
-			return ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+		"save": func(ks secrets.Store) error {
+			return ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 				&mocks.MockCredential{Username: "bob", Password: "bob-password"})
 		},
-		"delete": func(ks store.Store) error {
-			return ks.Delete(t.Context(), store.MustParseID("com.test.test/test/bob"))
+		"delete": func(ks secrets.Store) error {
+			return ks.Delete(t.Context(), secrets.MustParseID("com.test.test/test/bob"))
 		},
-		"get all metadata": func(ks store.Store) error {
+		"get all metadata": func(ks secrets.Store) error {
 			_, err := ks.GetAllMetadata(t.Context())
 			return err
 		},
-		"filter": func(ks store.Store) error {
-			_, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+		"filter": func(ks secrets.Store) error {
+			_, err := ks.Filter(t.Context(), secrets.MustParsePattern("**"))
 			return err
 		},
 	}
@@ -489,7 +489,7 @@ func TestKeychainLockedCollectionUnlocksAndProceeds(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	secret, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/bob"))
+	secret, err := ks.Get(t.Context(), secrets.MustParseID("com.test.test/test/bob"))
 	require.NoError(t, err)
 	require.NotNil(t, secret)
 	assert.Equal(t, 1, fake.unlockCalls, "the locked collection must be unlocked before the read")
@@ -503,7 +503,7 @@ func TestKeychainRelockRetryUnlockFailureWrapsErrCollectionLocked(t *testing.T) 
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	err := ks.Save(t.Context(), store.MustParseID("com.test.test/test/bob"),
+	err := ks.Save(t.Context(), secrets.MustParseID("com.test.test/test/bob"),
 		&mocks.MockCredential{Username: "bob", Password: "bob-password"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrCollectionLocked)
@@ -521,7 +521,7 @@ func TestKeychainGetRetriesWhenCollectionRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	secret, err := ks.Get(t.Context(), store.MustParseID("com.test.test/test/bob"))
+	secret, err := ks.Get(t.Context(), secrets.MustParseID("com.test.test/test/bob"))
 	require.NoError(t, err)
 	require.NotNil(t, secret)
 
@@ -547,7 +547,7 @@ func TestKeychainFilterRetriesWhenCollectionRelocks(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	creds, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+	creds, err := ks.Filter(t.Context(), secrets.MustParsePattern("**"))
 	require.NoError(t, err)
 	require.Len(t, creds, 1)
 
@@ -560,7 +560,7 @@ func TestKeychainFilterEmpty(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	creds, err := ks.Filter(t.Context(), store.MustParsePattern("**"))
+	creds, err := ks.Filter(t.Context(), secrets.MustParsePattern("**"))
 	require.NoError(t, err)
 	assert.NotNil(t, creds)
 	assert.Empty(t, creds)
@@ -574,7 +574,7 @@ func TestKeychainFilterNoMatch(t *testing.T) {
 	withFakeService(t, fake)
 
 	ks := setupKeychain(t, nil)
-	creds, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/alice"))
+	creds, err := ks.Filter(t.Context(), secrets.MustParsePattern("com.test.test/test/alice"))
 	require.NoError(t, err)
 	assert.NotNil(t, creds)
 	assert.Empty(t, creds)
@@ -617,7 +617,7 @@ func ensureUnlocked(t *testing.T, svc *kc.SecretService, collection dbus.ObjectP
 // It returns its error rather than failing the test so it is safe to call from a
 // [require.Eventually] condition, which runs on a separate goroutine where the
 // require.* helpers must not be used.
-func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.ObjectPath, error) {
+func searchRealItems(serviceGroup, serviceName string, id secrets.ID) ([]dbus.ObjectPath, error) {
 	svc, err := kc.NewService(context.Background())
 	if err != nil {
 		return nil, err
@@ -638,7 +638,7 @@ func searchRealItems(serviceGroup, serviceName string, id store.ID) ([]dbus.Obje
 
 // findRealItems is the test-goroutine wrapper around [searchRealItems] that fails
 // the test on error.
-func findRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) []dbus.ObjectPath {
+func findRealItems(t *testing.T, serviceGroup, serviceName string, id secrets.ID) []dbus.ObjectPath {
 	t.Helper()
 	items, err := searchRealItems(serviceGroup, serviceName, id)
 	require.NoError(t, err)
@@ -650,7 +650,7 @@ func findRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) 
 // store deleting duplicates and an independent connection observing it; on
 // timeout EventuallyWithT reports the last observed count (and any search
 // error), so a genuine failure to converge is still caught and diagnosable.
-func requireItemCount(t *testing.T, serviceGroup, serviceName string, id store.ID, want int, msg string) {
+func requireItemCount(t *testing.T, serviceGroup, serviceName string, id secrets.ID, want int, msg string) {
 	t.Helper()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		items, err := searchRealItems(serviceGroup, serviceName, id)
@@ -663,7 +663,7 @@ func requireItemCount(t *testing.T, serviceGroup, serviceName string, id store.I
 // stable identity triple but carry a distinct volatile attribute each — exactly
 // how issue #446 accumulates duplicates: the daemon's replace match fails on the
 // differing volatile attributes, so every save mints a fresh item.
-func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store.ID, n int) {
+func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id secrets.ID, n int) {
 	t.Helper()
 	// context.Background(), not t.Context(): this direct-daemon helper also runs
 	// from t.Cleanup, where t.Context() is already cancelled, which would tear
@@ -713,7 +713,7 @@ func seedRealDuplicates(t *testing.T, serviceGroup, serviceName string, id store
 // the test cannot leak state. It unlocks the collection first (DeleteItem fails
 // on a locked collection) and deletes all matches, asserting success so a silent
 // cleanup failure surfaces as a leak rather than corrupting a later test.
-func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID) {
+func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id secrets.ID) {
 	t.Helper()
 	// context.Background(), not t.Context(): purgeRealItems runs from t.Cleanup,
 	// where t.Context() is already cancelled, which would tear the connection
@@ -743,14 +743,14 @@ func purgeRealItems(t *testing.T, serviceGroup, serviceName string, id store.ID)
 // identity, a single Save must update one item in place and delete the rest,
 // leaving exactly one item holding the latest secret.
 func TestKeychainCollapsesExistingDuplicates(t *testing.T) {
-	id := store.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/backlog")
+	id := secrets.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/backlog")
 	t.Cleanup(func() { purgeRealItems(t, dedupServiceGroup, dedupServiceName, id) })
 
 	// Pre-existing backlog: three duplicate items for one identity.
 	seedRealDuplicates(t, dedupServiceGroup, dedupServiceName, id, 3)
 	require.Len(t, findRealItems(t, dedupServiceGroup, dedupServiceName, id), 3, "precondition: three duplicates seeded")
 
-	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -774,10 +774,10 @@ func TestKeychainCollapsesExistingDuplicates(t *testing.T) {
 // metadata that changes on every save (mimicking volatile JWT claims) must keep
 // exactly one item, never minting duplicates.
 func TestKeychainSaveDoesNotAccumulate(t *testing.T) {
-	id := store.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/no-accumulate")
+	id := secrets.MustParseID(dedupServiceGroup + "/" + dedupServiceName + "/no-accumulate")
 	t.Cleanup(func() { purgeRealItems(t, dedupServiceGroup, dedupServiceName, id) })
 
-	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), dedupServiceGroup, dedupServiceName, func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -824,7 +824,7 @@ func TestKeychainLiveLockedCollection(t *testing.T) {
 
 	ks := setupKeychain(t, nil)
 	start := time.Now()
-	_, err = ks.Get(t.Context(), store.MustParseID("com.test.test/test/bob"))
+	_, err = ks.Get(t.Context(), secrets.MustParseID("com.test.test/test/bob"))
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
@@ -841,7 +841,7 @@ func TestNewProbeSucceeds(t *testing.T) {
 	fake := &fakeService{} // availableErr nil -> backend reachable
 	withFakeService(t, fake)
 
-	ks, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	ks, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -859,7 +859,7 @@ func TestNewProbeNoOwner(t *testing.T) {
 	fake := &fakeService{availableErr: kc.ErrNoSecretService}
 	withFakeService(t, fake)
 
-	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -877,7 +877,7 @@ func TestNewProbeNoSessionBus(t *testing.T) {
 	dialErr := errors.New("dbus: dial failed")
 	newService = func(context.Context) (secretService, error) { return nil, dialErr }
 
-	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -894,7 +894,7 @@ func TestNewProbeTransportError(t *testing.T) {
 	fake := &fakeService{availableErr: transportErr}
 	withFakeService(t, fake)
 
-	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -918,7 +918,7 @@ func TestNewProbeShape(t *testing.T) {
 	fake := &fakeService{}
 	withFakeService(t, fake)
 
-	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(t.Context(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -947,7 +947,7 @@ func TestNewProbeContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.Error(t, err)
@@ -965,7 +965,7 @@ func TestNewProbeAppliesDefaultTimeout(t *testing.T) {
 	withFakeService(t, fake)
 
 	before := time.Now()
-	_, err := New(context.Background(), "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(context.Background(), "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)
@@ -993,7 +993,7 @@ func TestNewProbeRespectsCallerDeadline(t *testing.T) {
 	ctx, cancel := context.WithDeadline(t.Context(), deadline)
 	defer cancel()
 
-	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ store.ID) store.Secret {
+	_, err := New(ctx, "com.test.test", "test", func(_ context.Context, _ secrets.ID) secrets.Secret {
 		return &mocks.MockCredential{}
 	})
 	require.NoError(t, err)

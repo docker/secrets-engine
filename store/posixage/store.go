@@ -36,20 +36,20 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/posixage/internal/flock"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
-type fileStore[T store.Secret] struct {
+type fileStore[T secrets.Secret] struct {
 	filesystem *os.Root
-	factory    store.Factory[T]
+	factory    secrets.Factory[T]
 	l          sync.RWMutex
 	*config
 }
 
-var _ store.Store = &fileStore[store.Secret]{}
+var _ secrets.Store = &fileStore[secrets.Secret]{}
 
 // tryLock is an internal convenience function for acquiring an exclusive
 // store lock.
@@ -168,7 +168,7 @@ func (f *fileStore[T]) tryDecrypt(keyType secretfile.KeyType, decryptionKey, enc
 	return io.ReadAll(r)
 }
 
-func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {
+func (f *fileStore[T]) Delete(ctx context.Context, id secrets.ID) error {
 	unlock, err := f.tryLock(ctx)
 	if err != nil {
 		return err
@@ -178,14 +178,14 @@ func (f *fileStore[T]) Delete(ctx context.Context, id store.ID) error {
 	return f.filesystem.RemoveAll(secretfile.IDToDirName(id))
 }
 
-func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (f *fileStore[T]) Filter(ctx context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer unlock()
 
-	secrets := map[store.ID]store.Secret{}
+	results := map[secrets.ID]secrets.Secret{}
 	err = fs.WalkDir(f.filesystem.FS(), ".", func(_ string, d fs.DirEntry, _ error) error {
 		// skip files, we are only interested in directories
 		if !d.IsDir() || d.Name() == "." {
@@ -230,7 +230,7 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 		if err := secret.Unmarshal(decryptedSecret); err != nil {
 			return err
 		}
-		secrets[id] = secret
+		results[id] = secret
 
 		// WalkDir should skip the files in the current directory.
 		// it should move on to the next directory.
@@ -240,13 +240,13 @@ func (f *fileStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[s
 		return nil, err
 	}
 
-	if len(secrets) == 0 {
-		return nil, store.ErrCredentialNotFound
+	if len(results) == 0 {
+		return nil, secrets.ErrNotFound
 	}
-	return secrets, nil
+	return results, nil
 }
 
-func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (f *fileStore[T]) Get(ctx context.Context, id secrets.ID) (secrets.Secret, error) {
 	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
@@ -274,14 +274,14 @@ func (f *fileStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, erro
 	return secret, nil
 }
 
-func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[secrets.ID]secrets.Secret, error) {
 	unlock, err := f.tryRLock(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer unlock()
 
-	secrets := map[store.ID]store.Secret{}
+	results := map[secrets.ID]secrets.Secret{}
 	err = fs.WalkDir(f.filesystem.FS(), ".", func(path string, d fs.DirEntry, _ error) error {
 		// skip files, we are only interested in directories
 		if !d.IsDir() || d.Name() == "." {
@@ -313,7 +313,7 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 		if err := secret.SetMetadata(metadata); err != nil {
 			return err
 		}
-		secrets[id] = secret
+		results[id] = secret
 
 		// WalkDir should skip the files in the current directory.
 		// it should move on to the next directory.
@@ -323,20 +323,20 @@ func (f *fileStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.S
 		return nil, err
 	}
 
-	if len(secrets) == 0 {
-		return nil, store.ErrCredentialNotFound
+	if len(results) == 0 {
+		return nil, secrets.ErrNotFound
 	}
-	return secrets, nil
+	return results, nil
 }
 
-func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) error {
+func (f *fileStore[T]) Save(ctx context.Context, id secrets.ID, s secrets.Secret) error {
 	secret, err := s.Marshal()
 	if err != nil {
 		return err
 	}
 	defer clear(secret)
 	if len(secret) == 0 {
-		return store.ErrEmptySecret
+		return secrets.ErrEmptySecret
 	}
 
 	unlock, err := f.tryLock(ctx)
@@ -355,7 +355,7 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 
 	metadata := s.Metadata()
 
-	var secrets []secretfile.EncryptedSecret
+	var encrypted []secretfile.EncryptedSecret
 	// Encryption keys must be grouped by type. The age library does not
 	// support mixing different key types in a single encryption operation
 	// (e.g., age + password). However, multiple keys of the same type are
@@ -381,16 +381,16 @@ func (f *fileStore[T]) Save(ctx context.Context, id store.ID, s store.Secret) er
 			return err
 		}
 
-		secrets = append(secrets, secretfile.EncryptedSecret{
+		encrypted = append(encrypted, secretfile.EncryptedSecret{
 			KeyType:       k,
 			EncryptedData: encryptedSecret.Bytes(),
 		})
 	}
 
-	return secretfile.Persist(id, f.filesystem, metadata, secrets)
+	return secretfile.Persist(id, f.filesystem, metadata, encrypted)
 }
 
-func (f *fileStore[T]) Upsert(ctx context.Context, id store.ID, s store.Secret) error {
+func (f *fileStore[T]) Upsert(ctx context.Context, id secrets.ID, s secrets.Secret) error {
 	return f.Save(ctx, id, s)
 }
 
@@ -508,13 +508,13 @@ func WithDecryptionCallbackFunc[K decryptionFuncs](callback K) Options {
 	}
 }
 
-// New returns a [store.Store] that manages encrypted files on disk.
+// New returns a [secrets.Store] that manages encrypted files on disk.
 //
 // Each secret is stored in its own directory, named with a base64-encoded
 // secret ID. The directory contains:
 //   - one encrypted secret file for each configured encryption key type
 //   - a metadata file, which is public and always formatted as valid JSON
-func New[T store.Secret](rootDir *os.Root, f store.Factory[T], opts ...Options) (store.Store, error) {
+func New[T secrets.Secret](rootDir *os.Root, f secrets.Factory[T], opts ...Options) (secrets.Store, error) {
 	store := &fileStore[T]{
 		filesystem: rootDir,
 		factory:    f,

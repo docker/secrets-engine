@@ -18,19 +18,19 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 var ErrNoStoreInContext = errors.New("docker-pass: store not attached to context")
 
 type storeCtxKey struct{}
 
-func WithStore(ctx context.Context, s store.Store) context.Context {
+func WithStore(ctx context.Context, s secrets.Store) context.Context {
 	return context.WithValue(ctx, storeCtxKey{}, s)
 }
 
-func StoreFrom(ctx context.Context) (store.Store, error) {
-	s, ok := ctx.Value(storeCtxKey{}).(store.Store)
+func StoreFrom(ctx context.Context) (secrets.Store, error) {
+	s, ok := ctx.Value(storeCtxKey{}).(secrets.Store)
 	if !ok {
 		return nil, ErrNoStoreInContext
 	}

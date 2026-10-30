@@ -19,21 +19,21 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type MockStore struct {
 	lock  sync.RWMutex
-	store map[store.ID]store.Secret
+	store map[secrets.ID]secrets.Secret
 }
 
 func (m *MockStore) init() {
 	if m.store == nil {
-		m.store = make(map[store.ID]store.Secret)
+		m.store = make(map[secrets.ID]secrets.Secret)
 	}
 }
 
-func (m *MockStore) Delete(_ context.Context, id store.ID) error {
+func (m *MockStore) Delete(_ context.Context, id secrets.ID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.init()
@@ -42,26 +42,26 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
+func (m *MockStore) Get(_ context.Context, id secrets.ID) (secrets.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
 
 	secret, exists := m.store[id]
 	if !exists {
-		return nil, store.ErrCredentialNotFound
+		return nil, secrets.ErrNotFound
 	}
 	return secret, nil
 }
 
-func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[secrets.ID]secrets.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	m.init()
 	return maps.Clone(m.store), nil
 }
 
-func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) error {
+func (m *MockStore) Save(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.init()
@@ -70,16 +70,16 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	return nil
 }
 
-func (m *MockStore) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+func (m *MockStore) Upsert(ctx context.Context, id secrets.ID, secret secrets.Secret) error {
 	return m.Save(ctx, id, secret)
 }
 
-func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (m *MockStore) Filter(_ context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.init()
 
-	filtered := make(map[store.ID]store.Secret)
+	filtered := make(map[secrets.ID]secrets.Secret)
 	for id, f := range m.store {
 		if pattern.Match(id) {
 			filtered[id] = f
@@ -88,4 +88,4 @@ func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.
 	return filtered, nil
 }
 
-var _ store.Store = &MockStore{}
+var _ secrets.Store = &MockStore{}

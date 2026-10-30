@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/mocks"
 )
 
@@ -42,7 +42,7 @@ type mustMarshalError struct {
 	attributes
 }
 
-var _ store.Secret = &mustMarshalError{}
+var _ secrets.Secret = &mustMarshalError{}
 
 func (m *mustMarshalError) Marshal() ([]byte, error) {
 	return nil, errors.New("i am failing on purpose")
@@ -56,7 +56,7 @@ type mustUnmarshalError struct {
 	attributes
 }
 
-var _ store.Secret = &mustUnmarshalError{}
+var _ secrets.Secret = &mustUnmarshalError{}
 
 func (m *mustUnmarshalError) Marshal() ([]byte, error) {
 	return []byte("eeyyy"), nil
@@ -71,7 +71,7 @@ type emptySecret struct {
 	value []byte
 }
 
-var _ store.Secret = &emptySecret{}
+var _ secrets.Secret = &emptySecret{}
 
 func (e *emptySecret) Marshal() ([]byte, error) {
 	return e.value, nil
@@ -81,10 +81,10 @@ func (e *emptySecret) Unmarshal([]byte) error {
 	return nil
 }
 
-func setupKeychain(t *testing.T, secretFactory func(context.Context, store.ID) store.Secret) store.Store {
+func setupKeychain(t *testing.T, secretFactory func(context.Context, secrets.ID) secrets.Secret) secrets.Store {
 	t.Helper()
 	if secretFactory == nil {
-		secretFactory = func(_ context.Context, _ store.ID) store.Secret {
+		secretFactory = func(_ context.Context, _ secrets.ID) secrets.Secret {
 			return &mocks.MockCredential{}
 		}
 	}
@@ -97,7 +97,7 @@ func setupKeychain(t *testing.T, secretFactory func(context.Context, store.ID) s
 func TestKeychain(t *testing.T) {
 	t.Run("save credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/bob")
+		id := secrets.MustParseID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -110,7 +110,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("get credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/bob")
+		id := secrets.MustParseID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -136,8 +136,8 @@ func TestKeychain(t *testing.T) {
 	t.Run("list all credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
 
-		moreCreds := map[store.ID]*mocks.MockCredential{
-			store.MustParseID("com.test.test/test/bob"): {
+		moreCreds := map[secrets.ID]*mocks.MockCredential{
+			secrets.MustParseID("com.test.test/test/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -145,11 +145,11 @@ func TestKeychain(t *testing.T) {
 					"game":  "elden ring",
 				},
 			},
-			store.MustParseID("com.test.test/test/jeff"): {
+			secrets.MustParseID("com.test.test/test/jeff"): {
 				Username: "jeff",
 				Password: "jeff-password",
 			},
-			store.MustParseID("com.test.test/test/pete"): {
+			secrets.MustParseID("com.test.test/test/pete"): {
 				Username: "pete",
 				Password: "pete-password",
 			},
@@ -163,12 +163,12 @@ func TestKeychain(t *testing.T) {
 		for id, anotherCred := range moreCreds {
 			require.NoError(t, ks.Save(t.Context(), id, anotherCred))
 		}
-		secrets, err := ks.GetAllMetadata(t.Context())
+		results, err := ks.GetAllMetadata(t.Context())
 		require.NoError(t, err)
-		assert.Len(t, secrets, 3)
+		assert.Len(t, results, 3)
 
-		actual := make(map[store.ID]*mocks.MockCredential)
-		for k, v := range secrets {
+		actual := make(map[secrets.ID]*mocks.MockCredential)
+		for k, v := range results {
 			actual[k] = v.(*mocks.MockCredential)
 		}
 
@@ -188,8 +188,8 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("filter credentials", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		moreCreds := map[store.ID]*mocks.MockCredential{
-			store.MustParseID("com.test.test/test/bob"): {
+		moreCreds := map[secrets.ID]*mocks.MockCredential{
+			secrets.MustParseID("com.test.test/test/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -197,11 +197,11 @@ func TestKeychain(t *testing.T) {
 					"favcolor": "green",
 				},
 			},
-			store.MustParseID("com.test.test/test/jeff"): {
+			secrets.MustParseID("com.test.test/test/jeff"): {
 				Username: "jeff",
 				Password: "jeff-password",
 			},
-			store.MustParseID("com.test.test/test/pete"): {
+			secrets.MustParseID("com.test.test/test/pete"): {
 				Username: "pete",
 				Password: "pete-password",
 				Attributes: map[string]string{
@@ -209,7 +209,7 @@ func TestKeychain(t *testing.T) {
 					"favcolor": "green",
 				},
 			},
-			store.MustParseID("com.test.test2/test2/bob"): {
+			secrets.MustParseID("com.test.test2/test2/bob"): {
 				Username: "bob",
 				Password: "bob-password",
 				Attributes: map[string]string{
@@ -229,50 +229,50 @@ func TestKeychain(t *testing.T) {
 		})
 
 		t.Run("can use recursive pattern", func(t *testing.T) {
-			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/**"))
+			actual, err := ks.Filter(t.Context(), secrets.MustParsePattern("com.test.test/**"))
 			require.NoError(t, err)
 			assert.Len(t, actual, 3)
 		})
 
 		t.Run("can use subset pattern", func(t *testing.T) {
-			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/*"))
+			actual, err := ks.Filter(t.Context(), secrets.MustParsePattern("com.test.test/test/*"))
 			require.NoError(t, err)
 			assert.Len(t, actual, 3)
 		})
 
 		t.Run("can use serviceName only in pattern", func(t *testing.T) {
-			actual, err := ks.Filter(t.Context(), store.MustParsePattern("*/test/*"))
+			actual, err := ks.Filter(t.Context(), secrets.MustParsePattern("*/test/*"))
 			require.NoError(t, err)
 			assert.Len(t, actual, 3)
 		})
 
 		t.Run("can match on only username in pattern", func(t *testing.T) {
-			result, err := ks.Filter(t.Context(), store.MustParsePattern("**/bob"))
+			result, err := ks.Filter(t.Context(), secrets.MustParsePattern("**/bob"))
 			require.NoError(t, err)
 			assert.Len(t, result, 2)
-			actual := make(map[store.ID]*mocks.MockCredential)
+			actual := make(map[secrets.ID]*mocks.MockCredential)
 			for k, v := range result {
 				actual[k] = v.(*mocks.MockCredential)
 			}
 			assert.Len(t, actual, 2)
-			expected := make(map[store.ID]*mocks.MockCredential)
-			expected[store.MustParseID("com.test.test/test/bob")] = moreCreds[store.MustParseID("com.test.test/test/bob")]
-			expected[store.MustParseID("com.test.test2/test2/bob")] = moreCreds[store.MustParseID("com.test.test2/test2/bob")]
+			expected := make(map[secrets.ID]*mocks.MockCredential)
+			expected[secrets.MustParseID("com.test.test/test/bob")] = moreCreds[secrets.MustParseID("com.test.test/test/bob")]
+			expected[secrets.MustParseID("com.test.test2/test2/bob")] = moreCreds[secrets.MustParseID("com.test.test2/test2/bob")]
 			assert.EqualValues(t, expected, actual)
 		})
 
 		t.Run("exact id match should still return exactly one secret", func(t *testing.T) {
-			actual, err := ks.Filter(t.Context(), store.MustParsePattern("com.test.test/test/pete"))
+			actual, err := ks.Filter(t.Context(), secrets.MustParsePattern("com.test.test/test/pete"))
 			require.NoError(t, err)
 			assert.Len(t, actual, 1)
-			_, ok := actual[store.MustParseID("com.test.test/test/pete")]
+			_, ok := actual[secrets.MustParseID("com.test.test/test/pete")]
 			assert.True(t, ok)
 		})
 	})
 
 	t.Run("save and get large JWT credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/jwt-user")
+		id := secrets.MustParseID("com.test.test/test/jwt-user")
 
 		// Construct a fake JWT large enough that, when UTF-16 encoded on
 		// Windows, it exceeds the 2560-byte blob limit and must be chunked.
@@ -309,7 +309,7 @@ func TestKeychain(t *testing.T) {
 		}
 
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/overwrite-user")
+		id := secrets.MustParseID("com.test.test/test/overwrite-user")
 
 		smallCreds := &mocks.MockCredential{
 			Username: "alice",
@@ -343,7 +343,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("delete credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/bob")
+		id := secrets.MustParseID("com.test.test/test/bob")
 		creds := &mocks.MockCredential{
 			Username: "bob",
 			Password: "bob-password",
@@ -351,43 +351,43 @@ func TestKeychain(t *testing.T) {
 		require.NoError(t, ks.Save(t.Context(), id, creds))
 		require.NoError(t, ks.Delete(t.Context(), id))
 		_, err := ks.Get(t.Context(), id)
-		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+		require.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 
 	t.Run("delete non-existent credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/does-not-exist")
+		id := secrets.MustParseID("com.test.test/test/does-not-exist")
 		require.NoError(t, ks.Delete(t.Context(), id))
 	})
 
 	t.Run("marshal error on save", func(t *testing.T) {
 		kc := setupKeychain(t, nil)
-		id, err := store.ParseID("something/will/fail")
+		id, err := secrets.ParseID("something/will/fail")
 		require.NoError(t, err)
 		require.ErrorContains(t, kc.Save(t.Context(), id, &mustMarshalError{}), "i am failing on purpose")
 	})
 
 	t.Run("save and upsert reject an empty secret value", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/empty-secret")
+		id := secrets.MustParseID("com.test.test/test/empty-secret")
 		t.Cleanup(func() {
 			require.NoError(t, ks.Delete(context.Background(), id))
 		})
 
-		for _, secret := range []store.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
-			require.ErrorIs(t, ks.Save(t.Context(), id, secret), store.ErrEmptySecret)
-			require.ErrorIs(t, ks.Upsert(t.Context(), id, secret), store.ErrEmptySecret)
+		for _, secret := range []secrets.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
+			require.ErrorIs(t, ks.Save(t.Context(), id, secret), secrets.ErrEmptySecret)
+			require.ErrorIs(t, ks.Upsert(t.Context(), id, secret), secrets.ErrEmptySecret)
 		}
 
 		_, err := ks.Get(t.Context(), id)
-		require.ErrorIs(t, err, store.ErrCredentialNotFound)
+		require.ErrorIs(t, err, secrets.ErrNotFound)
 	})
 
 	t.Run("unmarshal error on get", func(t *testing.T) {
-		kc := setupKeychain(t, func(_ context.Context, _ store.ID) store.Secret {
+		kc := setupKeychain(t, func(_ context.Context, _ secrets.ID) secrets.Secret {
 			return &mustUnmarshalError{}
 		})
-		id, err := store.ParseID("something/will/fail")
+		id, err := secrets.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, kc.Delete(context.Background(), id))
@@ -399,7 +399,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("upsert inserts when credential does not exist", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/upsert-insert")
+		id := secrets.MustParseID("com.test.test/test/upsert-insert")
 		creds := &mocks.MockCredential{
 			Username: "alice",
 			Password: "alice-password",
@@ -419,7 +419,7 @@ func TestKeychain(t *testing.T) {
 
 	t.Run("upsert overwrites an existing credential", func(t *testing.T) {
 		ks := setupKeychain(t, nil)
-		id := store.MustParseID("com.test.test/test/upsert-overwrite")
+		id := secrets.MustParseID("com.test.test/test/upsert-overwrite")
 		original := &mocks.MockCredential{
 			Username: "bob",
 			Password: "original-password",
@@ -444,10 +444,10 @@ func TestKeychain(t *testing.T) {
 	})
 
 	t.Run("set metadata error on getAllMetadata", func(t *testing.T) {
-		kc := setupKeychain(t, func(_ context.Context, _ store.ID) store.Secret {
+		kc := setupKeychain(t, func(_ context.Context, _ secrets.ID) secrets.Secret {
 			return &mustUnmarshalError{}
 		})
-		id, err := store.ParseID("something/will/fail")
+		id, err := secrets.ParseID("something/will/fail")
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, kc.Delete(context.Background(), id))
@@ -466,7 +466,7 @@ func TestSafelySetID(t *testing.T) {
 			"id":                 "avoid clash",
 			"x_already-prefixed": "prefixed",
 		}
-		safelySetID(store.MustParseID("username"), attributes)
+		safelySetID(secrets.MustParseID("username"), attributes)
 		assert.EqualValues(t, map[string]string{
 			"color":              "blue",
 			"game":               "elden ring",

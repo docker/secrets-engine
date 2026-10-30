@@ -12,22 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package store holds aliases of the types and helpers that moved to
+// github.com/docker/secrets-engine/secrets.
+//
+// Deprecated: Use github.com/docker/secrets-engine/secrets instead. The store
+// backends in the keychain and posixage subpackages are not deprecated.
 package store
 
 import "github.com/docker/secrets-engine/secrets"
 
-type (
-	ID      = secrets.ID
-	Pattern = secrets.Pattern
-	Secret  = secrets.Secret
-	Store   = secrets.Store
-)
+// Deprecated: Use [secrets.ID] instead.
+//
+//go:fix inline
+type ID = secrets.ID
 
-type Factory[T Secret] = secrets.Factory[T]
+// Deprecated: Use [secrets.Pattern] instead.
+//
+//go:fix inline
+type Pattern = secrets.Pattern
 
-var (
-	ParseID          = secrets.ParseID
-	MustParseID      = secrets.MustParseID
-	ParsePattern     = secrets.ParsePattern
-	MustParsePattern = secrets.MustParsePattern
-)
+// Deprecated: Use [secrets.Secret] instead.
+//
+//go:fix inline
+type Secret = secrets.Secret
+
+// Deprecated: Use [secrets.Store] instead.
+//
+//go:fix inline
+type Store = secrets.Store
+
+// Deprecated: Use [secrets.Factory] instead.
+//
+//go:fix inline
+type Factory[T secrets.Secret] = secrets.Factory[T]
+
+// Deprecated: Use [secrets.ParseID] instead.
+//
+//go:fix inline
+func ParseID(s string) (secrets.ID, error) {
+	return secrets.ParseID(s)
+}
+
+// Deprecated: Use [secrets.MustParseID] instead.
+//
+//go:fix inline
+func MustParseID(s string) secrets.ID {
+	return secrets.MustParseID(s)
+}
+
+// Deprecated: Use [secrets.ParsePattern] instead.
+//
+//go:fix inline
+func ParsePattern(s string) (secrets.Pattern, error) {
+	return secrets.ParsePattern(s)
+}
+
+// Deprecated: Use [secrets.MustParsePattern] instead.
+//
+//go:fix inline
+func MustParsePattern(s string) secrets.Pattern {
+	return secrets.MustParsePattern(s)
+}

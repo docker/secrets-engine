@@ -26,15 +26,15 @@ import (
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/store"
+
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 func Test_passPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
 		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
@@ -44,7 +44,7 @@ func Test_passPlugin(t *testing.T) {
 		assert.Equal(t, envelopeSchemaVersion, e[0].Version)
 	})
 	t.Run("no secrets", func(t *testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{}))
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{}))
 		p := &passPlugin{kc: mock}
 		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
@@ -57,8 +57,8 @@ func Test_passPlugin(t *testing.T) {
 		assert.ErrorIs(t, err, errFilter)
 	})
 	t.Run("unwrap error", func(*testing.T) {
-		mock := teststore.NewMockStore(teststore.WithStore(map[store.ID]store.Secret{
-			store.MustParseID("foo"): &MockMyOtherValue{Value: 7},
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"): &MockMyOtherValue{Value: 7},
 		}))
 		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
 		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
@@ -66,7 +66,7 @@ func Test_passPlugin(t *testing.T) {
 	})
 }
 
-var _ store.Secret = &MockMyOtherValue{}
+var _ secrets.Secret = &MockMyOtherValue{}
 
 type MockMyOtherValue struct {
 	Value int64 `json:"value"`

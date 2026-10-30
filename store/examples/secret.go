@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"errors"
 
-	secrets "github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type secret struct {
@@ -27,12 +27,12 @@ type secret struct {
 	Attributes   map[string]string
 }
 
-// Metadata implements store.Secret.
+// Metadata implements secrets.Secret.
 func (s *secret) Metadata() map[string]string {
 	return s.Attributes
 }
 
-// SetMetadata implements store.Secret.
+// SetMetadata implements secrets.Secret.
 func (s *secret) SetMetadata(attributes map[string]string) error {
 	s.Attributes = attributes
 	return nil

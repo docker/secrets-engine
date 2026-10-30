@@ -20,7 +20,7 @@ import (
 
 	"github.com/docker/secrets-engine/plugin"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/realms"
 )
 
@@ -34,7 +34,7 @@ var errUnknownSecretType = errors.New("unknown secret type")
 const envelopeSchemaVersion = "0.0.1"
 
 type passPlugin struct {
-	kc     store.Store
+	kc     secrets.Store
 	logger plugin.Logger
 }
 
@@ -65,7 +65,7 @@ func (m *passPlugin) GetSecrets(ctx context.Context, pattern plugin.Pattern) ([]
 	return result, nil
 }
 
-func unpackValue(id store.ID, secret store.Secret) (*plugin.Envelope, error) {
+func unpackValue(id secrets.ID, secret secrets.Secret) (*plugin.Envelope, error) {
 	impl, ok := secret.(*pass.PassValue)
 	if !ok {
 		return nil, errUnknownSecretType
@@ -86,6 +86,6 @@ func (m *passPlugin) Run(ctx context.Context) error {
 	return nil
 }
 
-func NewPassPlugin(logger plugin.Logger, store store.Store) (plugin.Plugin, error) {
+func NewPassPlugin(logger plugin.Logger, store secrets.Store) (plugin.Plugin, error) {
 	return &passPlugin{kc: store, logger: logger}, nil
 }

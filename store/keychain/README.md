@@ -15,7 +15,7 @@ For more design implementation see [../docs/keychain/design.md](../docs/keychain
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/keychain"
 	"github.com/docker/secrets-engine/store/mocks"
 )
@@ -26,7 +26,7 @@ func main() {
 		ctx,
 		"service-group",
 		"service-name",
-		func(_ context.Context, _ store.ID) *mocks.MockCredential {
+		func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 			return &mocks.MockCredential{}
 		},
 	)
@@ -96,7 +96,7 @@ back.
 
 ### Secrets
 
-The `keychain` assumes that any secret stored would conform to the `store.Secret`
+The `keychain` assumes that any secret stored would conform to the `secrets.Secret`
 interface. This allows the `keychain` to store secrets of any type and leaves
 it up to the implementer to decide how they would like their secret parsed.
 
