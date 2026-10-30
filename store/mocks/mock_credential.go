@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type MockCredential struct {
@@ -27,18 +27,18 @@ type MockCredential struct {
 	Attributes map[string]string
 }
 
-// Metadata implements store.Secret.
+// Metadata implements secrets.Secret.
 func (m *MockCredential) Metadata() map[string]string {
 	return m.Attributes
 }
 
-// SetMetadata implements store.Secret.
+// SetMetadata implements secrets.Secret.
 func (m *MockCredential) SetMetadata(attributes map[string]string) error {
 	m.Attributes = attributes
 	return nil
 }
 
-var _ store.Secret = &MockCredential{}
+var _ secrets.Secret = &MockCredential{}
 
 // Marshal implements secrets.Secret.
 func (m *MockCredential) Marshal() ([]byte, error) {

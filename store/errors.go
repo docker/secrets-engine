@@ -15,11 +15,14 @@
 package store
 
 import (
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
+// Deprecated: Use [secrets.ErrNotFound] instead.
 var ErrCredentialNotFound = secrets.ErrNotFound
 
 // ErrEmptySecret is returned by Save and Upsert when the secret's value is
 // empty.
+//
+// Deprecated: Use [secrets.ErrEmptySecret] instead.
 var ErrEmptySecret = secrets.ErrEmptySecret

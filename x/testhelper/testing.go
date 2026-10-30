@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 func WaitForErrorWithTimeout(in <-chan error) error {

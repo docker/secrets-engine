@@ -15,11 +15,9 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParsePattern(t *testing.T) {
@@ -49,7 +47,9 @@ func TestParsePattern(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParsePattern(tc.input)
-			assert.ErrorIs(t, err, tc.expected)
+			if !errors.Is(err, tc.expected) {
+				t.Errorf("ParsePattern(%q) error = %v, want %v", tc.input, err, tc.expected)
+			}
 		})
 	}
 }
@@ -57,12 +57,15 @@ func TestParsePattern(t *testing.T) {
 func TestPatternComparable(t *testing.T) {
 	a := MustParsePattern("foo")
 	b := MustParsePattern("foo")
-	assert.Equal(t, a, b)
+	if a != b {
+		t.Errorf("%v != %v", a, b)
+	}
 	myMap := map[Pattern]string{}
 	bar := "bar"
 	myMap[MustParsePattern("foo")] = bar
-	assert.Equal(t, bar, myMap[a])
-	assert.Equal(t, bar, myMap[b])
+	if myMap[a] != bar || myMap[b] != bar {
+		t.Errorf("map lookup = %q, %q, want %q", myMap[a], myMap[b], bar)
+	}
 }
 
 func TestPatternContains(t *testing.T) {
@@ -105,11 +108,10 @@ func TestPatternContains(t *testing.T) {
 	}
 	for idx, tc := range tests {
 		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
-			p, err := ParsePattern(tc.pattern)
-			require.NoError(t, err)
-			other, err := ParsePattern(tc.other)
-			require.NoError(t, err)
-			assert.Equal(t, tc.contained, p.Contains(other))
+			p, other := mustParsePair(t, tc.pattern, tc.other)
+			if got := p.Contains(other); got != tc.contained {
+				t.Errorf("%s.Contains(%s) = %v, want %v", tc.pattern, tc.other, got, tc.contained)
+			}
 		})
 	}
 }
@@ -139,14 +141,28 @@ func TestPatternOverlaps(t *testing.T) {
 	}
 	for idx, tc := range tests {
 		t.Run(fmt.Sprintf("pattern %d", idx+1), func(t *testing.T) {
-			p, err := ParsePattern(tc.pattern)
-			require.NoError(t, err)
-			other, err := ParsePattern(tc.other)
-			require.NoError(t, err)
-			assert.Equal(t, tc.overlaps, p.Overlaps(other))
-			assert.Equal(t, tc.overlaps, other.Overlaps(p), "Overlaps must be symmetric")
+			p, other := mustParsePair(t, tc.pattern, tc.other)
+			if got := p.Overlaps(other); got != tc.overlaps {
+				t.Errorf("%s.Overlaps(%s) = %v, want %v", tc.pattern, tc.other, got, tc.overlaps)
+			}
+			if got := other.Overlaps(p); got != tc.overlaps {
+				t.Errorf("Overlaps must be symmetric: %s.Overlaps(%s) = %v, want %v", tc.other, tc.pattern, got, tc.overlaps)
+			}
 		})
 	}
+}
+
+func mustParsePair(t *testing.T, a, b string) (Pattern, Pattern) {
+	t.Helper()
+	p, err := ParsePattern(a)
+	if err != nil {
+		t.Fatalf("ParsePattern(%q): %v", a, err)
+	}
+	q, err := ParsePattern(b)
+	if err != nil {
+		t.Fatalf("ParsePattern(%q): %v", b, err)
+	}
+	return p, q
 }
 
 func Test_apply(t *testing.T) {
@@ -207,11 +223,17 @@ func Test_apply(t *testing.T) {
 				t.Run(fmt.Sprintf("%d-%d %s %s", idx, inner, test.pattern, query.pattern), func(t *testing.T) {
 					result, err := replace1(test.pattern, query.pattern)
 					if query.result == "" {
-						assert.Error(t, err, fmt.Sprintf("got: %s", result))
+						if err == nil {
+							t.Errorf("expected an error, got: %s", result)
+						}
 						return
 					}
-					require.NoError(t, err, fmt.Sprintf("query: %s, expected out: %s", query.pattern, query.result))
-					assert.Equal(t, query.result, result)
+					if err != nil {
+						t.Fatalf("query: %s, expected out: %s: %v", query.pattern, query.result, err)
+					}
+					if result != query.result {
+						t.Errorf("got %q, want %q", result, query.result)
+					}
 				})
 			}
 		})
@@ -234,13 +256,20 @@ func TestPatternExpandID(t *testing.T) {
 			expanded, err := MustParsePattern(tc.pattern).ExpandID(MustParseID(tc.id))
 			if tc.result == "" {
 				var invalid ErrInvalidID
-				require.ErrorAs(t, err, &invalid)
+				if !errors.As(err, &invalid) {
+					t.Fatalf("error = %v, want ErrInvalidID", err)
+				}
 				return
 			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.result, expanded.String())
-			_, err = ParseID(expanded.String())
-			assert.NoError(t, err)
+			if err != nil {
+				t.Fatalf("ExpandID: %v", err)
+			}
+			if got := expanded.String(); got != tc.result {
+				t.Errorf("got %q, want %q", got, tc.result)
+			}
+			if _, err := ParseID(expanded.String()); err != nil {
+				t.Errorf("ParseID(%q): %v", expanded.String(), err)
+			}
 		})
 	}
 }

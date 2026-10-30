@@ -19,10 +19,13 @@ import (
 	"strings"
 )
 
+// ErrInvalidID is returned by [ParseID] when a string is not a valid [ID].
 type ErrInvalidID struct {
+	// ID is the rejected input.
 	ID string
 }
 
+// Error describes the rejected input and the format an ID must match.
 func (e ErrInvalidID) Error() string {
 	return fmt.Sprintf("invalid identifier: %q must match ^[A-Za-z0-9._:-]+(?:/[A-Za-z0-9._:-]+)*$", e.ID)
 }

@@ -19,11 +19,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/api/accesscontrol"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/plugins"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type (

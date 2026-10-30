@@ -17,7 +17,7 @@ package plugins
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type Plugin interface {

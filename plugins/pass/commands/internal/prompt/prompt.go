@@ -27,7 +27,7 @@ import (
 
 	"github.com/charmbracelet/x/term"
 
-	secrets "github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 var (

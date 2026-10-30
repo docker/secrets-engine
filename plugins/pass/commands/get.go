@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 //go:embed get_example.md
@@ -48,7 +48,7 @@ func GetCommand(options ...ClientOption) (*cobra.Command, error) {
 		Long:    strings.Trim(getLong, "\n"),
 		Example: strings.Trim(getExample, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := store.ParseID(args[0])
+			id, err := secrets.ParseID(args[0])
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func GetCommand(options ...ClientOption) (*cobra.Command, error) {
 	return wrapEngineErrors(wrapKeychainErrors(cmd)), nil
 }
 
-func printSecret(w io.Writer, id store.ID, value []byte) error {
+func printSecret(w io.Writer, id secrets.ID, value []byte) error {
 	_, err := fmt.Fprintf(w, "ID: %s\nValue: %s\n", id, value)
 	return err
 }

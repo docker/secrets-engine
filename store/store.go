@@ -12,100 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package store holds aliases of the types and helpers that moved to
+// github.com/docker/secrets-engine/secrets.
+//
+// Deprecated: Use github.com/docker/secrets-engine/secrets instead. The store
+// backends in the keychain and posixage subpackages are not deprecated.
 package store
 
-import (
-	"context"
+import "github.com/docker/secrets-engine/secrets"
 
-	"github.com/docker/secrets-engine/x/secrets"
-)
+// Deprecated: Use [secrets.ID] instead.
+//
+//go:fix inline
+type ID = secrets.ID
 
-type (
-	ID      = secrets.ID
-	Pattern = secrets.Pattern
-)
+// Deprecated: Use [secrets.Pattern] instead.
+//
+//go:fix inline
+type Pattern = secrets.Pattern
 
-var (
-	ParseID          = secrets.ParseID
-	MustParseID      = secrets.MustParseID
-	ParsePattern     = secrets.ParsePattern
-	MustParsePattern = secrets.MustParsePattern
-)
+// Deprecated: Use [secrets.Secret] instead.
+//
+//go:fix inline
+type Secret = secrets.Secret
 
-// Secret is a generic type that represents the actual secret values
+// Deprecated: Use [secrets.Store] instead.
 //
-// The implementer is responsible for defining the data structure of their secrets.
+//go:fix inline
+type Store = secrets.Store
+
+// Deprecated: Use [secrets.Factory] instead.
 //
-// Example:
+//go:fix inline
+type Factory[T secrets.Secret] = secrets.Factory[T]
+
+// Deprecated: Use [secrets.ParseID] instead.
 //
-//	type secret struct {
-//		AccessToken string
-//		RefreshToken string
-//	}
-//
-//	func (s *secret) Marshal() ([]byte, error) {
-//		return []byte(s.AccessToken+":"+s.RefreshToken), nil
-//	}
-//
-//	func (s *secret) Unmarshal(data []byte) error {
-//		tokens := bytes.Split(data, []byte(":"))
-//		if len(tokens) != 2 {
-//			return errors.New("invalid secret format")
-//		}
-//
-//		s.AccessToken, s.RefreshToken = string(tokens[0]), string(tokens[1])
-//		return nil
-//	}
-type Secret interface {
-	// Marshal the secret into a slice of bytes
-	Marshal() ([]byte, error)
-	// Unmarshal the secret from a slice of bytes into its structured format.
-	// Implementations must copy any bytes they retain: store backends zero
-	// the source buffer after Unmarshal returns to avoid leaking plaintext.
-	Unmarshal(data []byte) error
-	// Metadata returns a key-value pair of non-sensitive data about the secret
-	Metadata() map[string]string
-	// SetMetadata allows the caller to set the secrets non-sensitive data
-	// A secret may expects certain keys or values from the map and may return
-	// an error.
-	SetMetadata(map[string]string) error
+//go:fix inline
+func ParseID(s string) (secrets.ID, error) {
+	return secrets.ParseID(s)
 }
 
-// Store defines a strict format for secrets to conform to when interacting
-// with the secrets engine
-type Store interface {
-	// Delete removes credentials from the store for a given ID.
-	Delete(ctx context.Context, id ID) error
-	// Get retrieves credentials from the store for a given ID.
-	Get(ctx context.Context, id ID) (Secret, error)
-	// GetAllMetadata retrieves all the credentials from the store.
-	// Credentials retrieved will only call [Secret.SetMetadata] so that the
-	// underlying store does not get queried for each secret's sensitive data.
-	// This could be very taxing on the underlying store and cause a poor User
-	// Experience.
-	GetAllMetadata(ctx context.Context) (map[ID]Secret, error)
-	// Save persists credentials from the store.
-	//
-	// An empty secret value is rejected with [ErrEmptySecret].
-	Save(ctx context.Context, id ID, secret Secret) error
-	// Upsert atomically replaces an existing credential or inserts a new one.
-	//
-	// An empty secret value is rejected with [ErrEmptySecret].
-	//
-	// On the macOS Keychain an existing item is updated in place, keeping the
-	// applications the user allowed to access it. Another store instance or
-	// process can still write the same item concurrently, in which case Upsert
-	// returns keychain.ErrDuplicateItem.
-	Upsert(ctx context.Context, id ID, secret Secret) error
-	// Filter returns a map of secrets based on a [Pattern].
-	//
-	// A pattern matching nothing is a valid empty result: implementations
-	// return an empty (non-nil) map with a nil error, not ErrCredentialNotFound.
-	//
-	// Secrets returned will have both [Secret.SetMetadata] and [Secret.Unmarshal]
-	// called; in that order. Any error produced by any of them would result in
-	// an early return with a nil secrets map.
-	Filter(ctx context.Context, pattern Pattern) (map[ID]Secret, error)
+// Deprecated: Use [secrets.MustParseID] instead.
+//
+//go:fix inline
+func MustParseID(s string) secrets.ID {
+	return secrets.MustParseID(s)
 }
 
-type Factory[T Secret] func(context.Context, ID) T
+// Deprecated: Use [secrets.ParsePattern] instead.
+//
+//go:fix inline
+func ParsePattern(s string) (secrets.Pattern, error) {
+	return secrets.ParsePattern(s)
+}
+
+// Deprecated: Use [secrets.MustParsePattern] instead.
+//
+//go:fix inline
+func MustParsePattern(s string) secrets.Pattern {
+	return secrets.MustParsePattern(s)
+}

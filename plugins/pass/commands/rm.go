@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 //go:embed rm_example.md
@@ -68,13 +68,13 @@ func RmCommand(options ...ClientOption) (*cobra.Command, error) {
 	return wrapEngineErrors(wrapKeychainErrors(cmd)), nil
 }
 
-func validateArgs(args []string, opts rmOpts) ([]store.ID, error) {
+func validateArgs(args []string, opts rmOpts) ([]secrets.ID, error) {
 	if (len(args) == 0 && !opts.all) || (len(args) > 0 && opts.all) {
 		return nil, fmt.Errorf("either provide a secret name or use --all to remove all secrets")
 	}
-	var result []store.ID
+	var result []secrets.ID
 	for _, arg := range args {
-		id, err := store.ParseID(arg)
+		id, err := secrets.ParseID(arg)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func validateArgs(args []string, opts rmOpts) ([]store.ID, error) {
 	return result, nil
 }
 
-func runRm(ctx context.Context, out io.Writer, kc store.Store, idList []store.ID, opts rmOpts) error {
+func runRm(ctx context.Context, out io.Writer, kc secrets.Store, idList []secrets.ID, opts rmOpts) error {
 	existing, err := kc.GetAllMetadata(ctx)
 	if err != nil {
 		return err
@@ -93,13 +93,13 @@ func runRm(ctx context.Context, out io.Writer, kc store.Store, idList []store.ID
 			idList = append(idList, k)
 		}
 	}
-	slices.SortFunc(idList, func(a, b store.ID) int { return strings.Compare(a.String(), b.String()) })
+	slices.SortFunc(idList, func(a, b secrets.ID) int { return strings.Compare(a.String(), b.String()) })
 	var errs []error
-	var toDelete []store.ID
+	var toDelete []secrets.ID
 	for _, id := range idList {
 		if _, ok := existing[id]; !ok {
-			errs = append(errs, fmt.Errorf("%s: %w", id, store.ErrCredentialNotFound))
-			fmt.Fprintf(out, "ERR: %s: %s\n", id, store.ErrCredentialNotFound)
+			errs = append(errs, fmt.Errorf("%s: %w", id, secrets.ErrNotFound))
+			fmt.Fprintf(out, "ERR: %s: %s\n", id, secrets.ErrNotFound)
 			continue
 		}
 		toDelete = append(toDelete, id)

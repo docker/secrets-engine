@@ -12,49 +12,91 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package secrets aliases github.com/docker/secrets-engine/secrets.
+//
+// Deprecated: Use github.com/docker/secrets-engine/secrets instead. This
+// package will be removed after its last tag.
 package secrets
 
-import (
-	"context"
-	"encoding/json"
-	"errors"
-	"time"
-)
+import "github.com/docker/secrets-engine/secrets"
 
 var (
-	ErrNotFound     = errors.New("secret not found")
-	ErrAccessDenied = errors.New("access denied") // nuh, uh, uh!
-	ErrEmptySecret  = errors.New("secret value must not be empty")
+	// Deprecated: Use [secrets.ErrNotFound] instead.
+	ErrNotFound = secrets.ErrNotFound
+	// Deprecated: Use [secrets.ErrAccessDenied] instead.
+	ErrAccessDenied = secrets.ErrAccessDenied
+	// Deprecated: Use [secrets.ErrEmptySecret] instead.
+	ErrEmptySecret = secrets.ErrEmptySecret
+	// Deprecated: Use [secrets.ErrInvalidPattern] instead.
+	ErrInvalidPattern = secrets.ErrInvalidPattern
 )
 
-type Envelope struct {
-	ID         ID                `json:"-"`
-	Value      []byte            `json:"-"`
-	Metadata   map[string]string `json:"-"`
-	Provider   string            `json:"-"`
-	Version    string            `json:"-"`
-	CreatedAt  time.Time         `json:"-"`
-	ResolvedAt time.Time         `json:"-"`
-	ExpiresAt  time.Time         `json:"-"`
+// Deprecated: Use [secrets.ErrInvalidID] instead.
+//
+//go:fix inline
+type ErrInvalidID = secrets.ErrInvalidID
+
+// Deprecated: Use [secrets.ID] instead.
+//
+//go:fix inline
+type ID = secrets.ID
+
+// Deprecated: Use [secrets.Pattern] instead.
+//
+//go:fix inline
+type Pattern = secrets.Pattern
+
+// Deprecated: Use [secrets.Envelope] instead.
+//
+//go:fix inline
+type Envelope = secrets.Envelope
+
+// Deprecated: Use [secrets.Resolver] instead.
+//
+//go:fix inline
+type Resolver = secrets.Resolver
+
+// Deprecated: Use [secrets.AuthorizeResponse] instead.
+//
+//go:fix inline
+type AuthorizeResponse = secrets.AuthorizeResponse
+
+// Deprecated: Use [secrets.Authorizer] instead.
+//
+//go:fix inline
+type Authorizer = secrets.Authorizer
+
+// Deprecated: Use [secrets.ParseID] instead.
+//
+//go:fix inline
+func ParseID(s string) (secrets.ID, error) {
+	return secrets.ParseID(s)
 }
 
-var _ json.Marshaler = Envelope{}
-
-func (e Envelope) MarshalJSON() ([]byte, error) {
-	panic("secrets.Envelope does not support json.Marshal")
+// Deprecated: Use [secrets.MustParseID] instead.
+//
+//go:fix inline
+func MustParseID(s string) secrets.ID {
+	return secrets.MustParseID(s)
 }
 
-type Resolver interface {
-	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
+// Deprecated: Use [secrets.ParsePattern] instead.
+//
+//go:fix inline
+func ParsePattern(s string) (secrets.Pattern, error) {
+	return secrets.ParsePattern(s)
 }
 
-type AuthorizeResponse struct {
-	// Expiry is when the decision stops holding. A zero Expiry means the
-	// decision never expires, and the wire message then carries no timestamp.
-	Expiry time.Time
-	Allow  bool
+// Deprecated: Use [secrets.MustParsePattern] instead.
+//
+//go:fix inline
+func MustParsePattern(s string) secrets.Pattern {
+	return secrets.MustParsePattern(s)
 }
 
-type Authorizer interface {
-	Authorize(ctx context.Context, pattern ...Pattern) (AuthorizeResponse, error)
+// Deprecated: Use [secrets.Minimize] instead.
+//
+//go:fix inline
+func Minimize(patterns []secrets.Pattern) []secrets.Pattern {
+	return secrets.Minimize(patterns)
 }

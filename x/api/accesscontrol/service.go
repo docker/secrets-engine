@@ -22,9 +22,9 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/docker/secrets-engine/secrets"
 	accesscontrolv1 "github.com/docker/secrets-engine/x/api/accesscontrol/v1"
 	"github.com/docker/secrets-engine/x/api/accesscontrol/v1/accesscontrolv1connect"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 var _ accesscontrolv1connect.AccessControlServiceHandler = &accessControlService{}

@@ -17,11 +17,11 @@ package store
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/keychain"
 )
 
-var _ store.Secret = &PassValue{}
+var _ secrets.Secret = &PassValue{}
 
 type PassValue struct {
 	value    []byte
@@ -52,12 +52,12 @@ func (m *PassValue) SetMetadata(md map[string]string) error {
 	return nil
 }
 
-func PassStore(ctx context.Context, serviceGroup string, opts ...keychain.Option) (store.Store, error) {
+func PassStore(ctx context.Context, serviceGroup string, opts ...keychain.Option) (secrets.Store, error) {
 	kc, err := keychain.New(
 		ctx,
 		serviceGroup,
 		"docker-pass-cli",
-		func(_ context.Context, _ store.ID) *PassValue {
+		func(_ context.Context, _ secrets.ID) *PassValue {
 			return &PassValue{}
 		},
 		opts...,

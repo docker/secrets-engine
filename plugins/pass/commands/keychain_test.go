@@ -25,7 +25,7 @@ import (
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/keychain"
 )
 
@@ -95,14 +95,14 @@ func TestStoreCommandsHintOnLockedKeychain(t *testing.T) {
 	tests := []struct {
 		name string
 		cmd  *cobra.Command
-		mock store.Store
+		mock secrets.Store
 		args []string
 	}{
 		{"get", mustGetCommand(t), teststore.NewMockStore(teststore.WithStoreGetErr(locked)), []string{"foo"}},
 		{"set", mustSetCommand(t), teststore.NewMockStore(teststore.WithStoreSaveErr(locked)), []string{"foo=bar"}},
 		{"ls", ListCommand(), teststore.NewMockStore(teststore.WithStoreGetAllErr(locked)), nil},
 		{"rm", mustRmCommand(t, engineOpts(t, &mockEngine{allow: true})...), teststore.NewMockStore(
-			teststore.WithStore(map[store.ID]store.Secret{store.MustParseID("foo"): pass.NewPassValue([]byte("bar"))}),
+			teststore.WithStore(map[secrets.ID]secrets.Secret{secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar"))}),
 			teststore.WithStoreDeleteErr(locked),
 		), []string{"foo"}},
 	}

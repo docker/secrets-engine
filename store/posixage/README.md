@@ -85,4 +85,4 @@ func main() {
 
 ### Secrets
 
-Any secret format is supported as long as it conforms to the `store.Secret` interface.
+Any secret format is supported as long as it conforms to the `secrets.Secret` interface.

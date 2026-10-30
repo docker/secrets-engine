@@ -19,13 +19,13 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/keychain"
 )
 
 type Option func(m *MockStore)
 
-var _ store.Store = &MockStore{}
+var _ secrets.Store = &MockStore{}
 
 type MockStore struct {
 	lock      sync.RWMutex
@@ -35,11 +35,11 @@ type MockStore struct {
 	errGet    error
 	errFilter error
 	errUpsert error
-	store     map[store.ID]store.Secret
+	store     map[secrets.ID]secrets.Secret
 }
 
-func NewMockStore(options ...Option) store.Store {
-	s := &MockStore{store: map[store.ID]store.Secret{}}
+func NewMockStore(options ...Option) secrets.Store {
+	s := &MockStore{store: map[secrets.ID]secrets.Secret{}}
 	for _, option := range options {
 		option(s)
 	}
@@ -82,13 +82,13 @@ func WithStoreUpsertErr(err error) Option {
 	}
 }
 
-func WithStore(store map[store.ID]store.Secret) Option {
+func WithStore(store map[secrets.ID]secrets.Secret) Option {
 	return func(m *MockStore) {
 		m.store = store
 	}
 }
 
-func (m *MockStore) Delete(_ context.Context, id store.ID) error {
+func (m *MockStore) Delete(_ context.Context, id secrets.ID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -100,7 +100,7 @@ func (m *MockStore) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
+func (m *MockStore) Get(_ context.Context, id secrets.ID) (secrets.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -110,12 +110,12 @@ func (m *MockStore) Get(_ context.Context, id store.ID) (store.Secret, error) {
 
 	secret, exists := m.store[id]
 	if !exists {
-		return nil, store.ErrCredentialNotFound
+		return nil, secrets.ErrNotFound
 	}
 	return secret, nil
 }
 
-func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret, error) {
+func (m *MockStore) GetAllMetadata(_ context.Context) (map[secrets.ID]secrets.Secret, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.errGetAll != nil {
@@ -124,7 +124,7 @@ func (m *MockStore) GetAllMetadata(_ context.Context) (map[store.ID]store.Secret
 	return maps.Clone(m.store), nil
 }
 
-func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) error {
+func (m *MockStore) Save(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if m.errSave != nil {
@@ -138,7 +138,7 @@ func (m *MockStore) Save(_ context.Context, id store.ID, secret store.Secret) er
 	return nil
 }
 
-func (m *MockStore) Upsert(_ context.Context, id store.ID, secret store.Secret) error {
+func (m *MockStore) Upsert(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if m.errUpsert != nil {
@@ -149,7 +149,7 @@ func (m *MockStore) Upsert(_ context.Context, id store.ID, secret store.Secret) 
 	return nil
 }
 
-func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (m *MockStore) Filter(_ context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -157,7 +157,7 @@ func (m *MockStore) Filter(_ context.Context, pattern store.Pattern) (map[store.
 		return nil, m.errFilter
 	}
 
-	filtered := make(map[store.ID]store.Secret)
+	filtered := make(map[secrets.ID]secrets.Secret)
 	for id, f := range m.store {
 		if pattern.Match(id) {
 			filtered[id] = f

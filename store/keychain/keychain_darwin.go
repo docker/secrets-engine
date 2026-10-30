@@ -23,7 +23,7 @@ import (
 
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 var (
@@ -31,11 +31,11 @@ var (
 	ErrAuthFailed            = errors.New("user incorrectly enterered their credentials")
 )
 
-type keychainStore[T store.Secret] struct {
+type keychainStore[T secrets.Secret] struct {
 	mu                        sync.Mutex
 	serviceGroup              string
 	serviceName               string
-	factory                   store.Factory[T]
+	factory                   secrets.Factory[T]
 	useDataProtectionKeychain bool
 }
 
@@ -56,7 +56,7 @@ func ensureAvailable(_ context.Context) error { return nil }
 //
 // The id parameter can be empty, in which case the item will search based on
 // the service name and group, but not the item label or account.
-func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
+func newKeychainItem[T secrets.Secret](id string, k *keychainStore[T]) kc.Item {
 	item := kc.NewItem()
 	// generic password is used here as we don't know what we are storing
 	// the main difference between a generic and internet password is the
@@ -86,7 +86,7 @@ func newKeychainItem[T store.Secret](id string, k *keychainStore[T]) kc.Item {
 // It uses the SetReturnData attribute to query for an item with its data.
 // It cannot be used with MatchLimitAll, as it will return an error.
 // https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)#Discussion
-func getItemWithData[T store.Secret](id string, k *keychainStore[T]) (*kc.QueryResult, error) {
+func getItemWithData[T secrets.Secret](id string, k *keychainStore[T]) (*kc.QueryResult, error) {
 	item := newKeychainItem(id, k)
 	item.SetReturnData(true)
 
@@ -95,7 +95,7 @@ func getItemWithData[T store.Secret](id string, k *keychainStore[T]) (*kc.QueryR
 		return nil, mapKeychainError(err)
 	}
 	if len(results) == 0 {
-		return nil, store.ErrCredentialNotFound
+		return nil, secrets.ErrNotFound
 	}
 
 	return &results[0], nil
@@ -114,7 +114,7 @@ func convertAttributes(attributes map[string]any) (map[string]string, error) {
 	return attr, nil
 }
 
-func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(_ context.Context, id secrets.ID) error {
 	item := newKeychainItem(id.String(), k)
 	err := kc.DeleteItem(item)
 	if err != nil && !errors.Is(err, kc.ErrorItemNotFound) {
@@ -123,7 +123,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id secrets.ID) (secrets.Secret, error) {
 	result, err := getItemWithData(id.String(), k)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[secrets.ID]secrets.Secret, error) {
 	item := newKeychainItem("", k)
 
 	// We use the MatchLimitAll attribute to query for multiple items from the
@@ -159,9 +159,9 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[store.ID]store.Secret, len(results))
+	creds := make(map[secrets.ID]secrets.Secret, len(results))
 	for _, result := range results {
-		id, err := store.ParseID(result.Account)
+		id, err := secrets.ParseID(result.Account)
 		if err != nil {
 			return nil, err
 		}
@@ -180,19 +180,19 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	return creds, nil
 }
 
-func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	data, err := secret.Marshal()
 	if err != nil {
 		return err
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return store.ErrEmptySecret
+		return secrets.ErrEmptySecret
 	}
 	return k.add(id, secret, data)
 }
 
-func (k *keychainStore[T]) add(id store.ID, secret store.Secret, data []byte) error {
+func (k *keychainStore[T]) add(id secrets.ID, secret secrets.Secret, data []byte) error {
 	item := newKeychainItem(id.String(), k)
 	item.SetData(data)
 	// only creation of a secret needs the label attribute.
@@ -204,7 +204,7 @@ func (k *keychainStore[T]) add(id store.ID, secret store.Secret, data []byte) er
 	return mapKeychainError(kc.AddItem(item))
 }
 
-func (k *keychainStore[T]) genericMetadata(id store.ID, secret store.Secret) map[string]any {
+func (k *keychainStore[T]) genericMetadata(id secrets.ID, secret secrets.Secret) map[string]any {
 	metadata := make(map[string]string)
 	maps.Copy(metadata, secret.Metadata())
 	safelySetMetadata(k.serviceGroup, k.serviceName, metadata)
@@ -224,10 +224,10 @@ func (k *keychainStore[T]) genericMetadata(id store.ID, secret store.Secret) map
 // applications the user allowed to read the item stay allowed. Deleting and
 // re-adding it would reset those lists to the calling binary alone.
 //
-// An empty secret value returns [store.ErrEmptySecret] without touching the
+// An empty secret value returns [secrets.ErrEmptySecret] without touching the
 // keychain. Another store instance or process can still write the same item
 // concurrently, in which case Upsert returns [ErrDuplicateItem].
-func (k *keychainStore[T]) Upsert(_ context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Upsert(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
@@ -237,17 +237,17 @@ func (k *keychainStore[T]) Upsert(_ context.Context, id store.ID, secret store.S
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return store.ErrEmptySecret
+		return secrets.ErrEmptySecret
 	}
 
 	err = k.update(id, secret, data)
-	if !errors.Is(err, store.ErrCredentialNotFound) {
+	if !errors.Is(err, secrets.ErrNotFound) {
 		return err
 	}
 	return k.add(id, secret, data)
 }
 
-func (k *keychainStore[T]) update(id store.ID, secret store.Secret, data []byte) error {
+func (k *keychainStore[T]) update(id secrets.ID, secret secrets.Secret, data []byte) error {
 	// We aren't using newKeychainItem here because we only want to identify the item, not read it.
 	query := kc.NewItem()
 	query.SetSecClass(kc.SecClassGenericPassword)
@@ -265,7 +265,7 @@ func (k *keychainStore[T]) update(id store.ID, secret store.Secret, data []byte)
 	return mapKeychainError(kc.UpdateItem(query, changes))
 }
 
-func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	// Note: Filter on macOS cannot filter by generic attributes and thus we
 	// cannot split the ID and store it in the keychain as parts for later
 	// pattern matching.
@@ -293,15 +293,15 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		return nil, mapKeychainError(err)
 	}
 
-	creds := make(map[store.ID]store.Secret)
+	creds := make(map[secrets.ID]secrets.Secret)
 	for _, result := range results {
 		// it is possible that someone else has stored secrets in the keychain
-		// directly without conforming to the store.ID format.
+		// directly without conforming to the secrets.ID format.
 		// We shouldn't error here when these values cannot be retrieved or
 		// parsed. Instead we just ignore them and proceed.
 		// I guess in future we could at least log them somewhere?
 		// but for now, let's just continue with the other items in the store.
-		id, err := store.ParseID(result.Account)
+		id, err := secrets.ParseID(result.Account)
 		if err != nil {
 			continue
 		}
@@ -330,7 +330,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 
 // loadSecret fetches the raw keychain data for id, zeroes it after use,
 // and returns a fully populated Secret.
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, attr map[string]string) (store.Secret, error) {
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id secrets.ID, attr map[string]string) (secrets.Secret, error) {
 	i, err := getItemWithData(id.String(), k)
 	if err != nil {
 		return nil, err
@@ -352,7 +352,7 @@ func mapKeychainError(err error) error {
 	case kc.ErrorInteractionNotAllowed.Error():
 		return ErrInteractionNotAllowed
 	case kc.ErrorItemNotFound.Error():
-		return store.ErrCredentialNotFound
+		return secrets.ErrNotFound
 	case kc.ErrorAuthFailed.Error():
 		return ErrAuthFailed
 	case kc.ErrorDuplicateItem.Error():

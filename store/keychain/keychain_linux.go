@@ -29,7 +29,7 @@ import (
 
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain/secretservice"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 const (
@@ -357,13 +357,13 @@ func withRelockRetry(ctx context.Context, service secretService, collectionPath 
 	return err
 }
 
-type keychainStore[T store.Secret] struct {
+type keychainStore[T secrets.Secret] struct {
 	serviceGroup string
 	serviceName  string
-	factory      store.Factory[T]
+	factory      secrets.Factory[T]
 }
 
-func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(ctx context.Context, id secrets.ID) error {
 	service, err := operationService(ctx)
 	if err != nil {
 		return err
@@ -406,7 +406,7 @@ func (k *keychainStore[T]) Delete(ctx context.Context, id store.ID) error {
 	}, items[0])
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id secrets.ID) (secrets.Secret, error) {
 	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
@@ -441,7 +441,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	}
 
 	if len(items) == 0 {
-		return nil, store.ErrCredentialNotFound
+		return nil, secrets.ErrNotFound
 	}
 
 	attributes, err := service.GetAttributes(ctx, items[0])
@@ -472,7 +472,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 	return secret, nil
 }
 
-func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[secrets.ID]secrets.Secret, error) {
 	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
@@ -508,7 +508,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	// An empty collection is a valid empty result for "list all", not a miss:
 	// return an empty (non-nil) map with a nil error. This matches the macOS and Windows backends, which
 	// have no empty-as-error guard.
-	credentials := make(map[store.ID]store.Secret, len(itemPaths))
+	credentials := make(map[secrets.ID]secrets.Secret, len(itemPaths))
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(ctx, itemPath)
 		if err != nil {
@@ -520,7 +520,7 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 			return nil, errors.New("secret attributes does not contain `id` field")
 		}
 
-		secretID, err := store.ParseID(attrID)
+		secretID, err := secrets.ParseID(attrID)
 		if err != nil {
 			return nil, err
 		}
@@ -537,14 +537,14 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	return credentials, nil
 }
 
-func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(ctx context.Context, id secrets.ID, secret secrets.Secret) error {
 	value, err := secret.Marshal()
 	if err != nil {
 		return err
 	}
 	defer clear(value)
 	if len(value) == 0 {
-		return store.ErrEmptySecret
+		return secrets.ErrEmptySecret
 	}
 
 	service, err := operationService(ctx)
@@ -631,7 +631,7 @@ func (k *keychainStore[T]) Save(ctx context.Context, id store.ID, secret store.S
 	return nil
 }
 
-func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Upsert(ctx context.Context, id secrets.ID, secret secrets.Secret) error {
 	return k.Save(ctx, id, secret)
 }
 
@@ -640,12 +640,12 @@ func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store
 // collection, used to re-unlock if it relocks mid-read (see withRelockRetry).
 func (k *keychainStore[T]) loadSecret(
 	ctx context.Context,
-	id store.ID,
+	id secrets.ID,
 	svc secretService,
 	collectionPath, itemPath dbus.ObjectPath,
 	session *kc.Session,
 	attributes map[string]string,
-) (store.Secret, error) {
+) (secrets.Secret, error) {
 	var value []byte
 	err := withRelockRetry(ctx, svc, collectionPath, func() error {
 		var getErr error
@@ -667,7 +667,7 @@ func (k *keychainStore[T]) loadSecret(
 }
 
 //gocyclo:ignore
-func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	service, err := operationService(ctx)
 	if err != nil {
 		return nil, err
@@ -703,7 +703,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		return nil, fmt.Errorf("failed to search collection: %w", err)
 	}
 
-	credentials := make(map[store.ID]store.Secret)
+	credentials := make(map[secrets.ID]secrets.Secret)
 	for _, itemPath := range itemPaths {
 		attributes, err := service.GetAttributes(ctx, itemPath)
 		if err != nil {
@@ -711,7 +711,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		}
 
 		// it is possible that someone else has stored secrets in the keychain
-		// directly without conforming to the store.ID format.
+		// directly without conforming to the secrets.ID format.
 		// We shouldn't error here when these values cannot be retrieved or
 		// parsed. Instead we just ignore them and proceed.
 		// I guess in future we could at least log them somewhere?
@@ -721,7 +721,7 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 			continue
 		}
 
-		secretID, err := store.ParseID(attrID)
+		secretID, err := secrets.ParseID(attrID)
 		if err != nil {
 			continue
 		}

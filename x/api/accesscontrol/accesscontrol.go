@@ -17,7 +17,7 @@ package accesscontrol
 import (
 	"context"
 
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type AccessControl interface {

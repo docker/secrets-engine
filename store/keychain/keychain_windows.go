@@ -26,7 +26,7 @@ import (
 	"github.com/danieljoos/wincred"
 	"golang.org/x/sys/windows"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/keychain/internal/utf16le"
 )
 
@@ -54,14 +54,14 @@ const (
 )
 
 // encodeSecret marshals the secret into a slice of bytes in UTF16 format
-func encodeSecret(secret store.Secret) ([]byte, error) {
+func encodeSecret(secret secrets.Secret) ([]byte, error) {
 	data, err := secret.Marshal()
 	if err != nil {
 		return nil, err
 	}
 	defer clear(data)
 	if len(data) == 0 {
-		return nil, store.ErrEmptySecret
+		return nil, secrets.ErrEmptySecret
 	}
 
 	return utf16le.Encode(data), nil
@@ -69,7 +69,7 @@ func encodeSecret(secret store.Secret) ([]byte, error) {
 
 // decodeSecret unmarshals the secret from UTF16 format to UTF8
 // secret will contain the unmarshaled value.
-func decodeSecret(blob []byte, secret store.Secret) error {
+func decodeSecret(blob []byte, secret secrets.Secret) error {
 	val := utf16le.Decode(blob)
 	defer clear(val)
 
@@ -98,10 +98,10 @@ func isChunkCredential(attrs []wincred.CredentialAttribute) bool {
 	return false
 }
 
-type keychainStore[T store.Secret] struct {
+type keychainStore[T secrets.Secret] struct {
 	serviceGroup string
 	serviceName  string
-	factory      store.Factory[T]
+	factory      secrets.Factory[T]
 }
 
 // ensureAvailable is the Windows no-op of the per-platform availability hook New
@@ -112,13 +112,13 @@ type keychainStore[T store.Secret] struct {
 func ensureAvailable(_ context.Context) error { return nil }
 
 // itemChunkLabel returns the target name for the i-th chunk of a secret.
-func (k *keychainStore[T]) itemChunkLabel(id store.ID, index int) string {
+func (k *keychainStore[T]) itemChunkLabel(id secrets.ID, index int) string {
 	return fmt.Sprintf("%s:chunk:%d", k.itemLabel(id.String()), index)
 }
 
 // readChunks fetches count chunk credentials for id and concatenates their
 // raw CredentialBlob bytes in order.
-func (k *keychainStore[T]) readChunks(id store.ID, count int) ([]byte, error) {
+func (k *keychainStore[T]) readChunks(id secrets.ID, count int) ([]byte, error) {
 	var blob []byte
 	for i := range count {
 		gc, err := wincred.GetGenericCredential(k.itemChunkLabel(id, i))
@@ -132,7 +132,7 @@ func (k *keychainStore[T]) readChunks(id store.ID, count int) ([]byte, error) {
 
 // deleteChunks removes chunk credentials for id until none remain.
 // It is safe to call when no chunks exist.
-func (k *keychainStore[T]) deleteChunks(id store.ID) error {
+func (k *keychainStore[T]) deleteChunks(id secrets.ID) error {
 	for i := 0; ; i++ {
 		g := wincred.NewGenericCredential(k.itemChunkLabel(id, i))
 		err := g.Delete()
@@ -145,7 +145,7 @@ func (k *keychainStore[T]) deleteChunks(id store.ID) error {
 	}
 }
 
-func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
+func (k *keychainStore[T]) Delete(_ context.Context, id secrets.ID) error {
 	if err := k.deleteChunks(id); err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (k *keychainStore[T]) Delete(_ context.Context, id store.ID) error {
 	return nil
 }
 
-func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, error) {
+func (k *keychainStore[T]) Get(ctx context.Context, id secrets.ID) (secrets.Secret, error) {
 	gc, err := wincred.GetGenericCredential(k.itemLabel(id.String()))
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -198,7 +198,7 @@ func (k *keychainStore[T]) Get(ctx context.Context, id store.ID) (store.Secret, 
 //
 // The keychainStore serviceGroup and serviceName should match what is stored
 // in the attributes.
-func isServiceCredential[T store.Secret](k *keychainStore[T], attrs []wincred.CredentialAttribute) bool {
+func isServiceCredential[T secrets.Secret](k *keychainStore[T], attrs []wincred.CredentialAttribute) bool {
 	// must have both serviceGroup and serviceName
 	var (
 		serviceName  string
@@ -217,7 +217,7 @@ func isServiceCredential[T store.Secret](k *keychainStore[T], attrs []wincred.Cr
 
 // findServiceCredentials is an iterator that yields credentials that match the
 // service group and service name.
-func findServiceCredentials[T store.Secret](k *keychainStore[T], pattern store.Pattern, credentials []*wincred.Credential) iter.Seq[*wincred.Credential] {
+func findServiceCredentials[T secrets.Secret](k *keychainStore[T], pattern secrets.Pattern, credentials []*wincred.Credential) iter.Seq[*wincred.Credential] {
 	return func(yield func(cred *wincred.Credential) bool) {
 		for _, c := range credentials {
 			if isChunkCredential(c.Attributes) {
@@ -226,7 +226,7 @@ func findServiceCredentials[T store.Secret](k *keychainStore[T], pattern store.P
 			if !isServiceCredential(k, c.Attributes) {
 				continue
 			}
-			id, err := store.ParseID(c.UserName)
+			id, err := secrets.ParseID(c.UserName)
 			if err != nil {
 				continue
 			}
@@ -259,7 +259,7 @@ func mapFromWindowsAttributes(winAttrs []wincred.CredentialAttribute) map[string
 	return attributes
 }
 
-func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[secrets.ID]secrets.Secret, error) {
 	credentials, err := wincred.List()
 	if err != nil {
 		return nil, mapWindowsCredentialError(err)
@@ -268,11 +268,11 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 	onlyLabelPrefix := k.itemLabel("")
 
 	// this pattern matches any secret ID that conforms to the secrets engine
-	pattern := store.MustParsePattern("**")
+	pattern := secrets.MustParsePattern("**")
 
-	secrets := make(map[store.ID]store.Secret)
+	results := make(map[secrets.ID]secrets.Secret)
 	for cred := range findServiceCredentials(k, pattern, credentials) {
-		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
+		id, err := secrets.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			return nil, err
 		}
@@ -284,13 +284,13 @@ func (k *keychainStore[T]) GetAllMetadata(ctx context.Context) (map[store.ID]sto
 		if err := secret.SetMetadata(attributes); err != nil {
 			return nil, err
 		}
-		secrets[id] = secret
+		results[id] = secret
 	}
 
-	return secrets, nil
+	return results, nil
 }
 
-func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Save(_ context.Context, id secrets.ID, secret secrets.Secret) error {
 	blob, err := encodeSecret(secret)
 	if err != nil {
 		return err
@@ -340,11 +340,11 @@ func (k *keychainStore[T]) Save(_ context.Context, id store.ID, secret store.Sec
 	return mapWindowsCredentialError(g.Write())
 }
 
-func (k *keychainStore[T]) Upsert(ctx context.Context, id store.ID, secret store.Secret) error {
+func (k *keychainStore[T]) Upsert(ctx context.Context, id secrets.ID, secret secrets.Secret) error {
 	return k.Save(ctx, id, secret)
 }
 
-func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (map[store.ID]store.Secret, error) {
+func (k *keychainStore[T]) Filter(ctx context.Context, pattern secrets.Pattern) (map[secrets.ID]secrets.Secret, error) {
 	// Note: there is no notion of a filter on Windows inside the wincred API.
 	// It has no way to even filter on known attributes.
 	// This means we need to retrieve the entire list of ALL secrets, that
@@ -360,15 +360,15 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 
 	onlyLabelPrefix := k.itemLabel("")
 
-	secrets := make(map[store.ID]store.Secret)
+	results := make(map[secrets.ID]secrets.Secret)
 	for cred := range findServiceCredentials(k, pattern, credentials) {
 		// it is possible that someone else has stored secrets in the keychain
-		// directly without conforming to the store.ID format.
+		// directly without conforming to the secrets.ID format.
 		// We shouldn't error here when these values cannot be retrieved or
 		// parsed. Instead we just ignore them and proceed.
 		// I guess in future we could at least log them somewhere?
 		// but for now, let's just continue with the other items in the store.
-		id, err := store.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
+		id, err := secrets.ParseID(strings.ReplaceAll(cred.TargetName, onlyLabelPrefix, ""))
 		if err != nil {
 			continue
 		}
@@ -382,16 +382,16 @@ func (k *keychainStore[T]) Filter(ctx context.Context, pattern store.Pattern) (m
 		if err != nil {
 			return nil, err
 		}
-		secrets[id] = secret
+		results[id] = secret
 	}
 
-	return secrets, nil
+	return results, nil
 }
 
 // loadSecret fetches, decodes, and zeroes the raw blob for id, then
 // returns a fully populated Secret. rawBlob is zeroed only when it was
 // allocated by readChunks (chunked path); gc.CredentialBlob is not ours.
-func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, gc *wincred.GenericCredential) (store.Secret, error) {
+func (k *keychainStore[T]) loadSecret(ctx context.Context, id secrets.ID, gc *wincred.GenericCredential) (secrets.Secret, error) {
 	gcAttributes := mapFromWindowsAttributes(gc.Attributes)
 
 	var (
@@ -431,7 +431,7 @@ func (k *keychainStore[T]) loadSecret(ctx context.Context, id store.ID, gc *winc
 func mapWindowsCredentialError(err error) error {
 	switch err {
 	case wincred.ErrElementNotFound:
-		return store.ErrCredentialNotFound
+		return secrets.ErrNotFound
 	case wincred.ErrBadUsername:
 		return ErrCredentialBadUsername
 	case wincred.ErrInvalidParameter:

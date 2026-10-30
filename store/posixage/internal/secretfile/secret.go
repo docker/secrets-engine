@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/secrets-engine/store"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 type EncryptedSecret struct {
@@ -33,20 +33,20 @@ type EncryptedSecret struct {
 // IDToDirName encodes a secret ID as a base64 string suitable for use
 // as a directory name. This avoids issues with unsupported characters
 // (such as slashes) in filesystem paths.
-func IDToDirName(id store.ID) string {
+func IDToDirName(id secrets.ID) string {
 	return base64.StdEncoding.EncodeToString([]byte(id.String()))
 }
 
 // DirNameToID decodes a base64-encoded directory name back into a secret ID.
 //
 // It returns an error if the directory name is not valid base64 or cannot
-// be parsed into a [store.ID].
-func DirNameToID(dirName string) (store.ID, error) {
+// be parsed into a [secrets.ID].
+func DirNameToID(dirName string) (secrets.ID, error) {
 	s, err := base64.StdEncoding.DecodeString(dirName)
 	if err != nil {
 		return nil, err
 	}
-	return store.ParseID(string(s))
+	return secrets.ParseID(string(s))
 }
 
 const (
@@ -99,7 +99,7 @@ func atomicWrite(fs *os.Root, fileName string, data []byte) error {
 //
 // If any step fails, the directory is removed to prevent partial or
 // inconsistent state. An error is returned in such cases.
-func Persist(id store.ID, root *os.Root, metadata map[string]string, secrets []EncryptedSecret) error {
+func Persist(id secrets.ID, root *os.Root, metadata map[string]string, encrypted []EncryptedSecret) error {
 	secretDirName := IDToDirName(id)
 
 	// always remove the directory before writing
@@ -141,7 +141,7 @@ func Persist(id store.ID, root *os.Root, metadata map[string]string, secrets []E
 		return err
 	}
 
-	for _, s := range secrets {
+	for _, s := range encrypted {
 		err = atomicWrite(secretDir, SecretFileName+string(s.KeyType), s.EncryptedData)
 		if err != nil {
 			return err
@@ -152,7 +152,7 @@ func Persist(id store.ID, root *os.Root, metadata map[string]string, secrets []E
 }
 
 // RestoreSecret reads the secret and metadata files from its scoped directory
-func RestoreSecret(id store.ID, root *os.Root) ([]EncryptedSecret, map[string]string, error) {
+func RestoreSecret(id secrets.ID, root *os.Root) ([]EncryptedSecret, map[string]string, error) {
 	secretDir, err := root.OpenRoot(IDToDirName(id))
 	if err != nil {
 		return nil, nil, err
@@ -171,7 +171,7 @@ func RestoreSecret(id store.ID, root *os.Root) ([]EncryptedSecret, map[string]st
 		return nil, nil, err
 	}
 
-	var secrets []EncryptedSecret
+	var encrypted []EncryptedSecret
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -183,13 +183,13 @@ func RestoreSecret(id store.ID, root *os.Root) ([]EncryptedSecret, map[string]st
 		if err != nil {
 			continue
 		}
-		secrets = append(secrets, EncryptedSecret{
+		encrypted = append(encrypted, EncryptedSecret{
 			KeyType:       KeyType(strings.ReplaceAll(file.Name(), SecretFileName, "")),
 			EncryptedData: encryptedData,
 		})
 	}
 
-	return secrets, metadata, nil
+	return encrypted, metadata, nil
 }
 
 // RestoreMetadata reads and unmarshals the [metadataFileName] file
