@@ -34,11 +34,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store"
 	"github.com/docker/secrets-engine/store/mocks"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
 	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 

@@ -28,7 +28,7 @@ import (
 
 	"github.com/docker/secrets-engine/plugins/pass/commands/internal/prompt"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 //go:embed set_example.md

@@ -15,7 +15,7 @@
 package store
 
 import (
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 var ErrCredentialNotFound = secrets.ErrNotFound

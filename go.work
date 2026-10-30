@@ -5,6 +5,7 @@ use (
 	./plugin
 	./plugins/credentialhelper
 	./plugins/pass
+	./secrets
 	./store
 	./x
 )

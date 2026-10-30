@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/docker/secrets-engine/client/realms"
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 var (

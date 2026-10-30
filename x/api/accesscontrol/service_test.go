@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/secrets"
 	accesscontrolv1 "github.com/docker/secrets-engine/x/api/accesscontrol/v1"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 type stubAccessControl struct {

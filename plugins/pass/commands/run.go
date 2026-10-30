@@ -29,7 +29,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/secrets-engine/x/secrets"
+	"github.com/docker/secrets-engine/secrets"
 )
 
 const sePrefix = "se://"

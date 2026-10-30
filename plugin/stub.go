@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 // stub implements Stub.

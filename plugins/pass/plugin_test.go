@@ -25,8 +25,8 @@ import (
 
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store"
-	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 

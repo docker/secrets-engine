@@ -15,9 +15,8 @@
 package secrets
 
 import (
+	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestParseIDNew(t *testing.T) {
@@ -40,7 +39,9 @@ func TestParseIDNew(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParseID(tc.input)
-			assert.ErrorIs(t, err, tc.expected)
+			if !errors.Is(err, tc.expected) {
+				t.Errorf("ParseID(%q) error = %v, want %v", tc.input, err, tc.expected)
+			}
 		})
 	}
 }
@@ -48,12 +49,15 @@ func TestParseIDNew(t *testing.T) {
 func TestIDComparable(t *testing.T) {
 	a := MustParseID("foo")
 	b := MustParseID("foo")
-	assert.Equal(t, a, b)
+	if a != b {
+		t.Errorf("%v != %v", a, b)
+	}
 	myMap := map[ID]string{}
 	bar := "bar"
 	myMap[MustParseID("foo")] = bar
-	assert.Equal(t, bar, myMap[a])
-	assert.Equal(t, bar, myMap[b])
+	if myMap[a] != bar || myMap[b] != bar {
+		t.Errorf("map lookup = %q, %q, want %q", myMap[a], myMap[b], bar)
+	}
 }
 
 func TestMatchNew(t *testing.T) {
@@ -122,10 +126,16 @@ func TestMatchNew(t *testing.T) {
 		t.Run(tc.pattern, func(t *testing.T) {
 			for _, m := range tc.ids {
 				id, err := ParseID(m)
-				assert.NoError(t, err)
+				if err != nil {
+					t.Fatalf("ParseID(%q): %v", m, err)
+				}
 				pattern, err := ParsePattern(tc.pattern)
-				assert.NoError(t, err)
-				assert.Equalf(t, tc.expected, id.Match(pattern), "unexpected match for id `%q` to and pattern `%q`", m, tc.pattern)
+				if err != nil {
+					t.Fatalf("ParsePattern(%q): %v", tc.pattern, err)
+				}
+				if got := id.Match(pattern); got != tc.expected {
+					t.Errorf("unexpected match for id `%q` to and pattern `%q`: got %v", m, tc.pattern, got)
+				}
 			}
 		})
 	}

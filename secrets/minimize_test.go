@@ -16,9 +16,8 @@ package secrets
 
 import (
 	"fmt"
+	"slices"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestMinimize(t *testing.T) {
@@ -94,7 +93,9 @@ func TestMinimize(t *testing.T) {
 			for _, p := range result {
 				resultStrings = append(resultStrings, p.String())
 			}
-			assert.Equal(t, tc.expected, resultStrings)
+			if !slices.Equal(resultStrings, tc.expected) {
+				t.Errorf("Minimize(%v) = %v, want %v", tc.input, resultStrings, tc.expected)
+			}
 		})
 	}
 }
@@ -137,7 +138,9 @@ func Test_covers(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s covers %s", tc.p, tc.q), func(t *testing.T) {
 			got := covers(canonicalize(tc.p), canonicalize(tc.q))
-			assert.Equal(t, tc.expected, got, "%s covers %s", tc.p, tc.q)
+			if got != tc.expected {
+				t.Errorf("%s covers %s = %v, want %v", tc.p, tc.q, got, tc.expected)
+			}
 		})
 	}
 }

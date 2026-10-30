@@ -14,7 +14,7 @@
 
 package realms
 
-import "github.com/docker/secrets-engine/x/secrets"
+import "github.com/docker/secrets-engine/secrets"
 
 // Docker realms all start with `docker/` as the prefix.
 //

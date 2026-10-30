@@ -23,8 +23,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
-	"github.com/docker/secrets-engine/x/secrets"
 )
 
 const defaultPreflightPingTimeout = 3 * time.Second

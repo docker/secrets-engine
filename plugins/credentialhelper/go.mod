@@ -9,9 +9,12 @@ replace github.com/docker/secrets-engine/plugin => ../../plugin
 
 replace github.com/docker/secrets-engine/x => ../../x
 
+replace github.com/docker/secrets-engine/secrets => ../../secrets
+
 require (
 	github.com/docker/docker-credential-helpers v0.9.4
 	github.com/docker/secrets-engine/plugin v0.3.4
+	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/docker/secrets-engine/x v0.8.5
 	github.com/stretchr/testify v1.11.1
 )

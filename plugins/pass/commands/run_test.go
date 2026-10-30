@@ -40,9 +40,9 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/x/secrets"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
