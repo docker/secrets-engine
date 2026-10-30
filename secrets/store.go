@@ -79,7 +79,7 @@ type Store interface {
 	// On the macOS Keychain an existing item is updated in place, keeping the
 	// applications the user allowed to access it. Another store instance or
 	// process can still write the same item concurrently, in which case Upsert
-	// returns keychain.ErrDuplicateItem.
+	// returns a backend-specific duplicate item error.
 	Upsert(ctx context.Context, id ID, secret Secret) error
 	// Filter returns a map of secrets based on a [Pattern].
 	//
@@ -92,4 +92,7 @@ type Store interface {
 	Filter(ctx context.Context, pattern Pattern) (map[ID]Secret, error)
 }
 
+// Factory returns a new, empty [Secret] for the given ID. Store backends call
+// it for every secret they read, then fill it in with [Secret.SetMetadata]
+// and, when the value is read too, [Secret.Unmarshal].
 type Factory[T Secret] func(context.Context, ID) T

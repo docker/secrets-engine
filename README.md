@@ -252,6 +252,20 @@ for _, profile := range profiles {
 }
 ```
 
+## How to use the core secret types
+
+The IDs, patterns, envelopes and the `Secret` and `Store` interfaces live in
+the `secrets` module, which depends only on the standard library. Import it
+when you implement a secret type or a store backend, or need the types without
+the client:
+
+```shell
+go get github.com/docker/secrets-engine/secrets
+```
+
+See [secrets/README.md](secrets/README.md) for examples and for migrating from
+the deprecated `x/secrets` package and `store` aliases.
+
 ## How to create a plugin
 
 ### 1. Implement the plugin interface

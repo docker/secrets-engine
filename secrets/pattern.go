@@ -20,6 +20,8 @@ import (
 	"strings"
 )
 
+// ErrInvalidPattern is returned by [ParsePattern] when a string is not a
+// valid [Pattern].
 var ErrInvalidPattern = errors.New("invalid pattern")
 
 // validPattern reports whether s is a valid pattern: non-empty '/'-separated
