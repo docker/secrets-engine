@@ -38,7 +38,6 @@ import (
 
 	"github.com/docker/secrets-engine/store/mocks"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
-	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
@@ -46,22 +45,22 @@ type testLogger struct {
 	t *testing.T
 }
 
-// Errorf implements logging.Logger.
+// Errorf implements Logger.
 func (t *testLogger) Errorf(format string, v ...any) {
 	t.t.Logf(format, v...)
 }
 
-// Printf implements logging.Logger.
+// Printf implements Logger.
 func (t *testLogger) Printf(format string, v ...any) {
 	t.t.Logf(format, v...)
 }
 
-// Warnf implements logging.Logger.
+// Warnf implements Logger.
 func (t *testLogger) Warnf(format string, v ...any) {
 	t.t.Logf(format, v...)
 }
 
-var _ logging.Logger = &testLogger{}
+var _ Logger = &testLogger{}
 
 func onlyDirs(f fs.FS) ([]fs.DirEntry, error) {
 	var dirs []fs.DirEntry

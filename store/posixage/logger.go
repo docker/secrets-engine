@@ -14,7 +14,11 @@
 
 package posixage
 
-import "github.com/docker/secrets-engine/x/logging"
+type Logger interface {
+	Printf(format string, v ...any)
+	Warnf(format string, v ...any)
+	Errorf(format string, v ...any)
+}
 
 type noopLogger struct{}
 
@@ -27,4 +31,4 @@ func (n *noopLogger) Printf(_ string, _ ...any) {
 func (n *noopLogger) Warnf(_ string, _ ...any) {
 }
 
-var _ logging.Logger = &noopLogger{}
+var _ Logger = &noopLogger{}

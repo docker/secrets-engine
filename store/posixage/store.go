@@ -39,7 +39,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/store/posixage/internal/flock"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 type fileStore[T secrets.Secret] struct {
@@ -63,7 +62,7 @@ var _ secrets.Store = &fileStore[secrets.Secret]{}
 func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 	f.l.Lock()
 
-	unlock, err := flock.TryLock(logging.WithLogger(ctx, f.logger), f.filesystem)
+	unlock, err := flock.TryLock(flock.WithLogger(ctx, f.logger), f.filesystem)
 	if err != nil {
 		f.l.Unlock()
 		return nil, err
@@ -89,7 +88,7 @@ func (f *fileStore[T]) tryLock(ctx context.Context) (func(), error) {
 func (f *fileStore[T]) tryRLock(ctx context.Context) (func(), error) {
 	f.l.RLock()
 
-	unlock, err := flock.TryRLock(logging.WithLogger(ctx, f.logger), f.filesystem)
+	unlock, err := flock.TryRLock(flock.WithLogger(ctx, f.logger), f.filesystem)
 	if err != nil {
 		f.l.RUnlock()
 		return nil, err
@@ -389,7 +388,7 @@ func (f *fileStore[T]) Upsert(ctx context.Context, id secrets.ID, s secrets.Secr
 }
 
 type config struct {
-	logger                    logging.Logger
+	logger                    Logger
 	registeredDecryptionFunc  []promptCaller
 	registeredEncryptionFuncs []promptCaller
 	// scryptWorkFactor is the scrypt work factor (2^logN) applied to
@@ -401,7 +400,7 @@ type Options func(c *config) error
 
 // WithLogger adds a custom logger to the store.
 // If a no logger has been specified, a noop logger is used instead.
-func WithLogger(l logging.Logger) Options {
+func WithLogger(l Logger) Options {
 	return func(c *config) error {
 		c.logger = l
 		return nil

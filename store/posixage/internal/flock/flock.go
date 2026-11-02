@@ -21,26 +21,31 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"github.com/docker/secrets-engine/x/logging"
 )
 
-// noopLogger discards every record. It is the [logging.Logger]
-// implementation used when no logger is provided in the context passed
-// to [TryLock] or [TryRLock], so the package never writes to the
-// caller's stderr unsolicited.
+type Logger interface {
+	Warnf(format string, v ...any)
+}
+
+// noopLogger discards every record. It is the [Logger] implementation
+// used when no logger is provided in the context passed to [TryLock] or
+// [TryRLock], so the package never writes to the caller's stderr
+// unsolicited.
 type noopLogger struct{}
 
-func (noopLogger) Printf(string, ...any) {}
-func (noopLogger) Warnf(string, ...any)  {}
-func (noopLogger) Errorf(string, ...any) {}
+func (noopLogger) Warnf(string, ...any) {}
 
-// loggerFromCtx returns the [logging.Logger] stored on ctx by
-// [logging.WithLogger], or a [noopLogger] when none is set. The library
-// must never log to a default sink — silence is the safe default for a
-// dependency.
-func loggerFromCtx(ctx context.Context) logging.Logger {
-	if l, err := logging.FromContext(ctx); err == nil {
+type loggerKey struct{}
+
+func WithLogger(ctx context.Context, logger Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
+// loggerFromCtx returns the [Logger] stored on ctx by [WithLogger], or a
+// [noopLogger] when none is set. The library must never log to a default
+// sink — silence is the safe default for a dependency.
+func loggerFromCtx(ctx context.Context) Logger {
+	if l, ok := ctx.Value(loggerKey{}).(Logger); ok && l != nil {
 		return l
 	}
 	return noopLogger{}
@@ -194,7 +199,7 @@ func tryLock(ctx context.Context, root *os.Root, exclusive bool) (UnlockFunc, er
 // The supplied logger is used by the goroutine to surface truncate
 // failures and inode-mismatch hijacks. A [noopLogger] is acceptable when
 // the caller has no logging plumbed.
-func startHeartbeat(fl *os.File, root *os.Root, logger logging.Logger) UnlockFunc {
+func startHeartbeat(fl *os.File, root *os.Root, logger Logger) UnlockFunc {
 	hbCtx, stop := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -219,13 +224,13 @@ func startHeartbeat(fl *os.File, root *os.Root, logger logging.Logger) UnlockFun
 // file at the lock-file path. A mismatch means we have been hijacked
 // (heartbeat starved past [staleThreshold] long enough for recovery to
 // fire). There is no in-band way to fail the caller's outstanding
-// operation, so the mismatch is logged via the supplied [logging.Logger]
+// operation, so the mismatch is logged via the supplied [Logger]
 // and the goroutine keeps running — surfacing the hijack is the best we
 // can do.
 //
 // The goroutine returns when ctx is canceled by [startHeartbeat]'s
 // returned [UnlockFunc].
-func heartbeat(ctx context.Context, fl *os.File, root *os.Root, logger logging.Logger) {
+func heartbeat(ctx context.Context, fl *os.File, root *os.Root, logger Logger) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 	for {
@@ -277,15 +282,15 @@ func retryLock(ctx context.Context, root *os.Root, exclusive bool) (*os.File, er
 // manual intervention may be required.
 //
 // The heartbeat goroutine surfaces truncate failures and hijack
-// detections through the [logging.Logger] stored on ctx via
-// [logging.WithLogger]. When no logger is set, those events are dropped
-// silently — the package never writes to a default sink.
+// detections through the [Logger] stored on ctx via [WithLogger]. When
+// no logger is set, those events are dropped silently — the package never
+// writes to a default sink.
 //
 // On success, the returned [UnlockFunc] MUST be called exactly once to
 // release the lock, close the file descriptor, and stop the heartbeat
 // goroutine. The idiomatic pattern is to defer it immediately:
 //
-//	ctx = logging.WithLogger(ctx, myLogger) // optional
+//	ctx = flock.WithLogger(ctx, myLogger) // optional
 //	unlock, err := flock.TryLock(ctx, root)
 //	if err != nil {
 //	    return err
@@ -313,15 +318,15 @@ func TryLock(ctx context.Context, root *os.Root) (UnlockFunc, error) {
 // manual intervention may be required.
 //
 // The heartbeat goroutine surfaces truncate failures and hijack
-// detections through the [logging.Logger] stored on ctx via
-// [logging.WithLogger]. When no logger is set, those events are dropped
-// silently — the package never writes to a default sink.
+// detections through the [Logger] stored on ctx via [WithLogger]. When
+// no logger is set, those events are dropped silently — the package never
+// writes to a default sink.
 //
 // On success, the returned [UnlockFunc] MUST be called exactly once to
 // release the lock, close the file descriptor, and stop the heartbeat
 // goroutine. The idiomatic pattern is to defer it immediately:
 //
-//	ctx = logging.WithLogger(ctx, myLogger) // optional
+//	ctx = flock.WithLogger(ctx, myLogger) // optional
 //	unlock, err := flock.TryRLock(ctx, root)
 //	if err != nil {
 //	    return err
