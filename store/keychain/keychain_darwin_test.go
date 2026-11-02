@@ -19,6 +19,7 @@ package keychain
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,12 +28,11 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	kc "github.com/docker/secrets-engine/store/keychain/internal/go-keychain"
 	"github.com/docker/secrets-engine/store/mocks"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 func TestMacosKeychain(t *testing.T) {
 	var (
-		serviceName  = testhelper.RandomString()
+		serviceName  = rand.Text()
 		serviceGroup = "com.test.testing"
 	)
 	keychainStore := keychainStore[*mocks.MockCredential]{
@@ -44,9 +44,9 @@ func TestMacosKeychain(t *testing.T) {
 	}
 
 	ids := []string{
-		serviceGroup + "/" + serviceName + "/" + testhelper.RandomString(),
-		serviceGroup + "/" + serviceName + "/" + testhelper.RandomString(),
-		serviceGroup + "/" + serviceName + "/" + testhelper.RandomString(),
+		serviceGroup + "/" + serviceName + "/" + rand.Text(),
+		serviceGroup + "/" + serviceName + "/" + rand.Text(),
+		serviceGroup + "/" + serviceName + "/" + rand.Text(),
 	}
 	t.Cleanup(func() {
 		for _, id := range ids {
@@ -55,8 +55,8 @@ func TestMacosKeychain(t *testing.T) {
 	})
 	for _, id := range ids {
 		assert.NoError(t, keychainStore.Save(t.Context(), secrets.MustParseID(id), &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
 				"color": "purple",
 				"game":  "unknown",
@@ -65,10 +65,10 @@ func TestMacosKeychain(t *testing.T) {
 	}
 
 	t.Run("can store secret that has no attribute", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
+			Username: rand.Text(),
 			Password: "bob2",
 		}
 		t.Cleanup(func() {
@@ -81,14 +81,14 @@ func TestMacosKeychain(t *testing.T) {
 	})
 
 	t.Run("can store large attributes", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
 		})
 
 		large := bytes.Repeat([]byte{'a'}, 1024*1024)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
+			Username: rand.Text(),
 			Password: "bob2",
 			Attributes: map[string]string{
 				"large": string(large),
@@ -103,13 +103,13 @@ func TestMacosKeychain(t *testing.T) {
 	})
 
 	t.Run("filter populates both metadata and secret", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
 		})
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
+			Username: rand.Text(),
 			Password: "bob2",
 			Attributes: map[string]string{
 				"game": "elden ring",
@@ -129,13 +129,13 @@ func TestMacosKeychain(t *testing.T) {
 	})
 
 	t.Run("can use pattern only matching service name", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 
 		t.Cleanup(func() {
 			assert.NoError(t, keychainStore.Delete(t.Context(), id))
 		})
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
+			Username: rand.Text(),
 			Password: "bob2",
 			Attributes: map[string]string{
 				"color": "blue",
@@ -153,7 +153,7 @@ func TestMacosKeychain(t *testing.T) {
 
 func TestUpsert(t *testing.T) {
 	var (
-		serviceName  = testhelper.RandomString()
+		serviceName  = rand.Text()
 		serviceGroup = "com.test.testing"
 	)
 	ks := keychainStore[*mocks.MockCredential]{
@@ -165,7 +165,7 @@ func TestUpsert(t *testing.T) {
 	}
 
 	t.Run("inserts when credential does not exist", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -185,7 +185,7 @@ func TestUpsert(t *testing.T) {
 	})
 
 	t.Run("overwrites an existing credential", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -211,7 +211,7 @@ func TestUpsert(t *testing.T) {
 	})
 
 	t.Run("updates an existing credential in place", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})
@@ -261,7 +261,7 @@ func TestUpsert(t *testing.T) {
 				return &bufferSecret{}
 			},
 		}
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
@@ -281,7 +281,7 @@ func TestUpsert(t *testing.T) {
 				return &bufferSecret{}
 			},
 		}
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
@@ -303,7 +303,7 @@ func TestUpsert(t *testing.T) {
 				return &bufferSecret{}
 			},
 		}
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, bs.Delete(t.Context(), id))
 		})
@@ -316,7 +316,7 @@ func TestUpsert(t *testing.T) {
 	})
 
 	t.Run("save returns duplicate item error when credential already exists", func(t *testing.T) {
-		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + testhelper.RandomString())
+		id := secrets.MustParseID(serviceGroup + "/" + serviceName + "/" + rand.Text())
 		t.Cleanup(func() {
 			assert.NoError(t, ks.Delete(t.Context(), id))
 		})

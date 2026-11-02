@@ -38,7 +38,6 @@ import (
 
 	"github.com/docker/secrets-engine/store/mocks"
 	"github.com/docker/secrets-engine/store/posixage/internal/secretfile"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 type testLogger struct {
@@ -83,7 +82,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -98,14 +97,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		fsFiles, err := onlyDirs(root.FS())
@@ -156,7 +155,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -171,14 +170,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		storeSecret, err := s.Get(t.Context(), id)
@@ -195,7 +194,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -210,20 +209,20 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		results := map[secrets.ID]*mocks.MockCredential{
-			secrets.MustParseID("something/secret1/" + testhelper.RandomString()): {
-				Username: testhelper.RandomString(),
-				Password: testhelper.RandomString(),
+			secrets.MustParseID("something/secret1/" + rand.Text()): {
+				Username: rand.Text(),
+				Password: rand.Text(),
 				Attributes: map[string]string{
-					"val1": testhelper.RandomString(),
-					"val2": testhelper.RandomString(),
+					"val1": rand.Text(),
+					"val2": rand.Text(),
 				},
 			},
-			secrets.MustParseID("something/secret2/" + testhelper.RandomString()): {
-				Username: testhelper.RandomString(),
-				Password: testhelper.RandomString(),
+			secrets.MustParseID("something/secret2/" + rand.Text()): {
+				Username: rand.Text(),
+				Password: rand.Text(),
 				Attributes: map[string]string{
-					"val3": testhelper.RandomString(),
-					"val4": testhelper.RandomString(),
+					"val3": rand.Text(),
+					"val4": rand.Text(),
 				},
 			},
 		}
@@ -253,7 +252,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -268,24 +267,24 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		secretOne := secrets.MustParseID("something/secret1/" + testhelper.RandomString())
-		secretTwo := secrets.MustParseID("something2/secret2/" + testhelper.RandomString())
+		secretOne := secrets.MustParseID("something/secret1/" + rand.Text())
+		secretTwo := secrets.MustParseID("something2/secret2/" + rand.Text())
 
 		results := map[secrets.ID]*mocks.MockCredential{
 			secretOne: {
-				Username: testhelper.RandomString(),
-				Password: testhelper.RandomString(),
+				Username: rand.Text(),
+				Password: rand.Text(),
 				Attributes: map[string]string{
-					"val1": testhelper.RandomString(),
-					"val2": testhelper.RandomString(),
+					"val1": rand.Text(),
+					"val2": rand.Text(),
 				},
 			},
 			secretTwo: {
-				Username: testhelper.RandomString(),
-				Password: testhelper.RandomString(),
+				Username: rand.Text(),
+				Password: rand.Text(),
 				Attributes: map[string]string{
-					"val3": testhelper.RandomString(),
-					"val4": testhelper.RandomString(),
+					"val3": rand.Text(),
+					"val4": rand.Text(),
 				},
 			},
 		}
@@ -305,7 +304,7 @@ func TestPOSIXAge(t *testing.T) {
 	})
 
 	t.Run("filter on an empty store returns an empty map", func(t *testing.T) {
-		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+		s := newPasswordStore(t, newTempRoot(t), rand.Text())
 
 		storeSecrets, err := s.Filter(t.Context(), secrets.MustParsePattern("**"))
 		require.NoError(t, err)
@@ -314,10 +313,10 @@ func TestPOSIXAge(t *testing.T) {
 	})
 
 	t.Run("filter with no matching secret returns an empty map", func(t *testing.T) {
-		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+		s := newPasswordStore(t, newTempRoot(t), rand.Text())
 		require.NoError(t, s.Save(t.Context(), secrets.MustParseID("something/secret1/bob"), &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 		}))
 
 		storeSecrets, err := s.Filter(t.Context(), secrets.MustParsePattern("something/secret1/alice"))
@@ -327,7 +326,7 @@ func TestPOSIXAge(t *testing.T) {
 	})
 
 	t.Run("get all metadata on an empty store returns an empty map", func(t *testing.T) {
-		s := newPasswordStore(t, newTempRoot(t), testhelper.RandomString())
+		s := newPasswordStore(t, newTempRoot(t), rand.Text())
 
 		storeSecrets, err := s.GetAllMetadata(t.Context())
 		require.NoError(t, err)
@@ -342,7 +341,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
@@ -366,14 +365,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		fsFiles, err := onlyDirs(root.FS())
@@ -425,7 +424,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
@@ -449,14 +448,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		fsFiles, err := onlyDirs(root.FS())
@@ -494,7 +493,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
@@ -528,14 +527,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		x := s.(*fileStore[*mocks.MockCredential])
@@ -565,7 +564,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
@@ -611,14 +610,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		storeSecret, err := s.Get(t.Context(), id)
@@ -633,7 +632,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
@@ -673,14 +672,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		storeSecret, err := s.Get(t.Context(), id)
@@ -695,7 +694,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -711,10 +710,10 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Upsert(t.Context(), id, secret))
 
 		storeSecret, err := s.Get(t.Context(), id)
@@ -729,7 +728,7 @@ func TestPOSIXAge(t *testing.T) {
 			assert.NoError(t, root.Close())
 		})
 
-		masterKey := testhelper.RandomString()
+		masterKey := rand.Text()
 		s, err := New(root,
 			func(_ context.Context, _ secrets.ID) *mocks.MockCredential {
 				return &mocks.MockCredential{}
@@ -745,15 +744,15 @@ func TestPOSIXAge(t *testing.T) {
 		require.NoError(t, err)
 
 		original := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, original))
 
 		updated := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 		}
 		require.NoError(t, s.Upsert(t.Context(), id, updated))
 
@@ -784,14 +783,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		assert.ErrorIs(t, s.Save(t.Context(), id, secret), encryptError)
 	})
 
@@ -817,14 +816,14 @@ func TestPOSIXAge(t *testing.T) {
 		)
 		require.NoError(t, err)
 		secret := &mocks.MockCredential{
-			Username: testhelper.RandomString(),
-			Password: testhelper.RandomString(),
+			Username: rand.Text(),
+			Password: rand.Text(),
 			Attributes: map[string]string{
-				"val1": testhelper.RandomString(),
-				"val2": testhelper.RandomString(),
+				"val1": rand.Text(),
+				"val2": rand.Text(),
 			},
 		}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		_, err = s.Get(t.Context(), id)
@@ -905,12 +904,12 @@ func TestScryptWorkFactor(t *testing.T) {
 	const workFactor = 10
 
 	t.Run("records the configured work factor in the header", func(t *testing.T) {
-		password := testhelper.RandomString()
+		password := rand.Text()
 		root := newTempRoot(t)
 		s := newPasswordStore(t, root, password, WithScryptWorkFactor(workFactor))
 
-		secret := &mocks.MockCredential{Username: testhelper.RandomString(), Password: testhelper.RandomString()}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		secret := &mocks.MockCredential{Username: rand.Text(), Password: rand.Text()}
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		encryptedFile := readPassSecret(t, root, id)
@@ -923,12 +922,12 @@ func TestScryptWorkFactor(t *testing.T) {
 	})
 
 	t.Run("defaults to the age work factor when unset", func(t *testing.T) {
-		password := testhelper.RandomString()
+		password := rand.Text()
 		root := newTempRoot(t)
 		s := newPasswordStore(t, root, password)
 
-		secret := &mocks.MockCredential{Username: testhelper.RandomString(), Password: testhelper.RandomString()}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		secret := &mocks.MockCredential{Username: rand.Text(), Password: rand.Text()}
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, s.Save(t.Context(), id, secret))
 
 		encryptedFile := readPassSecret(t, root, id)
@@ -940,12 +939,12 @@ func TestScryptWorkFactor(t *testing.T) {
 		// A file written with a custom work factor must decrypt on a store that
 		// has no work-factor option configured: the factor is read from the
 		// header, not from store configuration.
-		password := testhelper.RandomString()
+		password := rand.Text()
 		root := newTempRoot(t)
 		writer := newPasswordStore(t, root, password, WithScryptWorkFactor(workFactor))
 
-		secret := &mocks.MockCredential{Username: testhelper.RandomString(), Password: testhelper.RandomString()}
-		id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+		secret := &mocks.MockCredential{Username: rand.Text(), Password: rand.Text()}
+		id := secrets.MustParseID("test/something/" + rand.Text())
 		require.NoError(t, writer.Save(t.Context(), id, secret))
 
 		// A separate store with no work-factor option configured.
@@ -983,17 +982,17 @@ func TestScryptWorkFactor(t *testing.T) {
 // configured for a different work factor migrates the stored file to that
 // factor while preserving the plaintext. The factor moves in both directions.
 func TestScryptWorkFactorMigration(t *testing.T) {
-	password := testhelper.RandomString()
+	password := rand.Text()
 	root := newTempRoot(t)
 
 	secret := &mocks.MockCredential{
-		Username: testhelper.RandomString(),
-		Password: testhelper.RandomString(),
+		Username: rand.Text(),
+		Password: rand.Text(),
 		Attributes: map[string]string{
-			"val1": testhelper.RandomString(),
+			"val1": rand.Text(),
 		},
 	}
-	id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+	id := secrets.MustParseID("test/something/" + rand.Text())
 
 	// Seed the secret with the age default (logN=18), simulating data written
 	// by a build that never configured a work factor.
@@ -1064,7 +1063,7 @@ func TestSaveRejectsEmptySecret(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-	id := secrets.MustParseID("test/something/" + testhelper.RandomString())
+	id := secrets.MustParseID("test/something/" + rand.Text())
 
 	for _, secret := range []secrets.Secret{&emptySecret{}, &emptySecret{value: []byte{}}} {
 		require.ErrorIs(t, s.Save(t.Context(), id, secret), secrets.ErrEmptySecret)
