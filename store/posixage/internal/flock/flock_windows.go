@@ -19,6 +19,8 @@ package flock
 import (
 	"errors"
 	"os"
+	"path/filepath"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -26,6 +28,51 @@ import (
 const (
 	maxBytes = ^uint32(0) // lock the whole file
 )
+
+func openFile(root *os.Root) (*os.File, error) {
+	dir, err := root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = dir.Close() }()
+
+	name, err := windows.NewNTUnicodeString(lockFileName)
+	if err != nil {
+		return nil, err
+	}
+	oa := windows.OBJECT_ATTRIBUTES{
+		RootDirectory: windows.Handle(dir.Fd()),
+		ObjectName:    name,
+		Attributes:    windows.OBJ_CASE_INSENSITIVE | windows.OBJ_DONT_REPARSE,
+	}
+	oa.Length = uint32(unsafe.Sizeof(oa))
+
+	var (
+		h    windows.Handle
+		iosb windows.IO_STATUS_BLOCK
+	)
+	err = windows.NtCreateFile(
+		&h,
+		windows.FILE_GENERIC_READ|windows.FILE_GENERIC_WRITE|windows.SYNCHRONIZE,
+		&oa,
+		&iosb,
+		nil,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		windows.FILE_OPEN_IF,
+		windows.FILE_NON_DIRECTORY_FILE|windows.FILE_SYNCHRONOUS_IO_NONALERT,
+		0,
+		0,
+	)
+	if err != nil {
+		var status windows.NTStatus
+		if errors.As(err, &status) {
+			err = status.Errno()
+		}
+		return nil, &os.PathError{Op: "open", Path: lockFileName, Err: err}
+	}
+	return os.NewFile(uintptr(h), filepath.Join(root.Name(), lockFileName)), nil
+}
 
 func lockFile(fd uintptr, exclusive bool) error {
 	var flag uint32 = windows.LOCKFILE_FAIL_IMMEDIATELY
