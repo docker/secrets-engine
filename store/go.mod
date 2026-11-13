@@ -5,8 +5,6 @@ go 1.26.11
 // This `replace` is only for CI to function.
 // The correct version will get resolved from below when this module is
 // retrieved using `go get`.
-replace github.com/docker/secrets-engine/x => ../x
-
 replace github.com/docker/secrets-engine/secrets => ../secrets
 
 require (
