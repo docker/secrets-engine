@@ -220,8 +220,8 @@ const file_health_v1_api_proto_rawDesc = "" +
 	"commitHash2[\n" +
 	"\x0eVersionService\x12I\n" +
 	"\n" +
-	"GetVersion\x12\x1c.health.v1.GetVersionRequest\x1a\x1d.health.v1.GetVersionResponseB\x99\x01\n" +
-	"\rcom.health.v1B\bApiProtoP\x01Z9github.com/docker/secrets-engine/x/api/health/v1;healthv1\xa2\x02\x03HXX\xaa\x02\tHealth.V1\xca\x02\tHealth\\V1\xe2\x02\x15Health\\V1\\GPBMetadata\xea\x02\n" +
+	"GetVersion\x12\x1c.health.v1.GetVersionRequest\x1a\x1d.health.v1.GetVersionResponseB\x9e\x01\n" +
+	"\rcom.health.v1B\bApiProtoP\x01Z>github.com/docker/secrets-engine/client/api/health/v1;healthv1\xa2\x02\x03HXX\xaa\x02\tHealth.V1\xca\x02\tHealth\\V1\xe2\x02\x15Health\\V1\\GPBMetadata\xea\x02\n" +
 	"Health::V1b\beditionsp\xe8\a"
 
 var file_health_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 2)

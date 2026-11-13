@@ -5,6 +5,10 @@ modules:
 lint:
   use:
     - STANDARD
+  ignore_only:
+    # management.proto generates its messages into client/api/plugins/v1.
+    PACKAGE_SAME_GO_PACKAGE:
+      - x/api/plugins/v1
 breaking:
   use:
     - FILE

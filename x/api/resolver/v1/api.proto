@@ -18,7 +18,7 @@ package resolver.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1";
+option go_package = "github.com/docker/secrets-engine/client/api/resolver/v1;resolverv1";
 
 service ResolverService {
   // Resolve a secret by its ID.

@@ -25,8 +25,6 @@ const (
 	RegisterServiceName = "plugins.v1.RegisterService"
 	// PluginServiceName is the fully-qualified name of the PluginService service.
 	PluginServiceName = "plugins.v1.PluginService"
-	// PluginManagementServiceName is the fully-qualified name of the PluginManagementService service.
-	PluginManagementServiceName = "plugins.v1.PluginManagementService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -42,15 +40,6 @@ const (
 	RegisterServiceRegisterPluginProcedure = "/plugins.v1.RegisterService/RegisterPlugin"
 	// PluginServiceShutdownProcedure is the fully-qualified name of the PluginService's Shutdown RPC.
 	PluginServiceShutdownProcedure = "/plugins.v1.PluginService/Shutdown"
-	// PluginManagementServiceListPluginsProcedure is the fully-qualified name of the
-	// PluginManagementService's ListPlugins RPC.
-	PluginManagementServiceListPluginsProcedure = "/plugins.v1.PluginManagementService/ListPlugins"
-	// PluginManagementServiceEnablePluginProcedure is the fully-qualified name of the
-	// PluginManagementService's EnablePlugin RPC.
-	PluginManagementServiceEnablePluginProcedure = "/plugins.v1.PluginManagementService/EnablePlugin"
-	// PluginManagementServiceDisablePluginProcedure is the fully-qualified name of the
-	// PluginManagementService's DisablePlugin RPC.
-	PluginManagementServiceDisablePluginProcedure = "/plugins.v1.PluginManagementService/DisablePlugin"
 )
 
 // RegisterServiceClient is a client for the plugins.v1.RegisterService service.
@@ -195,133 +184,4 @@ type UnimplementedPluginServiceHandler struct{}
 
 func (UnimplementedPluginServiceHandler) Shutdown(context.Context, *connect.Request[v1.ShutdownRequest]) (*connect.Response[v1.ShutdownResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("plugins.v1.PluginService.Shutdown is not implemented"))
-}
-
-// PluginManagementServiceClient is a client for the plugins.v1.PluginManagementService service.
-type PluginManagementServiceClient interface {
-	// ListPlugins returns all plugins registered with the engine.
-	ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error)
-	// EnablePlugin enables a plugin by name.
-	EnablePlugin(context.Context, *connect.Request[v1.EnablePluginRequest]) (*connect.Response[v1.EnablePluginResponse], error)
-	// DisablePlugin disables a plugin by name.
-	DisablePlugin(context.Context, *connect.Request[v1.DisablePluginRequest]) (*connect.Response[v1.DisablePluginResponse], error)
-}
-
-// NewPluginManagementServiceClient constructs a client for the plugins.v1.PluginManagementService
-// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
-// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
-// the connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewPluginManagementServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) PluginManagementServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	pluginManagementServiceMethods := v1.File_plugins_v1_api_proto.Services().ByName("PluginManagementService").Methods()
-	return &pluginManagementServiceClient{
-		listPlugins: connect.NewClient[v1.ListPluginsRequest, v1.ListPluginsResponse](
-			httpClient,
-			baseURL+PluginManagementServiceListPluginsProcedure,
-			connect.WithSchema(pluginManagementServiceMethods.ByName("ListPlugins")),
-			connect.WithClientOptions(opts...),
-		),
-		enablePlugin: connect.NewClient[v1.EnablePluginRequest, v1.EnablePluginResponse](
-			httpClient,
-			baseURL+PluginManagementServiceEnablePluginProcedure,
-			connect.WithSchema(pluginManagementServiceMethods.ByName("EnablePlugin")),
-			connect.WithClientOptions(opts...),
-		),
-		disablePlugin: connect.NewClient[v1.DisablePluginRequest, v1.DisablePluginResponse](
-			httpClient,
-			baseURL+PluginManagementServiceDisablePluginProcedure,
-			connect.WithSchema(pluginManagementServiceMethods.ByName("DisablePlugin")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// pluginManagementServiceClient implements PluginManagementServiceClient.
-type pluginManagementServiceClient struct {
-	listPlugins   *connect.Client[v1.ListPluginsRequest, v1.ListPluginsResponse]
-	enablePlugin  *connect.Client[v1.EnablePluginRequest, v1.EnablePluginResponse]
-	disablePlugin *connect.Client[v1.DisablePluginRequest, v1.DisablePluginResponse]
-}
-
-// ListPlugins calls plugins.v1.PluginManagementService.ListPlugins.
-func (c *pluginManagementServiceClient) ListPlugins(ctx context.Context, req *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
-	return c.listPlugins.CallUnary(ctx, req)
-}
-
-// EnablePlugin calls plugins.v1.PluginManagementService.EnablePlugin.
-func (c *pluginManagementServiceClient) EnablePlugin(ctx context.Context, req *connect.Request[v1.EnablePluginRequest]) (*connect.Response[v1.EnablePluginResponse], error) {
-	return c.enablePlugin.CallUnary(ctx, req)
-}
-
-// DisablePlugin calls plugins.v1.PluginManagementService.DisablePlugin.
-func (c *pluginManagementServiceClient) DisablePlugin(ctx context.Context, req *connect.Request[v1.DisablePluginRequest]) (*connect.Response[v1.DisablePluginResponse], error) {
-	return c.disablePlugin.CallUnary(ctx, req)
-}
-
-// PluginManagementServiceHandler is an implementation of the plugins.v1.PluginManagementService
-// service.
-type PluginManagementServiceHandler interface {
-	// ListPlugins returns all plugins registered with the engine.
-	ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error)
-	// EnablePlugin enables a plugin by name.
-	EnablePlugin(context.Context, *connect.Request[v1.EnablePluginRequest]) (*connect.Response[v1.EnablePluginResponse], error)
-	// DisablePlugin disables a plugin by name.
-	DisablePlugin(context.Context, *connect.Request[v1.DisablePluginRequest]) (*connect.Response[v1.DisablePluginResponse], error)
-}
-
-// NewPluginManagementServiceHandler builds an HTTP handler from the service implementation. It
-// returns the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewPluginManagementServiceHandler(svc PluginManagementServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	pluginManagementServiceMethods := v1.File_plugins_v1_api_proto.Services().ByName("PluginManagementService").Methods()
-	pluginManagementServiceListPluginsHandler := connect.NewUnaryHandler(
-		PluginManagementServiceListPluginsProcedure,
-		svc.ListPlugins,
-		connect.WithSchema(pluginManagementServiceMethods.ByName("ListPlugins")),
-		connect.WithHandlerOptions(opts...),
-	)
-	pluginManagementServiceEnablePluginHandler := connect.NewUnaryHandler(
-		PluginManagementServiceEnablePluginProcedure,
-		svc.EnablePlugin,
-		connect.WithSchema(pluginManagementServiceMethods.ByName("EnablePlugin")),
-		connect.WithHandlerOptions(opts...),
-	)
-	pluginManagementServiceDisablePluginHandler := connect.NewUnaryHandler(
-		PluginManagementServiceDisablePluginProcedure,
-		svc.DisablePlugin,
-		connect.WithSchema(pluginManagementServiceMethods.ByName("DisablePlugin")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/plugins.v1.PluginManagementService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case PluginManagementServiceListPluginsProcedure:
-			pluginManagementServiceListPluginsHandler.ServeHTTP(w, r)
-		case PluginManagementServiceEnablePluginProcedure:
-			pluginManagementServiceEnablePluginHandler.ServeHTTP(w, r)
-		case PluginManagementServiceDisablePluginProcedure:
-			pluginManagementServiceDisablePluginHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
-}
-
-// UnimplementedPluginManagementServiceHandler returns CodeUnimplemented from all methods.
-type UnimplementedPluginManagementServiceHandler struct{}
-
-func (UnimplementedPluginManagementServiceHandler) ListPlugins(context.Context, *connect.Request[v1.ListPluginsRequest]) (*connect.Response[v1.ListPluginsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("plugins.v1.PluginManagementService.ListPlugins is not implemented"))
-}
-
-func (UnimplementedPluginManagementServiceHandler) EnablePlugin(context.Context, *connect.Request[v1.EnablePluginRequest]) (*connect.Response[v1.EnablePluginResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("plugins.v1.PluginManagementService.EnablePlugin is not implemented"))
-}
-
-func (UnimplementedPluginManagementServiceHandler) DisablePlugin(context.Context, *connect.Request[v1.DisablePluginRequest]) (*connect.Response[v1.DisablePluginResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("plugins.v1.PluginManagementService.DisablePlugin is not implemented"))
 }

@@ -7,8 +7,11 @@ go 1.26.11
 // retrieved using `go get`.
 replace github.com/docker/secrets-engine/secrets => ../secrets
 
+replace github.com/docker/secrets-engine/client => ../client
+
 require (
 	connectrpc.com/connect v1.19.1
+	github.com/docker/secrets-engine/client v0.2.2
 	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1

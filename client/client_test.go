@@ -33,14 +33,15 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	healthv1 "github.com/docker/secrets-engine/client/api/health/v1"
+	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
+	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
-	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
+	xpluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
@@ -96,11 +97,11 @@ func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[plugi
 		}
 		switch {
 		case plugin.SecretsProvider != nil:
-			b.SecretsProvider = pluginsv1.SecretsProvider_builder{
+			b.SecretsProvider = xpluginsv1.SecretsProvider_builder{
 				Pattern: proto.String(plugin.SecretsProvider.Pattern.String()),
 			}.Build()
 		case plugin.AccessControlModule != nil:
-			b.AccessControlModule = pluginsv1.AccessControlModule_builder{}.Build()
+			b.AccessControlModule = xpluginsv1.AccessControlModule_builder{}.Build()
 		}
 		plugins = append(plugins, b.Build())
 	}
