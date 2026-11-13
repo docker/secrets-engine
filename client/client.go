@@ -24,6 +24,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
@@ -220,8 +221,8 @@ func (c client) connectError(err error) error {
 	return &ConnectError{Reason: connectReason(err), SocketPath: c.socketPath, Err: err}
 }
 
-// New creates a client that connects to [api.StandaloneSocketPath] by default.
-// To connect to Docker Desktop, use WithSocketPath(api.DesktopSocketPath()).
+// New creates a client that connects to config.StandaloneSocketPath by default.
+// To connect to Docker Desktop, use WithSocketPath(config.DesktopSocketPath()).
 func New(options ...Option) (Client, error) {
 	cfg := &config{
 		requestTimeout:  api.DefaultClientRequestTimeout,
@@ -233,7 +234,7 @@ func New(options ...Option) (Client, error) {
 		}
 	}
 	if cfg.dialContext == nil {
-		cfg.socketPath = api.StandaloneSocketPath()
+		cfg.socketPath = clientconfig.StandaloneSocketPath()
 		cfg.dialContext = dialFromPath(cfg.socketPath)
 	}
 	c := &http.Client{

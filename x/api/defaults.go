@@ -58,6 +58,8 @@ const (
 // If the user cache directory cannot be determined, it returns
 // <temp>/docker-secrets-engine/engine.sock, where <temp> is the directory returned
 // by [os.TempDir].
+//
+// Deprecated: Use [github.com/docker/secrets-engine/client/config.DesktopSocketPath] instead.
 func DesktopSocketPath() string {
 	if dir, err := os.UserCacheDir(); err == nil {
 		return filepath.Join(dir, "docker-secrets-engine", "engine.sock")
@@ -67,7 +69,7 @@ func DesktopSocketPath() string {
 
 // DefaultSocketPath returns the Secrets Engine socket path used by Docker Desktop.
 //
-// Deprecated: Use [DesktopSocketPath] instead.
+// Deprecated: Use [github.com/docker/secrets-engine/client/config.DesktopSocketPath] instead.
 func DefaultSocketPath() string {
 	return DesktopSocketPath()
 }

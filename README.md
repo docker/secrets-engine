@@ -177,8 +177,8 @@ go get github.com/docker/secrets-engine/client
 Fetch a secret:
 
 ```go
-// Uses api.StandaloneSocketPath() by default.
-// Use api.DesktopSocketPath() to connect to Docker Desktop's Secrets Engine.
+// Uses config.StandaloneSocketPath() by default.
+// Use config.DesktopSocketPath() to connect to Docker Desktop's Secrets Engine.
 c, err := client.New()
 if err != nil {
     log.Fatalf("failed to create secrets engine client: %v", err)

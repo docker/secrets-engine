@@ -56,7 +56,7 @@ type runOpts struct {
 	env      []string
 }
 
-// RunCommand uses [api.DesktopSocketPath] by default.
+// RunCommand uses [config.DesktopSocketPath] by default.
 func RunCommand(options ...ClientOption) (*cobra.Command, error) {
 	copts, err := parseClientOptions(options...)
 	if err != nil {

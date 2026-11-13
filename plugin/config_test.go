@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -122,7 +123,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				})
 				os.Args = []string{"test-plugin"}
 				t.Setenv("XDG_RUNTIME_DIR", os.TempDir())
-				socketPath := api.StandaloneSocketPath()
+				socketPath := config.StandaloneSocketPath()
 				// Abstract sockets (leading "@", Linux) live in the abstract
 				// namespace, not on the filesystem, so they need no directory
 				// and leave nothing to clean up.

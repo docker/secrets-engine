@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 )
@@ -109,7 +110,7 @@ func WithResponseTimeout(responseTimeout time.Duration) ClientOption {
 	}
 }
 
-// WithSocketPath overrides the default [api.DesktopSocketPath].
+// WithSocketPath overrides the default [config.DesktopSocketPath].
 func WithSocketPath(socketPath string) ClientOption {
 	return func(o *clientOpts) error {
 		if socketPath == "" {
@@ -136,7 +137,7 @@ func parseClientOptions(options ...ClientOption) (clientOpts, error) {
 func newClient(opts clientOpts) (client.Client, error) {
 	socketPath := opts.socketPath
 	if socketPath == "" {
-		socketPath = api.DesktopSocketPath()
+		socketPath = config.DesktopSocketPath()
 	}
 	c, err := client.New(client.WithSocketPath(socketPath),
 		client.WithTimeout(opts.timeout),
