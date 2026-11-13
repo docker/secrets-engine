@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/docker/secrets-engine/x/api/health/v1"
+	v1 "github.com/docker/secrets-engine/client/api/health/v1"
 	http "net/http"
 	strings "strings"
 )

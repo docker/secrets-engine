@@ -16,7 +16,7 @@ edition = "2023";
 
 package health.v1;
 
-option go_package = "github.com/docker/secrets-engine/x/api/health/v1;healthv1";
+option go_package = "github.com/docker/secrets-engine/client/api/health/v1;healthv1";
 
 service VersionService {
   // GetVersion returns the version of the daemon.

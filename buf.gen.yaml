@@ -3,10 +3,11 @@ managed:
   enabled: true
 plugins:
   # For latest version, see: https://github.com/protocolbuffers/protobuf-go/tags
+  # Placed by go_package, so the client-facing messages land in client/api.
   - remote: buf.build/protocolbuffers/go:v1.36.7
-    out: x/api
+    out: .
     opt:
-      - paths=source_relative
+      - module=github.com/docker/secrets-engine
       - default_api_level=API_OPAQUE
   # Installed in the Dockerfile, pinned by commit via CONNECT_GO_COMMIT in the Makefile.
   - local: protoc-gen-connect-go

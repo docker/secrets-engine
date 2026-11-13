@@ -668,8 +668,8 @@ const file_resolver_v1_api_proto_rawDesc = "" +
 	"\n" +
 	"GetSecrets\x12\x1e.resolver.v1.GetSecretsRequest\x1a\x1f.resolver.v1.GetSecretsResponse2_\n" +
 	"\x11AuthorizerService\x12J\n" +
-	"\tAuthorize\x12\x1d.resolver.v1.AuthorizeRequest\x1a\x1e.resolver.v1.AuthorizeResponseB\xa7\x01\n" +
-	"\x0fcom.resolver.v1B\bApiProtoP\x01Z=github.com/docker/secrets-engine/x/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
+	"\tAuthorize\x12\x1d.resolver.v1.AuthorizeRequest\x1a\x1e.resolver.v1.AuthorizeResponseB\xac\x01\n" +
+	"\x0fcom.resolver.v1B\bApiProtoP\x01ZBgithub.com/docker/secrets-engine/client/api/resolver/v1;resolverv1\xa2\x02\x03RXX\xaa\x02\vResolver.V1\xca\x02\vResolver\\V1\xe2\x02\x17Resolver\\V1\\GPBMetadata\xea\x02\fResolver::V1b\beditionsp\xe8\a"
 
 var file_resolver_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_resolver_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
