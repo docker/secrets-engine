@@ -42,9 +42,9 @@ import (
 
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/plugin/api/resolver"
+	"github.com/docker/secrets-engine/plugin/api/resolver/v1/resolverv1rpc"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api/resolver"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 )
 
 const (
@@ -618,8 +618,8 @@ func (e *mockEngine) recorded() []string {
 func (e *mockEngine) serve(t *testing.T) string {
 	t.Helper()
 	mux := http.NewServeMux()
-	mux.Handle(resolverv1connect.NewAuthorizerServiceHandler(resolver.NewAuthorizerHandler(e)))
-	mux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(e)))
+	mux.Handle(resolverv1rpc.NewAuthorizerServiceHandler(resolver.NewAuthorizerHandler(e)))
+	mux.Handle(resolverv1rpc.NewResolverServiceHandler(resolver.NewResolverHandler(e)))
 	socket := rand.Text() + ".sock"
 	ln, err := net.Listen("unix", socket)
 	require.NoError(t, err)

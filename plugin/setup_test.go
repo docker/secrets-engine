@@ -23,30 +23,29 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/docker/secrets-engine/client/version"
+	pluginsv1 "github.com/docker/secrets-engine/plugin/api/plugins/v1"
+	"github.com/docker/secrets-engine/plugin/api/plugins/v1/pluginsv1rpc"
 	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/secrets"
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 )
 
 type mockRegistrationHandler struct {
 	registerRequests int
 }
 
-func (m *mockRegistrationHandler) RegisterPlugin(context.Context, *connect.Request[pluginsv1.RegisterPluginRequest]) (*connect.Response[pluginsv1.RegisterPluginResponse], error) {
+func (m *mockRegistrationHandler) RegisterPlugin(context.Context, *pluginsv1.RegisterPluginRequest) (*pluginsv1.RegisterPluginResponse, error) {
 	m.registerRequests++
-	return connect.NewResponse(pluginsv1.RegisterPluginResponse_builder{
+	return pluginsv1.RegisterPluginResponse_builder{
 		EngineName:     proto.String("mock"),
 		EngineVersion:  proto.String("v1.0.0"),
 		RequestTimeout: durationpb.New(10 * time.Second),
-	}.Build()), nil
+	}.Build(), nil
 }
 
 func Test_setup(t *testing.T) {
@@ -54,7 +53,7 @@ func Test_setup(t *testing.T) {
 		a, b := net.Pipe()
 		httpMux := http.NewServeMux()
 		mRegister := &mockRegistrationHandler{}
-		httpMux.Handle(pluginsv1connect.NewRegisterServiceHandler(mRegister))
+		httpMux.Handle(pluginsv1rpc.NewRegisterServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
 		_, client, err := ipc.NewServerIPC(&testLogger{t}, a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)
@@ -78,7 +77,7 @@ func Test_setup(t *testing.T) {
 			close(pluginClosed)
 		})
 		require.NoError(t, err)
-		_, err = pluginsv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(pluginsv1.ShutdownRequest_builder{}.Build()))
+		_, err = pluginsv1rpc.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), pluginsv1.ShutdownRequest_builder{}.Build())
 		assert.NoError(t, err)
 		assert.NoError(t, waitForClosedWithTimeout(pluginClosed))
 		assert.NoError(t, closer.Close())

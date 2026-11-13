@@ -21,14 +21,13 @@ import (
 	"net/http"
 	"sync"
 
-	"connectrpc.com/connect"
-
+	"github.com/docker/secrets-engine/plugin/api/accesscontrol"
+	"github.com/docker/secrets-engine/plugin/api/accesscontrol/v1/accesscontrolv1rpc"
+	"github.com/docker/secrets-engine/plugin/api/plugins/v1/pluginsv1rpc"
+	resolverv1 "github.com/docker/secrets-engine/plugin/api/resolver"
+	"github.com/docker/secrets-engine/plugin/api/resolver/v1/resolverv1rpc"
 	"github.com/docker/secrets-engine/plugin/ipc"
-	"github.com/docker/secrets-engine/x/api/accesscontrol"
-	"github.com/docker/secrets-engine/x/api/accesscontrol/v1/accesscontrolv1connect"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
+	"github.com/docker/secrets-engine/plugin/rpc"
 )
 
 func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer, error) {
@@ -39,16 +38,16 @@ func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer,
 	})
 	closed := make(chan struct{})
 	once := sync.OnceFunc(func() { close(closed) })
-	httpMux.Handle(pluginsv1connect.NewPluginServiceHandler(&pluginService{func(context.Context) {
+	httpMux.Handle(pluginsv1rpc.NewPluginServiceHandler(&pluginService{func(context.Context) {
 		once()
 	}}))
 	setupCompleted := make(chan struct{})
-	gated := connect.WithInterceptors(setupInterceptor(setupCompleted, config.registrationTimeout))
+	gated := rpc.WithInterceptors(setupInterceptor(setupCompleted, config.registrationTimeout))
 	switch {
 	case config.secretsProviderPlugin != nil:
-		httpMux.Handle(resolverv1connect.NewResolverServiceHandler(resolverv1.NewResolverHandler(config.secretsProviderPlugin), gated))
+		httpMux.Handle(resolverv1rpc.NewResolverServiceHandler(resolverv1.NewResolverHandler(config.secretsProviderPlugin), gated))
 	case config.accessControlModule != nil:
-		httpMux.Handle(accesscontrolv1connect.NewAccessControlServiceHandler(accesscontrol.NewAccessControlHandler(config.accessControlModule), gated))
+		httpMux.Handle(accesscontrolv1rpc.NewAccessControlServiceHandler(accesscontrol.NewAccessControlHandler(config.accessControlModule), gated))
 	default:
 		return nil, errors.New("no service handler configured for plugin")
 	}

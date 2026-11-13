@@ -22,17 +22,15 @@ import (
 	"net/http"
 	"time"
 
-	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
+	healthv1 "github.com/docker/secrets-engine/client/api/health/v1"
+	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
+	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
-	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	"github.com/docker/secrets-engine/x/api/resolver"
 )
 
 type (
@@ -127,33 +125,60 @@ var (
 )
 
 type client struct {
-	socketPath       string
-	resolverClient   secrets.Resolver
-	engineClient     pluginsv1connect.PluginManagementServiceClient
-	versionClient    healthv1connect.VersionServiceClient
-	authorizerClient secrets.Authorizer
+	socketPath string
+	httpClient *http.Client
 }
 
 // Authorize decides access to the patterns. The decision holds until the
 // response expiry. A zero expiry means the decision never expires.
 func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
-	resp, err := c.authorizerClient.Authorize(ctx, patterns...)
-	if isDialError(err) {
-		return secrets.AuthorizeResponse{}, c.connectError(err)
+	msgPatterns := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		msgPatterns = append(msgPatterns, p.String())
 	}
-	if err != nil {
+	req := resolverv1.AuthorizeRequest_builder{Patterns: msgPatterns}.Build()
+	resp := &resolverv1.AuthorizeResponse{}
+	if err := c.call(ctx, authorizeProcedure, req, resp); err != nil {
+		if rpcErr, ok := errors.AsType[*RPCError](err); ok && rpcErr.Code == CodePermissionDenied {
+			return secrets.AuthorizeResponse{}, secrets.ErrAccessDenied
+		}
 		return secrets.AuthorizeResponse{}, err
 	}
-	return resp, nil
+	var expiry time.Time
+	if resp.HasExpiresAt() {
+		expiry = resp.GetExpiresAt().AsTime()
+	}
+	return secrets.AuthorizeResponse{
+		Expiry: expiry,
+		Allow:  resp.GetDecision() == resolverv1.Decision_DECISION_ALLOW,
+	}, nil
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	envelopes, err := c.resolverClient.GetSecrets(ctx, pattern)
-	if isDialError(err) {
-		return nil, c.connectError(err)
-	}
-	if err != nil {
+	req := resolverv1.GetSecretsRequest_builder{Pattern: proto.String(pattern.String())}.Build()
+	resp := &resolverv1.GetSecretsResponse{}
+	if err := c.call(ctx, getSecretsProcedure, req, resp); err != nil {
+		if rpcErr, ok := errors.AsType[*RPCError](err); ok && rpcErr.Code == CodeNotFound {
+			return nil, secrets.ErrNotFound
+		}
 		return nil, err
+	}
+	var envelopes []secrets.Envelope
+	for _, item := range resp.GetEnvelopes() {
+		id, err := secrets.ParseID(item.GetId())
+		if err != nil {
+			continue
+		}
+		envelopes = append(envelopes, secrets.Envelope{
+			ID:         id,
+			Value:      item.GetValue(),
+			Metadata:   item.GetMetadata(),
+			Provider:   item.GetProvider(),
+			Version:    item.GetVersion(),
+			CreatedAt:  item.GetCreatedAt().AsTime(),
+			ResolvedAt: item.GetResolvedAt().AsTime(),
+			ExpiresAt:  item.GetExpiresAt().AsTime(),
+		})
 	}
 	return envelopes, nil
 }
@@ -163,18 +188,15 @@ func (c client) HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth {
 }
 
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
-	resp, err := c.versionClient.GetVersion(ctx, connect.NewRequest(healthv1.GetVersionRequest_builder{}.Build()))
-	if isDialError(err) {
-		return DaemonVersion{}, c.connectError(err)
-	}
-	if err != nil {
+	resp := &healthv1.GetVersionResponse{}
+	if err := c.call(ctx, getVersionProcedure, healthv1.GetVersionRequest_builder{}.Build(), resp); err != nil {
 		return DaemonVersion{}, err
 	}
-	ver, err := version.NewVersion(resp.Msg.GetVersion())
+	ver, err := version.NewVersion(resp.GetVersion())
 	if err != nil {
-		return DaemonVersion{}, fmt.Errorf("parsing daemon version %q: %w", resp.Msg.GetVersion(), err)
+		return DaemonVersion{}, fmt.Errorf("parsing daemon version %q: %w", resp.GetVersion(), err)
 	}
-	return DaemonVersion{Version: ver, Date: resp.Msg.GetDate(), CommitHash: resp.Msg.GetCommitHash()}, nil
+	return DaemonVersion{Version: ver, Date: resp.GetDate(), CommitHash: resp.GetCommitHash()}, nil
 }
 
 // Client is the interface for interacting with the secrets engine daemon.
@@ -258,26 +280,16 @@ func New(options ...Option) (Client, error) {
 		// it can be overwritten with [WithTimeout]
 		Timeout: cfg.requestTimeout,
 	}
-	return &client{
-		socketPath:       cfg.socketPath,
-		resolverClient:   resolver.NewResolverClient(c),
-		engineClient:     pluginsv1connect.NewPluginManagementServiceClient(c, "http://unix"),
-		versionClient:    healthv1connect.NewVersionServiceClient(c, "http://unix"),
-		authorizerClient: resolver.NewAuthorizerClient(c),
-	}, nil
+	return &client{socketPath: cfg.socketPath, httpClient: c}, nil
 }
 
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
-	req := connect.NewRequest(pluginsv1.ListPluginsRequest_builder{}.Build())
-	resp, err := c.engineClient.ListPlugins(ctx, req)
-	if isDialError(err) {
-		return nil, c.connectError(err)
-	}
-	if err != nil {
+	resp := &pluginsv1.ListPluginsResponse{}
+	if err := c.call(ctx, listPluginsProcedure, pluginsv1.ListPluginsRequest_builder{}.Build(), resp); err != nil {
 		return nil, err
 	}
 	var result []PluginInfo
-	for _, item := range resp.Msg.GetPlugins() {
+	for _, item := range resp.GetPlugins() {
 		name, err := version.NewName(item.GetName())
 		if err != nil {
 			continue
@@ -313,21 +325,13 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 func (c client) EnablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.EnablePluginRequest_builder{}.Build()
 	r.SetName(name)
-	_, err := c.engineClient.EnablePlugin(ctx, connect.NewRequest(r))
-	if isDialError(err) {
-		return c.connectError(err)
-	}
-	return err
+	return c.call(ctx, enablePluginProcedure, r, &pluginsv1.EnablePluginResponse{})
 }
 
 func (c client) DisablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.DisablePluginRequest_builder{}.Build()
 	r.SetName(name)
-	_, err := c.engineClient.DisablePlugin(ctx, connect.NewRequest(r))
-	if isDialError(err) {
-		return c.connectError(err)
-	}
-	return err
+	return c.call(ctx, disablePluginProcedure, r, &pluginsv1.DisablePluginResponse{})
 }
 
 type PluginInfo struct {

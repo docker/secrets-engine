@@ -30,9 +30,9 @@ import (
 
 	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/version"
+	"github.com/docker/secrets-engine/plugin/api"
 	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 )
 
 var _ SecretsProvider = &mockPlugin{}
