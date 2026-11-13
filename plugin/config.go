@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/ipc"
 )
@@ -95,7 +96,7 @@ func newCfgForManualLaunch(opts ...ManualLaunchOption) (*cfg, error) {
 		}
 	}
 	if cfg.conn == nil {
-		socketPath := api.StandaloneSocketPath()
+		socketPath := config.StandaloneSocketPath()
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to default socket %q: %w", socketPath, err)

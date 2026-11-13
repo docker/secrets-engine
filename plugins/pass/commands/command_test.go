@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/config"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/secrets"
 
 	"github.com/docker/secrets-engine/store/keychain"
-	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
@@ -454,7 +454,7 @@ func TestWithEngineHint(t *testing.T) {
 	connErr := func(reason client.ConnectReason, socket string) error {
 		return fmt.Errorf("authorizing: %w", &client.ConnectError{Reason: reason, SocketPath: socket, Err: errors.New("dial")})
 	}
-	desktop := api.DesktopSocketPath()
+	desktop := config.DesktopSocketPath()
 	tests := []struct {
 		name string
 		err  error

@@ -33,6 +33,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
@@ -424,8 +425,8 @@ func TestConnectError(t *testing.T) {
 }
 
 func TestConnectErrorHint(t *testing.T) {
-	desktop := api.DesktopSocketPath()
-	standalone := api.StandaloneSocketPath()
+	desktop := clientconfig.DesktopSocketPath()
+	standalone := clientconfig.StandaloneSocketPath()
 	denied := func(socket string) string {
 		return "Your user lacks permission to connect to " + socket + ". Grant it read and write access to the socket and retry."
 	}
