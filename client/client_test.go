@@ -16,6 +16,7 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"net"
 	"net/http"
@@ -43,7 +44,6 @@ import (
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 var _ healthv1connect.VersionServiceHandler = &mockVersionService{}
@@ -64,7 +64,7 @@ func (m mockVersionService) GetVersion(_ context.Context, _ *connect.Request[hea
 
 func mockVersionEngine(t *testing.T, version, date, commitHash string) string {
 	t.Helper()
-	socketPath := testhelper.RandomShortSocketName()
+	socketPath := randomShortSocketName()
 	muxServer(t, socketPath, []handler{wrapHandler(healthv1connect.NewVersionServiceHandler(&mockVersionService{version: version, date: date, commitHash: commitHash}))})
 	return socketPath
 }
@@ -154,9 +154,19 @@ func wrapHandler(pattern string, h http.Handler) handler {
 	return handler{pattern: pattern, handler: h}
 }
 
+// randomShortSocketName creates a socket name string that avoids common pitfalls in tests.
+// There are a bunch of opposing problems in unit tests with sockets:
+// Ideally, we'd like to use t.TmpDir+something.sock -> too long socket name
+// We can't just use local short file name -> clashes when running tests in parallel
+// We can't use t.ChDir + short name -> t.ChDir does not allow t.Parallel
+// -> we use a short local but randomized socket path
+func randomShortSocketName() string {
+	return rand.Text() + ".sock"
+}
+
 func mockListPluginsEngine(t *testing.T, plugins []PluginInfo) string {
 	t.Helper()
-	socketPath := testhelper.RandomShortSocketName()
+	socketPath := randomShortSocketName()
 	muxServer(t, socketPath, []handler{wrapHandler(pluginsv1connect.NewPluginManagementServiceHandler(&mockPluginsList{list: plugins}))})
 	return socketPath
 }
@@ -262,7 +272,7 @@ func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Reques
 
 func mockAuthorizeEngine(t *testing.T, m *mockAuthorizerService) string {
 	t.Helper()
-	socketPath := testhelper.RandomShortSocketName()
+	socketPath := randomShortSocketName()
 	muxServer(t, socketPath, []handler{wrapHandler(resolverv1connect.NewAuthorizerServiceHandler(m))})
 	return socketPath
 }
@@ -322,7 +332,7 @@ func Test_Authorize(t *testing.T) {
 		require.ErrorIs(t, err, ErrAccessDenied)
 	})
 	t.Run("unavailable daemon", func(t *testing.T) {
-		socketPath := testhelper.RandomShortSocketName()
+		socketPath := randomShortSocketName()
 		c, err := New(WithSocketPath(socketPath))
 		require.NoError(t, err)
 		_, err = c.Authorize(t.Context(), MustParsePattern("docker/auth/hub/joe"))
@@ -343,7 +353,7 @@ func Test_Version(t *testing.T) {
 		assert.Equal(t, "abc1234", dv.CommitHash)
 	})
 	t.Run("unavailable daemon", func(t *testing.T) {
-		socketPath := testhelper.RandomShortSocketName()
+		socketPath := randomShortSocketName()
 		c, err := New(WithSocketPath(socketPath))
 		require.NoError(t, err)
 		_, err = c.Version(t.Context())
@@ -352,7 +362,7 @@ func Test_Version(t *testing.T) {
 }
 
 func TestSecretsEngineUnavailable(t *testing.T) {
-	socketPath := testhelper.RandomShortSocketName()
+	socketPath := randomShortSocketName()
 	client, err := New(WithSocketPath(socketPath))
 	require.NoError(t, err)
 	m, err := PluginManagementFromClient(client)
@@ -364,7 +374,7 @@ func TestSecretsEngineUnavailable(t *testing.T) {
 }
 
 func TestHubAuth(t *testing.T) {
-	client, err := New(WithSocketPath(testhelper.RandomShortSocketName()))
+	client, err := New(WithSocketPath(randomShortSocketName()))
 	require.NoError(t, err)
 	assert.NotNil(t, client.HubAuth())
 	assert.NotNil(t, client.HubAuth(dockerhub.Staging()))
@@ -477,11 +487,11 @@ func TestConnectErrorFromSocket(t *testing.T) {
 	}
 
 	t.Run("missing socket", func(t *testing.T) {
-		err := getSecrets(t, testhelper.RandomShortSocketName())
+		err := getSecrets(t, randomShortSocketName())
 		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
 	})
 	t.Run("nothing listening", func(t *testing.T) {
-		socketPath := testhelper.RandomShortSocketName()
+		socketPath := randomShortSocketName()
 		l, err := net.Listen("unix", socketPath)
 		require.NoError(t, err)
 		l.(*net.UnixListener).SetUnlinkOnClose(false)
@@ -495,7 +505,7 @@ func TestConnectErrorFromSocket(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 			t.Skip("needs Unix file permissions enforced for the current user")
 		}
-		socketPath := testhelper.RandomShortSocketName()
+		socketPath := randomShortSocketName()
 		l, err := net.Listen("unix", socketPath)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = l.Close() })
