@@ -28,7 +28,6 @@ import (
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
@@ -279,7 +278,7 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 	}
 	var result []PluginInfo
 	for _, item := range resp.Msg.GetPlugins() {
-		name, err := api.NewName(item.GetName())
+		name, err := version.NewName(item.GetName())
 		if err != nil {
 			continue
 		}
@@ -332,7 +331,7 @@ func (c client) DisablePlugin(ctx context.Context, name string) error {
 }
 
 type PluginInfo struct {
-	Name                api.Name
+	Name                version.Name
 	Version             version.Version
 	Disabled            bool
 	External            bool
