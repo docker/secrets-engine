@@ -37,7 +37,6 @@ import (
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
 	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
@@ -167,14 +166,14 @@ func Test_ListPlugins(t *testing.T) {
 	t.Run("external and internal configurable plugins", func(t *testing.T) {
 		plugins := []PluginInfo{
 			{
-				Name:            api.MustNewName("foo"),
+				Name:            version.MustNewName("foo"),
 				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				Configurable:    true,
 				Disabled:        true,
 			},
 			{
-				Name:            api.MustNewName("bar"),
+				Name:            version.MustNewName("bar"),
 				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				External:        true,
@@ -182,7 +181,7 @@ func Test_ListPlugins(t *testing.T) {
 				StatusMessage:   "exit status 1: connection refused",
 			},
 			{
-				Name:                api.MustNewName("baz"),
+				Name:                version.MustNewName("baz"),
 				Version:             version.MustNewVersion("v1"),
 				AccessControlModule: &AccessControlModuleMetadata{},
 				External:            true,
@@ -211,10 +210,10 @@ func Test_ListPlugins(t *testing.T) {
 	t.Run("mix of valid and invalid plugin info", func(t *testing.T) {
 		plugins := []PluginInfo{
 			{
-				Name: api.MustNewName("foo"),
+				Name: version.MustNewName("foo"),
 			},
 			{
-				Name:            api.MustNewName("bar"),
+				Name:            version.MustNewName("bar"),
 				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
@@ -229,7 +228,7 @@ func Test_ListPlugins(t *testing.T) {
 
 		assert.Equal(t, []PluginInfo{
 			{
-				Name:            api.MustNewName("bar"),
+				Name:            version.MustNewName("bar"),
 				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
