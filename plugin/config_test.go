@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client/config"
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -52,14 +53,14 @@ func TestConfigValid(t *testing.T) {
 		{
 			name: "valid secrets provider config",
 			config: Config{
-				Version:               api.MustNewVersion("v1"),
+				Version:               version.MustNewVersion("v1"),
 				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
 			},
 		},
 		{
 			name: "valid access control config",
 			config: Config{
-				Version:             api.MustNewVersion("v1"),
+				Version:             version.MustNewVersion("v1"),
 				AccessControlConfig: &AccessControlConfig{},
 			},
 		},
@@ -73,14 +74,14 @@ func TestConfigValid(t *testing.T) {
 		{
 			name: "no module config set",
 			config: Config{
-				Version: api.MustNewVersion("v1"),
+				Version: version.MustNewVersion("v1"),
 			},
 			wantErr: "exactly one of SecretsProviderConfig and AccessControlConfig must be set",
 		},
 		{
 			name: "both module configs set",
 			config: Config{
-				Version:               api.MustNewVersion("v1"),
+				Version:               version.MustNewVersion("v1"),
 				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
 				AccessControlConfig:   &AccessControlConfig{},
 			},
@@ -89,7 +90,7 @@ func TestConfigValid(t *testing.T) {
 		{
 			name: "secrets provider config missing pattern",
 			config: Config{
-				Version:               api.MustNewVersion("v1"),
+				Version:               version.MustNewVersion("v1"),
 				SecretsProviderConfig: &SecretsProviderConfig{},
 			},
 			wantErr: "pattern is required",

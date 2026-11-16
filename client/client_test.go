@@ -35,6 +35,7 @@ import (
 
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
@@ -167,14 +168,14 @@ func Test_ListPlugins(t *testing.T) {
 		plugins := []PluginInfo{
 			{
 				Name:            api.MustNewName("foo"),
-				Version:         api.MustNewVersion("v1"),
+				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				Configurable:    true,
 				Disabled:        true,
 			},
 			{
 				Name:            api.MustNewName("bar"),
-				Version:         api.MustNewVersion("v1"),
+				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 				External:        true,
 				RunStatus:       pluginsv1.RunStatus_RUN_STATUS_CRASHED,
@@ -182,7 +183,7 @@ func Test_ListPlugins(t *testing.T) {
 			},
 			{
 				Name:                api.MustNewName("baz"),
-				Version:             api.MustNewVersion("v1"),
+				Version:             version.MustNewVersion("v1"),
 				AccessControlModule: &AccessControlModuleMetadata{},
 				External:            true,
 			},
@@ -214,7 +215,7 @@ func Test_ListPlugins(t *testing.T) {
 			},
 			{
 				Name:            api.MustNewName("bar"),
-				Version:         api.MustNewVersion("v1"),
+				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
 		}
@@ -229,7 +230,7 @@ func Test_ListPlugins(t *testing.T) {
 		assert.Equal(t, []PluginInfo{
 			{
 				Name:            api.MustNewName("bar"),
-				Version:         api.MustNewVersion("v1"),
+				Version:         version.MustNewVersion("v1"),
 				SecretsProvider: &SecretsProviderMetadata{Pattern: secrets.MustParsePattern("**")},
 			},
 		}, result)
