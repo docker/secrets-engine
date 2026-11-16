@@ -15,6 +15,7 @@
 package dockerhub_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"maps"
@@ -28,7 +29,6 @@ import (
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 //nolint:gosec
@@ -66,15 +66,24 @@ const profileWire = `{
 }`
 
 type fakeEngine struct {
-	testhelper.MockResolver
-	err error
+	store map[secrets.ID]string
+	err   error
 }
 
-func (f fakeEngine) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+func (f fakeEngine) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.MockResolver.GetSecrets(ctx, pattern)
+	var result []secrets.Envelope
+	for id, v := range f.store {
+		if pattern.Match(id) {
+			result = append(result, secrets.Envelope{ID: id, Value: []byte(v)})
+		}
+	}
+	slices.SortFunc(result, func(a, b secrets.Envelope) int {
+		return cmp.Compare(a.ID.String(), b.ID.String())
+	})
+	return result, nil
 }
 
 func serving(store map[string]string) fakeEngine {
@@ -82,7 +91,7 @@ func serving(store map[string]string) fakeEngine {
 	for id, value := range store {
 		resolved[secrets.MustParseID(id)] = value
 	}
-	return fakeEngine{MockResolver: testhelper.MockResolver{Store: resolved}}
+	return fakeEngine{store: resolved}
 }
 
 type nilIDEngine map[string]string
