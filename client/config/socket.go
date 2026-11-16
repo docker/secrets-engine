@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package config provides the socket paths of the Secrets Engine.
 package config
 
 import (

@@ -26,25 +26,37 @@ const (
 	// DefaultPluginRegistrationTimeout is the default timeout for plugin registration.
 	DefaultPluginRegistrationTimeout = 5 * time.Second
 	// DefaultClientRequestTimeout is the default timeout for clients to handle a request.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientRequestTimeout] instead.
 	DefaultClientRequestTimeout = time.Duration(0) // 0 means no limit
 	// DefaultClientResponseHeaderTimeout is the default timeout for response
 	// headers, excluding the body. No limit by default: a request may block
 	// on user interaction daemon-side. Use [client.WithResponseTimeout] or a
 	// context deadline for a hard bound.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientResponseHeaderTimeout] instead.
 	DefaultClientResponseHeaderTimeout = time.Duration(0) // 0 means no limit
 	// DefaultClientTLSHandshakeTimeout is the default timeout for clients to handle
 	// tls handshakes. It should usually be short.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientTLSHandshakeTimeout] instead.
 	DefaultClientTLSHandshakeTimeout = time.Second
 	// DefaultClientIdleConnTimeout is the time a connection may stay alive for.
 	// Clients that are long-lived take advantage of re-using the same connection
 	// when making subsequent requests. This reduces latency.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientIdleConnTimeout] instead.
 	DefaultClientIdleConnTimeout = 90 * time.Second
 	// DefaultClientMaxConnsPerHost is the maximum number of open connections
 	// to the same host.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientMaxConnsPerHost] instead.
 	DefaultClientMaxConnsPerHost = 100
 	// DefaultClientMaxIdleConnsPerHost is the maximum number of idle connections
 	// to the same host. Long-lived clients can re-use a connection from the
 	// connection pool.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/config.DefaultClientMaxIdleConnsPerHost] instead.
 	DefaultClientMaxIdleConnsPerHost = 10
 )
 
