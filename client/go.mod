@@ -14,6 +14,7 @@ require (
 	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/docker/secrets-engine/x v0.8.5
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/mod v0.41.0
 	google.golang.org/protobuf v1.36.11
 )
 

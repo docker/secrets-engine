@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
 )
 
@@ -42,8 +42,8 @@ var (
 	MustParseID      = secrets.MustParseID
 	ParsePattern     = secrets.ParsePattern
 	MustParsePattern = secrets.MustParsePattern
-	NewVersion       = api.NewVersion
-	MustNewVersion   = api.MustNewVersion
+	NewVersion       = version.NewVersion
+	MustNewVersion   = version.MustNewVersion
 
 	ErrSecretNotFound = secrets.ErrNotFound
 )

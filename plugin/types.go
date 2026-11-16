@@ -19,8 +19,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/api/accesscontrol"
 	"github.com/docker/secrets-engine/x/logging"
 	"github.com/docker/secrets-engine/x/plugins"
@@ -32,8 +32,8 @@ type (
 	// Envelope is a type alias for secrets.Envelope, representing a secret envelope.
 	Envelope = secrets.Envelope
 
-	// Version is a type alias for api.Version, representing the plugin version.
-	Version = api.Version
+	// Version is a type alias for version.Version, representing the plugin version.
+	Version = version.Version
 	// ID is a type alias for secrets.ID, representing a secret identifier.
 	ID = secrets.ID
 	// Pattern is a type alias for secrets.Pattern, used to match secret IDs.

@@ -28,8 +28,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	"github.com/docker/secrets-engine/x/ipc"
@@ -65,7 +65,7 @@ func Test_setup(t *testing.T) {
 		pluginClosed := make(chan struct{})
 		closer, err := setup(t.Context(), cfg{
 			Config: Config{
-				Version:               api.MustNewVersion("v1"),
+				Version:               version.MustNewVersion("v1"),
 				Logger:                testhelper.TestLogger(t),
 				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
 			},

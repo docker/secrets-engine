@@ -26,6 +26,7 @@ import (
 
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
@@ -40,7 +41,7 @@ type (
 	ID                = secrets.ID
 	Pattern           = secrets.Pattern
 	AuthorizeResponse = secrets.AuthorizeResponse
-	DaemonVersion     = api.DaemonVersion
+	DaemonVersion     = version.DaemonVersion
 )
 
 var (
@@ -170,7 +171,7 @@ func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 	if err != nil {
 		return DaemonVersion{}, err
 	}
-	ver, err := api.NewVersion(resp.Msg.GetVersion())
+	ver, err := version.NewVersion(resp.Msg.GetVersion())
 	if err != nil {
 		return DaemonVersion{}, fmt.Errorf("parsing daemon version %q: %w", resp.Msg.GetVersion(), err)
 	}
@@ -282,13 +283,13 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 		if err != nil {
 			continue
 		}
-		version, err := api.NewVersion(item.GetVersion())
+		ver, err := version.NewVersion(item.GetVersion())
 		if err != nil {
 			continue
 		}
 		info := PluginInfo{
 			Name:          name,
-			Version:       version,
+			Version:       ver,
 			Disabled:      item.GetDisabled(),
 			External:      item.GetExternal(),
 			Configurable:  item.GetConfigurable(),
@@ -332,7 +333,7 @@ func (c client) DisablePlugin(ctx context.Context, name string) error {
 
 type PluginInfo struct {
 	Name                api.Name
-	Version             api.Version
+	Version             version.Version
 	Disabled            bool
 	External            bool
 	Configurable        bool
