@@ -226,8 +226,8 @@ func (c client) connectError(err error) error {
 // To connect to Docker Desktop, use WithSocketPath(config.DesktopSocketPath()).
 func New(options ...Option) (Client, error) {
 	cfg := &config{
-		requestTimeout:  api.DefaultClientRequestTimeout,
-		responseTimeout: api.DefaultClientResponseHeaderTimeout,
+		requestTimeout:  clientconfig.DefaultClientRequestTimeout,
+		responseTimeout: clientconfig.DefaultClientResponseHeaderTimeout,
 	}
 	for _, opt := range options {
 		if err := opt(cfg); err != nil {
@@ -242,13 +242,13 @@ func New(options ...Option) (Client, error) {
 		Transport: &http.Transport{
 			// re-use the same connection to the runtime, this speeds up subsequent
 			// calls.
-			MaxConnsPerHost:     api.DefaultClientMaxConnsPerHost,
-			MaxIdleConnsPerHost: api.DefaultClientMaxIdleConnsPerHost,
+			MaxConnsPerHost:     clientconfig.DefaultClientMaxConnsPerHost,
+			MaxIdleConnsPerHost: clientconfig.DefaultClientMaxIdleConnsPerHost,
 			// keep the connection alive (good for long-lived clients)
-			IdleConnTimeout: api.DefaultClientIdleConnTimeout,
+			IdleConnTimeout: clientconfig.DefaultClientIdleConnTimeout,
 			// no timeout by default; override with [WithResponseTimeout]
 			ResponseHeaderTimeout: cfg.responseTimeout,
-			TLSHandshakeTimeout:   api.DefaultClientTLSHandshakeTimeout,
+			TLSHandshakeTimeout:   clientconfig.DefaultClientTLSHandshakeTimeout,
 
 			DialContext:        cfg.dialContext,
 			DisableKeepAlives:  false,

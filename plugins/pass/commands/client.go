@@ -25,7 +25,6 @@ import (
 	"github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/api"
 )
 
 const defaultPreflightPingTimeout = 3 * time.Second
@@ -123,8 +122,8 @@ func WithSocketPath(socketPath string) ClientOption {
 
 func parseClientOptions(options ...ClientOption) (clientOpts, error) {
 	opts := clientOpts{
-		timeout:         api.DefaultClientRequestTimeout,
-		responseTimeout: api.DefaultClientResponseHeaderTimeout,
+		timeout:         config.DefaultClientRequestTimeout,
+		responseTimeout: config.DefaultClientResponseHeaderTimeout,
 	}
 	for _, o := range options {
 		if err := o(&opts); err != nil {
