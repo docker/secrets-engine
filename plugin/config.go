@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/docker/secrets-engine/client/config"
+	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/x/api"
-	"github.com/docker/secrets-engine/x/ipc"
 )
 
 const hijackTimeout = 2 * time.Second

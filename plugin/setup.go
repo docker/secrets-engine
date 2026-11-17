@@ -23,12 +23,12 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/x/api/accesscontrol"
 	"github.com/docker/secrets-engine/x/api/accesscontrol/v1/accesscontrolv1connect"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
 	resolverv1 "github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/x/ipc"
 )
 
 func setup(ctx context.Context, config cfg, onClose func(err error)) (io.Closer, error) {

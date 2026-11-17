@@ -10,10 +10,8 @@ replace github.com/docker/secrets-engine/secrets => ../secrets
 require (
 	connectrpc.com/connect v1.19.1
 	github.com/docker/secrets-engine/secrets v1.0.0
-	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.41.0
-	golang.org/x/sys v0.46.0
 	google.golang.org/protobuf v1.36.11
 )
 
