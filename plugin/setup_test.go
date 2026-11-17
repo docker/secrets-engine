@@ -29,10 +29,10 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/docker/secrets-engine/client/version"
+	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/secrets"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	"github.com/docker/secrets-engine/x/ipc"
 	"github.com/docker/secrets-engine/x/testhelper"
 )
 
