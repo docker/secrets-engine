@@ -16,6 +16,7 @@ package plugin
 
 import (
 	"context"
+	"crypto/rand"
 	"io"
 	"net"
 	"net/http"
@@ -33,7 +34,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 var _ SecretsProvider = &mockPlugin{}
@@ -136,7 +136,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
-				go runUncheckedDummyAcceptor(testhelper.TestLogger(t), listener)
+				go runUncheckedDummyAcceptor(logging.NewDefaultLogger(t.Name()), listener)
 				t.Cleanup(func() {
 					listener.Close()
 					os.Remove(socketPath)
@@ -152,11 +152,11 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 		{
 			name: "with all custom options",
 			test: func(t *testing.T) {
-				socket := testhelper.RandomShortSocketName()
+				socket := rand.Text() + ".sock"
 				l, err := net.Listen("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { l.Close() })
-				go runUncheckedDummyAcceptor(testhelper.TestLogger(t), l)
+				go runUncheckedDummyAcceptor(logging.NewDefaultLogger(t.Name()), l)
 				conn, err := net.Dial("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })

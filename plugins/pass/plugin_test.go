@@ -26,9 +26,16 @@ import (
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/plugins/pass/teststore"
 	"github.com/docker/secrets-engine/secrets"
-
-	"github.com/docker/secrets-engine/x/testhelper"
 )
+
+// testLogger writes log output to the test log.
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Printf(format string, v ...any) { l.t.Logf(format, v...) }
+func (l *testLogger) Warnf(format string, v ...any)  { l.t.Logf(format, v...) }
+func (l *testLogger) Errorf(format string, v ...any) { l.t.Logf(format, v...) }
 
 func Test_passPlugin(t *testing.T) {
 	t.Parallel()
@@ -36,7 +43,7 @@ func Test_passPlugin(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
 			secrets.MustParseID("foo"): pass.NewPassValue([]byte("bar")),
 		}))
-		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
+		p := &passPlugin{kc: mock, logger: &testLogger{t}}
 		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		require.NoError(t, err)
 		require.NotEmpty(t, e)
@@ -52,7 +59,7 @@ func Test_passPlugin(t *testing.T) {
 	t.Run("store error", func(t *testing.T) {
 		errFilter := errors.New("filter error")
 		mock := teststore.NewMockStore(teststore.WithStoreFilterErr(errFilter))
-		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
+		p := &passPlugin{kc: mock, logger: &testLogger{t}}
 		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, errFilter)
 	})
@@ -60,7 +67,7 @@ func Test_passPlugin(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
 			secrets.MustParseID("foo"): &MockMyOtherValue{Value: 7},
 		}))
-		p := &passPlugin{kc: mock, logger: testhelper.TestLogger(t)}
+		p := &passPlugin{kc: mock, logger: &testLogger{t}}
 		_, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("foo"))
 		assert.ErrorIs(t, err, secrets.ErrNotFound)
 	})

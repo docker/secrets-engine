@@ -17,6 +17,8 @@ package ipc
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -30,7 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/secrets-engine/x/testhelper"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 func Test_hijacking(t *testing.T) {
@@ -43,7 +45,7 @@ func Test_hijacking(t *testing.T) {
 	wait := make(chan struct{})
 	once := sync.OnceFunc(func() { close(wait) })
 	defer once()
-	httpMux.Handle(NewHijackAcceptor(testhelper.TestLogger(t), func(_ context.Context, closer io.ReadWriteCloser) {
+	httpMux.Handle(NewHijackAcceptor(logging.NewDefaultLogger(t.Name()), func(_ context.Context, closer io.ReadWriteCloser) {
 		ch <- closer
 		<-wait
 	}))
@@ -61,7 +63,7 @@ func Test_hijacking(t *testing.T) {
 	t.Cleanup(func() { connClient.Close() })
 	connHijacked, err := Hijackify(connClient, hijackTimeout)
 	require.NoError(t, err)
-	connServer, err := testhelper.WaitForWithTimeoutV(ch)
+	connServer, err := waitForWithTimeoutV(ch)
 	require.NoError(t, err)
 
 	assert.NoError(t, writeLine(connHijacked, "ping"))
@@ -77,11 +79,11 @@ func Test_hijacking(t *testing.T) {
 	assert.Equal(t, "ok", health)
 
 	assert.NoError(t, server.Close())
-	assert.ErrorIs(t, testhelper.WaitForErrorWithTimeout(serverErr), http.ErrServerClosed)
+	assert.ErrorIs(t, waitForErrorWithTimeout(serverErr), http.ErrServerClosed)
 }
 
 func TestHijackify_hijackRequest_timeout(t *testing.T) {
-	socket := testhelper.RandomShortSocketName()
+	socket := rand.Text() + ".sock"
 	l, err := net.Listen("unix", socket)
 	require.NoError(t, err)
 	t.Cleanup(func() { l.Close() })
@@ -126,4 +128,25 @@ func requestHealthCheck(socketPath string) (string, error) {
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	return string(body), nil
+}
+
+func waitForErrorWithTimeout(in <-chan error) error {
+	val, err := waitForWithTimeoutV(in)
+	if err != nil {
+		return err
+	}
+	return val
+}
+
+func waitForWithTimeoutV[T any](ch <-chan T) (T, error) {
+	var zero T
+	select {
+	case val, ok := <-ch:
+		if !ok {
+			return zero, errors.New("channel closed")
+		}
+		return val, nil
+	case <-time.After(2 * time.Second):
+		return zero, errors.New("timeout")
+	}
 }
