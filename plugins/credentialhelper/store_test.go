@@ -29,8 +29,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
+
+// testLogger writes log output to the test log.
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Printf(format string, v ...any) { l.t.Logf(format, v...) }
+func (l *testLogger) Warnf(format string, v ...any)  { l.t.Logf(format, v...) }
+func (l *testLogger) Errorf(format string, v ...any) { l.t.Logf(format, v...) }
 
 type mockCredentialHelper struct {
 	t *testing.T
@@ -103,7 +111,7 @@ func TestCredentialHelper(t *testing.T) {
 	t.Run("can get secret", func(t *testing.T) {
 		store := map[string]credentials.Credentials{}
 
-		c, err := New(testhelper.TestLogger(t),
+		c, err := New(&testLogger{t},
 			WithShellProgramFunc(func(args ...string) client.Program {
 				return &mockCredentialHelper{
 					t:         t,
@@ -141,7 +149,7 @@ func TestCredentialHelper(t *testing.T) {
 	t.Run("can prefix secret key", func(t *testing.T) {
 		store := map[string]credentials.Credentials{}
 
-		c, err := New(testhelper.TestLogger(t),
+		c, err := New(&testLogger{t},
 			WithKeyRewriter(func(serverURL, _ string) (secrets.ID, error) {
 				return secrets.ParseID("docker/test/" + strings.TrimPrefix(serverURL, "https://"))
 			}),
@@ -182,7 +190,7 @@ func TestCredentialHelper(t *testing.T) {
 	t.Run("keys can have multiple path separators", func(t *testing.T) {
 		store := map[string]credentials.Credentials{}
 
-		c, err := New(testhelper.TestLogger(t),
+		c, err := New(&testLogger{t},
 			WithShellProgramFunc(func(args ...string) client.Program {
 				return &mockCredentialHelper{
 					t:         t,
@@ -222,7 +230,7 @@ func TestCredentialHelper(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	t.Run("returns context cancelled when context is cancelled", func(t *testing.T) {
-		c, err := New(testhelper.TestLogger(t),
+		c, err := New(&testLogger{t},
 			WithShellProgramFunc(func(args ...string) client.Program {
 				return &mockCredentialHelper{
 					t:         t,

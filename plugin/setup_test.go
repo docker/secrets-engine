@@ -16,6 +16,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -33,7 +34,7 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	"github.com/docker/secrets-engine/x/testhelper"
+	"github.com/docker/secrets-engine/x/logging"
 )
 
 type mockRegistrationHandler struct {
@@ -56,7 +57,7 @@ func Test_setup(t *testing.T) {
 		mRegister := &mockRegistrationHandler{}
 		httpMux.Handle(pluginsv1connect.NewRegisterServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
-		_, client, err := ipc.NewServerIPC(testhelper.TestLogger(t), a, httpMux, func(err error) {
+		_, client, err := ipc.NewServerIPC(logging.NewDefaultLogger(t.Name()), a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)
 			close(runtimeClosed)
 		})
@@ -66,7 +67,7 @@ func Test_setup(t *testing.T) {
 		closer, err := setup(t.Context(), cfg{
 			Config: Config{
 				Version:               version.MustNewVersion("v1"),
-				Logger:                testhelper.TestLogger(t),
+				Logger:                logging.NewDefaultLogger(t.Name()),
 				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
 			},
 			secretsProviderPlugin: mPlugin,
@@ -80,8 +81,17 @@ func Test_setup(t *testing.T) {
 		require.NoError(t, err)
 		_, err = pluginsv1connect.NewPluginServiceClient(client, "http://unix").Shutdown(t.Context(), connect.NewRequest(pluginsv1.ShutdownRequest_builder{}.Build()))
 		assert.NoError(t, err)
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(pluginClosed))
+		assert.NoError(t, waitForClosedWithTimeout(pluginClosed))
 		assert.NoError(t, closer.Close())
-		assert.NoError(t, testhelper.WaitForClosedWithTimeout(runtimeClosed))
+		assert.NoError(t, waitForClosedWithTimeout(runtimeClosed))
 	})
+}
+
+func waitForClosedWithTimeout(in <-chan struct{}) error {
+	select {
+	case <-in:
+		return nil
+	case <-time.After(4 * time.Second):
+		return errors.New("timeout")
+	}
 }

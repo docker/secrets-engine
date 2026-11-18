@@ -17,7 +17,9 @@ package commands
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -43,7 +45,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api/resolver"
 	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 const (
@@ -175,10 +176,27 @@ func mustParseEnv(t *testing.T, env []string) []envVar {
 	return vars
 }
 
+type mockResolver struct {
+	Store map[secrets.ID]string
+}
+
+func (m mockResolver) GetSecrets(_ context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
+	var result []secrets.Envelope
+	for id, v := range m.Store {
+		if pattern.Match(id) {
+			result = append(result, secrets.Envelope{ID: id, Value: []byte(v)})
+		}
+	}
+	slices.SortFunc(result, func(a, b secrets.Envelope) int {
+		return cmp.Compare(a.ID.String(), b.ID.String())
+	})
+	return result, nil
+}
+
 func TestResolveEnv(t *testing.T) {
 	t.Parallel()
 
-	mock := testhelper.MockResolver{
+	mock := mockResolver{
 		Store: map[secrets.ID]string{
 			secrets.MustParseID("gh-token"):                "ghp_abc123",
 			secrets.MustParseID("myapp/postgres/password"): "s3cr3t",
@@ -582,7 +600,7 @@ func (e *mockEngine) Authorize(_ context.Context, patterns ...secrets.Pattern) (
 
 func (e *mockEngine) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
 	e.record("resolve " + pattern.String())
-	return testhelper.MockResolver{Store: e.store}.GetSecrets(ctx, pattern)
+	return mockResolver{Store: e.store}.GetSecrets(ctx, pattern)
 }
 
 func (e *mockEngine) record(call string) {
@@ -602,7 +620,7 @@ func (e *mockEngine) serve(t *testing.T) string {
 	mux := http.NewServeMux()
 	mux.Handle(resolverv1connect.NewAuthorizerServiceHandler(resolver.NewAuthorizerHandler(e)))
 	mux.Handle(resolverv1connect.NewResolverServiceHandler(resolver.NewResolverHandler(e)))
-	socket := testhelper.RandomShortSocketName()
+	socket := rand.Text() + ".sock"
 	ln, err := net.Listen("unix", socket)
 	require.NoError(t, err)
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: time.Second}
@@ -612,7 +630,7 @@ func (e *mockEngine) serve(t *testing.T) string {
 }
 
 type pingClient struct {
-	testhelper.MockResolver
+	mockResolver
 	ping func(context.Context) (client.DaemonVersion, error)
 }
 

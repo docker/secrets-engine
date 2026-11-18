@@ -16,6 +16,7 @@ package commands
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strconv"
@@ -33,7 +34,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 
 	"github.com/docker/secrets-engine/store/keychain"
-	"github.com/docker/secrets-engine/x/testhelper"
 )
 
 var mockInfo = VersionInfo{
@@ -487,7 +487,7 @@ func TestWithEngineHint(t *testing.T) {
 
 func deadSocket(t *testing.T) string {
 	t.Helper()
-	return testhelper.RandomShortSocketName()
+	return rand.Text() + ".sock"
 }
 
 func engineOpts(t *testing.T, engine *mockEngine) []ClientOption {
