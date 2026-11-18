@@ -25,14 +25,17 @@ import (
 	"strings"
 )
 
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 type Logger interface {
 	Printf(format string, v ...interface{})
 	Warnf(format string, v ...interface{})
 	Errorf(format string, v ...interface{})
 }
 
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 type Option func(l *defaultLogger)
 
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 func WithOut(out io.Writer) Option {
 	return func(l *defaultLogger) {
 		if out == nil {
@@ -51,6 +54,7 @@ func newDefaultLogger(out io.Writer) *log.Logger {
 	return log.New(out, "", log.LstdFlags)
 }
 
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 func NewDefaultLogger(prefix string, options ...Option) Logger {
 	if prefix != "" && !strings.HasSuffix(prefix, ": ") {
 		prefix += ": "
@@ -110,12 +114,16 @@ func stackTrace() string {
 type loggerKey struct{}
 
 // WithLogger returns a new context with the provided logger.
+//
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 func WithLogger(ctx context.Context, logger Logger) context.Context {
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
 // FromContext retrieves the current logger from the context. If no logger is
 // available, a new default logger gets returned.
+//
+// Deprecated: Importers need their own copy. This package will be removed after its last tag.
 func FromContext(ctx context.Context) (Logger, error) {
 	if logger, ok := ctx.Value(loggerKey{}).(Logger); ok {
 		return logger, nil

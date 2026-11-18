@@ -22,7 +22,6 @@ import (
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api/accesscontrol"
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 type (
@@ -37,8 +36,6 @@ type (
 	ID = secrets.ID
 	// Pattern is a type alias for secrets.Pattern, used to match secret IDs.
 	Pattern = secrets.Pattern
-	// Logger is a type alias for logging.Logger, used for logging within plugins.
-	Logger = logging.Logger
 
 	AccessControl = accesscontrol.AccessControl
 )
@@ -81,7 +78,7 @@ type Stub interface {
 type Config struct {
 	// Version of the plugin in semver format.
 	Version Version
-	// Logger to be used within plugin side SDK code. If nil, a default logger will be created and used.
+	// Logger to be used within plugin side SDK code. If nil, the SDK logs nothing.
 	Logger Logger
 
 	*SecretsProviderConfig

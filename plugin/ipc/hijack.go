@@ -23,8 +23,6 @@ import (
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 const (
@@ -97,7 +95,7 @@ type CloseWriter interface {
 type hijackHandler struct {
 	cb         func(ctx context.Context, conn io.ReadWriteCloser)
 	ackTimeout time.Duration
-	logger     logging.Logger
+	logger     Logger
 }
 
 // ServeHTTP hijacks the underlying connection of a http request.
@@ -164,6 +162,6 @@ func (h *hijackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewHijackAcceptor(logger logging.Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
+func NewHijackAcceptor(logger Logger, cb func(context.Context, io.ReadWriteCloser)) (string, http.Handler) {
 	return hijackPath, &hijackHandler{logger: logger, cb: cb, ackTimeout: hijackTimeout}
 }

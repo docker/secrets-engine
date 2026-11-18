@@ -345,7 +345,7 @@ func main() {
 		SecretsProviderConfig: &plugin.SecretsProviderConfig{
 			Pattern: plugin.MustParsePattern("myrealm/**"),
 		},
-        // custom logger
+        // optional: without a logger, the SDK logs nothing
 		Logger:  &myLogger{},
 	}
     secrets := map[plugin.ID]string{

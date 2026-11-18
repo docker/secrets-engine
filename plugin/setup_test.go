@@ -34,7 +34,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
 	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 type mockRegistrationHandler struct {
@@ -57,7 +56,7 @@ func Test_setup(t *testing.T) {
 		mRegister := &mockRegistrationHandler{}
 		httpMux.Handle(pluginsv1connect.NewRegisterServiceHandler(mRegister))
 		runtimeClosed := make(chan struct{})
-		_, client, err := ipc.NewServerIPC(logging.NewDefaultLogger(t.Name()), a, httpMux, func(err error) {
+		_, client, err := ipc.NewServerIPC(&testLogger{t}, a, httpMux, func(err error) {
 			assert.ErrorIs(t, err, io.EOF)
 			close(runtimeClosed)
 		})
@@ -67,7 +66,7 @@ func Test_setup(t *testing.T) {
 		closer, err := setup(t.Context(), cfg{
 			Config: Config{
 				Version:               version.MustNewVersion("v1"),
-				Logger:                logging.NewDefaultLogger(t.Name()),
+				Logger:                &testLogger{t},
 				SecretsProviderConfig: &SecretsProviderConfig{Pattern: secrets.MustParsePattern("*")},
 			},
 			secretsProviderPlugin: mPlugin,
