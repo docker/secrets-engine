@@ -26,8 +26,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
-
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 const (
@@ -47,12 +45,17 @@ func WithShutdownTimeout(d time.Duration) Option {
 	}
 }
 
+type Logger interface {
+	Printf(format string, v ...any)
+	Errorf(format string, v ...any)
+}
+
 type loggerWrapper struct {
-	logger logging.Logger
+	logger Logger
 }
 
 func (l loggerWrapper) Print(v ...interface{}) {
-	l.logger.Errorf(fmt.Sprint(v...))
+	l.logger.Errorf("%s", fmt.Sprint(v...))
 }
 
 func (l loggerWrapper) Printf(format string, v ...interface{}) {
@@ -60,10 +63,10 @@ func (l loggerWrapper) Printf(format string, v ...interface{}) {
 }
 
 func (l loggerWrapper) Println(v ...interface{}) {
-	l.logger.Errorf(fmt.Sprintln(v...))
+	l.logger.Errorf("%s", fmt.Sprintln(v...))
 }
 
-func NewClientIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
+func NewClientIPC(logger Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	cfg := yamux.DefaultConfig()
 	cfg.Logger = &loggerWrapper{logger}
 	cfg.LogOutput = nil
@@ -75,7 +78,7 @@ func NewClientIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler ht
 	return i, c, nil
 }
 
-func NewServerIPC(logger logging.Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
+func NewServerIPC(logger Logger, sockConn io.ReadWriteCloser, handler http.Handler, onServerClosed func(error), option ...Option) (io.Closer, *http.Client, error) {
 	cfg := yamux.DefaultConfig()
 	cfg.Logger = &loggerWrapper{logger}
 	cfg.LogOutput = nil
@@ -130,7 +133,7 @@ type ipcImpl struct {
 	teardown func() error
 }
 
-func newMuxedIPC(logger logging.Logger, session *yamux.Session, handler http.Handler, onClose func(error), option ...Option) (*ipcImpl, *http.Client) {
+func newMuxedIPC(logger Logger, session *yamux.Session, handler http.Handler, onClose func(error), option ...Option) (*ipcImpl, *http.Client) {
 	// Note: Calling session.Close() needs to be done as the very last step as it shuts down all IPC!
 
 	cfg := &cfg{shutdownTimeout: defaultShutdownTimeout}
@@ -157,7 +160,7 @@ func newMuxedIPC(logger logging.Logger, session *yamux.Session, handler http.Han
 	}, c
 }
 
-func waitForClientToDisconnect(logger logging.Logger, s *yamux.Session, t time.Duration) {
+func waitForClientToDisconnect(logger Logger, s *yamux.Session, t time.Duration) {
 	timeout := time.After(t)
 	for {
 		select {

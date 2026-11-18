@@ -33,7 +33,6 @@ import (
 	"github.com/docker/secrets-engine/plugin/ipc"
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api"
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 var _ SecretsProvider = &mockPlugin{}
@@ -43,6 +42,14 @@ type mockPlugin struct{}
 func (m *mockPlugin) GetSecrets(context.Context, secrets.Pattern) ([]secrets.Envelope, error) {
 	return []secrets.Envelope{}, nil
 }
+
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Printf(format string, v ...any) { l.t.Logf(format, v...) }
+func (l *testLogger) Warnf(format string, v ...any)  { l.t.Logf(format, v...) }
+func (l *testLogger) Errorf(format string, v ...any) { l.t.Logf(format, v...) }
 
 func TestConfigValid(t *testing.T) {
 	tests := []struct {
@@ -136,7 +143,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				if err != nil {
 					t.Fatalf("listen failed: %v", err)
 				}
-				go runUncheckedDummyAcceptor(logging.NewDefaultLogger(t.Name()), listener)
+				go runUncheckedDummyAcceptor(&testLogger{t}, listener)
 				t.Cleanup(func() {
 					listener.Close()
 					os.Remove(socketPath)
@@ -156,7 +163,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 				l, err := net.Listen("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { l.Close() })
-				go runUncheckedDummyAcceptor(logging.NewDefaultLogger(t.Name()), l)
+				go runUncheckedDummyAcceptor(&testLogger{t}, l)
 				conn, err := net.Dial("unix", socket)
 				require.NoError(t, err)
 				t.Cleanup(func() { conn.Close() })
@@ -182,7 +189,7 @@ func Test_newCfgForManualLaunch(t *testing.T) {
 
 // We on purpose never actually deal with accepted hijacked connections or server errors
 // as in the context of where this function is used we don't care.
-func runUncheckedDummyAcceptor(logger logging.Logger, listener net.Listener) {
+func runUncheckedDummyAcceptor(logger ipc.Logger, listener net.Listener) {
 	httpMux := http.NewServeMux()
 	httpMux.Handle(ipc.NewHijackAcceptor(logger, func(context.Context, io.ReadWriteCloser) {}))
 	server := &http.Server{Handler: httpMux}

@@ -24,7 +24,6 @@ import (
 
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 // stub implements Stub.
@@ -51,7 +50,7 @@ var (
 // NewSecretsProvider creates a stub with the given plugin and options.
 // ManualLaunchOption only apply when the plugin is launched manually.
 // If launched by the secrets runtime, they are ignored.
-// If logger is nil, a default logger will be created and used.
+// If logger is nil, the SDK logs nothing.
 func NewSecretsProvider(p SecretsProvider, config Config, opts ...ManualLaunchOption) (Stub, error) {
 	if config.SecretsProviderConfig == nil {
 		return nil, errors.New("secrets provider config is required")
@@ -71,7 +70,7 @@ func newStub(config Config, setPlugin func(*cfg), opts ...ManualLaunchOption) (S
 		return nil, err
 	}
 	if config.Logger == nil {
-		config.Logger = logging.NewDefaultLogger("plugin")
+		config.Logger = &noopLogger{}
 	}
 	cfg, err := newCfg(opts...)
 	if err != nil {

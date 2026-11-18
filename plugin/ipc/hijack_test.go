@@ -31,8 +31,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/docker/secrets-engine/x/logging"
 )
 
 func Test_hijacking(t *testing.T) {
@@ -45,7 +43,7 @@ func Test_hijacking(t *testing.T) {
 	wait := make(chan struct{})
 	once := sync.OnceFunc(func() { close(wait) })
 	defer once()
-	httpMux.Handle(NewHijackAcceptor(logging.NewDefaultLogger(t.Name()), func(_ context.Context, closer io.ReadWriteCloser) {
+	httpMux.Handle(NewHijackAcceptor(&testLogger{t}, func(_ context.Context, closer io.ReadWriteCloser) {
 		ch <- closer
 		<-wait
 	}))
