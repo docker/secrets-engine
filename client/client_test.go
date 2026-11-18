@@ -17,7 +17,9 @@ package client
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -28,25 +30,21 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	healthv1 "github.com/docker/secrets-engine/client/api/health/v1"
+	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
+	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
-	healthv1 "github.com/docker/secrets-engine/x/api/health/v1"
-	"github.com/docker/secrets-engine/x/api/health/v1/healthv1connect"
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
-	resolverv1 "github.com/docker/secrets-engine/x/api/resolver/v1"
-	"github.com/docker/secrets-engine/x/api/resolver/v1/resolverv1connect"
 )
-
-var _ healthv1connect.VersionServiceHandler = &mockVersionService{}
 
 type mockVersionService struct {
 	version    string
@@ -54,28 +52,27 @@ type mockVersionService struct {
 	commitHash string
 }
 
-func (m mockVersionService) GetVersion(_ context.Context, _ *connect.Request[healthv1.GetVersionRequest]) (*connect.Response[healthv1.GetVersionResponse], error) {
-	return connect.NewResponse(healthv1.GetVersionResponse_builder{
+func (m mockVersionService) GetVersion(_ *healthv1.GetVersionRequest) (*healthv1.GetVersionResponse, error) {
+	return healthv1.GetVersionResponse_builder{
 		Version:    proto.String(m.version),
 		Date:       proto.String(m.date),
 		CommitHash: proto.String(m.commitHash),
-	}.Build()), nil
+	}.Build(), nil
 }
 
 func mockVersionEngine(t *testing.T, version, date, commitHash string) string {
 	t.Helper()
 	socketPath := randomShortSocketName()
-	muxServer(t, socketPath, []handler{wrapHandler(healthv1connect.NewVersionServiceHandler(&mockVersionService{version: version, date: date, commitHash: commitHash}))})
+	m := mockVersionService{version: version, date: date, commitHash: commitHash}
+	muxServer(t, socketPath, []handler{unary(t, "health.v1.VersionService.GetVersion", m.GetVersion)})
 	return socketPath
 }
-
-var _ pluginsv1connect.PluginManagementServiceHandler = &mockPluginsList{}
 
 type mockPluginsList struct {
 	list []PluginInfo
 }
 
-func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[pluginsv1.ListPluginsRequest]) (*connect.Response[pluginsv1.ListPluginsResponse], error) {
+func (m mockPluginsList) ListPlugins(_ *pluginsv1.ListPluginsRequest) (*pluginsv1.ListPluginsResponse, error) {
 	var plugins []*pluginsv1.Plugin
 	for _, plugin := range m.list {
 		var name string
@@ -105,17 +102,9 @@ func (m mockPluginsList) ListPlugins(_ context.Context, _ *connect.Request[plugi
 		}
 		plugins = append(plugins, b.Build())
 	}
-	return connect.NewResponse(pluginsv1.ListPluginsResponse_builder{
+	return pluginsv1.ListPluginsResponse_builder{
 		Plugins: plugins,
-	}.Build()), nil
-}
-
-func (m mockPluginsList) EnablePlugin(_ context.Context, _ *connect.Request[pluginsv1.EnablePluginRequest]) (*connect.Response[pluginsv1.EnablePluginResponse], error) {
-	return connect.NewResponse(pluginsv1.EnablePluginResponse_builder{}.Build()), nil
-}
-
-func (m mockPluginsList) DisablePlugin(_ context.Context, _ *connect.Request[pluginsv1.DisablePluginRequest]) (*connect.Response[pluginsv1.DisablePluginResponse], error) {
-	return connect.NewResponse(pluginsv1.DisablePluginResponse_builder{}.Build()), nil
+	}.Build(), nil
 }
 
 type handler struct {
@@ -164,10 +153,88 @@ func randomShortSocketName() string {
 	return rand.Text() + ".sock"
 }
 
+func unary[Req, Resp proto.Message](t *testing.T, method protoreflect.FullName, fn func(Req) (Resp, error)) handler {
+	t.Helper()
+	var (
+		reqType  Req
+		respType Resp
+	)
+	desc, err := protoregistry.GlobalFiles.FindDescriptorByName(method)
+	require.NoError(t, err)
+	rpc, ok := desc.(protoreflect.MethodDescriptor)
+	require.True(t, ok, "%s is not an RPC method", method)
+	require.Equal(t, rpc.Input().FullName(), reqType.ProtoReflect().Descriptor().FullName())
+	require.Equal(t, rpc.Output().FullName(), respType.ProtoReflect().Descriptor().FullName())
+
+	serve := func(r *http.Request) ([]byte, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return nil, err
+		}
+		req := reqType.ProtoReflect().New().Interface().(Req)
+		if err := proto.Unmarshal(body, req); err != nil {
+			return nil, err
+		}
+		resp, err := fn(req)
+		if err != nil {
+			return nil, err
+		}
+		return proto.Marshal(resp)
+	}
+	procedure := "/" + string(rpc.Parent().FullName()) + "/" + string(rpc.Name())
+	return wrapHandler(procedure, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, err := serve(r)
+		if err != nil {
+			rpcErr, ok := errors.AsType[*RPCError](err)
+			if !ok {
+				rpcErr = &RPCError{Code: CodeUnknown, Message: err.Error()}
+			}
+			w.Header().Set("Content-Type", contentTypeJSON)
+			w.WriteHeader(statusFromCode(rpcErr.Code))
+			_ = json.NewEncoder(w).Encode(struct {
+				Code    Code   `json:"code"`
+				Message string `json:"message,omitempty"`
+			}{rpcErr.Code, rpcErr.Message})
+			return
+		}
+		w.Header().Set("Content-Type", contentTypeProto)
+		_, _ = w.Write(data)
+	}))
+}
+
+// https://connectrpc.com/docs/protocol#error-codes
+func statusFromCode(code Code) int {
+	switch code {
+	case CodeCanceled:
+		return 499
+	case CodeInvalidArgument, CodeFailedPrecondition, CodeOutOfRange:
+		return http.StatusBadRequest
+	case CodeUnauthenticated:
+		return http.StatusUnauthorized
+	case CodePermissionDenied:
+		return http.StatusForbidden
+	case CodeNotFound:
+		return http.StatusNotFound
+	case CodeAlreadyExists, CodeAborted:
+		return http.StatusConflict
+	case CodeResourceExhausted:
+		return http.StatusTooManyRequests
+	case CodeUnimplemented:
+		return http.StatusNotImplemented
+	case CodeUnavailable:
+		return http.StatusServiceUnavailable
+	case CodeDeadlineExceeded:
+		return http.StatusGatewayTimeout
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func mockListPluginsEngine(t *testing.T, plugins []PluginInfo) string {
 	t.Helper()
 	socketPath := randomShortSocketName()
-	muxServer(t, socketPath, []handler{wrapHandler(pluginsv1connect.NewPluginManagementServiceHandler(&mockPluginsList{list: plugins}))})
+	m := mockPluginsList{list: plugins}
+	muxServer(t, socketPath, []handler{unary(t, "plugins.v1.PluginManagementService.ListPlugins", m.ListPlugins)})
 	return socketPath
 }
 
@@ -246,7 +313,123 @@ func Test_ListPlugins(t *testing.T) {
 	})
 }
 
-var _ resolverv1connect.AuthorizerServiceHandler = &mockAuthorizerService{}
+type mockPluginToggle struct {
+	enabled  []string
+	disabled []string
+	err      error
+}
+
+func (m *mockPluginToggle) EnablePlugin(req *pluginsv1.EnablePluginRequest) (*pluginsv1.EnablePluginResponse, error) {
+	m.enabled = append(m.enabled, req.GetName())
+	if m.err != nil {
+		return nil, m.err
+	}
+	return pluginsv1.EnablePluginResponse_builder{}.Build(), nil
+}
+
+func (m *mockPluginToggle) DisablePlugin(req *pluginsv1.DisablePluginRequest) (*pluginsv1.DisablePluginResponse, error) {
+	m.disabled = append(m.disabled, req.GetName())
+	if m.err != nil {
+		return nil, m.err
+	}
+	return pluginsv1.DisablePluginResponse_builder{}.Build(), nil
+}
+
+func Test_EnableDisablePlugin(t *testing.T) {
+	t.Parallel()
+	start := func(t *testing.T, m *mockPluginToggle) PluginManagement {
+		t.Helper()
+		socketPath := randomShortSocketName()
+		muxServer(t, socketPath, []handler{
+			unary(t, "plugins.v1.PluginManagementService.EnablePlugin", m.EnablePlugin),
+			unary(t, "plugins.v1.PluginManagementService.DisablePlugin", m.DisablePlugin),
+		})
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		pm, err := PluginManagementFromClient(c)
+		require.NoError(t, err)
+		return pm
+	}
+	t.Run("forwards the plugin name", func(t *testing.T) {
+		m := &mockPluginToggle{}
+		pm := start(t, m)
+		require.NoError(t, pm.EnablePlugin(t.Context(), "foo"))
+		require.NoError(t, pm.DisablePlugin(t.Context(), "bar"))
+		assert.Equal(t, []string{"foo"}, m.enabled)
+		assert.Equal(t, []string{"bar"}, m.disabled)
+	})
+	t.Run("returns the engine error", func(t *testing.T) {
+		want := &RPCError{Code: CodeNotFound, Message: `plugin "foo" not found`}
+		pm := start(t, &mockPluginToggle{err: want})
+		assert.Equal(t, want, pm.EnablePlugin(t.Context(), "foo"))
+		assert.Equal(t, want, pm.DisablePlugin(t.Context(), "foo"))
+	})
+}
+
+type mockResolverService struct {
+	envelopes []*resolverv1.GetSecretsResponse_Envelope
+	err       error
+	pattern   string
+}
+
+func (m *mockResolverService) GetSecrets(req *resolverv1.GetSecretsRequest) (*resolverv1.GetSecretsResponse, error) {
+	m.pattern = req.GetPattern()
+	if m.err != nil {
+		return nil, m.err
+	}
+	return resolverv1.GetSecretsResponse_builder{Envelopes: m.envelopes}.Build(), nil
+}
+
+func Test_GetSecrets(t *testing.T) {
+	t.Parallel()
+	getSecrets := func(t *testing.T, m *mockResolverService) ([]Envelope, error) {
+		t.Helper()
+		socketPath := randomShortSocketName()
+		muxServer(t, socketPath, []handler{unary(t, "resolver.v1.ResolverService.GetSecrets", m.GetSecrets)})
+		c, err := New(WithSocketPath(socketPath))
+		require.NoError(t, err)
+		return c.GetSecrets(t.Context(), MustParsePattern("acme/**"))
+	}
+	t.Run("forwards the pattern and returns the envelopes", func(t *testing.T) {
+		createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+		m := &mockResolverService{envelopes: []*resolverv1.GetSecretsResponse_Envelope{
+			resolverv1.GetSecretsResponse_Envelope_builder{
+				Id:         proto.String("acme/api-token"),
+				Value:      []byte("s3cret"),
+				Metadata:   map[string]string{"owner": "acme"},
+				Provider:   proto.String("pass"),
+				Version:    proto.String("v1"),
+				CreatedAt:  timestamppb.New(createdAt),
+				ResolvedAt: timestamppb.New(createdAt.Add(time.Hour)),
+				ExpiresAt:  timestamppb.New(createdAt.Add(2 * time.Hour)),
+			}.Build(),
+			resolverv1.GetSecretsResponse_Envelope_builder{Value: []byte("no id")}.Build(),
+		}}
+		got, err := getSecrets(t, m)
+		require.NoError(t, err)
+		assert.Equal(t, "acme/**", m.pattern)
+		assert.Equal(t, []Envelope{{
+			ID:         MustParseID("acme/api-token"),
+			Value:      []byte("s3cret"),
+			Metadata:   map[string]string{"owner": "acme"},
+			Provider:   "pass",
+			Version:    "v1",
+			CreatedAt:  createdAt,
+			ResolvedAt: createdAt.Add(time.Hour),
+			ExpiresAt:  createdAt.Add(2 * time.Hour),
+		}}, got, "an envelope without a valid ID is dropped")
+	})
+	t.Run("not found", func(t *testing.T) {
+		_, err := getSecrets(t, &mockResolverService{err: &RPCError{Code: CodeNotFound, Message: secrets.ErrNotFound.Error()}})
+		assert.Equal(t, ErrSecretNotFound, err)
+	})
+	t.Run("returns other engine errors as RPCError", func(t *testing.T) {
+		want := &RPCError{Code: CodePermissionDenied, Message: "denied by policy"}
+		_, err := getSecrets(t, &mockResolverService{err: want})
+		assert.Equal(t, want, err)
+		assert.EqualError(t, err, "permission_denied: denied by policy")
+	})
+}
 
 type mockAuthorizerService struct {
 	expiry   time.Time
@@ -255,8 +438,8 @@ type mockAuthorizerService struct {
 	patterns []string
 }
 
-func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Request[resolverv1.AuthorizeRequest]) (*connect.Response[resolverv1.AuthorizeResponse], error) {
-	m.patterns = req.Msg.GetPatterns()
+func (m *mockAuthorizerService) Authorize(req *resolverv1.AuthorizeRequest) (*resolverv1.AuthorizeResponse, error) {
+	m.patterns = req.GetPatterns()
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -264,16 +447,16 @@ func (m *mockAuthorizerService) Authorize(_ context.Context, req *connect.Reques
 	if !m.expiry.IsZero() {
 		expiresAt = timestamppb.New(m.expiry)
 	}
-	return connect.NewResponse(resolverv1.AuthorizeResponse_builder{
+	return resolverv1.AuthorizeResponse_builder{
 		ExpiresAt: expiresAt,
 		Decision:  m.decision,
-	}.Build()), nil
+	}.Build(), nil
 }
 
 func mockAuthorizeEngine(t *testing.T, m *mockAuthorizerService) string {
 	t.Helper()
 	socketPath := randomShortSocketName()
-	muxServer(t, socketPath, []handler{wrapHandler(resolverv1connect.NewAuthorizerServiceHandler(m))})
+	muxServer(t, socketPath, []handler{unary(t, "resolver.v1.AuthorizerService.Authorize", m.Authorize)})
 	return socketPath
 }
 
@@ -324,7 +507,7 @@ func Test_Authorize(t *testing.T) {
 		assert.False(t, got.Allow, "a decision must be explicit to grant access")
 	})
 	t.Run("denied", func(t *testing.T) {
-		m := &mockAuthorizerService{err: connect.NewError(connect.CodePermissionDenied, secrets.ErrAccessDenied)}
+		m := &mockAuthorizerService{err: &RPCError{Code: CodePermissionDenied, Message: secrets.ErrAccessDenied.Error()}}
 		socket := mockAuthorizeEngine(t, m)
 		c, err := New(WithSocketPath(socket))
 		require.NoError(t, err)

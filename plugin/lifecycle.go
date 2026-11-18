@@ -20,26 +20,27 @@ import (
 	"fmt"
 	"time"
 
-	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
+	pluginsv1 "github.com/docker/secrets-engine/plugin/api/plugins/v1"
+	"github.com/docker/secrets-engine/plugin/api/plugins/v1/pluginsv1rpc"
+	"github.com/docker/secrets-engine/plugin/rpc"
 )
 
-var _ pluginsv1connect.PluginServiceHandler = &pluginService{}
+var _ pluginsv1rpc.PluginServiceHandler = &pluginService{}
 
 type pluginService struct {
 	shutdown func(context.Context)
 }
 
-func (s *pluginService) Shutdown(ctx context.Context, _ *connect.Request[pluginsv1.ShutdownRequest]) (*connect.Response[pluginsv1.ShutdownResponse], error) {
+func (s *pluginService) Shutdown(ctx context.Context, _ *pluginsv1.ShutdownRequest) (*pluginsv1.ShutdownResponse, error) {
 	s.shutdown(ctx)
-	return connect.NewResponse(&pluginsv1.ShutdownResponse{}), nil
+	return &pluginsv1.ShutdownResponse{}, nil
 }
 
-func setupInterceptor(chSetup chan struct{}, timeout time.Duration) connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+func setupInterceptor(chSetup chan struct{}, timeout time.Duration) rpc.Interceptor {
+	return func(next rpc.UnaryFunc) rpc.UnaryFunc {
+		return func(ctx context.Context, req proto.Message) (proto.Message, error) {
 			// Fast path once setup is done: avoids allocating a timer per RPC.
 			select {
 			case <-chSetup:
@@ -51,9 +52,9 @@ func setupInterceptor(chSetup chan struct{}, timeout time.Duration) connect.Unar
 			case <-chSetup:
 				return next(ctx, req)
 			case <-ctx.Done():
-				return nil, connect.NewError(connect.CodeInternal, errors.New("context cancelled while waiting for registration"))
+				return nil, rpc.NewError(rpc.CodeInternal, errors.New("context cancelled while waiting for registration"))
 			case <-time.After(timeout):
-				return nil, connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("registration incomplete (timeout after %s)", timeout))
+				return nil, rpc.NewError(rpc.CodeDeadlineExceeded, fmt.Errorf("registration incomplete (timeout after %s)", timeout))
 			}
 		}
 	}

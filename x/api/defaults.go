@@ -22,8 +22,12 @@ import (
 
 const (
 	// PluginLaunchedByEngineVar is used to inform engine-launched plugins about their name.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/plugin/api.PluginLaunchedByEngineVar] instead.
 	PluginLaunchedByEngineVar = "DOCKER_SECRETS_ENGINE_PLUGIN_LAUNCH_CFG"
 	// DefaultPluginRegistrationTimeout is the default timeout for plugin registration.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/plugin/api.DefaultPluginRegistrationTimeout] instead.
 	DefaultPluginRegistrationTimeout = 5 * time.Second
 	// DefaultClientRequestTimeout is the default timeout for clients to handle a request.
 	//

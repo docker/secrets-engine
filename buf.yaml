@@ -1,10 +1,14 @@
 # For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
 version: v2
 modules:
-  - path: x/api/
+  - path: plugin/api/
 lint:
   use:
     - STANDARD
+  ignore_only:
+    # management.proto and metadata.proto generate their messages into client/api/plugins/v1.
+    PACKAGE_SAME_GO_PACKAGE:
+      - plugin/api/plugins/v1
 breaking:
   use:
     - FILE

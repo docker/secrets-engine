@@ -20,15 +20,15 @@ import (
 	"net/http"
 	"time"
 
-	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	pluginsv1 "github.com/docker/secrets-engine/x/api/plugins/v1"
-	"github.com/docker/secrets-engine/x/api/plugins/v1/pluginsv1connect"
+	clientpluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
+	pluginsv1 "github.com/docker/secrets-engine/plugin/api/plugins/v1"
+	"github.com/docker/secrets-engine/plugin/api/plugins/v1/pluginsv1rpc"
 )
 
 type registerClient struct {
-	engineClient pluginsv1connect.RegisterServiceClient
+	engineClient pluginsv1rpc.RegisterServiceClient
 	pluginName   string
 	config       Config
 	timeout      time.Duration
@@ -36,7 +36,7 @@ type registerClient struct {
 
 func newRegisterClient(c *http.Client, pluginName string, config Config, timeout time.Duration) *registerClient {
 	return &registerClient{
-		engineClient: pluginsv1connect.NewRegisterServiceClient(c, "http://unix"),
+		engineClient: pluginsv1rpc.NewRegisterServiceClient(c, "http://unix"),
 		pluginName:   pluginName,
 		config:       config,
 		timeout:      timeout,
@@ -53,18 +53,17 @@ func (c *registerClient) register(ctx context.Context) (*runtimeConfig, error) {
 	}
 	switch {
 	case c.config.SecretsProviderConfig != nil:
-		builder.SecretsProvider = pluginsv1.SecretsProvider_builder{Pattern: proto.String(c.config.Pattern.String())}.Build()
+		builder.SecretsProvider = clientpluginsv1.SecretsProvider_builder{Pattern: proto.String(c.config.Pattern.String())}.Build()
 	case c.config.AccessControlConfig != nil:
-		builder.AccessControlModule = pluginsv1.AccessControlModule_builder{}.Build()
+		builder.AccessControlModule = clientpluginsv1.AccessControlModule_builder{}.Build()
 	}
-	req := connect.NewRequest(builder.Build())
-	resp, err := c.engineClient.RegisterPlugin(ctx, req)
+	resp, err := c.engineClient.RegisterPlugin(ctx, builder.Build())
 	if err != nil {
 		return nil, fmt.Errorf("failed to register with secrets engine: %w", err)
 	}
 	return &runtimeConfig{
-		Engine:  resp.Msg.GetEngineName(),
-		Version: resp.Msg.GetEngineVersion(),
+		Engine:  resp.GetEngineName(),
+		Version: resp.GetEngineVersion(),
 	}, nil
 }
 

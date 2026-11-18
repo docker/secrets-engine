@@ -19,14 +19,16 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/docker/secrets-engine/plugin/rpc"
 )
 
 func TestSetupInterceptor(t *testing.T) {
 	t.Parallel()
-	newNext := func(called *int) connect.UnaryFunc {
-		return func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+	newNext := func(called *int) rpc.UnaryFunc {
+		return func(context.Context, proto.Message) (proto.Message, error) {
 			*called++
 			return nil, nil
 		}
