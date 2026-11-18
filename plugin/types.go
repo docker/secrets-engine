@@ -23,7 +23,6 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 	"github.com/docker/secrets-engine/x/api/accesscontrol"
 	"github.com/docker/secrets-engine/x/logging"
-	"github.com/docker/secrets-engine/x/plugins"
 )
 
 type (
@@ -40,13 +39,18 @@ type (
 	Pattern = secrets.Pattern
 	// Logger is a type alias for logging.Logger, used for logging within plugins.
 	Logger = logging.Logger
-	// Plugin is an internal engine plugin.
-	Plugin = plugins.Plugin
 
 	AccessControl = accesscontrol.AccessControl
 )
 
 var ErrNotFound = secrets.ErrNotFound
+
+// Plugin is an in memory plugin.
+type Plugin interface {
+	Resolver
+
+	Run(ctx context.Context) error
+}
 
 type SecretsProvider interface {
 	Resolver

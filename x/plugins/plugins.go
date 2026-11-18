@@ -20,6 +20,7 @@ import (
 	"github.com/docker/secrets-engine/secrets"
 )
 
+// Deprecated: Use [github.com/docker/secrets-engine/plugin.Plugin] instead.
 type Plugin interface {
 	secrets.Resolver
 
