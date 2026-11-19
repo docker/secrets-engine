@@ -32,6 +32,7 @@
 //	docker/mcp/oauth-dcr/**        – MCP Dynamic Client Registration configs
 //	docker/sandbox/**              – Sandbox-related secrets
 //	docker/sandbox/oauth/**        – Sandbox third-party OAuth tokens
+//	docker/secrets-engine/**       – secrets-engine's own secrets
 //
 // All variables in this package are provided here as a stable, versioned
 // surface for external consumers.
@@ -82,4 +83,11 @@ var (
 	// DockerSandboxOAuth is the realm used for all Sandbox OAuth credentials
 	// such as third-party tokens - this does not store the Docker Auth tokens.
 	DockerSandboxOAuth = secrets.MustParsePattern("docker/sandbox/oauth/**")
+)
+
+var (
+	// SecretsEngine is the default realm used for secrets-engine related secrets.
+	SecretsEngine = secrets.MustParsePattern("docker/secrets-engine/**")
+	// SecretsEnginePlugins is the realm used to store credentials and configuration for secrets-engine plugins.
+	SecretsEnginePlugins = secrets.MustParsePattern("docker/secrets-engine/plugins/**")
 )

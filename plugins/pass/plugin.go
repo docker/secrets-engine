@@ -18,10 +18,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/docker/secrets-engine/client/realms"
 	"github.com/docker/secrets-engine/plugin"
 	pass "github.com/docker/secrets-engine/plugins/pass/store"
 	"github.com/docker/secrets-engine/secrets"
-	"github.com/docker/secrets-engine/x/realms"
 )
 
 var _ plugin.Plugin = &passPlugin{}

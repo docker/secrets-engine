@@ -50,6 +50,20 @@ func Test_passPlugin(t *testing.T) {
 		assert.Equal(t, "bar", string(e[0].Value))
 		assert.Equal(t, envelopeSchemaVersion, e[0].Version)
 	})
+	t.Run("engine realm", func(t *testing.T) {
+		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{
+			secrets.MustParseID("foo"):                                 pass.NewPassValue([]byte("bar")),
+			secrets.MustParseID("docker/secrets-engine/token"):         pass.NewPassValue([]byte("internal")),
+			secrets.MustParseID("docker/secrets-engine/plugins/a/key"): pass.NewPassValue([]byte("internal")),
+		}))
+		p := &passPlugin{kc: mock, logger: &testLogger{t}}
+		e, err := p.GetSecrets(t.Context(), secrets.MustParsePattern("**"))
+		require.NoError(t, err)
+		require.Len(t, e, 1)
+		assert.Equal(t, "foo", e[0].ID.String())
+		_, err = p.GetSecrets(t.Context(), secrets.MustParsePattern("docker/secrets-engine/**"))
+		assert.ErrorIs(t, err, secrets.ErrNotFound)
+	})
 	t.Run("no secrets", func(t *testing.T) {
 		mock := teststore.NewMockStore(teststore.WithStore(map[secrets.ID]secrets.Secret{}))
 		p := &passPlugin{kc: mock}
