@@ -576,12 +576,29 @@ func rawVersionEngine(t *testing.T, h http.HandlerFunc) Client {
 
 func Test_call(t *testing.T) {
 	t.Parallel()
-	t.Run("reports a dial failure without the request URL", func(t *testing.T) {
+	t.Run("reports a dial failure as unavailable, without the request URL", func(t *testing.T) {
 		c, err := New(WithSocketPath(randomShortSocketName()))
 		require.NoError(t, err)
 		_, err = c.Version(t.Context())
 		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
+		assert.Equal(t, rpc.CodeUnavailable, rpc.CodeOf(err))
 		assert.NotContains(t, err.Error(), baseURL)
+	})
+	dialFails := func(t *testing.T, dialErr error) error {
+		t.Helper()
+		c, err := New(WithDialContext(func(context.Context, string, string) (net.Conn, error) { return nil, dialErr }))
+		require.NoError(t, err)
+		_, err = c.Version(t.Context())
+		return err
+	}
+	t.Run("reports a dial timeout as deadline_exceeded", func(t *testing.T) {
+		err := dialFails(t, &net.OpError{Op: "dial", Net: "unix", Err: os.ErrDeadlineExceeded})
+		require.ErrorIs(t, err, ErrSecretsEngineTimeout)
+		assert.Equal(t, rpc.CodeDeadlineExceeded, rpc.CodeOf(err))
+	})
+	t.Run("reports a cancelled dial as canceled", func(t *testing.T) {
+		dialErr := &net.OpError{Op: "dial", Net: "unix", Err: context.Canceled}
+		assert.Equal(t, rpc.NewError(rpc.CodeCanceled, dialErr), dialFails(t, dialErr))
 	})
 	t.Run("keeps context errors matchable", func(t *testing.T) {
 		c := rawVersionEngine(t, func(_ http.ResponseWriter, r *http.Request) {
@@ -640,7 +657,7 @@ func TestConnectError(t *testing.T) {
 	t.Run("cancelled context is not an engine error", func(t *testing.T) {
 		in := &net.OpError{Op: "dial", Net: "unix", Err: context.Canceled}
 		err := connectError("/run/engine.sock", in)
-		assert.Equal(t, rpc.NewError(rpc.CodeCanceled, in), err)
+		assert.Same(t, in, err)
 	})
 	t.Run("message", func(t *testing.T) {
 		err := connectError("/run/engine.sock", dialErr(syscall.ENOENT))

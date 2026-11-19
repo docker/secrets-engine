@@ -94,6 +94,10 @@ func callServer(ctx context.Context, server *httptest.Server) (*healthv1.GetVers
 	return call(ctx, rpc.NewClient(server.Client(), server.URL))
 }
 
+type overdueContext struct{ context.Context }
+
+func (overdueContext) Deadline() (time.Time, bool) { return time.Now().Add(-time.Millisecond), true }
+
 func TestCall(t *testing.T) {
 	t.Parallel()
 	t.Run("sends a Connect unary request", func(t *testing.T) {
@@ -340,6 +344,15 @@ func TestCall(t *testing.T) {
 		_, err := callServer(ctx, blockingServer(t, func(http.ResponseWriter) { cancel() }))
 		assert.Equal(t, rpc.NewError(rpc.CodeCanceled, context.Canceled), err)
 	})
+	t.Run("reports a cancellation with a coded cause as canceled", func(t *testing.T) {
+		cause := rpc.NewError(rpc.CodePermissionDenied, errors.New("denied by policy"))
+		ctx, cancel := context.WithCancelCause(t.Context())
+		defer cancel(nil)
+		_, err := callServer(ctx, blockingServer(t, func(http.ResponseWriter) { cancel(cause) }))
+		require.EqualError(t, err, "canceled: context canceled: permission_denied: denied by policy")
+		assert.Equal(t, rpc.CodeCanceled, rpc.CodeOf(err))
+		require.ErrorIs(t, err, context.Canceled)
+	})
 	t.Run("keeps a context deadline matchable while it reads a JSON error", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cancel()
@@ -348,10 +361,9 @@ func TestCall(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
-	lateError := func(end func()) doFunc {
+	lateError := func(before func(context.Context)) doFunc {
 		return func(req *http.Request) (*http.Response, error) {
-			end()
-			<-req.Context().Done()
+			before(req.Context())
 			return &http.Response{
 				Status:     "500 Internal Server Error",
 				StatusCode: http.StatusInternalServerError,
@@ -363,14 +375,21 @@ func TestCall(t *testing.T) {
 	t.Run("reports the context deadline over an error the server answers late", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
 		defer cancel()
-		_, err := call(ctx, rpc.NewClient(lateError(func() {}), "http://unix"))
+		httpClient := lateError(func(ctx context.Context) { <-ctx.Done() })
+		_, err := call(ctx, rpc.NewClient(httpClient, "http://unix"))
 		assert.Equal(t, rpc.NewError(rpc.CodeDeadlineExceeded, context.DeadlineExceeded), err)
 	})
 	t.Run("reports the context cancellation over an error the server answers late", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
-		_, err := call(ctx, rpc.NewClient(lateError(cancel), "http://unix"))
+		httpClient := lateError(func(context.Context) { cancel() })
+		_, err := call(ctx, rpc.NewClient(httpClient, "http://unix"))
 		assert.Equal(t, rpc.NewError(rpc.CodeCanceled, context.Canceled), err)
+	})
+	t.Run("reports a passed deadline over an error the server answers before the context ends", func(t *testing.T) {
+		httpClient := lateError(func(context.Context) {})
+		_, err := call(overdueContext{t.Context()}, rpc.NewClient(httpClient, "http://unix"))
+		assert.Equal(t, rpc.NewError(rpc.CodeDeadlineExceeded, context.DeadlineExceeded), err)
 	})
 }
 

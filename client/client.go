@@ -236,8 +236,8 @@ const baseURL = "http://unix"
 func call(rpcClient *rpc.Client, socketPath string) func(ctx context.Context, procedure string, req, resp proto.Message) error {
 	return func(ctx context.Context, procedure string, req, resp proto.Message) error {
 		err := rpcClient.Call(ctx, procedure, req, resp)
-		if opErr, ok := errors.AsType[*net.OpError](err); ok && isDialError(opErr) {
-			return connectError(socketPath, opErr)
+		if isDialError(err) {
+			return connectError(socketPath, err)
 		}
 		return err
 	}
@@ -256,7 +256,7 @@ func isDialError(err error) bool {
 
 func connectError(socketPath string, err error) error {
 	if errors.Is(err, context.Canceled) {
-		return rpc.NewError(rpc.CodeCanceled, err)
+		return err
 	}
 	return &ConnectError{Reason: connectReason(err), SocketPath: socketPath, Err: err}
 }

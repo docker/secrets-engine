@@ -104,7 +104,7 @@ func ceilMilliseconds(d time.Duration) int64 {
 }
 
 func transportError(ctx context.Context, err error) *Error {
-	if e, ok := errors.AsType[*Error](err); ok {
+	if e, ok := errors.AsType[*Error](err); ok && ctx.Err() == nil {
 		return e
 	}
 	if urlErr, ok := errors.AsType[*url.Error](err); ok {
@@ -126,6 +126,9 @@ func transportError(ctx context.Context, err error) *Error {
 func errorFromResponse(ctx context.Context, resp *http.Response, contentType string) *Error {
 	if err := ctx.Err(); err != nil {
 		return transportError(ctx, err)
+	}
+	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		return NewError(CodeDeadlineExceeded, context.DeadlineExceeded)
 	}
 	code := codeFromStatus(resp.StatusCode)
 	if contentType != contentTypeJSON {
