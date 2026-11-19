@@ -111,7 +111,7 @@ func TestCheckPluginName(t *testing.T) {
 	for _, name := range []string{"", "acme", "acme-plugin.v2"} {
 		assert.NoError(t, checkPluginName(name), name)
 	}
-	for _, name := range []string{".", "..", "dir/acme", "/acme", "acme/"} {
+	for _, name := range []string{".", "..", "/", "dir/acme", "/acme", "acme/"} {
 		assert.ErrorContains(t, checkPluginName(name), "invalid --name", name)
 	}
 }

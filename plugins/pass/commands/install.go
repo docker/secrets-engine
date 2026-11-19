@@ -173,16 +173,24 @@ func usesPluginSDK(info *buildinfo.BuildInfo) bool {
 }
 
 func checkPluginName(name string) error {
-	if name == "" || (name == filepath.Base(name) && name != "." && name != "..") {
+	if name == "" || isFileName(name) {
 		return nil
 	}
 	return fmt.Errorf("invalid --name %q: want a file name without a directory", name)
+}
+
+func isFileName(name string) bool {
+	return name != "." && filepath.IsLocal(name) && name == filepath.Base(name)
 }
 
 func pluginFileName(name, built string) string {
 	if name == "" {
 		return built
 	}
+	return withExeSuffix(name)
+}
+
+func withExeSuffix(name string) string {
 	if runtime.GOOS == "windows" && !strings.EqualFold(filepath.Ext(name), ".exe") {
 		name += ".exe"
 	}
@@ -235,21 +243,25 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
-// sudoInstall copies src to dst as root; this process stays unprivileged.
-// sudo, being setuid-root, prompts for the password on the terminal itself,
-// so the password never passes through here. Without a terminal it fails.
 func sudoInstall(cmd *cobra.Command, src, dst string) error {
+	dir := filepath.Dir(dst)
 	if runtime.GOOS == "windows" {
-		return fmt.Errorf("installing to %s: %w", filepath.Dir(dst), fs.ErrPermission)
+		return fmt.Errorf("installing to %s: %w", dir, fs.ErrPermission)
 	}
-	args := []string{"install", "-m", "0755", src, dst}
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Installing to %s requires root; running: sudo %s\n", filepath.Dir(dst), strings.Join(args, " "))
+	return sudoRun(cmd, "Installing to "+dir, "install", "-m", "0755", src, dst)
+}
+
+// sudoRun runs a command as root; this process stays unprivileged. sudo,
+// being setuid-root, prompts for the password on the terminal itself, so the
+// password never passes through here. Without a terminal it fails.
+func sudoRun(cmd *cobra.Command, action string, args ...string) error {
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s requires root; running: sudo %s\n", action, strings.Join(args, " "))
 	sudo := exec.CommandContext(cmd.Context(), "sudo", args...)
 	sudo.Stdin = cmd.InOrStdin()
 	sudo.Stdout = cmd.OutOrStdout()
 	sudo.Stderr = cmd.ErrOrStderr()
 	if err := sudo.Run(); err != nil {
-		return fmt.Errorf("sudo install: %w", err)
+		return fmt.Errorf("sudo %s: %w", args[0], err)
 	}
 	return nil
 }
