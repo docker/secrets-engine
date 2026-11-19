@@ -81,7 +81,11 @@ var (
 
 var (
 	// SecretsEngine is the default realm used for secrets-engine related secrets.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/realms.SecretsEngine] instead.
 	SecretsEngine = secrets.MustParsePattern("docker/secrets-engine/**")
 	// SecretsEnginePlugins is the realm used to store credentials and configuration for secrets-engine plugins.
+	//
+	// Deprecated: Use [github.com/docker/secrets-engine/client/realms.SecretsEnginePlugins] instead.
 	SecretsEnginePlugins = secrets.MustParsePattern("docker/secrets-engine/plugins/**")
 )
