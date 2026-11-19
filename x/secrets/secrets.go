@@ -18,7 +18,12 @@
 // package will be removed after its last tag.
 package secrets
 
-import "github.com/docker/secrets-engine/secrets"
+import (
+	"context"
+	"time"
+
+	"github.com/docker/secrets-engine/secrets"
+)
 
 var (
 	// Deprecated: Use [secrets.ErrNotFound] instead.
@@ -51,20 +56,21 @@ type Pattern = secrets.Pattern
 //go:fix inline
 type Envelope = secrets.Envelope
 
-// Deprecated: Use [secrets.Resolver] instead.
-//
-//go:fix inline
-type Resolver = secrets.Resolver
+// Deprecated: Use [github.com/docker/secrets-engine/client/api/resolver.Resolver] instead.
+type Resolver interface {
+	GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error)
+}
 
-// Deprecated: Use [secrets.AuthorizeResponse] instead.
-//
-//go:fix inline
-type AuthorizeResponse = secrets.AuthorizeResponse
+// Deprecated: Use [github.com/docker/secrets-engine/client/api/resolver.AuthorizeResponse] instead.
+type AuthorizeResponse struct {
+	Expiry time.Time
+	Allow  bool
+}
 
-// Deprecated: Use [secrets.Authorizer] instead.
-//
-//go:fix inline
-type Authorizer = secrets.Authorizer
+// Deprecated: Use [github.com/docker/secrets-engine/client/api/resolver.Authorizer] instead.
+type Authorizer interface {
+	Authorize(ctx context.Context, pattern ...secrets.Pattern) (AuthorizeResponse, error)
+}
 
 // Deprecated: Use [secrets.ParseID] instead.
 //

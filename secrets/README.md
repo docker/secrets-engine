@@ -1,8 +1,8 @@
 # secrets
 
 `github.com/docker/secrets-engine/secrets` holds the core types of the Secrets
-Engine: secret IDs and patterns, resolved envelopes, and the `Resolver`,
-`Authorizer`, `Secret` and `Store` interfaces.
+Engine: secret IDs and patterns, resolved envelopes, and the `Secret` and
+`Store` interfaces.
 
 It depends only on the standard library, so clients, plugins and store
 backends can import it without pulling in the engine runtime or the keychain
@@ -80,9 +80,14 @@ this module. They carry `//go:fix inline` directives, so `go fix ./...`
 rewrites callers to import `secrets` directly. `x/secrets` will be removed in a
 future release of `x`.
 
+`x/secrets.Resolver`, `x/secrets.Authorizer` and `x/secrets.AuthorizeResponse`
+are the exception: `go fix` leaves them alone, and their replacements live in
+`github.com/docker/secrets-engine/client/api/resolver`.
+
 | Deprecated                                                  | Replacement                 |
 |-------------------------------------------------------------|-----------------------------|
 | `x/secrets.*`                                               | `secrets.*`                 |
+| `x/secrets.Resolver`, `x/secrets.Authorizer`, `x/secrets.AuthorizeResponse` | `client/api/resolver.Resolver`, `client/api/resolver.Authorizer`, `client/api/resolver.AuthorizeResponse` |
 | `store.ID`, `store.Pattern`, `store.Secret`, `store.Store`  | `secrets.ID`, `secrets.Pattern`, `secrets.Secret`, `secrets.Store` |
 | `store.Factory[T]`                                          | `secrets.Factory[T]`        |
 | `store.ParseID`, `store.MustParseID`                        | `secrets.ParseID`, `secrets.MustParseID` |

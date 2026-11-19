@@ -29,6 +29,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/secrets"
 )
 
@@ -205,7 +206,7 @@ func parseEnv(env []string) ([]envVar, error) {
 	return vars, nil
 }
 
-func authorizeEnv(ctx context.Context, a secrets.Authorizer, vars []envVar) error {
+func authorizeEnv(ctx context.Context, a resolver.Authorizer, vars []envVar) error {
 	var patterns []secrets.Pattern
 	for _, v := range vars {
 		if v.pattern == nil {
@@ -219,7 +220,7 @@ func authorizeEnv(ctx context.Context, a secrets.Authorizer, vars []envVar) erro
 	return authorize(ctx, a, patterns...)
 }
 
-func resolveEnv(ctx context.Context, r secrets.Resolver, vars []envVar) ([]string, error) {
+func resolveEnv(ctx context.Context, r resolver.Resolver, vars []envVar) ([]string, error) {
 	var out []string
 	for _, v := range vars {
 		value, err := resolveVar(ctx, r, v)
@@ -231,7 +232,7 @@ func resolveEnv(ctx context.Context, r secrets.Resolver, vars []envVar) ([]strin
 	return out, nil
 }
 
-func resolveVar(ctx context.Context, r secrets.Resolver, v envVar) (string, error) {
+func resolveVar(ctx context.Context, r resolver.Resolver, v envVar) (string, error) {
 	if v.pattern == nil {
 		return v.value, nil
 	}

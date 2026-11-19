@@ -19,14 +19,15 @@ import (
 	"errors"
 	"time"
 
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/plugin/api/accesscontrol"
 	"github.com/docker/secrets-engine/secrets"
 )
 
 type (
-	// Resolver is a type alias for secrets.Resolver, used to resolve secrets.
-	Resolver = secrets.Resolver
+	// Resolver is a type alias for resolver.Resolver, used to resolve secrets.
+	Resolver = resolver.Resolver
 	// Envelope is a type alias for secrets.Envelope, representing a secret envelope.
 	Envelope = secrets.Envelope
 

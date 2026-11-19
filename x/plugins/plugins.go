@@ -22,7 +22,7 @@ import (
 
 // Deprecated: Use [github.com/docker/secrets-engine/plugin.Plugin] instead.
 type Plugin interface {
-	secrets.Resolver
+	GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error)
 
 	Run(ctx context.Context) error
 }

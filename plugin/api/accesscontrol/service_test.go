@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/docker/secrets-engine/client/api/resolver"
 	accesscontrolv1 "github.com/docker/secrets-engine/plugin/api/accesscontrol/v1"
 	"github.com/docker/secrets-engine/plugin/rpc"
 	"github.com/docker/secrets-engine/secrets"
@@ -44,10 +45,10 @@ func (s *stubAccessControl) CheckAccess(_ context.Context, req CheckAccessReques
 	return s.allowed, s.err
 }
 
-func (s *stubAccessControl) Authorize(_ context.Context, req AuthorizeRequest) (secrets.AuthorizeResponse, error) {
+func (s *stubAccessControl) Authorize(_ context.Context, req AuthorizeRequest) (resolver.AuthorizeResponse, error) {
 	s.called = true
 	s.authReq = req
-	return secrets.AuthorizeResponse{Expiry: s.expiry, Allow: s.allowed}, s.err
+	return resolver.AuthorizeResponse{Expiry: s.expiry, Allow: s.allowed}, s.err
 }
 
 func TestCheckAccess(t *testing.T) {

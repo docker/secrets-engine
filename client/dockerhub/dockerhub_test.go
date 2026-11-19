@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/secrets"
 )
@@ -121,7 +122,7 @@ func envelope(value string) secrets.Envelope {
 	return secrets.Envelope{Value: []byte(value), Provider: "docker-auth", Version: "0.0.1"}
 }
 
-func hub(t *testing.T, engine secrets.Resolver, opts ...dockerhub.Option) dockerhub.ClientAuth {
+func hub(t *testing.T, engine resolver.Resolver, opts ...dockerhub.Option) dockerhub.ClientAuth {
 	t.Helper()
 	return dockerhub.New(engine, opts...)
 }

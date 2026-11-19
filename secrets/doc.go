@@ -14,7 +14,7 @@
 
 // Package secrets defines the core types shared across the Secrets Engine:
 // secret identifiers and patterns, resolved secret envelopes, and the
-// interfaces implemented by resolvers, authorizers and secret stores.
+// interfaces implemented by secret stores.
 //
 // # Identifiers and patterns
 //
@@ -39,8 +39,10 @@
 //
 // # Resolving secrets
 //
-// A [Resolver] returns the [Envelope] of every secret that matches a pattern.
-// An [Authorizer] decides whether access to a set of patterns is allowed.
+// A [github.com/docker/secrets-engine/client/api/resolver.Resolver] returns
+// the [Envelope] of every secret that matches a pattern. A
+// [github.com/docker/secrets-engine/client/api/resolver.Authorizer] decides
+// whether access to a set of patterns is allowed.
 //
 // # Storing secrets
 //

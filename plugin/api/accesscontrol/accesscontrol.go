@@ -17,12 +17,13 @@ package accesscontrol
 import (
 	"context"
 
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/secrets"
 )
 
 type AccessControl interface {
 	CheckAccess(ctx context.Context, req CheckAccessRequest) (bool, error)
-	Authorize(ctx context.Context, req AuthorizeRequest) (secrets.AuthorizeResponse, error)
+	Authorize(ctx context.Context, req AuthorizeRequest) (resolver.AuthorizeResponse, error)
 }
 
 type CheckAccessRequest struct {

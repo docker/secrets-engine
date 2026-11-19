@@ -15,7 +15,6 @@
 package secrets
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -63,26 +62,4 @@ var _ json.Marshaler = Envelope{}
 // never written out by encoding/json by accident.
 func (e Envelope) MarshalJSON() ([]byte, error) {
 	panic("secrets.Envelope does not support json.Marshal")
-}
-
-// Resolver resolves secrets by pattern.
-type Resolver interface {
-	// GetSecrets returns an Envelope for every secret matching pattern.
-	GetSecrets(ctx context.Context, pattern Pattern) ([]Envelope, error)
-}
-
-// AuthorizeResponse is the access decision returned by an [Authorizer].
-type AuthorizeResponse struct {
-	// Expiry is when the decision stops holding. A zero Expiry means the
-	// decision never expires, and the wire message then carries no timestamp.
-	Expiry time.Time
-	// Allow reports whether access is granted. A deny decision is returned
-	// with Allow false and a nil error.
-	Allow bool
-}
-
-// Authorizer decides access to secrets.
-type Authorizer interface {
-	// Authorize decides access to all of the given patterns at once.
-	Authorize(ctx context.Context, pattern ...Pattern) (AuthorizeResponse, error)
 }

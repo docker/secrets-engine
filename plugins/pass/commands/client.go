@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/secrets"
 )
@@ -148,7 +149,7 @@ func newClient(opts clientOpts) (client.Client, error) {
 	return c, nil
 }
 
-func authorize(ctx context.Context, a secrets.Authorizer, patterns ...secrets.Pattern) error {
+func authorize(ctx context.Context, a resolver.Authorizer, patterns ...secrets.Pattern) error {
 	resp, err := a.Authorize(ctx, patterns...)
 	if err != nil {
 		return fmt.Errorf("authorizing: %w", err)
