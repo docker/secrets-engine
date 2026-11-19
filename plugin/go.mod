@@ -10,7 +10,7 @@ replace github.com/docker/secrets-engine/secrets => ../secrets
 replace github.com/docker/secrets-engine/client => ../client
 
 require (
-	github.com/docker/secrets-engine/client v0.2.2
+	github.com/docker/secrets-engine/client v1.0.0
 	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/hashicorp/yamux v0.1.2
 	github.com/stretchr/testify v1.11.1
