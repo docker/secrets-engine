@@ -94,11 +94,24 @@ from a checkout of this repository.
 
 It needs the Go toolchain and accepts only binaries that use the
 [`plugin`](../../plugin) SDK. The file name becomes the plugin name; change it
-with `--name`. If the plugin directory is not writable, the final copy runs
-through `sudo`. The engine loads plugins at startup, so restart it afterwards.
+with `--name`. If the plugin directory is not writable, run the command with
+`sudo`: the build still runs as the user who called `sudo`. The engine loads
+plugins at startup, so restart it afterwards.
 
-The command exists only in builds whose engine launches plugins from a
-directory.
+### Uninstall a plugin
+
+`docker pass uninstall` deletes plugins from the engine's plugin directory by
+file name:
+
+```console
+$ docker pass uninstall stdinreader
+```
+
+If the plugin directory is not writable, run the command with `sudo`. A deleted
+plugin keeps running until the engine restarts, so restart it afterwards.
+
+`install` and `uninstall` exist only in builds whose engine launches plugins
+from a directory.
 
 ### Troubleshooting
 
@@ -172,6 +185,6 @@ connect to Docker Desktop's socket by default; pass `commands.WithSocketPath`
 to use another one, and `commands.WithTimeout` or
 `commands.WithResponseTimeout` to change the timeouts.
 
-`commands.InstallCommand(pluginDir)` needs neither the store nor the engine.
-Pass it the directory your engine launches plugins from, and add it only where
-that directory exists.
+`commands.InstallCommand(pluginDir)` and `commands.UninstallCommand(pluginDir)`
+need neither the store nor the engine. Pass them the directory your engine
+launches plugins from, and add them only where that directory exists.

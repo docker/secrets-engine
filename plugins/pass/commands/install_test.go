@@ -23,7 +23,6 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -111,7 +110,7 @@ func TestCheckPluginName(t *testing.T) {
 	for _, name := range []string{"", "acme", "acme-plugin.v2"} {
 		assert.NoError(t, checkPluginName(name), name)
 	}
-	for _, name := range []string{".", "..", "dir/acme", "/acme", "acme/"} {
+	for _, name := range []string{".", "..", "/", "dir/acme", "/acme", "acme/"} {
 		assert.ErrorContains(t, checkPluginName(name), "invalid --name", name)
 	}
 }
@@ -127,6 +126,7 @@ func TestInstallCommand(t *testing.T) {
 	t.Setenv("GOFLAGS", "-buildvcs=false")
 	t.Setenv("GOTOOLCHAIN", "local")
 	t.Setenv("GOPROXY", "off")
+	t.Setenv("SUDO_UID", "")
 
 	install := func(t *testing.T, args ...string) (pluginDir, out string, err error) {
 		t.Helper()
@@ -176,6 +176,22 @@ func TestInstallCommand(t *testing.T) {
 		require.NoError(t, err, out)
 		assert.Equal(t, []string{exeName("stdinreader")}, dirNames(t, pluginDir))
 	})
+	t.Run("ignores SUDO_UID without root", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("needs an unprivileged user")
+		}
+		t.Setenv("SUDO_UID", "0")
+		pluginDir, out, err := install(t, plugin)
+		require.NoError(t, err, out)
+		assert.Equal(t, []string{exeName("stdinreader")}, dirNames(t, pluginDir))
+	})
+	t.Run("go not on PATH", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		pluginDir, out, err := install(t, plugin)
+		assert.ErrorContains(t, err, "the Go toolchain is required to build plugins", out)
+		assert.NotContains(t, out, sudoPathHint)
+		assert.Empty(t, dirNames(t, pluginDir))
+	})
 	t.Run("compile error", func(t *testing.T) {
 		broken := writeModule(t, "package main\n\nfunc main() { missing() }\n")
 		pluginDir, out, err := install(t, broken)
@@ -197,24 +213,17 @@ func TestInstallCommand(t *testing.T) {
 	})
 }
 
-func TestPlaceElevates(t *testing.T) {
+func TestInstallCommandHintsSudo(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("needs a directory the current user cannot write to")
 	}
 	t.Parallel()
-	src := filepath.Join(t.TempDir(), "myplugin")
-	require.NoError(t, os.WriteFile(src, []byte("binary"), 0o600))
 	pluginDir := t.TempDir()
 	require.NoError(t, os.Chmod(pluginDir, 0o555))
-	dst := filepath.Join(pluginDir, "myplugin")
 
-	var elevated []string
-	opts := installOpts{elevate: func(_ *cobra.Command, from, to string) error {
-		elevated = append(elevated, from, to)
-		return nil
-	}}
-	require.NoError(t, place(&cobra.Command{}, opts, src, dst))
-	assert.Equal(t, []string{src, dst}, elevated)
+	out, err := execute(t, newInstallCommand(installOpts{pluginDir: pluginDir}), nil, t.TempDir())
+	require.ErrorIs(t, err, fs.ErrPermission, out)
+	assert.Equal(t, "Error: installing to "+pluginDir+": permission denied\n\n"+sudoHint+"\n", out)
 	assert.Empty(t, dirNames(t, pluginDir))
 }
 

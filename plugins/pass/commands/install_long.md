@@ -11,7 +11,7 @@ a Go program that uses the plugin SDK
 (`github.com/docker/secrets-engine/plugin`). The file name becomes the plugin
 name; set it with `--name`.
 
-Requires the Go toolchain. If the plugin directory is not writable, the final
-copy runs through `sudo`.
+Requires the Go toolchain. If the plugin directory is not writable, run the
+command with `sudo`: the build still runs as the user who called `sudo`.
 
 The engine loads plugins at startup, so restart it afterwards.

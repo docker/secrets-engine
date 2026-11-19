@@ -12,8 +12,8 @@ replace github.com/docker/secrets-engine/secrets => ../../secrets
 replace github.com/docker/secrets-engine/client => ../../client
 
 require (
-	github.com/docker/secrets-engine/client v0.2.2
-	github.com/docker/secrets-engine/plugin v0.3.4
+	github.com/docker/secrets-engine/client v1.0.0
+	github.com/docker/secrets-engine/plugin v0.4.1
 	github.com/stretchr/testify v1.11.1
 )
 
