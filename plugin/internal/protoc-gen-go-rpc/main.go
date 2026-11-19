@@ -21,6 +21,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"path"
 	"strconv"
@@ -37,13 +38,23 @@ var (
 	contextContext = protogen.GoImportPath("context").Ident("Context")
 	errorsNew      = protogen.GoImportPath("errors").Ident("New")
 	httpHandler    = protogen.GoImportPath("net/http").Ident("Handler")
+	protoMessage   = protogen.GoImportPath("google.golang.org/protobuf/proto").Ident("Message")
 )
 
 func main() {
-	protogen.Options{}.Run(generate)
+	opts, clientModule := options()
+	opts.Run(func(plugin *protogen.Plugin) error {
+		return generate(plugin, *clientModule)
+	})
 }
 
-func generate(plugin *protogen.Plugin) error {
+func options() (protogen.Options, *string) {
+	var flags flag.FlagSet
+	clientModule := flags.String("client_module", "", "write, for the proto files whose Go package is in this module, only clients that send requests through a function")
+	return protogen.Options{ParamFunc: flags.Set}, clientModule
+}
+
+func generate(plugin *protogen.Plugin, clientModule string) error {
 	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL | pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
 	plugin.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO2
 	plugin.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
@@ -51,14 +62,21 @@ func generate(plugin *protogen.Plugin) error {
 		if !file.Generate || len(file.Services) == 0 {
 			continue
 		}
-		if err := generateFile(plugin, file); err != nil {
+		if clientModule != "" && !inModule(file.GoImportPath, clientModule) {
+			continue
+		}
+		if err := generateFile(plugin, file, clientModule != ""); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func generateFile(plugin *protogen.Plugin, file *protogen.File) error {
+func inModule(pkg protogen.GoImportPath, module string) bool {
+	return string(pkg) == module || strings.HasPrefix(string(pkg), module+"/")
+}
+
+func generateFile(plugin *protogen.Plugin, file *protogen.File, clientOnly bool) error {
 	for _, service := range file.Services {
 		for _, method := range service.Methods {
 			if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
@@ -76,13 +94,15 @@ func generateFile(plugin *protogen.Plugin, file *protogen.File) error {
 	g.P()
 	g.P("package ", pkg)
 	g.P()
-	g.P("const (")
-	for _, service := range file.Services {
-		g.P("// ", service.GoName, "Name is the fully-qualified name of the ", service.Desc.Name(), " service.")
-		g.P(service.GoName, "Name = ", strconv.Quote(string(service.Desc.FullName())))
+	if !clientOnly {
+		g.P("const (")
+		for _, service := range file.Services {
+			g.P("// ", service.GoName, "Name is the fully-qualified name of the ", service.Desc.Name(), " service.")
+			g.P(service.GoName, "Name = ", strconv.Quote(string(service.Desc.FullName())))
+		}
+		g.P(")")
+		g.P()
 	}
-	g.P(")")
-	g.P()
 	g.P("const (")
 	for _, service := range file.Services {
 		for _, method := range service.Methods {
@@ -92,13 +112,15 @@ func generateFile(plugin *protogen.Plugin, file *protogen.File) error {
 	}
 	g.P(")")
 	for _, service := range file.Services {
-		generateClient(g, service)
-		generateHandler(g, service)
+		generateClient(g, service, clientOnly)
+		if !clientOnly {
+			generateHandler(g, service)
+		}
 	}
 	return nil
 }
 
-func generateClient(g *protogen.GeneratedFile, service *protogen.Service) {
+func generateClient(g *protogen.GeneratedFile, service *protogen.Service, clientOnly bool) {
 	name := service.GoName + "Client"
 	impl := strings.ToLower(name[:1]) + name[1:]
 
@@ -110,6 +132,28 @@ func generateClient(g *protogen.GeneratedFile, service *protogen.Service) {
 	}
 	g.P("}")
 	g.P()
+	if clientOnly {
+		call := "func(ctx " + g.QualifiedGoIdent(contextContext) + ", procedure string, req, res " + g.QualifiedGoIdent(protoMessage) + ") error"
+		g.P("// New", name, " constructs a client for the ", service.Desc.FullName(), " service that sends each request through call.")
+		g.P("func New", name, "(call ", call, ") ", name, " {")
+		g.P("return &", impl, "{call}")
+		g.P("}")
+		g.P()
+		g.P("type ", impl, " struct {")
+		g.P("call ", call)
+		g.P("}")
+		for _, method := range service.Methods {
+			g.P()
+			g.P("func (c *", impl, ") ", method.GoName, "(ctx ", contextContext, ", req *", method.Input.GoIdent, ") (*", method.Output.GoIdent, ", error) {")
+			g.P("res := &", method.Output.GoIdent, "{}")
+			g.P("if err := c.call(ctx, ", procedure(method), ", req, res); err != nil {")
+			g.P("return nil, err")
+			g.P("}")
+			g.P("return res, nil")
+			g.P("}")
+		}
+		return
+	}
 	g.P("// New", name, " constructs a client for the ", service.Desc.FullName(), ` service at baseURL, for example "http://unix".`)
 	g.P("func New", name, "(httpClient ", rpcPackage.Ident("HTTPClient"), ", baseURL string, opts ...", rpcPackage.Ident("ClientOption"), ") ", name, " {")
 	g.P("return &", impl, "{", rpcPackage.Ident("NewClient"), "(httpClient, baseURL, opts...)}")

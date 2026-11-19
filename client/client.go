@@ -25,10 +25,14 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	healthv1 "github.com/docker/secrets-engine/client/api/health/v1"
+	"github.com/docker/secrets-engine/client/api/health/v1/healthv1rpc"
 	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
+	"github.com/docker/secrets-engine/client/api/plugins/v1/pluginsv1rpc"
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
+	"github.com/docker/secrets-engine/client/api/resolver/v1/resolverv1rpc"
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/client/rpc"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 )
@@ -125,8 +129,10 @@ var (
 )
 
 type client struct {
-	socketPath string
-	httpClient *http.Client
+	resolverClient   resolverv1rpc.ResolverServiceClient
+	authorizerClient resolverv1rpc.AuthorizerServiceClient
+	versionClient    healthv1rpc.VersionServiceClient
+	pluginsClient    pluginsv1rpc.PluginManagementServiceClient
 }
 
 // Authorize decides access to the patterns. The decision holds until the
@@ -136,10 +142,9 @@ func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (sec
 	for _, p := range patterns {
 		msgPatterns = append(msgPatterns, p.String())
 	}
-	req := resolverv1.AuthorizeRequest_builder{Patterns: msgPatterns}.Build()
-	resp := &resolverv1.AuthorizeResponse{}
-	if err := c.call(ctx, authorizeProcedure, req, resp); err != nil {
-		if rpcErr, ok := errors.AsType[*RPCError](err); ok && rpcErr.Code == CodePermissionDenied {
+	resp, err := c.authorizerClient.Authorize(ctx, resolverv1.AuthorizeRequest_builder{Patterns: msgPatterns}.Build())
+	if err != nil {
+		if rpc.CodeOf(err) == rpc.CodePermissionDenied {
 			return secrets.AuthorizeResponse{}, secrets.ErrAccessDenied
 		}
 		return secrets.AuthorizeResponse{}, err
@@ -155,10 +160,9 @@ func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (sec
 }
 
 func (c client) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
-	req := resolverv1.GetSecretsRequest_builder{Pattern: proto.String(pattern.String())}.Build()
-	resp := &resolverv1.GetSecretsResponse{}
-	if err := c.call(ctx, getSecretsProcedure, req, resp); err != nil {
-		if rpcErr, ok := errors.AsType[*RPCError](err); ok && rpcErr.Code == CodeNotFound {
+	resp, err := c.resolverClient.GetSecrets(ctx, resolverv1.GetSecretsRequest_builder{Pattern: proto.String(pattern.String())}.Build())
+	if err != nil {
+		if rpc.CodeOf(err) == rpc.CodeNotFound {
 			return nil, secrets.ErrNotFound
 		}
 		return nil, err
@@ -188,8 +192,8 @@ func (c client) HubAuth(opts ...dockerhub.Option) dockerhub.ClientAuth {
 }
 
 func (c client) Version(ctx context.Context) (DaemonVersion, error) {
-	resp := &healthv1.GetVersionResponse{}
-	if err := c.call(ctx, getVersionProcedure, healthv1.GetVersionRequest_builder{}.Build(), resp); err != nil {
+	resp, err := c.versionClient.GetVersion(ctx, healthv1.GetVersionRequest_builder{}.Build())
+	if err != nil {
 		return DaemonVersion{}, err
 	}
 	ver, err := version.NewVersion(resp.GetVersion())
@@ -225,6 +229,20 @@ func PluginManagementFromClient(c Client) (PluginManagement, error) {
 	return m, nil
 }
 
+const baseURL = "http://unix"
+
+// call sends a unary request in the Connect protocol:
+// https://connectrpc.com/docs/protocol#unary-request
+func call(rpcClient *rpc.Client, socketPath string) func(ctx context.Context, procedure string, req, resp proto.Message) error {
+	return func(ctx context.Context, procedure string, req, resp proto.Message) error {
+		err := rpcClient.Call(ctx, procedure, req, resp)
+		if opErr, ok := errors.AsType[*net.OpError](err); ok && isDialError(opErr) {
+			return connectError(socketPath, opErr)
+		}
+		return err
+	}
+}
+
 func isDialError(err error) bool {
 	if err == nil {
 		return false
@@ -236,11 +254,11 @@ func isDialError(err error) bool {
 	return false
 }
 
-func (c client) connectError(err error) error {
+func connectError(socketPath string, err error) error {
 	if errors.Is(err, context.Canceled) {
-		return err
+		return rpc.NewError(rpc.CodeCanceled, err)
 	}
-	return &ConnectError{Reason: connectReason(err), SocketPath: c.socketPath, Err: err}
+	return &ConnectError{Reason: connectReason(err), SocketPath: socketPath, Err: err}
 }
 
 // New creates a client that connects to config.StandaloneSocketPath by default.
@@ -280,12 +298,18 @@ func New(options ...Option) (Client, error) {
 		// it can be overwritten with [WithTimeout]
 		Timeout: cfg.requestTimeout,
 	}
-	return &client{socketPath: cfg.socketPath, httpClient: c}, nil
+	callEngine := call(rpc.NewClient(c, baseURL), cfg.socketPath)
+	return &client{
+		resolverClient:   resolverv1rpc.NewResolverServiceClient(callEngine),
+		authorizerClient: resolverv1rpc.NewAuthorizerServiceClient(callEngine),
+		versionClient:    healthv1rpc.NewVersionServiceClient(callEngine),
+		pluginsClient:    pluginsv1rpc.NewPluginManagementServiceClient(callEngine),
+	}, nil
 }
 
 func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
-	resp := &pluginsv1.ListPluginsResponse{}
-	if err := c.call(ctx, listPluginsProcedure, pluginsv1.ListPluginsRequest_builder{}.Build(), resp); err != nil {
+	resp, err := c.pluginsClient.ListPlugins(ctx, pluginsv1.ListPluginsRequest_builder{}.Build())
+	if err != nil {
 		return nil, err
 	}
 	var result []PluginInfo
@@ -325,13 +349,15 @@ func (c client) ListPlugins(ctx context.Context) ([]PluginInfo, error) {
 func (c client) EnablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.EnablePluginRequest_builder{}.Build()
 	r.SetName(name)
-	return c.call(ctx, enablePluginProcedure, r, &pluginsv1.EnablePluginResponse{})
+	_, err := c.pluginsClient.EnablePlugin(ctx, r)
+	return err
 }
 
 func (c client) DisablePlugin(ctx context.Context, name string) error {
 	r := pluginsv1.DisablePluginRequest_builder{}.Build()
 	r.SetName(name)
-	return c.call(ctx, disablePluginProcedure, r, &pluginsv1.DisablePluginResponse{})
+	_, err := c.pluginsClient.DisablePlugin(ctx, r)
+	return err
 }
 
 type PluginInfo struct {

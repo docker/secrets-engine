@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -43,11 +42,17 @@ import (
 // apiDir is the directory that buf.gen.yaml makes the generator write to.
 const apiDir = "../../api"
 
+const (
+	clientModulePath = "github.com/docker/secrets-engine/client"
+	clientAPIDir     = "../../../client/api"
+)
+
 func run(t *testing.T, req *pluginpb.CodeGeneratorRequest) *pluginpb.CodeGeneratorResponse {
 	t.Helper()
-	plugin, err := protogen.Options{}.New(req)
+	opts, clientModule := options()
+	plugin, err := opts.New(req)
 	require.NoError(t, err)
-	if err := generate(plugin); err != nil {
+	if err := generate(plugin, *clientModule); err != nil {
 		plugin.Error(err)
 	}
 	return plugin.Response()
@@ -75,7 +80,27 @@ func tokens(src []byte) []string {
 // the message packages register, and compares them with the files in
 // plugin/api. Those descriptors carry no comments, so comments are left out.
 func TestCommittedStubsAreCurrent(t *testing.T) {
-	req := &pluginpb.CodeGeneratorRequest{Parameter: proto.String("paths=source_relative")}
+	compareWithCommitted(t, "paths=source_relative", apiDir)
+}
+
+func TestCommittedClientStubsAreCurrent(t *testing.T) {
+	files := compareWithCommitted(t, "paths=source_relative,client_module="+clientModulePath, clientAPIDir)
+	var names []string
+	for _, file := range files {
+		names = append(names, file.GetName())
+		assert.NotContains(t, file.GetContent(), "Handler")
+		assert.NotContains(t, file.GetContent(), "github.com/docker/secrets-engine/plugin")
+	}
+	assert.ElementsMatch(t, []string{
+		"health/v1/healthv1rpc/api.rpc.go",
+		"plugins/v1/pluginsv1rpc/management.rpc.go",
+		"resolver/v1/resolverv1rpc/api.rpc.go",
+	}, names)
+}
+
+func compareWithCommitted(t *testing.T, parameter, dir string) []*pluginpb.CodeGeneratorResponse_File {
+	t.Helper()
+	req := &pluginpb.CodeGeneratorRequest{Parameter: proto.String(parameter)}
 	seen := map[string]bool{}
 	var add func(protoreflect.FileDescriptor)
 	add = func(file protoreflect.FileDescriptor) {
@@ -102,17 +127,18 @@ func TestCommittedStubsAreCurrent(t *testing.T) {
 	generated := map[string]bool{}
 	for _, file := range resp.GetFile() {
 		generated[file.GetName()] = true
-		committed, err := os.ReadFile(filepath.Join(apiDir, file.GetName()))
+		committed, err := os.ReadFile(filepath.Join(dir, file.GetName()))
 		require.NoError(t, err)
 		assert.Equalf(t, tokens([]byte(file.GetContent())), tokens(committed), "%s is stale: run make proto-generate", file.GetName())
 	}
-	require.NoError(t, filepath.WalkDir(apiDir, func(path string, _ fs.DirEntry, err error) error {
+	require.NoError(t, filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
 		if err == nil && strings.HasSuffix(path, ".rpc.go") {
-			name, _ := filepath.Rel(apiDir, path)
+			name, _ := filepath.Rel(dir, path)
 			assert.Truef(t, generated[filepath.ToSlash(name)], "%s: this test lacks the descriptor: import the message package", name)
 		}
 		return err
 	}))
+	return resp.GetFile()
 }
 
 func TestRejectsStreamingRPCs(t *testing.T) {

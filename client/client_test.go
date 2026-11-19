@@ -38,10 +38,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	healthv1 "github.com/docker/secrets-engine/client/api/health/v1"
+	"github.com/docker/secrets-engine/client/api/health/v1/healthv1rpc"
 	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	clientconfig "github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/client/rpc"
 	"github.com/docker/secrets-engine/client/version"
 	"github.com/docker/secrets-engine/secrets"
 )
@@ -161,10 +163,10 @@ func unary[Req, Resp proto.Message](t *testing.T, method protoreflect.FullName, 
 	)
 	desc, err := protoregistry.GlobalFiles.FindDescriptorByName(method)
 	require.NoError(t, err)
-	rpc, ok := desc.(protoreflect.MethodDescriptor)
+	md, ok := desc.(protoreflect.MethodDescriptor)
 	require.True(t, ok, "%s is not an RPC method", method)
-	require.Equal(t, rpc.Input().FullName(), reqType.ProtoReflect().Descriptor().FullName())
-	require.Equal(t, rpc.Output().FullName(), respType.ProtoReflect().Descriptor().FullName())
+	require.Equal(t, md.Input().FullName(), reqType.ProtoReflect().Descriptor().FullName())
+	require.Equal(t, md.Output().FullName(), respType.ProtoReflect().Descriptor().FullName())
 
 	serve := func(r *http.Request) ([]byte, error) {
 		body, err := io.ReadAll(r.Body)
@@ -181,49 +183,49 @@ func unary[Req, Resp proto.Message](t *testing.T, method protoreflect.FullName, 
 		}
 		return proto.Marshal(resp)
 	}
-	procedure := "/" + string(rpc.Parent().FullName()) + "/" + string(rpc.Name())
+	procedure := "/" + string(md.Parent().FullName()) + "/" + string(md.Name())
 	return wrapHandler(procedure, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := serve(r)
 		if err != nil {
-			rpcErr, ok := errors.AsType[*RPCError](err)
+			rpcErr, ok := errors.AsType[*rpc.Error](err)
 			if !ok {
-				rpcErr = &RPCError{Code: CodeUnknown, Message: err.Error()}
+				rpcErr = rpc.NewError(rpc.CodeUnknown, err)
 			}
-			w.Header().Set("Content-Type", contentTypeJSON)
-			w.WriteHeader(statusFromCode(rpcErr.Code))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusFromCode(rpcErr.Code()))
 			_ = json.NewEncoder(w).Encode(struct {
-				Code    Code   `json:"code"`
-				Message string `json:"message,omitempty"`
-			}{rpcErr.Code, rpcErr.Message})
+				Code    rpc.Code `json:"code"`
+				Message string   `json:"message,omitempty"`
+			}{rpcErr.Code(), rpcErr.Message()})
 			return
 		}
-		w.Header().Set("Content-Type", contentTypeProto)
+		w.Header().Set("Content-Type", "application/proto")
 		_, _ = w.Write(data)
 	}))
 }
 
 // https://connectrpc.com/docs/protocol#error-codes
-func statusFromCode(code Code) int {
+func statusFromCode(code rpc.Code) int {
 	switch code {
-	case CodeCanceled:
+	case rpc.CodeCanceled:
 		return 499
-	case CodeInvalidArgument, CodeFailedPrecondition, CodeOutOfRange:
+	case rpc.CodeInvalidArgument, rpc.CodeFailedPrecondition, rpc.CodeOutOfRange:
 		return http.StatusBadRequest
-	case CodeUnauthenticated:
+	case rpc.CodeUnauthenticated:
 		return http.StatusUnauthorized
-	case CodePermissionDenied:
+	case rpc.CodePermissionDenied:
 		return http.StatusForbidden
-	case CodeNotFound:
+	case rpc.CodeNotFound:
 		return http.StatusNotFound
-	case CodeAlreadyExists, CodeAborted:
+	case rpc.CodeAlreadyExists, rpc.CodeAborted:
 		return http.StatusConflict
-	case CodeResourceExhausted:
+	case rpc.CodeResourceExhausted:
 		return http.StatusTooManyRequests
-	case CodeUnimplemented:
+	case rpc.CodeUnimplemented:
 		return http.StatusNotImplemented
-	case CodeUnavailable:
+	case rpc.CodeUnavailable:
 		return http.StatusServiceUnavailable
-	case CodeDeadlineExceeded:
+	case rpc.CodeDeadlineExceeded:
 		return http.StatusGatewayTimeout
 	default:
 		return http.StatusInternalServerError
@@ -359,7 +361,7 @@ func Test_EnableDisablePlugin(t *testing.T) {
 		assert.Equal(t, []string{"bar"}, m.disabled)
 	})
 	t.Run("returns the engine error", func(t *testing.T) {
-		want := &RPCError{Code: CodeNotFound, Message: `plugin "foo" not found`}
+		want := rpc.NewError(rpc.CodeNotFound, errors.New(`plugin "foo" not found`))
 		pm := start(t, &mockPluginToggle{err: want})
 		assert.Equal(t, want, pm.EnablePlugin(t.Context(), "foo"))
 		assert.Equal(t, want, pm.DisablePlugin(t.Context(), "foo"))
@@ -420,11 +422,11 @@ func Test_GetSecrets(t *testing.T) {
 		}}, got, "an envelope without a valid ID is dropped")
 	})
 	t.Run("not found", func(t *testing.T) {
-		_, err := getSecrets(t, &mockResolverService{err: &RPCError{Code: CodeNotFound, Message: secrets.ErrNotFound.Error()}})
+		_, err := getSecrets(t, &mockResolverService{err: rpc.NewError(rpc.CodeNotFound, secrets.ErrNotFound)})
 		assert.Equal(t, ErrSecretNotFound, err)
 	})
-	t.Run("returns other engine errors as RPCError", func(t *testing.T) {
-		want := &RPCError{Code: CodePermissionDenied, Message: "denied by policy"}
+	t.Run("returns other engine errors as rpc.Error", func(t *testing.T) {
+		want := rpc.NewError(rpc.CodePermissionDenied, errors.New("denied by policy"))
 		_, err := getSecrets(t, &mockResolverService{err: want})
 		assert.Equal(t, want, err)
 		assert.EqualError(t, err, "permission_denied: denied by policy")
@@ -507,7 +509,7 @@ func Test_Authorize(t *testing.T) {
 		assert.False(t, got.Allow, "a decision must be explicit to grant access")
 	})
 	t.Run("denied", func(t *testing.T) {
-		m := &mockAuthorizerService{err: &RPCError{Code: CodePermissionDenied, Message: secrets.ErrAccessDenied.Error()}}
+		m := &mockAuthorizerService{err: rpc.NewError(rpc.CodePermissionDenied, secrets.ErrAccessDenied)}
 		socket := mockAuthorizeEngine(t, m)
 		c, err := New(WithSocketPath(socket))
 		require.NoError(t, err)
@@ -563,6 +565,37 @@ func TestHubAuth(t *testing.T) {
 	assert.NotNil(t, client.HubAuth(dockerhub.Staging()))
 }
 
+func rawVersionEngine(t *testing.T, h http.HandlerFunc) Client {
+	t.Helper()
+	socketPath := randomShortSocketName()
+	muxServer(t, socketPath, []handler{wrapHandler(healthv1rpc.VersionServiceGetVersionProcedure, h)})
+	c, err := New(WithSocketPath(socketPath))
+	require.NoError(t, err)
+	return c
+}
+
+func Test_call(t *testing.T) {
+	t.Parallel()
+	t.Run("reports a dial failure without the request URL", func(t *testing.T) {
+		c, err := New(WithSocketPath(randomShortSocketName()))
+		require.NoError(t, err)
+		_, err = c.Version(t.Context())
+		require.ErrorIs(t, err, ErrSecretsEngineNotRunning)
+		assert.NotContains(t, err.Error(), baseURL)
+	})
+	t.Run("keeps context errors matchable", func(t *testing.T) {
+		c := rawVersionEngine(t, func(_ http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		})
+		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+		defer cancel()
+		_, err := c.Version(ctx)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Equal(t, rpc.CodeDeadlineExceeded, rpc.CodeOf(err))
+		assert.NotContains(t, err.Error(), baseURL)
+	})
+}
+
 func TestIsDialError(t *testing.T) {
 	require.True(t, isDialError(&net.OpError{
 		Op: "dial",
@@ -593,7 +626,7 @@ func TestConnectError(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := client{socketPath: "/run/engine.sock"}.connectError(tc.err)
+			err := connectError("/run/engine.sock", tc.err)
 			ce, ok := errors.AsType[*ConnectError](err)
 			require.True(t, ok)
 			assert.Equal(t, tc.reason, ce.Reason)
@@ -606,13 +639,13 @@ func TestConnectError(t *testing.T) {
 	}
 	t.Run("cancelled context is not an engine error", func(t *testing.T) {
 		in := &net.OpError{Op: "dial", Net: "unix", Err: context.Canceled}
-		err := client{socketPath: "/run/engine.sock"}.connectError(in)
-		assert.Same(t, in, err)
+		err := connectError("/run/engine.sock", in)
+		assert.Equal(t, rpc.NewError(rpc.CodeCanceled, in), err)
 	})
 	t.Run("message", func(t *testing.T) {
-		err := client{socketPath: "/run/engine.sock"}.connectError(dialErr(syscall.ENOENT))
+		err := connectError("/run/engine.sock", dialErr(syscall.ENOENT))
 		assert.Equal(t, "secrets engine is not running at /run/engine.sock: dial unix: connect: "+syscall.ENOENT.Error(), err.Error())
-		err = client{}.connectError(dialErr(syscall.ECONNRESET))
+		err = connectError("", dialErr(syscall.ECONNRESET))
 		assert.Equal(t, "cannot connect to the secrets engine: dial unix: connect: "+syscall.ECONNRESET.Error(), err.Error())
 	})
 }

@@ -19,68 +19,39 @@ import (
 	"errors"
 	"net/http"
 	"os"
+
+	clientrpc "github.com/docker/secrets-engine/client/rpc"
 )
 
-// Code is a Connect error code: https://connectrpc.com/docs/protocol#error-codes
-type Code string
+type Code = clientrpc.Code
 
 const (
-	CodeCanceled           Code = "canceled"
-	CodeUnknown            Code = "unknown"
-	CodeInvalidArgument    Code = "invalid_argument"
-	CodeDeadlineExceeded   Code = "deadline_exceeded"
-	CodeNotFound           Code = "not_found"
-	CodeAlreadyExists      Code = "already_exists"
-	CodePermissionDenied   Code = "permission_denied"
-	CodeResourceExhausted  Code = "resource_exhausted"
-	CodeFailedPrecondition Code = "failed_precondition"
-	CodeAborted            Code = "aborted"
-	CodeOutOfRange         Code = "out_of_range"
-	CodeUnimplemented      Code = "unimplemented"
-	CodeInternal           Code = "internal"
-	CodeUnavailable        Code = "unavailable"
-	CodeDataLoss           Code = "data_loss"
-	CodeUnauthenticated    Code = "unauthenticated"
+	CodeCanceled           = clientrpc.CodeCanceled
+	CodeUnknown            = clientrpc.CodeUnknown
+	CodeInvalidArgument    = clientrpc.CodeInvalidArgument
+	CodeDeadlineExceeded   = clientrpc.CodeDeadlineExceeded
+	CodeNotFound           = clientrpc.CodeNotFound
+	CodeAlreadyExists      = clientrpc.CodeAlreadyExists
+	CodePermissionDenied   = clientrpc.CodePermissionDenied
+	CodeResourceExhausted  = clientrpc.CodeResourceExhausted
+	CodeFailedPrecondition = clientrpc.CodeFailedPrecondition
+	CodeAborted            = clientrpc.CodeAborted
+	CodeOutOfRange         = clientrpc.CodeOutOfRange
+	CodeUnimplemented      = clientrpc.CodeUnimplemented
+	CodeInternal           = clientrpc.CodeInternal
+	CodeUnavailable        = clientrpc.CodeUnavailable
+	CodeDataLoss           = clientrpc.CodeDataLoss
+	CodeUnauthenticated    = clientrpc.CodeUnauthenticated
 )
 
-// Error is a failed call. A handler returns one to choose the code its caller
-// sees. A [Client] returns one for every call that fails.
-type Error struct {
-	code Code
-	err  error
-}
+type Error = clientrpc.Error
 
-// NewError annotates err with code.
 func NewError(code Code, err error) *Error {
-	return &Error{code: code, err: err}
+	return clientrpc.NewError(code, err)
 }
 
-func (e *Error) Code() Code { return e.code }
-
-// Message returns the text of the underlying error, without the code.
-func (e *Error) Message() string {
-	if e.err == nil {
-		return ""
-	}
-	return e.err.Error()
-}
-
-func (e *Error) Error() string {
-	if msg := e.Message(); msg != "" {
-		return string(e.code) + ": " + msg
-	}
-	return string(e.code)
-}
-
-func (e *Error) Unwrap() error { return e.err }
-
-// CodeOf returns the code of the first [Error] in err's chain, and
-// CodeUnknown if the chain holds none.
 func CodeOf(err error) Code {
-	if e, ok := errors.AsType[*Error](err); ok {
-		return e.code
-	}
-	return CodeUnknown
+	return clientrpc.CodeOf(err)
 }
 
 type wireError struct {
@@ -108,25 +79,7 @@ var statusByCode = map[Code]int{
 	CodeUnauthenticated:    http.StatusUnauthorized,
 }
 
-// https://connectrpc.com/docs/protocol#http-to-error-code
-func codeFromStatus(status int) Code {
-	switch status {
-	case http.StatusBadRequest:
-		return CodeInternal
-	case http.StatusUnauthorized:
-		return CodeUnauthenticated
-	case http.StatusForbidden:
-		return CodePermissionDenied
-	case http.StatusNotFound:
-		return CodeUnimplemented
-	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		return CodeUnavailable
-	default:
-		return CodeUnknown
-	}
-}
-
-func asError(err error, fallback Code) *Error {
+func asError(err error) *Error {
 	if e, ok := errors.AsType[*Error](err); ok {
 		return e
 	}
@@ -136,6 +89,6 @@ func asError(err error, fallback Code) *Error {
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
 		return NewError(CodeDeadlineExceeded, err)
 	default:
-		return NewError(fallback, err)
+		return NewError(CodeUnknown, err)
 	}
 }

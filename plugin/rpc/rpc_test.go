@@ -70,29 +70,12 @@ func call(ctx context.Context, server *httptest.Server, name string, opts ...rpc
 	return rpc.CallUnary[pluginsv1.RegisterPluginResponse](ctx, rpc.NewClient(server.Client(), server.URL, opts...), procedure, req)
 }
 
-func respond(status int, contentType, body string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
-		}
-		w.WriteHeader(status)
-		_, _ = w.Write([]byte(body))
-	}
-}
-
 func TestCallUnary(t *testing.T) {
 	t.Parallel()
 	t.Run("returns the response", func(t *testing.T) {
 		resp, err := call(t.Context(), serve(t, echo), "foo")
 		require.NoError(t, err)
 		assert.Equal(t, "foo", resp.GetEngineName())
-	})
-	t.Run("accepts a base URL with a trailing slash", func(t *testing.T) {
-		server := serve(t, echo)
-		client := rpc.NewClient(server.Client(), server.URL+"/")
-		resp, err := rpc.CallUnary[pluginsv1.RegisterPluginResponse](t.Context(), client, procedure, &pluginsv1.RegisterPluginRequest{})
-		require.NoError(t, err)
-		assert.Empty(t, resp.GetEngineName())
 	})
 
 	deadlineTests := []struct {
@@ -189,108 +172,6 @@ func TestCallUnary(t *testing.T) {
 			assert.Equal(t, rpc.NewError(tc.code, errors.New(tc.message)), err)
 		})
 	}
-
-	responseTests := []struct {
-		name    string
-		handler http.HandlerFunc
-		code    rpc.Code
-		message string
-	}{
-		{
-			name:    "procedure the server does not serve",
-			handler: http.NotFound,
-			code:    rpc.CodeUnimplemented,
-			message: "404 Not Found",
-		},
-		{
-			name:    "JSON error without a code",
-			handler: respond(http.StatusServiceUnavailable, "application/json; charset=utf-8", `{"message":"starting"}`),
-			code:    rpc.CodeUnavailable,
-			message: "starting",
-		},
-		{
-			name:    "JSON error with a code outside the protocol",
-			handler: respond(http.StatusTooManyRequests, "application/json", `{"code":"bogus","message":"slow down"}`),
-			code:    rpc.CodeUnavailable,
-			message: "slow down",
-		},
-		{
-			name:    "malformed JSON error",
-			handler: respond(http.StatusUnauthorized, "application/json", `{`),
-			code:    rpc.CodeUnauthenticated,
-			message: "401 Unauthorized",
-		},
-		{
-			name:    "error that is not JSON",
-			handler: respond(http.StatusForbidden, "text/plain", "denied"),
-			code:    rpc.CodePermissionDenied,
-			message: "403 Forbidden",
-		},
-		{
-			name:    "bad request",
-			handler: respond(http.StatusBadRequest, "", ""),
-			code:    rpc.CodeInternal,
-			message: "400 Bad Request",
-		},
-		{
-			name:    "other status",
-			handler: respond(http.StatusTeapot, "text/plain", "short and stout"),
-			code:    rpc.CodeUnknown,
-			message: "418 I'm a teapot",
-		},
-		{
-			name:    "response that is not protobuf",
-			handler: respond(http.StatusOK, "text/html", "<html></html>"),
-			code:    rpc.CodeUnknown,
-			message: `invalid content-type "text/html": expecting "application/proto"`,
-		},
-	}
-	for _, tc := range responseTests {
-		t.Run("server sends a "+tc.name, func(t *testing.T) {
-			_, err := call(t.Context(), serveHTTP(t, tc.handler), "foo")
-			assert.Equal(t, rpc.NewError(tc.code, errors.New(tc.message)), err)
-		})
-	}
-	t.Run("server sends a malformed message", func(t *testing.T) {
-		_, err := call(t.Context(), serveHTTP(t, respond(http.StatusOK, "application/proto", "\xff")), "foo")
-		assert.Equal(t, rpc.CodeInternal, rpc.CodeOf(err))
-		assert.ErrorContains(t, err, "unmarshal response")
-	})
-
-	t.Run("reports an unreachable server as unavailable", func(t *testing.T) {
-		server := serve(t, echo)
-		server.Close()
-		_, err := call(t.Context(), server, "foo")
-		assert.Equal(t, rpc.CodeUnavailable, rpc.CodeOf(err))
-	})
-	t.Run("keeps a context deadline matchable", func(t *testing.T) {
-		server := blockingServer(t, func() {})
-		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
-		defer cancel()
-		_, err := call(ctx, server, "foo")
-		assert.Equal(t, rpc.CodeDeadlineExceeded, rpc.CodeOf(err))
-		assert.ErrorIs(t, err, context.DeadlineExceeded)
-	})
-	t.Run("keeps a context cancellation matchable", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		_, err := call(ctx, blockingServer(t, cancel), "foo")
-		assert.Equal(t, rpc.CodeCanceled, rpc.CodeOf(err))
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-}
-
-// blockingServer serves a handler that calls onRequest and then blocks until the test ends.
-func blockingServer(t *testing.T, onRequest func()) *httptest.Server {
-	t.Helper()
-	release := make(chan struct{})
-	server := serve(t, func(context.Context, *pluginsv1.RegisterPluginRequest) (*pluginsv1.RegisterPluginResponse, error) {
-		onRequest()
-		<-release
-		return nil, errors.New("released")
-	})
-	t.Cleanup(func() { close(release) })
-	return server
 }
 
 func post(t *testing.T, server *httptest.Server, method string, header map[string]string, body []byte) (*http.Response, string) {
@@ -334,16 +215,34 @@ func TestHandler(t *testing.T) {
 		})
 	}
 
+	jsonTests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "a JSON request", contentType: "application/json", body: `{"name":"foo"}`},
+		{name: "a JSON content type with parameters", contentType: "Application/JSON; charset=utf-8", body: `{"name":"foo"}`},
+		{name: "a JSON request with an unknown field", contentType: "application/json", body: `{"name":"foo","later":true}`},
+	}
+	for _, tc := range jsonTests {
+		t.Run("answers "+tc.name+" in JSON", func(t *testing.T) {
+			resp, body := post(t, serve(t, echo), http.MethodPost, map[string]string{"Content-Type": tc.contentType}, []byte(tc.body))
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+			assert.JSONEq(t, `{"engineName":"foo"}`, body)
+		})
+	}
+
 	t.Run("rejects other methods", func(t *testing.T) {
 		resp, _ := post(t, serve(t, echo), http.MethodGet, nil, nil)
 		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 		assert.Equal(t, http.MethodPost, resp.Header.Get("Allow"))
 	})
-	for _, contentType := range []string{"", "application/json", "application/grpc"} {
+	for _, contentType := range []string{"", "text/plain", "application/grpc"} {
 		t.Run(fmt.Sprintf("rejects the content type %q", contentType), func(t *testing.T) {
 			resp, _ := post(t, serve(t, echo), http.MethodPost, map[string]string{"Content-Type": contentType}, request)
 			assert.Equal(t, http.StatusUnsupportedMediaType, resp.StatusCode)
-			assert.Equal(t, "application/proto", resp.Header.Get("Accept-Post"))
+			assert.Equal(t, "application/proto, application/json", resp.Header.Get("Accept-Post"))
 		})
 	}
 
@@ -416,6 +315,20 @@ func TestHandler(t *testing.T) {
 		resp, body := post(t, serve(t, echo), http.MethodPost, map[string]string{"Content-Type": "application/proto"}, []byte("\xff"))
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		assert.Contains(t, body, `{"code":"invalid_argument","message":"unmarshal request: `)
+	})
+	for _, body := range []string{"", `{"name":`, `{"name":1}`} {
+		t.Run(fmt.Sprintf("rejects the JSON message %q", body), func(t *testing.T) {
+			resp, got := post(t, serve(t, echo), http.MethodPost, map[string]string{"Content-Type": "application/json"}, []byte(body))
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Contains(t, got, `{"code":"invalid_argument","message":"unmarshal request: `)
+		})
+	}
+	t.Run("answers a JSON request that fails with the same error", func(t *testing.T) {
+		server := serve(t, fail(rpc.NewError(rpc.CodeNotFound, errors.New("no such plugin"))))
+		resp, body := post(t, server, http.MethodPost, map[string]string{"Content-Type": "application/json"}, []byte(`{}`))
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+		assert.JSONEq(t, `{"code":"not_found","message":"no such plugin"}`, body)
 	})
 
 	statusTests := map[rpc.Code]int{
@@ -546,21 +459,4 @@ func TestGeneratedStubs(t *testing.T) {
 	assert.Equal(t, rpc.NewError(rpc.CodeUnimplemented, errors.New("plugins.v1.RegisterService.RegisterPlugin is not implemented")), err)
 	require.Len(t, seen, 1)
 	assert.Same(t, req, seen[0])
-}
-
-func TestError(t *testing.T) {
-	t.Parallel()
-	cause := errors.New("no such plugin")
-	err := rpc.NewError(rpc.CodeNotFound, cause)
-
-	assert.Equal(t, rpc.CodeNotFound, err.Code())
-	assert.Equal(t, "no such plugin", err.Message())
-	assert.EqualError(t, err, "not_found: no such plugin")
-	assert.ErrorIs(t, err, cause)
-	assert.EqualError(t, rpc.NewError(rpc.CodeNotFound, nil), "not_found")
-
-	assert.Equal(t, rpc.CodeNotFound, rpc.CodeOf(err))
-	assert.Equal(t, rpc.CodeNotFound, rpc.CodeOf(fmt.Errorf("lookup: %w", err)))
-	assert.Equal(t, rpc.CodeUnknown, rpc.CodeOf(cause))
-	assert.Equal(t, rpc.CodeUnknown, rpc.CodeOf(nil))
 }

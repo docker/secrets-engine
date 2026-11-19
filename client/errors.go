@@ -93,44 +93,6 @@ func (e *ConnectError) Is(target error) bool {
 	return s != nil && target == s
 }
 
-// Code is a Connect error code: https://connectrpc.com/docs/protocol#error-codes
-type Code string
-
-const (
-	CodeCanceled           Code = "canceled"
-	CodeUnknown            Code = "unknown"
-	CodeInvalidArgument    Code = "invalid_argument"
-	CodeDeadlineExceeded   Code = "deadline_exceeded"
-	CodeNotFound           Code = "not_found"
-	CodeAlreadyExists      Code = "already_exists"
-	CodePermissionDenied   Code = "permission_denied"
-	CodeResourceExhausted  Code = "resource_exhausted"
-	CodeFailedPrecondition Code = "failed_precondition"
-	CodeAborted            Code = "aborted"
-	CodeOutOfRange         Code = "out_of_range"
-	CodeUnimplemented      Code = "unimplemented"
-	CodeInternal           Code = "internal"
-	CodeUnavailable        Code = "unavailable"
-	CodeDataLoss           Code = "data_loss"
-	CodeUnauthenticated    Code = "unauthenticated"
-)
-
-// RPCError is an error the secrets engine returned for a request.
-//
-// GetSecrets returns ErrSecretNotFound in place of CodeNotFound, and
-// Authorize returns ErrAccessDenied in place of CodePermissionDenied.
-type RPCError struct {
-	Code    Code
-	Message string
-}
-
-func (e *RPCError) Error() string {
-	if e.Message == "" {
-		return string(e.Code)
-	}
-	return string(e.Code) + ": " + e.Message
-}
-
 const (
 	desktopNotRunningHint    = "Start Docker Desktop and retry: the secrets engine runs as part of it."
 	desktopTimeoutHint       = "The secrets engine did not respond. Restart Docker Desktop and retry."

@@ -14,3 +14,8 @@ plugins:
     out: plugin/api
     opt:
       - paths=source_relative
+  - local: ["go", "run", "./plugin/internal/protoc-gen-go-rpc"]
+    out: client/api
+    opt:
+      - paths=source_relative
+      - client_module=github.com/docker/secrets-engine/client
