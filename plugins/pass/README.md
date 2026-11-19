@@ -78,6 +78,41 @@ $ docker pass run -e DB_PASSWORD=se://POSTGRES_PASSWORD -- ./deploy.sh
 `--env-file` files, and in `--env` flags, then starts the command with the
 resolved values. It needs the Secrets Engine daemon to be running.
 
+### Install a plugin
+
+`docker pass install` builds a Secrets Engine plugin from Go source and copies
+the binary into the engine's plugin directory:
+
+```console
+$ docker pass install github.com/docker/secrets-engine/plugins/stdinreader
+$ docker pass install github.com/docker/secrets-engine/plugins/stdinreader@v0.1.0
+$ docker pass install ./plugins/stdinreader
+```
+
+All three install the [stdinreader plugin](../stdinreader); the last builds it
+from a checkout of this repository.
+
+It needs the Go toolchain and accepts only binaries that use the
+[`plugin`](../../plugin) SDK. The file name becomes the plugin name; change it
+with `--name`. If the plugin directory is not writable, the final copy runs
+through `sudo`. The engine loads plugins at startup, so restart it afterwards.
+
+### Uninstall a plugin
+
+`docker pass uninstall` deletes plugins from the engine's plugin directory by
+file name:
+
+```console
+$ docker pass uninstall stdinreader
+```
+
+If the plugin directory is not writable, the deletion runs through `sudo`. A
+deleted plugin keeps running until the engine restarts, so restart it
+afterwards.
+
+`install` and `uninstall` exist only in builds whose engine launches plugins
+from a directory.
+
 ### Troubleshooting
 
 - **Locked keychain (Linux):** log in to the desktop session, or run
@@ -149,3 +184,7 @@ back to another store there if your application supports one.
 connect to Docker Desktop's socket by default; pass `commands.WithSocketPath`
 to use another one, and `commands.WithTimeout` or
 `commands.WithResponseTimeout` to change the timeouts.
+
+`commands.InstallCommand(pluginDir)` and `commands.UninstallCommand(pluginDir)`
+need neither the store nor the engine. Pass them the directory your engine
+launches plugins from, and add them only where that directory exists.
