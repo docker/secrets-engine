@@ -28,6 +28,7 @@ import (
 	"github.com/docker/secrets-engine/client/api/health/v1/healthv1rpc"
 	pluginsv1 "github.com/docker/secrets-engine/client/api/plugins/v1"
 	"github.com/docker/secrets-engine/client/api/plugins/v1/pluginsv1rpc"
+	"github.com/docker/secrets-engine/client/api/resolver"
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	"github.com/docker/secrets-engine/client/api/resolver/v1/resolverv1rpc"
 	clientconfig "github.com/docker/secrets-engine/client/config"
@@ -41,7 +42,7 @@ type (
 	Envelope          = secrets.Envelope
 	ID                = secrets.ID
 	Pattern           = secrets.Pattern
-	AuthorizeResponse = secrets.AuthorizeResponse
+	AuthorizeResponse = resolver.AuthorizeResponse
 	DaemonVersion     = version.DaemonVersion
 )
 
@@ -56,7 +57,7 @@ var (
 	ErrAccessDenied   = secrets.ErrAccessDenied
 )
 
-var _ secrets.Resolver = &client{}
+var _ resolver.Resolver = &client{}
 
 type Option func(c *config) error
 
@@ -137,7 +138,7 @@ type client struct {
 
 // Authorize decides access to the patterns. The decision holds until the
 // response expiry. A zero expiry means the decision never expires.
-func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (resolver.AuthorizeResponse, error) {
 	msgPatterns := make([]string, 0, len(patterns))
 	for _, p := range patterns {
 		msgPatterns = append(msgPatterns, p.String())
@@ -145,15 +146,15 @@ func (c client) Authorize(ctx context.Context, patterns ...secrets.Pattern) (sec
 	resp, err := c.authorizerClient.Authorize(ctx, resolverv1.AuthorizeRequest_builder{Patterns: msgPatterns}.Build())
 	if err != nil {
 		if rpc.CodeOf(err) == rpc.CodePermissionDenied {
-			return secrets.AuthorizeResponse{}, secrets.ErrAccessDenied
+			return resolver.AuthorizeResponse{}, secrets.ErrAccessDenied
 		}
-		return secrets.AuthorizeResponse{}, err
+		return resolver.AuthorizeResponse{}, err
 	}
 	var expiry time.Time
 	if resp.HasExpiresAt() {
 		expiry = resp.GetExpiresAt().AsTime()
 	}
-	return secrets.AuthorizeResponse{
+	return resolver.AuthorizeResponse{
 		Expiry: expiry,
 		Allow:  resp.GetDecision() == resolverv1.Decision_DECISION_ALLOW,
 	}, nil
@@ -205,8 +206,8 @@ func (c client) Version(ctx context.Context) (DaemonVersion, error) {
 
 // Client is the interface for interacting with the secrets engine daemon.
 type Client interface {
-	secrets.Resolver
-	secrets.Authorizer
+	resolver.Resolver
+	resolver.Authorizer
 
 	// Version returns the name and version reported by the daemon.
 	Version(ctx context.Context) (DaemonVersion, error)

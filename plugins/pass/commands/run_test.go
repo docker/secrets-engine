@@ -589,13 +589,13 @@ type mockEngine struct {
 	calls []string
 }
 
-func (e *mockEngine) Authorize(_ context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+func (e *mockEngine) Authorize(_ context.Context, patterns ...secrets.Pattern) (client.AuthorizeResponse, error) {
 	names := make([]string, 0, len(patterns))
 	for _, p := range patterns {
 		names = append(names, p.String())
 	}
 	e.record("authorize " + strings.Join(names, ","))
-	return secrets.AuthorizeResponse{Allow: e.allow}, nil
+	return client.AuthorizeResponse{Allow: e.allow}, nil
 }
 
 func (e *mockEngine) GetSecrets(ctx context.Context, pattern secrets.Pattern) ([]secrets.Envelope, error) {
@@ -638,8 +638,8 @@ func (p pingClient) Version(ctx context.Context) (client.DaemonVersion, error) {
 	return p.ping(ctx)
 }
 
-func (p pingClient) Authorize(context.Context, ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
-	return secrets.AuthorizeResponse{Allow: true}, nil
+func (p pingClient) Authorize(context.Context, ...secrets.Pattern) (client.AuthorizeResponse, error) {
+	return client.AuthorizeResponse{Allow: true}, nil
 }
 
 func (pingClient) HubAuth(...dockerhub.Option) dockerhub.ClientAuth {

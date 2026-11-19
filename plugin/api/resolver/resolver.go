@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	clientresolver "github.com/docker/secrets-engine/client/api/resolver"
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	"github.com/docker/secrets-engine/plugin/api/resolver/v1/resolverv1rpc"
 	"github.com/docker/secrets-engine/plugin/rpc"
@@ -32,10 +33,10 @@ import (
 var _ resolverv1rpc.ResolverServiceHandler = &resolverService{}
 
 type resolverService struct {
-	resolver secrets.Resolver
+	resolver clientresolver.Resolver
 }
 
-func NewResolverHandler(r secrets.Resolver) resolverv1rpc.ResolverServiceHandler {
+func NewResolverHandler(r clientresolver.Resolver) resolverv1rpc.ResolverServiceHandler {
 	return &resolverService{r}
 }
 
@@ -74,13 +75,13 @@ func (r resolverService) GetSecrets(ctx context.Context, req *resolverv1.GetSecr
 	}.Build(), nil
 }
 
-var _ secrets.Resolver = &resolverClient{}
+var _ clientresolver.Resolver = &resolverClient{}
 
 type resolverClient struct {
 	resolverClient resolverv1rpc.ResolverServiceClient
 }
 
-func NewResolverClient(httpClient rpc.HTTPClient) secrets.Resolver {
+func NewResolverClient(httpClient rpc.HTTPClient) clientresolver.Resolver {
 	return &resolverClient{resolverClient: resolverv1rpc.NewResolverServiceClient(httpClient, "http://unix")}
 }
 
@@ -118,13 +119,13 @@ func (r resolverClient) GetSecrets(ctx context.Context, pattern secrets.Pattern)
 var _ resolverv1rpc.AuthorizerServiceHandler = &authorizerService{}
 
 type authorizerService struct {
-	authorizer secrets.Authorizer
+	authorizer clientresolver.Authorizer
 }
 
-// NewAuthorizerHandler adapts a secrets.Authorizer to the AuthorizerService
+// NewAuthorizerHandler adapts a resolver.Authorizer to the AuthorizerService
 // handler interface. It is served by the engine, not by secrets-provider
 // plugins.
-func NewAuthorizerHandler(a secrets.Authorizer) resolverv1rpc.AuthorizerServiceHandler {
+func NewAuthorizerHandler(a clientresolver.Authorizer) resolverv1rpc.AuthorizerServiceHandler {
 	return &authorizerService{a}
 }
 
@@ -164,17 +165,17 @@ func (s authorizerService) Authorize(ctx context.Context, req *resolverv1.Author
 	}.Build(), nil
 }
 
-var _ secrets.Authorizer = &authorizerClient{}
+var _ clientresolver.Authorizer = &authorizerClient{}
 
 type authorizerClient struct {
 	client resolverv1rpc.AuthorizerServiceClient
 }
 
-func NewAuthorizerClient(httpClient rpc.HTTPClient) secrets.Authorizer {
+func NewAuthorizerClient(httpClient rpc.HTTPClient) clientresolver.Authorizer {
 	return &authorizerClient{client: resolverv1rpc.NewAuthorizerServiceClient(httpClient, "http://unix")}
 }
 
-func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pattern) (clientresolver.AuthorizeResponse, error) {
 	msgPatterns := make([]string, 0, len(patterns))
 	for _, p := range patterns {
 		msgPatterns = append(msgPatterns, p.String())
@@ -186,7 +187,7 @@ func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pat
 		if rpc.CodeOf(err) == rpc.CodePermissionDenied {
 			err = secrets.ErrAccessDenied
 		}
-		return secrets.AuthorizeResponse{}, err
+		return clientresolver.AuthorizeResponse{}, err
 	}
 
 	// An absent timestamp means the decision never expires: keep the zero time.
@@ -194,7 +195,7 @@ func (a authorizerClient) Authorize(ctx context.Context, patterns ...secrets.Pat
 	if resp.HasExpiresAt() {
 		expiry = resp.GetExpiresAt().AsTime()
 	}
-	return secrets.AuthorizeResponse{
+	return clientresolver.AuthorizeResponse{
 		Expiry: expiry,
 		Allow:  resp.GetDecision() == resolverv1.Decision_DECISION_ALLOW,
 	}, nil

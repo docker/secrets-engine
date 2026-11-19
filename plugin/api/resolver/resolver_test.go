@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	clientresolver "github.com/docker/secrets-engine/client/api/resolver"
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
 	"github.com/docker/secrets-engine/plugin/api/resolver/v1/resolverv1rpc"
 	"github.com/docker/secrets-engine/plugin/rpc"
@@ -199,11 +200,11 @@ func (m maliciousPattern) Overlaps(secrets.Pattern) bool {
 
 type mockAuthorizer struct {
 	called bool
-	resp   secrets.AuthorizeResponse
+	resp   clientresolver.AuthorizeResponse
 	err    error
 }
 
-func (m *mockAuthorizer) Authorize(context.Context, ...secrets.Pattern) (secrets.AuthorizeResponse, error) {
+func (m *mockAuthorizer) Authorize(context.Context, ...secrets.Pattern) (clientresolver.AuthorizeResponse, error) {
 	m.called = true
 	return m.resp, m.err
 }
@@ -223,7 +224,7 @@ func TestAuthorizerService_Authorize(t *testing.T) {
 
 	t.Run("returns decision and expiry", func(t *testing.T) {
 		expiry := time.Now().Add(time.Hour).UTC()
-		s := NewAuthorizerHandler(&mockAuthorizer{resp: secrets.AuthorizeResponse{Expiry: expiry, Allow: true}})
+		s := NewAuthorizerHandler(&mockAuthorizer{resp: clientresolver.AuthorizeResponse{Expiry: expiry, Allow: true}})
 		resp, err := s.Authorize(t.Context(), resolverv1.AuthorizeRequest_builder{
 			Patterns: []string{"docker/auth/hub/joe"},
 		}.Build())
@@ -233,7 +234,7 @@ func TestAuthorizerService_Authorize(t *testing.T) {
 	})
 
 	t.Run("omits the expiry when the decision never expires", func(t *testing.T) {
-		s := NewAuthorizerHandler(&mockAuthorizer{resp: secrets.AuthorizeResponse{Allow: true}})
+		s := NewAuthorizerHandler(&mockAuthorizer{resp: clientresolver.AuthorizeResponse{Allow: true}})
 		resp, err := s.Authorize(t.Context(), resolverv1.AuthorizeRequest_builder{
 			Patterns: []string{"docker/auth/hub/joe"},
 		}.Build())
