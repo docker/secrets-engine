@@ -14,4 +14,4 @@ blocked:
     - github.com/docker/secrets-engine/x:
         reason: "Forbidden dependency"
     - connectrpc.com/connect:
-        reason: "The client speaks the Connect protocol itself: see rpc.go"
+        reason: "Forbidden dependency"

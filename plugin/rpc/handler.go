@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -78,21 +79,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); contentType != contentTypeProto {
-		w.Header().Set("Accept-Post", contentTypeProto)
+	contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if contentType != contentTypeProto && contentType != contentTypeJSON {
+		w.Header().Set("Accept-Post", contentTypeProto+", "+contentTypeJSON)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
-	body, err := h.serve(r)
+	body, err := h.serve(r, contentType)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", contentTypeProto)
+	w.Header().Set("Content-Type", contentType)
 	_, _ = w.Write(body)
 }
 
-func (h *Handler) serve(r *http.Request) ([]byte, error) {
+func (h *Handler) serve(r *http.Request, contentType string) ([]byte, error) {
 	if version := r.Header.Get(headerProtocolVersion); version != "" && version != protocolVersion {
 		return nil, NewError(CodeInvalidArgument, fmt.Errorf("%s must be %q: got %q", headerProtocolVersion, protocolVersion, version))
 	}
@@ -114,23 +116,37 @@ func (h *Handler) serve(r *http.Request) ([]byte, error) {
 		return nil, NewError(CodeUnknown, fmt.Errorf("read request: %w", err))
 	}
 	req := h.newRequest()
-	if err := proto.Unmarshal(body, req); err != nil {
+	if err := unmarshal(contentType, body, req); err != nil {
 		return nil, NewError(CodeInvalidArgument, fmt.Errorf("unmarshal request: %w", err))
 	}
 	res, err := h.unary(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	data, err := proto.Marshal(res)
+	data, err := marshal(contentType, res)
 	if err != nil {
 		return nil, NewError(CodeInternal, fmt.Errorf("marshal response: %w", err))
 	}
 	return data, nil
 }
 
+func unmarshal(contentType string, data []byte, msg proto.Message) error {
+	if contentType == contentTypeJSON {
+		return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(data, msg)
+	}
+	return proto.Unmarshal(data, msg)
+}
+
+func marshal(contentType string, msg proto.Message) ([]byte, error) {
+	if contentType == contentTypeJSON {
+		return protojson.Marshal(msg)
+	}
+	return proto.Marshal(msg)
+}
+
 func writeError(w http.ResponseWriter, err error) {
-	e := asError(err, CodeUnknown)
-	wire := wireError{Code: e.code, Message: e.Message()}
+	e := asError(err)
+	wire := wireError{Code: e.Code(), Message: e.Message()}
 	status, ok := statusByCode[wire.Code]
 	if !ok {
 		wire.Code, status = CodeUnknown, http.StatusInternalServerError

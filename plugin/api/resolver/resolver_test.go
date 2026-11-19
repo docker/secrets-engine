@@ -16,7 +16,11 @@ package resolver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	resolverv1 "github.com/docker/secrets-engine/client/api/resolver/v1"
+	"github.com/docker/secrets-engine/plugin/api/resolver/v1/resolverv1rpc"
 	"github.com/docker/secrets-engine/plugin/rpc"
 	"github.com/docker/secrets-engine/secrets"
 )
@@ -146,6 +151,36 @@ func TestResolverService_GetSecret(t *testing.T) {
 			tt.test(t)
 		})
 	}
+}
+
+func TestResolverService_ServesJSON(t *testing.T) {
+	t.Parallel()
+	mux := http.NewServeMux()
+	mux.Handle(resolverv1rpc.NewResolverServiceHandler(NewResolverHandler(newMockResolver(t))))
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL+resolverv1rpc.ResolverServiceGetSecretsProcedure, strings.NewReader(`{"pattern": "**"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := server.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	var got struct {
+		Envelopes []struct {
+			ID       string            `json:"id"`
+			Value    []byte            `json:"value"`
+			Metadata map[string]string `json:"metadata"`
+		} `json:"envelopes"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+	require.Len(t, got.Envelopes, 1)
+	assert.Equal(t, mockID.String(), got.Envelopes[0].ID)
+	assert.Equal(t, mockSecretValue, string(got.Envelopes[0].Value))
+	assert.Equal(t, mockMetadata, got.Envelopes[0].Metadata)
 }
 
 type maliciousPattern struct{}
