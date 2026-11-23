@@ -100,9 +100,6 @@ func TestFlock(t *testing.T) {
 	})
 
 	t.Run("can recover from an exclusive lock", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("recovery from an exclusive lock is not supported on Windows yet")
-		}
 		root, err := os.OpenRoot(t.TempDir())
 		require.NoError(t, err)
 		t.Cleanup(func() {
@@ -110,8 +107,11 @@ func TestFlock(t *testing.T) {
 		})
 
 		exclusive := true
-		_, err = tryLock(t.Context(), root, exclusive)
+		stuck, err := tryLock(t.Context(), root, exclusive)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = stuck()
+		})
 
 		// change the lock file modification time
 		fakeModTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
