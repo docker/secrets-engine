@@ -13,7 +13,7 @@ replace github.com/docker/secrets-engine/client => ../../client
 
 require (
 	github.com/docker/docker-credential-helpers v0.9.4
-	github.com/docker/secrets-engine/plugin v0.4.0
+	github.com/docker/secrets-engine/plugin v0.4.1
 	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/stretchr/testify v1.11.1
 )
