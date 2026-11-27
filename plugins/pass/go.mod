@@ -13,7 +13,7 @@ replace github.com/docker/secrets-engine/secrets => ./../../secrets
 require (
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/docker/secrets-engine/client v1.0.0
-	github.com/docker/secrets-engine/plugin v0.4.1
+	github.com/docker/secrets-engine/plugin v0.4.2
 	github.com/docker/secrets-engine/secrets v1.0.0
 	github.com/docker/secrets-engine/store v1.0.0
 	github.com/joho/godotenv v1.5.1
