@@ -26,15 +26,16 @@ func TestSigningInfoRoundTrip(t *testing.T) {
 
 	si := SigningInfo{
 		Root: &SigningIdentity{
-			SigningInfoBase: SigningInfoBase{SignedByDocker: true},
-			TeamID:          "9BNSXJN65R",
-			Identifier:      "com.docker.docker",
-			Organization:    "Docker Inc",
-			BundleName:      "Docker Desktop",
-			CommonName:      "Developer ID Application: Docker Inc (9BNSXJN65R)",
-			CDHash:          "aabbcc",
-			Status:          StatusValid | StatusHard,
-			Anchor:          AnchorAppleGeneric,
+			SigningInfoBase:   SigningInfoBase{SignedByDocker: true},
+			TeamID:            "9BNSXJN65R",
+			Identifier:        "com.docker.docker",
+			Organization:      "Docker Inc",
+			BundleName:        "Docker Desktop",
+			CommonName:        "Developer ID Application: Docker Inc (9BNSXJN65R)",
+			FingerprintSHA256: "deadbeef",
+			CDHash:            "aabbcc",
+			Status:            StatusValid | StatusHard,
+			Anchor:            AnchorAppleGeneric,
 		},
 		Leaf: &SigningIdentity{
 			TeamID:     "24VZTF6M5V",

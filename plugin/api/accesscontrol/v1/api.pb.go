@@ -1447,20 +1447,21 @@ func (b0 CheckAccessResponse_builder) Build() *CheckAccessResponse {
 
 // Verified code-signing identity of one process.
 type DarwinSigningInfo_SigningIdentity struct {
-	state                     protoimpl.MessageState   `protogen:"opaque.v1"`
-	xxx_hidden_TeamId         *string                  `protobuf:"bytes,1,opt,name=team_id,json=teamId"`
-	xxx_hidden_Identifier     *string                  `protobuf:"bytes,2,opt,name=identifier"`
-	xxx_hidden_Organization   *string                  `protobuf:"bytes,3,opt,name=organization"`
-	xxx_hidden_CommonName     *string                  `protobuf:"bytes,4,opt,name=common_name,json=commonName"`
-	xxx_hidden_CdHash         *string                  `protobuf:"bytes,5,opt,name=cd_hash,json=cdHash"`
-	xxx_hidden_Status         uint32                   `protobuf:"varint,6,opt,name=status"`
-	xxx_hidden_Anchor         DarwinSigningInfo_Anchor `protobuf:"varint,7,opt,name=anchor,enum=accesscontrol.v1.DarwinSigningInfo_Anchor"`
-	xxx_hidden_SignedByDocker bool                     `protobuf:"varint,8,opt,name=signed_by_docker,json=signedByDocker"`
-	xxx_hidden_BundleName     *string                  `protobuf:"bytes,9,opt,name=bundle_name,json=bundleName"`
-	XXX_raceDetectHookData    protoimpl.RaceDetectHookData
-	XXX_presence              [1]uint32
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                        protoimpl.MessageState   `protogen:"opaque.v1"`
+	xxx_hidden_TeamId            *string                  `protobuf:"bytes,1,opt,name=team_id,json=teamId"`
+	xxx_hidden_Identifier        *string                  `protobuf:"bytes,2,opt,name=identifier"`
+	xxx_hidden_Organization      *string                  `protobuf:"bytes,3,opt,name=organization"`
+	xxx_hidden_CommonName        *string                  `protobuf:"bytes,4,opt,name=common_name,json=commonName"`
+	xxx_hidden_CdHash            *string                  `protobuf:"bytes,5,opt,name=cd_hash,json=cdHash"`
+	xxx_hidden_Status            uint32                   `protobuf:"varint,6,opt,name=status"`
+	xxx_hidden_Anchor            DarwinSigningInfo_Anchor `protobuf:"varint,7,opt,name=anchor,enum=accesscontrol.v1.DarwinSigningInfo_Anchor"`
+	xxx_hidden_SignedByDocker    bool                     `protobuf:"varint,8,opt,name=signed_by_docker,json=signedByDocker"`
+	xxx_hidden_BundleName        *string                  `protobuf:"bytes,9,opt,name=bundle_name,json=bundleName"`
+	xxx_hidden_FingerprintSha256 *string                  `protobuf:"bytes,10,opt,name=fingerprint_sha256,json=fingerprintSha256"`
+	XXX_raceDetectHookData       protoimpl.RaceDetectHookData
+	XXX_presence                 [1]uint32
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) Reset() {
@@ -1571,49 +1572,64 @@ func (x *DarwinSigningInfo_SigningIdentity) GetBundleName() string {
 	return ""
 }
 
+func (x *DarwinSigningInfo_SigningIdentity) GetFingerprintSha256() string {
+	if x != nil {
+		if x.xxx_hidden_FingerprintSha256 != nil {
+			return *x.xxx_hidden_FingerprintSha256
+		}
+		return ""
+	}
+	return ""
+}
+
 func (x *DarwinSigningInfo_SigningIdentity) SetTeamId(v string) {
 	x.xxx_hidden_TeamId = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetIdentifier(v string) {
 	x.xxx_hidden_Identifier = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetOrganization(v string) {
 	x.xxx_hidden_Organization = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetCommonName(v string) {
 	x.xxx_hidden_CommonName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetCdHash(v string) {
 	x.xxx_hidden_CdHash = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetStatus(v uint32) {
 	x.xxx_hidden_Status = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetAnchor(v DarwinSigningInfo_Anchor) {
 	x.xxx_hidden_Anchor = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 6, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 6, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetSignedByDocker(v bool) {
 	x.xxx_hidden_SignedByDocker = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 7, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 7, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) SetBundleName(v string) {
 	x.xxx_hidden_BundleName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 8, 9)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 8, 10)
+}
+
+func (x *DarwinSigningInfo_SigningIdentity) SetFingerprintSha256(v string) {
+	x.xxx_hidden_FingerprintSha256 = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 9, 10)
 }
 
 func (x *DarwinSigningInfo_SigningIdentity) HasTeamId() bool {
@@ -1679,6 +1695,13 @@ func (x *DarwinSigningInfo_SigningIdentity) HasBundleName() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 8)
 }
 
+func (x *DarwinSigningInfo_SigningIdentity) HasFingerprintSha256() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 9)
+}
+
 func (x *DarwinSigningInfo_SigningIdentity) ClearTeamId() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_TeamId = nil
@@ -1724,6 +1747,11 @@ func (x *DarwinSigningInfo_SigningIdentity) ClearBundleName() {
 	x.xxx_hidden_BundleName = nil
 }
 
+func (x *DarwinSigningInfo_SigningIdentity) ClearFingerprintSha256() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 9)
+	x.xxx_hidden_FingerprintSha256 = nil
+}
+
 type DarwinSigningInfo_SigningIdentity_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
@@ -1756,6 +1784,8 @@ type DarwinSigningInfo_SigningIdentity_builder struct {
 	// App name from Info.plist (CFBundleDisplayName or CFBundleName);
 	// display only.
 	BundleName *string
+	// The hex-encoded SHA-256 hash of the leaf certificate's DER encoding.
+	FingerprintSha256 *string
 }
 
 func (b0 DarwinSigningInfo_SigningIdentity_builder) Build() *DarwinSigningInfo_SigningIdentity {
@@ -1763,40 +1793,44 @@ func (b0 DarwinSigningInfo_SigningIdentity_builder) Build() *DarwinSigningInfo_S
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.TeamId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 10)
 		x.xxx_hidden_TeamId = b.TeamId
 	}
 	if b.Identifier != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 10)
 		x.xxx_hidden_Identifier = b.Identifier
 	}
 	if b.Organization != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 10)
 		x.xxx_hidden_Organization = b.Organization
 	}
 	if b.CommonName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 10)
 		x.xxx_hidden_CommonName = b.CommonName
 	}
 	if b.CdHash != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 10)
 		x.xxx_hidden_CdHash = b.CdHash
 	}
 	if b.Status != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 10)
 		x.xxx_hidden_Status = *b.Status
 	}
 	if b.Anchor != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 6, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 6, 10)
 		x.xxx_hidden_Anchor = *b.Anchor
 	}
 	if b.SignedByDocker != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 7, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 7, 10)
 		x.xxx_hidden_SignedByDocker = *b.SignedByDocker
 	}
 	if b.BundleName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 8, 9)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 8, 10)
 		x.xxx_hidden_BundleName = b.BundleName
+	}
+	if b.FingerprintSha256 != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 9, 10)
+		x.xxx_hidden_FingerprintSha256 = b.FingerprintSha256
 	}
 	return m0
 }
@@ -2479,11 +2513,11 @@ const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\x06darwin\x18\x05 \x01(\v2#.accesscontrol.v1.DarwinSigningInfoH\x00R\x06darwin\x12@\n" +
 	"\awindows\x18\x06 \x01(\v2$.accesscontrol.v1.WindowsSigningInfoH\x00R\awindows\x12:\n" +
 	"\x05linux\x18\a \x01(\v2\".accesscontrol.v1.LinuxSigningInfoH\x00R\x05linuxB\x0e\n" +
-	"\fsigning_info\"\x84\a\n" +
+	"\fsigning_info\"\xb3\a\n" +
 	"\x11DarwinSigningInfo\x12G\n" +
 	"\x04root\x18\x01 \x01(\v23.accesscontrol.v1.DarwinSigningInfo.SigningIdentityR\x04root\x12G\n" +
 	"\x04leaf\x18\x02 \x01(\v23.accesscontrol.v1.DarwinSigningInfo.SigningIdentityR\x04leaf\x12E\n" +
-	"\x05chain\x18\x03 \x03(\v2/.accesscontrol.v1.DarwinSigningInfo.ProcessNodeR\x05chain\x1a\xcf\x02\n" +
+	"\x05chain\x18\x03 \x03(\v2/.accesscontrol.v1.DarwinSigningInfo.ProcessNodeR\x05chain\x1a\xfe\x02\n" +
 	"\x0fSigningIdentity\x12\x17\n" +
 	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12\x1e\n" +
 	"\n" +
@@ -2497,7 +2531,9 @@ const file_accesscontrol_v1_api_proto_rawDesc = "" +
 	"\x06anchor\x18\a \x01(\x0e2*.accesscontrol.v1.DarwinSigningInfo.AnchorR\x06anchor\x12(\n" +
 	"\x10signed_by_docker\x18\b \x01(\bR\x0esignedByDocker\x12\x1f\n" +
 	"\vbundle_name\x18\t \x01(\tR\n" +
-	"bundleName\x1a\xce\x01\n" +
+	"bundleName\x12-\n" +
+	"\x12fingerprint_sha256\x18\n" +
+	" \x01(\tR\x11fingerprintSha256\x1a\xce\x01\n" +
 	"\vProcessNode\x12\x10\n" +
 	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x14\n" +
 	"\x05start\x18\x02 \x01(\x03R\x05start\x12\x10\n" +

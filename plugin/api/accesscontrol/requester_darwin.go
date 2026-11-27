@@ -51,15 +51,16 @@ func signingIdentityToProto(id *SigningIdentity) *accesscontrolv1.DarwinSigningI
 		return nil
 	}
 	return accesscontrolv1.DarwinSigningInfo_SigningIdentity_builder{
-		SignedByDocker: proto.Bool(id.SignedByDocker),
-		TeamId:         proto.String(id.TeamID),
-		Identifier:     proto.String(id.Identifier),
-		Organization:   proto.String(id.Organization),
-		BundleName:     proto.String(id.BundleName),
-		CommonName:     proto.String(id.CommonName),
-		CdHash:         proto.String(id.CDHash),
-		Status:         proto.Uint32(uint32(id.Status)),
-		Anchor:         anchorToProto(id.Anchor),
+		SignedByDocker:    proto.Bool(id.SignedByDocker),
+		TeamId:            proto.String(id.TeamID),
+		Identifier:        proto.String(id.Identifier),
+		Organization:      proto.String(id.Organization),
+		BundleName:        proto.String(id.BundleName),
+		CommonName:        proto.String(id.CommonName),
+		FingerprintSha256: proto.String(id.FingerprintSHA256),
+		CdHash:            proto.String(id.CDHash),
+		Status:            proto.Uint32(uint32(id.Status)),
+		Anchor:            anchorToProto(id.Anchor),
 	}.Build()
 }
 

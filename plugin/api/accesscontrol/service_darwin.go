@@ -51,15 +51,16 @@ func signingIdentityFromProto(p *accesscontrolv1.DarwinSigningInfo_SigningIdenti
 		return nil
 	}
 	return &SigningIdentity{
-		SigningInfoBase: SigningInfoBase{SignedByDocker: p.GetSignedByDocker()},
-		TeamID:          p.GetTeamId(),
-		Identifier:      p.GetIdentifier(),
-		Organization:    p.GetOrganization(),
-		BundleName:      p.GetBundleName(),
-		CommonName:      p.GetCommonName(),
-		CDHash:          p.GetCdHash(),
-		Status:          CodeStatus(p.GetStatus()),
-		Anchor:          anchorFromProto(p.GetAnchor()),
+		SigningInfoBase:   SigningInfoBase{SignedByDocker: p.GetSignedByDocker()},
+		TeamID:            p.GetTeamId(),
+		Identifier:        p.GetIdentifier(),
+		Organization:      p.GetOrganization(),
+		BundleName:        p.GetBundleName(),
+		CommonName:        p.GetCommonName(),
+		FingerprintSHA256: p.GetFingerprintSha256(),
+		CDHash:            p.GetCdHash(),
+		Status:            CodeStatus(p.GetStatus()),
+		Anchor:            anchorFromProto(p.GetAnchor()),
 	}
 }
 
