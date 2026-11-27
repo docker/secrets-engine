@@ -123,6 +123,8 @@ message DarwinSigningInfo {
     // App name from Info.plist (CFBundleDisplayName or CFBundleName);
     // display only.
     string bundle_name = 9;
+    // The hex-encoded SHA-256 hash of the leaf certificate's DER encoding.
+    string fingerprint_sha256 = 10;
   }
 
   // One process in the ancestry chain.

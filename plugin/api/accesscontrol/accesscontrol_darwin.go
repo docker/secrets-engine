@@ -73,6 +73,10 @@ type SigningIdentity struct {
 	// name and TeamID as embedded display text.
 	CommonName string
 
+	// FingerprintSHA256 is the hex-encoded SHA-256 hash of the leaf
+	// certificate's DER encoding.
+	FingerprintSHA256 string
+
 	// CDHash is the code directory hash (kSecCodeInfoUnique), the exact identity
 	// of this specific binary build, hex-encoded. Use to pin an exact build.
 	CDHash string
